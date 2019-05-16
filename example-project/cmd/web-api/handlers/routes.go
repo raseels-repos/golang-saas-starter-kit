@@ -37,15 +37,15 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *db.DB, authenticato
 	// This route is not authenticated
 	app.Handle("GET", "/v1/users/token", u.Token)
 
-	// Register product and sale endpoints.
-	p := Product{
+	// Register project and sale endpoints.
+	p := Project{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/products", p.List, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/products", p.Create, mid.Authenticate(authenticator))
-	app.Handle("GET", "/v1/products/:id", p.Retrieve, mid.Authenticate(authenticator))
-	app.Handle("PUT", "/v1/products/:id", p.Update, mid.Authenticate(authenticator))
-	app.Handle("DELETE", "/v1/products/:id", p.Delete, mid.Authenticate(authenticator))
+	app.Handle("GET", "/v1/projects", p.List, mid.Authenticate(authenticator))
+	app.Handle("POST", "/v1/projects", p.Create, mid.Authenticate(authenticator))
+	app.Handle("GET", "/v1/projects/:id", p.Retrieve, mid.Authenticate(authenticator))
+	app.Handle("PUT", "/v1/projects/:id", p.Update, mid.Authenticate(authenticator))
+	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator))
 
 	return app
 }

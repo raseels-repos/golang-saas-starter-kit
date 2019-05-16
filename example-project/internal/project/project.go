@@ -1,4 +1,4 @@
-package product
+package project
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-const productsCollection = "products"
+const projectsCollection = "projects"
 
 var (
 	// ErrNotFound abstracts the mgo not found error.
@@ -22,26 +22,26 @@ var (
 	ErrInvalidID = errors.New("ID is not in its proper form")
 )
 
-// List retrieves a list of existing products from the database.
-func List(ctx context.Context, dbConn *db.DB) ([]Product, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.product.List")
+// List retrieves a list of existing projects from the database.
+func List(ctx context.Context, dbConn *db.DB) ([]Project, error) {
+	ctx, span := trace.StartSpan(ctx, "internal.project.List")
 	defer span.End()
 
-	p := []Product{}
+	p := []Project{}
 
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(nil).All(&p)
 	}
-	if err := dbConn.Execute(ctx, productsCollection, f); err != nil {
-		return nil, errors.Wrap(err, "db.products.find()")
+	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+		return nil, errors.Wrap(err, "db.projects.find()")
 	}
 
 	return p, nil
 }
 
-// Retrieve gets the specified product from the database.
-func Retrieve(ctx context.Context, dbConn *db.DB, id string) (*Product, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.product.Retrieve")
+// Retrieve gets the specified project from the database.
+func Retrieve(ctx context.Context, dbConn *db.DB, id string) (*Project, error) {
+	ctx, span := trace.StartSpan(ctx, "internal.project.Retrieve")
 	defer span.End()
 
 	if !bson.IsObjectIdHex(id) {
@@ -50,30 +50,30 @@ func Retrieve(ctx context.Context, dbConn *db.DB, id string) (*Product, error) {
 
 	q := bson.M{"_id": bson.ObjectIdHex(id)}
 
-	var p *Product
+	var p *Project
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(q).One(&p)
 	}
-	if err := dbConn.Execute(ctx, productsCollection, f); err != nil {
+	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("db.products.find(%s)", db.Query(q)))
+		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.find(%s)", db.Query(q)))
 	}
 
 	return p, nil
 }
 
-// Create inserts a new product into the database.
-func Create(ctx context.Context, dbConn *db.DB, cp *NewProduct, now time.Time) (*Product, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.product.Create")
+// Create inserts a new project into the database.
+func Create(ctx context.Context, dbConn *db.DB, cp *NewProject, now time.Time) (*Project, error) {
+	ctx, span := trace.StartSpan(ctx, "internal.project.Create")
 	defer span.End()
 
 	// Mongo truncates times to milliseconds when storing. We and do the same
 	// here so the value we return is consistent with what we store.
 	now = now.Truncate(time.Millisecond)
 
-	p := Product{
+	p := Project{
 		ID:           bson.NewObjectId(),
 		Name:         cp.Name,
 		Cost:         cp.Cost,
@@ -85,16 +85,16 @@ func Create(ctx context.Context, dbConn *db.DB, cp *NewProduct, now time.Time) (
 	f := func(collection *mgo.Collection) error {
 		return collection.Insert(&p)
 	}
-	if err := dbConn.Execute(ctx, productsCollection, f); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("db.products.insert(%s)", db.Query(&p)))
+	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.insert(%s)", db.Query(&p)))
 	}
 
 	return &p, nil
 }
 
-// Update replaces a product document in the database.
-func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProduct, now time.Time) error {
-	ctx, span := trace.StartSpan(ctx, "internal.product.Update")
+// Update replaces a project document in the database.
+func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProject, now time.Time) error {
+	ctx, span := trace.StartSpan(ctx, "internal.project.Update")
 	defer span.End()
 
 	if !bson.IsObjectIdHex(id) {
@@ -126,7 +126,7 @@ func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProduct, no
 	f := func(collection *mgo.Collection) error {
 		return collection.Update(q, m)
 	}
-	if err := dbConn.Execute(ctx, productsCollection, f); err != nil {
+	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}
@@ -136,9 +136,9 @@ func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProduct, no
 	return nil
 }
 
-// Delete removes a product from the database.
+// Delete removes a project from the database.
 func Delete(ctx context.Context, dbConn *db.DB, id string) error {
-	ctx, span := trace.StartSpan(ctx, "internal.product.Delete")
+	ctx, span := trace.StartSpan(ctx, "internal.project.Delete")
 	defer span.End()
 
 	if !bson.IsObjectIdHex(id) {
@@ -150,11 +150,11 @@ func Delete(ctx context.Context, dbConn *db.DB, id string) error {
 	f := func(collection *mgo.Collection) error {
 		return collection.Remove(q)
 	}
-	if err := dbConn.Execute(ctx, productsCollection, f); err != nil {
+	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}
-		return errors.Wrap(err, fmt.Sprintf("db.products.remove(%v)", q))
+		return errors.Wrap(err, fmt.Sprintf("db.projects.remove(%v)", q))
 	}
 
 	return nil

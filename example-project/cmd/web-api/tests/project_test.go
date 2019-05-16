@@ -10,38 +10,38 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/product"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/project"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gopkg.in/mgo.v2/bson"
 )
 
-// TestProducts is the entry point for the products
-func TestProducts(t *testing.T) {
+// TestProjects is the entry point for the projects
+func TestProjects(t *testing.T) {
 	defer tests.Recover(t)
 
-	t.Run("getProducts200Empty", getProducts200Empty)
-	t.Run("postProduct400", postProduct400)
-	t.Run("postProduct401", postProduct401)
-	t.Run("getProduct404", getProduct404)
-	t.Run("getProduct400", getProduct400)
-	t.Run("deleteProduct404", deleteProduct404)
-	t.Run("putProduct404", putProduct404)
-	t.Run("crudProducts", crudProduct)
+	t.Run("getProjects200Empty", getProjects200Empty)
+	t.Run("postProject400", postProject400)
+	t.Run("postProject401", postProject401)
+	t.Run("getProject404", getProject404)
+	t.Run("getProject400", getProject400)
+	t.Run("deleteProject404", deleteProject404)
+	t.Run("putProject404", putProject404)
+	t.Run("crudProjects", crudProject)
 }
 
-// getProducts200Empty validates an empty products list can be retrieved with the endpoint.
-func getProducts200Empty(t *testing.T) {
-	r := httptest.NewRequest("GET", "/v1/products", nil)
+// getProjects200Empty validates an empty projects list can be retrieved with the endpoint.
+func getProjects200Empty(t *testing.T) {
+	r := httptest.NewRequest("GET", "/v1/projects", nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to fetch an empty list of products with the products endpoint.")
+	t.Log("Given the need to fetch an empty list of projects with the projects endpoint.")
 	{
-		t.Log("\tTest 0:\tWhen fetching an empty product list.")
+		t.Log("\tTest 0:\tWhen fetching an empty project list.")
 		{
 			if w.Code != http.StatusOK {
 				t.Fatalf("\t%s\tShould receive a status code of 200 for the response : %v", tests.Failed, w.Code)
@@ -60,19 +60,19 @@ func getProducts200Empty(t *testing.T) {
 	}
 }
 
-// postProduct400 validates a product can't be created with the endpoint
-// unless a valid product document is submitted.
-func postProduct400(t *testing.T) {
-	r := httptest.NewRequest("POST", "/v1/products", strings.NewReader(`{}`))
+// postProject400 validates a project can't be created with the endpoint
+// unless a valid project document is submitted.
+func postProject400(t *testing.T) {
+	r := httptest.NewRequest("POST", "/v1/projects", strings.NewReader(`{}`))
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate a new product can't be created with an invalid document.")
+	t.Log("Given the need to validate a new project can't be created with an invalid document.")
 	{
-		t.Log("\tTest 0:\tWhen using an incomplete product value.")
+		t.Log("\tTest 0:\tWhen using an incomplete project value.")
 		{
 			if w.Code != http.StatusBadRequest {
 				t.Fatalf("\t%s\tShould receive a status code of 400 for the response : %v", tests.Failed, w.Code)
@@ -110,10 +110,10 @@ func postProduct400(t *testing.T) {
 	}
 }
 
-// postProduct401 validates a product can't be created with the endpoint
+// postProject401 validates a project can't be created with the endpoint
 // unless the user is authenticated
-func postProduct401(t *testing.T) {
-	np := product.NewProduct{
+func postProject401(t *testing.T) {
+	np := project.NewProject{
 		Name:     "Comic Books",
 		Cost:     25,
 		Quantity: 60,
@@ -124,16 +124,16 @@ func postProduct401(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := httptest.NewRequest("POST", "/v1/products", bytes.NewBuffer(body))
+	r := httptest.NewRequest("POST", "/v1/projects", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
 	// Not setting an authorization header
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate a new product can't be created with an invalid document.")
+	t.Log("Given the need to validate a new project can't be created with an invalid document.")
 	{
-		t.Log("\tTest 0:\tWhen using an incomplete product value.")
+		t.Log("\tTest 0:\tWhen using an incomplete project value.")
 		{
 			if w.Code != http.StatusUnauthorized {
 				t.Fatalf("\t%s\tShould receive a status code of 401 for the response : %v", tests.Failed, w.Code)
@@ -143,20 +143,20 @@ func postProduct401(t *testing.T) {
 	}
 }
 
-// getProduct400 validates a product request for a malformed id.
-func getProduct400(t *testing.T) {
+// getProject400 validates a project request for a malformed id.
+func getProject400(t *testing.T) {
 	id := "12345"
 
-	r := httptest.NewRequest("GET", "/v1/products/"+id, nil)
+	r := httptest.NewRequest("GET", "/v1/projects/"+id, nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate getting a product with a malformed id.")
+	t.Log("Given the need to validate getting a project with a malformed id.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusBadRequest {
 				t.Fatalf("\t%s\tShould receive a status code of 400 for the response : %v", tests.Failed, w.Code)
@@ -175,20 +175,20 @@ func getProduct400(t *testing.T) {
 	}
 }
 
-// getProduct404 validates a product request for a product that does not exist with the endpoint.
-func getProduct404(t *testing.T) {
+// getProject404 validates a project request for a project that does not exist with the endpoint.
+func getProject404(t *testing.T) {
 	id := bson.NewObjectId().Hex()
 
-	r := httptest.NewRequest("GET", "/v1/products/"+id, nil)
+	r := httptest.NewRequest("GET", "/v1/projects/"+id, nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate getting a product with an unknown id.")
+	t.Log("Given the need to validate getting a project with an unknown id.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusNotFound {
 				t.Fatalf("\t%s\tShould receive a status code of 404 for the response : %v", tests.Failed, w.Code)
@@ -207,20 +207,20 @@ func getProduct404(t *testing.T) {
 	}
 }
 
-// deleteProduct404 validates deleting a product that does not exist.
-func deleteProduct404(t *testing.T) {
+// deleteProject404 validates deleting a project that does not exist.
+func deleteProject404(t *testing.T) {
 	id := bson.NewObjectId().Hex()
 
-	r := httptest.NewRequest("DELETE", "/v1/products/"+id, nil)
+	r := httptest.NewRequest("DELETE", "/v1/projects/"+id, nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate deleting a product that does not exist.")
+	t.Log("Given the need to validate deleting a project that does not exist.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusNotFound {
 				t.Fatalf("\t%s\tShould receive a status code of 404 for the response : %v", tests.Failed, w.Code)
@@ -239,9 +239,9 @@ func deleteProduct404(t *testing.T) {
 	}
 }
 
-// putProduct404 validates updating a product that does not exist.
-func putProduct404(t *testing.T) {
-	up := product.UpdateProduct{
+// putProject404 validates updating a project that does not exist.
+func putProject404(t *testing.T) {
+	up := project.UpdateProject{
 		Name: tests.StringPointer("Nonexistent"),
 	}
 
@@ -252,16 +252,16 @@ func putProduct404(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := httptest.NewRequest("PUT", "/v1/products/"+id, bytes.NewBuffer(body))
+	r := httptest.NewRequest("PUT", "/v1/projects/"+id, bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate updating a product that does not exist.")
+	t.Log("Given the need to validate updating a project that does not exist.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusNotFound {
 				t.Fatalf("\t%s\tShould receive a status code of 404 for the response : %v", tests.Failed, w.Code)
@@ -280,18 +280,18 @@ func putProduct404(t *testing.T) {
 	}
 }
 
-// crudProduct performs a complete test of CRUD against the api.
-func crudProduct(t *testing.T) {
-	p := postProduct201(t)
-	defer deleteProduct204(t, p.ID.Hex())
+// crudProject performs a complete test of CRUD against the api.
+func crudProject(t *testing.T) {
+	p := postProject201(t)
+	defer deleteProject204(t, p.ID.Hex())
 
-	getProduct200(t, p.ID.Hex())
-	putProduct204(t, p.ID.Hex())
+	getProject200(t, p.ID.Hex())
+	putProject204(t, p.ID.Hex())
 }
 
-// postProduct201 validates a product can be created with the endpoint.
-func postProduct201(t *testing.T) product.Product {
-	np := product.NewProduct{
+// postProject201 validates a project can be created with the endpoint.
+func postProject201(t *testing.T) project.Project {
+	np := project.NewProject{
 		Name:     "Comic Books",
 		Cost:     25,
 		Quantity: 60,
@@ -302,7 +302,7 @@ func postProduct201(t *testing.T) product.Product {
 		t.Fatal(err)
 	}
 
-	r := httptest.NewRequest("POST", "/v1/products", bytes.NewBuffer(body))
+	r := httptest.NewRequest("POST", "/v1/projects", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
@@ -310,11 +310,11 @@ func postProduct201(t *testing.T) product.Product {
 	a.ServeHTTP(w, r)
 
 	// p is the value we will return.
-	var p product.Product
+	var p project.Project
 
-	t.Log("Given the need to create a new product with the products endpoint.")
+	t.Log("Given the need to create a new project with the projects endpoint.")
 	{
-		t.Log("\tTest 0:\tWhen using the declared product value.")
+		t.Log("\tTest 0:\tWhen using the declared project value.")
 		{
 			if w.Code != http.StatusCreated {
 				t.Fatalf("\t%s\tShould receive a status code of 201 for the response : %v", tests.Failed, w.Code)
@@ -342,18 +342,18 @@ func postProduct201(t *testing.T) product.Product {
 	return p
 }
 
-// deleteProduct200 validates deleting a product that does exist.
-func deleteProduct204(t *testing.T, id string) {
-	r := httptest.NewRequest("DELETE", "/v1/products/"+id, nil)
+// deleteProject200 validates deleting a project that does exist.
+func deleteProject204(t *testing.T, id string) {
+	r := httptest.NewRequest("DELETE", "/v1/projects/"+id, nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate deleting a product that does exist.")
+	t.Log("Given the need to validate deleting a project that does exist.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusNoContent {
 				t.Fatalf("\t%s\tShould receive a status code of 204 for the response : %v", tests.Failed, w.Code)
@@ -363,25 +363,25 @@ func deleteProduct204(t *testing.T, id string) {
 	}
 }
 
-// getProduct200 validates a product request for an existing id.
-func getProduct200(t *testing.T, id string) {
-	r := httptest.NewRequest("GET", "/v1/products/"+id, nil)
+// getProject200 validates a project request for an existing id.
+func getProject200(t *testing.T, id string) {
+	r := httptest.NewRequest("GET", "/v1/projects/"+id, nil)
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to validate getting a product that exists.")
+	t.Log("Given the need to validate getting a project that exists.")
 	{
-		t.Logf("\tTest 0:\tWhen using the new product %s.", id)
+		t.Logf("\tTest 0:\tWhen using the new project %s.", id)
 		{
 			if w.Code != http.StatusOK {
 				t.Fatalf("\t%s\tShould receive a status code of 200 for the response : %v", tests.Failed, w.Code)
 			}
 			t.Logf("\t%s\tShould receive a status code of 200 for the response.", tests.Success)
 
-			var p product.Product
+			var p project.Project
 			if err := json.NewDecoder(w.Body).Decode(&p); err != nil {
 				t.Fatalf("\t%s\tShould be able to unmarshal the response : %v", tests.Failed, err)
 			}
@@ -402,26 +402,26 @@ func getProduct200(t *testing.T, id string) {
 	}
 }
 
-// putProduct204 validates updating a product that does exist.
-func putProduct204(t *testing.T, id string) {
+// putProject204 validates updating a project that does exist.
+func putProject204(t *testing.T, id string) {
 	body := `{"name": "Graphic Novels", "cost": 100}`
-	r := httptest.NewRequest("PUT", "/v1/products/"+id, strings.NewReader(body))
+	r := httptest.NewRequest("PUT", "/v1/projects/"+id, strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	r.Header.Set("Authorization", userAuthorization)
 
 	a.ServeHTTP(w, r)
 
-	t.Log("Given the need to update a product with the products endpoint.")
+	t.Log("Given the need to update a project with the projects endpoint.")
 	{
-		t.Log("\tTest 0:\tWhen using the modified product value.")
+		t.Log("\tTest 0:\tWhen using the modified project value.")
 		{
 			if w.Code != http.StatusNoContent {
 				t.Fatalf("\t%s\tShould receive a status code of 204 for the response : %v", tests.Failed, w.Code)
 			}
 			t.Logf("\t%s\tShould receive a status code of 204 for the response.", tests.Success)
 
-			r = httptest.NewRequest("GET", "/v1/products/"+id, nil)
+			r = httptest.NewRequest("GET", "/v1/projects/"+id, nil)
 			w = httptest.NewRecorder()
 
 			r.Header.Set("Authorization", userAuthorization)
@@ -433,7 +433,7 @@ func putProduct204(t *testing.T, id string) {
 			}
 			t.Logf("\t%s\tShould receive a status code of 200 for the retrieve.", tests.Success)
 
-			var ru product.Product
+			var ru project.Project
 			if err := json.NewDecoder(w.Body).Decode(&ru); err != nil {
 				t.Fatalf("\t%s\tShould be able to unmarshal the response : %v", tests.Failed, err)
 			}

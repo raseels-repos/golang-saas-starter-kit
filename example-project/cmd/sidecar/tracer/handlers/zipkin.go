@@ -71,7 +71,7 @@ func (z *Zipkin) Publish(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 // send uses HTTP to send the data to the tracing sidecar for processing.
 func (z *Zipkin) send(sendBatch []trace.SpanData) error {
-	le, err := newEndpoint("sales-api", z.localHost)
+	le, err := newEndpoint("web-api", z.localHost)
 	if err != nil {
 		return err
 	}

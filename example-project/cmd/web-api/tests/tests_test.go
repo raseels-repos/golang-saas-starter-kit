@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/sales-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"

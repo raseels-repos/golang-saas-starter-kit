@@ -105,7 +105,7 @@ Running `make down` will properly stop and terminate the Docker Compose session.
 
 ## About The Project
 
-The service provides record keeping for someone running a multi-family garage sale. Authenticated users can maintain a list of products for sale.
+The service provides record keeping for someone running a multi-family garage sale. Authenticated users can maintain a list of projects for sale.
 
 <!--The service uses the following models:-->
 

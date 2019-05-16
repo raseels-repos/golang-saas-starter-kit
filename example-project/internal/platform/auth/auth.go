@@ -20,7 +20,7 @@ import (
 type KeyFunc func(keyID string) (*rsa.PublicKey, error)
 
 // NewSingleKeyFunc is a simple implementation of KeyFunc that only ever
-// supports one key. This is easy for development but in production should be
+// supports one key. This is easy for development but in projection should be
 // replaced with a caching layer that calls a JWKS endpoint.
 func NewSingleKeyFunc(id string, key *rsa.PublicKey) KeyFunc {
 	return func(kid string) (*rsa.PublicKey, error) {

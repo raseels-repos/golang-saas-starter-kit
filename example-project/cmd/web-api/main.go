@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/sales-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
@@ -45,7 +45,7 @@ func main() {
 	// =========================================================================
 	// Logging
 
-	log := log.New(os.Stdout, "SALES : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	log := log.New(os.Stdout, "WEB_APP : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	// =========================================================================
 	// Configuration
@@ -75,7 +75,7 @@ func main() {
 		}
 	}
 
-	if err := envconfig.Process("SALES", &cfg); err != nil {
+	if err := envconfig.Process("WEB_APP", &cfg); err != nil {
 		log.Fatalf("main : Parsing Config : %v", err)
 	}
 

@@ -1,6 +1,8 @@
 package auth_test
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"os"
 	"testing"
 	"time"
@@ -27,6 +29,17 @@ func testMain(m *testing.M) int {
 func TestAuthenticator(t *testing.T) {
 
 	awsSecretID := "jwt-key" + uuid.NewRandom().String()
+
+	defer func() {
+		// cleanup the secret after test is complete
+		sm := secretsmanager.New(test.AwsSession)
+		_, err := sm.DeleteSecret(&secretsmanager.DeleteSecretInput{
+			SecretId: aws.String(awsSecretID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var authTests = []struct {
 		name          string

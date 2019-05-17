@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"expvar"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,9 +17,12 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	itrace "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/trace"
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/kelseyhightower/envconfig"
 	"go.opencensus.io/trace"
+	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 )
 
 /*
@@ -68,10 +69,19 @@ func main() {
 			SendInterval time.Duration `default:"15s" envconfig:"SEND_INTERVAL"`
 			SendTimeout  time.Duration `default:"500ms" envconfig:"SEND_TIMEOUT"`
 		}
+		AwsAccount struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY"`
+			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+
+			// Get an AWS session from an implicit source if no explicit
+			// configuration is provided. This is useful for taking advantage of
+			// EC2/ECS instance roles.
+			UseRole bool `envconfig:"AWS_USE_ROLE"`
+		}
 		Auth struct {
-			KeyID          string `envconfig:"KEY_ID"`
-			PrivateKeyFile string `default:"/app/private.pem" envconfig:"PRIVATE_KEY_FILE"`
-			Algorithm      string `default:"RS256" envconfig:"ALGORITHM"`
+			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
+			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
 		}
 	}
 
@@ -104,21 +114,22 @@ func main() {
 	log.Printf("main : Config : %v\n", string(cfgJSON))
 
 	// =========================================================================
-	// Find auth keys
-
-	keyContents, err := ioutil.ReadFile(cfg.Auth.PrivateKeyFile)
-	if err != nil {
-		log.Fatalf("main : Reading auth private key : %v", err)
+	// Init AWS Session
+	var awsSession *session.Session
+	if cfg.AwsAccount.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		awsSession = session.Must(session.NewSession())
+	} else {
+		creds := credentials.NewStaticCredentials(cfg.AwsAccount.AccessKeyID, cfg.AwsAccount.SecretAccessKey, "")
+		awsSession = session.New(&aws.Config{Region: aws.String(cfg.AwsAccount.Region), Credentials: creds})
 	}
+	awsSession = awstrace.WrapSession(awsSession)
 
-	key, err := jwt.ParseRSAPrivateKeyFromPEM(keyContents)
-	if err != nil {
-		log.Fatalf("main : Parsing auth private key : %v", err)
-	}
-
-	publicKeyLookup := auth.NewSingleKeyFunc(cfg.Auth.KeyID, key.Public().(*rsa.PublicKey))
-
-	authenticator, err := auth.NewAuthenticator(key, cfg.Auth.KeyID, cfg.Auth.Algorithm, publicKeyLookup)
+	// =========================================================================
+	// Load auth keys from AWS and init new Authenticator
+	authenticator, err := auth.NewAuthenticator(awsSession, cfg.Auth.AwsSecretID, time.Now().UTC(), cfg.Auth.KeyExpiration)
 	if err != nil {
 		log.Fatalf("main : Constructing authenticator : %v", err)
 	}

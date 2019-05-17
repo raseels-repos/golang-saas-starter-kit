@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"log"
 	"os"
 	"runtime/debug"
@@ -23,9 +24,10 @@ const (
 
 // Test owns state for running/shutting down tests.
 type Test struct {
-	Log       *log.Logger
-	MasterDB  *db.DB
-	container *docker.Container
+	Log        *log.Logger
+	MasterDB   *db.DB
+	container  *docker.Container
+	AwsSession *session.Session
 }
 
 // New is the entry point for tests.
@@ -35,6 +37,10 @@ func New() *Test {
 	// Logging
 
 	log := log.New(os.Stdout, "TEST : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+
+	// ============================================================
+	// Init AWS Session
+	awsSession := session.Must(session.NewSession())
 
 	// ============================================================
 	// Startup Mongo container
@@ -59,7 +65,7 @@ func New() *Test {
 		log.Fatalf("startup : Register DB : %v", err)
 	}
 
-	return &Test{log, masterDB, container}
+	return &Test{log, masterDB, container, awsSession}
 }
 
 // TearDown is used for shutting down tests. Calling this should be

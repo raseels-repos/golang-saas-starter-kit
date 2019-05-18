@@ -20,10 +20,6 @@ import (
 
 var (
 	errInvalidTemplate = errors.New("Invalid template")
-
-	// Base template to support applying custom
-	// TODO try to remove this
-	//mainTmpl           = `{{define "main" }} {{ template "base" . }} {{ end }}`
 )
 
 type Template struct {
@@ -31,13 +27,15 @@ type Template struct {
 	mainTemplate *template.Template
 }
 
-
+// NewTemplate defines a base set of functions that will be applied to all templates
+// being rendered.
 func NewTemplate(templateFuncs template.FuncMap) *Template {
 	t := &Template{}
 
-	// these functions are used and rendered on run-time of web page so don't have to use javascript/jquery
-	// to for basic template formatting. transformation happens server-side instead of client-side to
-	// provide base-level consistency.
+	// Default functions are defined and available for all templates being rendered.
+	// These base function help with provided basic formatting so don't have to use javascript/jquery,
+	// transformation happens server-side instead of client-side to provide base-level consistency.
+	// Any defined function below will be overwritten if a matching function key is included.
 	t.Funcs = template.FuncMap{
 		// probably could provide examples of each of these
 		"Minus": func(a, b int) int {
@@ -125,10 +123,15 @@ type TemplateRenderer struct {
 	enableHotReload bool
 	templates              map[string]*template.Template
 	globalViewData         map[string]interface{}
-	//mainTemplate *template.Template
+	mainTemplate *template.Template
 	errorHandler func(ctx context.Context, w http.ResponseWriter, req *http.Request, renderer web.Renderer, statusCode int, er error) error
 }
 
+// NewTemplateRenderer implements the interface web.Renderer allowing for execution of
+// nested html templates. The templateDir should include three directories:
+// 	1. layouts: base layouts defined for the entire application
+//  2. content: page specific templates that will be nested instead of a layout template
+//  3. partials: templates used by multiple layout or content templates
 func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewData map[string]interface{}, tmpl *Template, errorHandler func(ctx context.Context, w http.ResponseWriter, req *http.Request, renderer web.Renderer, statusCode int, er error) error) (*TemplateRenderer, error) {
 	r := &TemplateRenderer{
 		templateDir: templateDir,
@@ -141,13 +144,12 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 		errorHandler: errorHandler,
 	}
 
-	//r.mainTemplate = template.New("main")
-	//r.mainTemplate, _ = r.mainTemplate.Parse(mainTmpl)
-	//r.mainTemplate.Funcs(tmpl.Funcs)
-
+	// Recursively loop through all folders/files in the template directory and group them by their
+	// template type. They are filename / filepath for lookup on render.
 	err := filepath.Walk(templateDir, func(path string, info os.FileInfo, err error) error {
 		dir := filepath.Base(filepath.Dir(path))
 
+		// Skip directories.
 		if info.IsDir() {
 			return nil
 		}
@@ -168,63 +170,79 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 		return r, err
 	}
 
+	// Main template used to render execute all templates against.
+	r.mainTemplate = template.New("main")
+	r.mainTemplate, _ = r.mainTemplate.Parse(	`{{define "main" }} {{ template "base" . }} {{ end }}`)
+	r.mainTemplate.Funcs(tmpl.Funcs)
+
 	// Ensure all layout files render successfully with no errors.
 	for _, f := range r.layoutFiles {
-		//t, err := r.mainTemplate.Clone()
-		//if err != nil {
-		//	return r, err
-		//}
-		t := template.New("main")
-		t.Funcs(tmpl.Funcs)
+		t, err := r.mainTemplate.Clone()
+		if err != nil {
+			return r, err
+		}
 		template.Must(t.ParseFiles(f))
 	}
 
 	// Ensure all partial files render successfully with no errors.
 	for _, f := range r.partialFiles {
-		//t, err := r.mainTemplate.Clone()
-		//if err != nil {
-		//	return r, err
-		//}
-		t := template.New("partial")
-		t.Funcs(tmpl.Funcs)
+		t, err := r.mainTemplate.Clone()
+		if err != nil {
+			return r, err
+		}
 		template.Must(t.ParseFiles(f))
 	}
 
 	// Ensure all content files render successfully with no errors.
 	for _, f := range r.contentFiles {
-		//t, err := r.mainTemplate.Clone()
-		//if err != nil {
-		//	return r, err
-		//}
-		t := template.New("content")
-		t.Funcs(tmpl.Funcs)
+		t, err := r.mainTemplate.Clone()
+		if err != nil {
+			return r, err
+		}
 		template.Must(t.ParseFiles(f))
 	}
 
 	return r, nil
 }
 
-// Render renders a template document
+// Render executes the nested templates and returns the result to the client.
+// contentType: supports any content type to allow for rendering text, emails and other formats
+// statusCode: the error method calls this function so allow the HTTP Status Code to be set
+// data: map[string]interface{} to allow including additional request and globally defined values.
 func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, req *http.Request, templateLayoutName, templateContentName, contentType string, statusCode int, data map[string]interface{}) error {
-
+	// If the template has not been rendered yet or hot reload is enabled,
+	// then parse the template files.
 	t, ok := r.templates[templateContentName]
 	if !ok || r.enableHotReload {
+		t, err := r.mainTemplate.Clone()
+		if err != nil {
+			return err
+		}
+
+		// Load the base template file path.
 		layoutFile, ok := r.layoutFiles[templateLayoutName]
 		if !ok {
 			return errors.Wrapf(errInvalidTemplate, "template layout file for %s does not exist", templateLayoutName)
 		}
+		// The base layout will be the first template.
 		files := []string{layoutFile}
 
+		// Append all of the partials that are defined. Not an easy way to determine if the
+		// layout or content template contain any references to a partial so load all of them.
+		// This assumes that all partial templates should be uniquely named and not conflict with
+		// and base layout or content definitions.
 		for _, f := range r.partialFiles {
 			files = append(files, f)
 		}
 
+		// Load the content template file path.
 		contentFile, ok := r.contentFiles[templateContentName]
 		if !ok {
 			return errors.Wrapf(errInvalidTemplate, "template content file for %s does not exist", templateContentName)
 		}
 		files = append(files, contentFile)
 
+		// Render all of template files
 		t = template.Must(t.ParseFiles(files...))
 		r.templates[templateContentName] = t
 	}
@@ -261,7 +279,6 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// to define context.Context as an argument
 	renderData["_Ctx"] = ctx
 
-
 	// Append request data map to render data last so any previous value can be overwritten.
 	if data != nil {
 		for k, v := range data {
@@ -278,8 +295,9 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	return nil
 }
 
+// Error formats an error and returns the result to the client.
 func (r *TemplateRenderer) Error(ctx context.Context, w http.ResponseWriter, req *http.Request, statusCode int, er error) error {
-	// If error hander was defined to support formated response for web, used it.
+	// If error handler was defined to support formatted response for web, used it.
 	if r.errorHandler != nil {
 		return  r.errorHandler(ctx, w, req, r, statusCode, er)
 	}
@@ -288,6 +306,8 @@ func (r *TemplateRenderer) Error(ctx context.Context, w http.ResponseWriter, req
 	return web.RespondError(ctx, w, er)
 }
 
+// Static serves files from the local file exist.
+// If an error is encountered, it will handled by TemplateRenderer.Error
 func (tr *TemplateRenderer) Static(rootDir, prefix string) web.Handler {
 	h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 		err := web.StaticHandler(ctx, w, r, params, rootDir, prefix)
@@ -299,6 +319,8 @@ func (tr *TemplateRenderer) Static(rootDir, prefix string) web.Handler {
 	return h
 }
 
+// S3Url formats a path to include either the S3 URL or a CloudFront
+// URL instead of serving the file from local file system.
 func S3Url(baseS3Url, baseS3Origin, p string) string {
 	if strings.HasPrefix(p, "http") {
 		return p

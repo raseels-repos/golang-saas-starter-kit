@@ -45,14 +45,14 @@ func main() {
 	// =========================================================================
 	// Logging
 
-	log := log.New(os.Stdout, "WEB_APP : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	log := log.New(os.Stdout, "WEB_API : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	// =========================================================================
 	// Configuration
 
 	var cfg struct {
-		Web struct {
-			APIHost         string        `default:"0.0.0.0:3000" envconfig:"API_HOST"`
+		HTTP struct {
+			Host            string        `default:"0.0.0.0:3001" envconfig:"HTTP_HOST"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ReadTimeout     time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
 			WriteTimeout    time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
@@ -164,10 +164,12 @@ func main() {
 	//
 	// /debug/vars - Added to the default mux by the expvars package.
 	// /debug/pprof - Added to the default mux by the net/http/pprof package.
-	go func() {
-		log.Printf("main : Debug Listening %s", cfg.Web.DebugHost)
-		log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.Web.DebugHost, http.DefaultServeMux))
-	}()
+	if cfg.HTTP.DebugHost != "" {
+		go func() {
+			log.Printf("main : Debug Listening %s", cfg.HTTP.DebugHost)
+			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.HTTP.DebugHost, http.DefaultServeMux))
+		}()
+	}
 
 	// =========================================================================
 	// Start API Service
@@ -178,10 +180,10 @@ func main() {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	api := http.Server{
-		Addr:           cfg.Web.APIHost,
+		Addr:           cfg.HTTP.Host,
 		Handler:        handlers.API(shutdown, log, masterDB, authenticator),
-		ReadTimeout:    cfg.Web.ReadTimeout,
-		WriteTimeout:   cfg.Web.WriteTimeout,
+		ReadTimeout:    cfg.HTTP.ReadTimeout,
+		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -191,7 +193,7 @@ func main() {
 
 	// Start the service listening for requests.
 	go func() {
-		log.Printf("main : API Listening %s", cfg.Web.APIHost)
+		log.Printf("main : API Listening %s", cfg.HTTP.Host)
 		serverErrors <- api.ListenAndServe()
 	}()
 
@@ -207,13 +209,13 @@ func main() {
 		log.Printf("main : %v : Start shutdown..", sig)
 
 		// Create context for Shutdown call.
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
 		defer cancel()
 
 		// Asking listener to shutdown and load shed.
 		err := api.Shutdown(ctx)
 		if err != nil {
-			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.Web.ShutdownTimeout, err)
+			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.HTTP.ShutdownTimeout, err)
 			err = api.Close()
 		}
 

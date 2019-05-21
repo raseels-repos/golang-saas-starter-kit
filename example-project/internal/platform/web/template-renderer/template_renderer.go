@@ -23,7 +23,7 @@ var (
 )
 
 type Template struct {
-	Funcs template.FuncMap
+	Funcs        template.FuncMap
 	mainTemplate *template.Template
 }
 
@@ -117,14 +117,14 @@ func NewTemplate(templateFuncs template.FuncMap) *Template {
 type TemplateRenderer struct {
 	templateDir string
 	// has to be map so can know the name and map the name to the  location / file path
-	layoutFiles map[string]string
-	contentFiles map[string]string
-	partialFiles map[string]string
+	layoutFiles     map[string]string
+	contentFiles    map[string]string
+	partialFiles    map[string]string
 	enableHotReload bool
-	templates              map[string]*template.Template
-	globalViewData         map[string]interface{}
-	mainTemplate *template.Template
-	errorHandler func(ctx context.Context, w http.ResponseWriter, req *http.Request, renderer web.Renderer, statusCode int, er error) error
+	templates       map[string]*template.Template
+	globalViewData  map[string]interface{}
+	mainTemplate    *template.Template
+	errorHandler    func(ctx context.Context, w http.ResponseWriter, req *http.Request, renderer web.Renderer, statusCode int, er error) error
 }
 
 // NewTemplateRenderer implements the interface web.Renderer allowing for execution of
@@ -134,14 +134,14 @@ type TemplateRenderer struct {
 //  3. partials: templates used by multiple layout or content templates
 func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewData map[string]interface{}, tmpl *Template, errorHandler func(ctx context.Context, w http.ResponseWriter, req *http.Request, renderer web.Renderer, statusCode int, er error) error) (*TemplateRenderer, error) {
 	r := &TemplateRenderer{
-		templateDir: templateDir,
-		layoutFiles: make( map[string]string),
-		contentFiles: make( map[string]string),
-		partialFiles: make( map[string]string),
+		templateDir:     templateDir,
+		layoutFiles:     make(map[string]string),
+		contentFiles:    make(map[string]string),
+		partialFiles:    make(map[string]string),
 		enableHotReload: enableHotReload,
-		templates: make(map[string]*template.Template),
-		globalViewData:globalViewData,
-		errorHandler: errorHandler,
+		templates:       make(map[string]*template.Template),
+		globalViewData:  globalViewData,
+		errorHandler:    errorHandler,
 	}
 
 	// Recursively loop through all folders/files in the template directory and group them by their
@@ -172,7 +172,7 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 
 	// Main template used to render execute all templates against.
 	r.mainTemplate = template.New("main")
-	r.mainTemplate, _ = r.mainTemplate.Parse(	`{{define "main" }} {{ template "base" . }} {{ end }}`)
+	r.mainTemplate, _ = r.mainTemplate.Parse(`{{define "main" }} {{ template "base" . }} {{ end }}`)
 	r.mainTemplate.Funcs(tmpl.Funcs)
 
 	// Ensure all layout files render successfully with no errors.
@@ -214,7 +214,8 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// then parse the template files.
 	t, ok := r.templates[templateContentName]
 	if !ok || r.enableHotReload {
-		t, err := r.mainTemplate.Clone()
+		var err error
+		t, err = r.mainTemplate.Clone()
 		if err != nil {
 			return err
 		}
@@ -267,7 +268,7 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// Add Request URL to render data
 	reqData := map[string]interface{}{
 		"Url": "",
-		"Uri":  "",
+		"Uri": "",
 	}
 	if req != nil {
 		reqData["Url"] = req.URL.String()
@@ -299,7 +300,7 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 func (r *TemplateRenderer) Error(ctx context.Context, w http.ResponseWriter, req *http.Request, statusCode int, er error) error {
 	// If error handler was defined to support formatted response for web, used it.
 	if r.errorHandler != nil {
-		return  r.errorHandler(ctx, w, req, r, statusCode, er)
+		return r.errorHandler(ctx, w, req, r, statusCode, er)
 	}
 
 	// Default response text response of error.
@@ -317,43 +318,4 @@ func (tr *TemplateRenderer) Static(rootDir, prefix string) web.Handler {
 		return nil
 	}
 	return h
-}
-
-// S3Url formats a path to include either the S3 URL or a CloudFront
-// URL instead of serving the file from local file system.
-func S3Url(baseS3Url, baseS3Origin, p string) string {
-	if strings.HasPrefix(p, "http") {
-		return p
-	}
-	org := strings.TrimRight(baseS3Origin, "/")
-	if org != "" {
-		p = strings.Replace(p, org+"/", "", 1)
-	}
-
-	pts := strings.Split(p, "?")
-	p = pts[0]
-
-	var rq string
-	if len(pts) > 1 {
-		rq = pts[1]
-	}
-
-	p = strings.TrimLeft(p, "/")
-
-	baseUrl := baseS3Url
-
-	u, err := url.Parse(baseUrl)
-	if err != nil {
-		return "?"
-	}
-	ldir := filepath.Base(u.Path)
-
-	if strings.HasPrefix(p, ldir) {
-		p = strings.Replace(p, ldir+"/", "", 1)
-	}
-
-	u.Path = filepath.Join(u.Path, p)
-	u.RawQuery = rq
-
-	return u.String()
 }

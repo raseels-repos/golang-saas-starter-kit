@@ -146,3 +146,28 @@ $ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 ## What's Next
 
 We are in the process of writing more documentation about this code. Classes are being finalized as part of the Ultimate series.
+
+
+
+
+## AWS Permissions
+
+Base required permissions
+```
+secretsmanager:CreateSecret 
+secretsmanager:GetSecretValue 
+secretsmanager:ListSecretVersionIds 
+secretsmanager:PutSecretValue 
+secretsmanager:UpdateSecret 
+```
+
+If cloudfront enabled for static files
+```
+cloudFront:ListDistributions
+```
+
+Additional permissions required for unittests
+```
+secretsmanager:DeleteSecret
+```
+

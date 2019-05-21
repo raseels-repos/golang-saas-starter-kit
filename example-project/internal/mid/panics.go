@@ -3,6 +3,7 @@ package mid
 import (
 	"context"
 	"net/http"
+	"runtime/debug"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/pkg/errors"
@@ -25,7 +26,7 @@ func Panics() web.Middleware {
 			// after the fact. Using the errors package will generate a stack trace.
 			defer func() {
 				if r := recover(); r != nil {
-					err = errors.Errorf("panic: %v", r)
+					err = errors.Errorf("panic: %+v %s", r, string(debug.Stack()))
 				}
 			}()
 

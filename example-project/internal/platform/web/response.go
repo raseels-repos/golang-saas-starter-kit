@@ -18,13 +18,13 @@ const (
 
 // MIME types
 const (
-	MIMEApplicationJSON                  = "application/json"
-	MIMEApplicationJSONCharsetUTF8       = MIMEApplicationJSON + "; " + charsetUTF8
-	MIMETextHTML                         = "text/html"
-	MIMETextHTMLCharsetUTF8              = MIMETextHTML + "; " + charsetUTF8
-	MIMETextPlain                        = "text/plain"
-	MIMETextPlainCharsetUTF8             = MIMETextPlain + "; " + charsetUTF8
-	MIMEOctetStream                      = "application/octet-stream"
+	MIMEApplicationJSON            = "application/json"
+	MIMEApplicationJSONCharsetUTF8 = MIMEApplicationJSON + "; " + charsetUTF8
+	MIMETextHTML                   = "text/html"
+	MIMETextHTMLCharsetUTF8        = MIMETextHTML + "; " + charsetUTF8
+	MIMETextPlain                  = "text/plain"
+	MIMETextPlainCharsetUTF8       = MIMETextPlain + "; " + charsetUTF8
+	MIMEOctetStream                = "application/octet-stream"
 )
 
 // RespondJsonError sends an error formatted as JSON response back to the client.
@@ -158,11 +158,14 @@ func Static(rootDir, prefix string) Handler {
 // the ability to format/display the error before responding to the client.
 func StaticHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string, rootDir, prefix string) error {
 	// Parse the URL from the http request.
-	urlPath := path.Clean("/"+r.URL.Path) // "/"+ for security
+	urlPath := path.Clean("/" + r.URL.Path) // "/"+ for security
 	urlPath = strings.TrimLeft(urlPath, "/")
 
 	// Remove the static directory name from the url
-	urlPath = strings.TrimLeft(urlPath, filepath.Base(rootDir))
+	rootDirName := filepath.Base(rootDir)
+	if strings.HasPrefix(urlPath, rootDirName) {
+		urlPath = strings.Replace(urlPath, rootDirName, "", 1)
+	}
 
 	// Also remove the URL prefix used to serve the static file since
 	// this does not need to match any existing directory structure.
@@ -172,7 +175,7 @@ func StaticHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, 
 
 	// Resolve the root directory to an absolute path
 	sd, err := filepath.Abs(rootDir)
-	if  err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -186,7 +189,7 @@ func StaticHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, 
 	}
 
 	// Serve the file from the local file system.
-	http.ServeFile(w, r , filePath)
+	http.ServeFile(w, r, filePath)
 
 	return nil
 }

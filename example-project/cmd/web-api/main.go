@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"expvar"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,9 +17,12 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	itrace "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/trace"
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/kelseyhightower/envconfig"
 	"go.opencensus.io/trace"
+	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 )
 
 /*
@@ -49,33 +50,59 @@ func main() {
 
 	// =========================================================================
 	// Configuration
-
 	var cfg struct {
+		Env  string `default:"dev" envconfig:"ENV"`
 		HTTP struct {
 			Host            string        `default:"0.0.0.0:3001" envconfig:"HTTP_HOST"`
-			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
-			ReadTimeout     time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
-			WriteTimeout    time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
-			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
+			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"HTTP_DEBUG_HOST"`
+			ReadTimeout     time.Duration `default:"5s" envconfig:"HTTP_READ_TIMEOUT"`
+			WriteTimeout    time.Duration `default:"5s" envconfig:"HTTP_WRITE_TIMEOUT"`
+			ShutdownTimeout time.Duration `default:"5s" envconfig:"HTTP_SHUTDOWN_TIMEOUT"`
+		}
+		App struct {
+			Name string `default:"web-app" envconfig:"APP_NAME"`
+		}
+		BuildInfo struct {
+			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
+			CiCommitRefSlug     string `envconfig:"CI_COMMIT_REF_SLUG"`
+			CiCommitSha         string `envconfig:"CI_COMMIT_SHA"`
+			CiCommitTag         string `envconfig:"CI_COMMIT_TAG"`
+			CiCommitTitle       string `envconfig:"CI_COMMIT_TITLE"`
+			CiCommitDescription string `envconfig:"CI_COMMIT_DESCRIPTION"`
+			CiJobId             string `envconfig:"CI_COMMIT_JOB_ID"`
+			CiJobUrl            string `envconfig:"CI_COMMIT_JOB_URL"`
+			CiPipelineId        string `envconfig:"CI_COMMIT_PIPELINE_ID"`
+			CiPipelineUrl       string `envconfig:"CI_COMMIT_PIPELINE_URL"`
 		}
 		DB struct {
-			DialTimeout time.Duration `default:"5s" envconfig:"DIAL_TIMEOUT"`
-			Host        string        `default:"mongo:27017/gotraining" envconfig:"HOST"`
+			DialTimeout time.Duration `default:"5s" envconfig:"DB_DIAL_TIMEOUT"`
+			Host        string        `default:"mongo:27017/gotraining" envconfig:"DB_HOST"`
 		}
 		Trace struct {
-			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"HOST"`
-			BatchSize    int           `default:"1000" envconfig:"BATCH_SIZE"`
-			SendInterval time.Duration `default:"15s" envconfig:"SEND_INTERVAL"`
-			SendTimeout  time.Duration `default:"500ms" envconfig:"SEND_TIMEOUT"`
+			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
+			BatchSize    int           `default:"1000" envconfig:"TRACE_BATCH_SIZE"`
+			SendInterval time.Duration `default:"15s" envconfig:"TRACE_SEND_INTERVAL"`
+			SendTimeout  time.Duration `default:"500ms" envconfig:"TRACE_SEND_TIMEOUT"`
+		}
+		AwsAccount struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY"`
+			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+
+			// Get an AWS session from an implicit source if no explicit
+			// configuration is provided. This is useful for taking advantage of
+			// EC2/ECS instance roles.
+			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			KeyID          string `envconfig:"KEY_ID"`
-			PrivateKeyFile string `default:"/app/private.pem" envconfig:"PRIVATE_KEY_FILE"`
-			Algorithm      string `default:"RS256" envconfig:"ALGORITHM"`
+			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
+			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
 		}
 	}
 
-	if err := envconfig.Process("WEB_APP", &cfg); err != nil {
+	// !!! This prefix seems buried, if you copy and paste this main.go
+	// 		file, its likely you will forget to update this.
+	if err := envconfig.Process("WEB_API", &cfg); err != nil {
 		log.Fatalf("main : Parsing Config : %v", err)
 	}
 
@@ -104,21 +131,22 @@ func main() {
 	log.Printf("main : Config : %v\n", string(cfgJSON))
 
 	// =========================================================================
-	// Find auth keys
-
-	keyContents, err := ioutil.ReadFile(cfg.Auth.PrivateKeyFile)
-	if err != nil {
-		log.Fatalf("main : Reading auth private key : %v", err)
+	// Init AWS Session
+	var awsSession *session.Session
+	if cfg.AwsAccount.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		awsSession = session.Must(session.NewSession())
+	} else {
+		creds := credentials.NewStaticCredentials(cfg.AwsAccount.AccessKeyID, cfg.AwsAccount.SecretAccessKey, "")
+		awsSession = session.New(&aws.Config{Region: aws.String(cfg.AwsAccount.Region), Credentials: creds})
 	}
+	awsSession = awstrace.WrapSession(awsSession)
 
-	key, err := jwt.ParseRSAPrivateKeyFromPEM(keyContents)
-	if err != nil {
-		log.Fatalf("main : Parsing auth private key : %v", err)
-	}
-
-	publicKeyLookup := auth.NewSingleKeyFunc(cfg.Auth.KeyID, key.Public().(*rsa.PublicKey))
-
-	authenticator, err := auth.NewAuthenticator(key, cfg.Auth.KeyID, cfg.Auth.Algorithm, publicKeyLookup)
+	// =========================================================================
+	// Load auth keys from AWS and init new Authenticator
+	authenticator, err := auth.NewAuthenticator(awsSession, cfg.Auth.AwsSecretID, time.Now().UTC(), cfg.Auth.KeyExpiration)
 	if err != nil {
 		log.Fatalf("main : Constructing authenticator : %v", err)
 	}

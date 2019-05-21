@@ -11,7 +11,7 @@ import (
 
 // User represents the User API method handler set.
 type Root struct {
-	MasterDB       *db.DB
+	MasterDB *db.DB
 	Renderer web.Renderer
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
@@ -21,5 +21,9 @@ func (u *Root) Index(ctx context.Context, w http.ResponseWriter, r *http.Request
 	ctx, span := trace.StartSpan(ctx, "handlers.Root.Index")
 	defer span.End()
 
-	return u.Renderer.Render(ctx, w, r, baseLayoutTmpl, "root-index.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
+	data := map[string]interface{}{
+		"imgSizes": []int{100, 200, 300, 400, 500},
+	}
+
+	return u.Renderer.Render(ctx, w, r, baseLayoutTmpl, "root-index.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

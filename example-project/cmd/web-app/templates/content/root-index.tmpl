@@ -4,6 +4,40 @@
 {{end}}
 {{define "content"}}
     Welcome to the web app
+
+    <p>S3ImgSrcLarge
+        <img {{ S3ImgSrcLarge $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgThumbSrcLarge
+        <img {{ S3ImgThumbSrcLarge $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgSrcMedium
+        <img {{ S3ImgSrcMedium $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgThumbSrcMedium
+        <img {{ S3ImgThumbSrcMedium $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgSrcSmall
+        <img {{ S3ImgSrcSmall $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgThumbSrcSmall
+        <img {{ S3ImgThumbSrcSmall $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
+    </p>
+
+    <p>S3ImgSrc
+        <img {{ S3ImgSrc $._ctx "/assets/images/glacier-example-pic.jpg" $.imgSizes }}/>
+    </p>
+
+    <p>S3ImgUrl
+        <img src="{{ S3ImgUrl $._ctx "/assets/images/glacier-example-pic.jpg" 200 }}" />
+    </p>
+
+
 {{end}}
 {{define "js"}}
 

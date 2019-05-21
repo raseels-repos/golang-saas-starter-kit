@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,30 +17,26 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"html/template"
 
-	template_renderer "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web/template-renderer"
-	lru "github.com/hashicorp/golang-lru"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-app/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/deploy"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
+	img_resize "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/img-resize"
 	itrace "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/trace"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	template_renderer "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web/template-renderer"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
 	"go.opencensus.io/trace"
+	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
+	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
 var build = "develop"
-
-const LRU_CACHE_ITEMS = 128
-
-var (
-	localCache         *lru.Cache
-)
-
-func init() {
-	localCache, _ = lru.New(LRU_CACHE_ITEMS)
-}
 
 func main() {
 
@@ -51,53 +48,79 @@ func main() {
 	// =========================================================================
 	// Configuration
 	var cfg struct {
-		Env            string        `default:"dev" envconfig:"ENV"`
+		Env  string `default:"dev" envconfig:"ENV"`
 		HTTP struct {
-			Host            string        `default:"0.0.0.0:3000" envconfig:"HTTP_HOST"`
-			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
-			ReadTimeout     time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
-			WriteTimeout    time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
-			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
-			TemplateDir       string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			StaticDir       string        `default:"./static" envconfig:"STATIC_DIR"`
+			Host         string        `default:"0.0.0.0:3000" envconfig:"HTTP_HOST"`
+			ReadTimeout  time.Duration `default:"10s" envconfig:"HTTP_READ_TIMEOUT"`
+			WriteTimeout time.Duration `default:"10s" envconfig:"HTTP_WRITE_TIMEOUT"`
+		}
+		HTTPS struct {
+			Host         string        `default:"" envconfig:"HTTPS_HOST"`
+			ReadTimeout  time.Duration `default:"5s" envconfig:"HTTPS_READ_TIMEOUT"`
+			WriteTimeout time.Duration `default:"5s" envconfig:"HTTPS_WRITE_TIMEOUT"`
 		}
 		App struct {
-			Name             string       `default:"web-app" envconfig:"APP_NAME"`
-			StaticS3 struct {
-				S3Bucket       string        `envconfig:"APP_STATIC_S3_BUCKET"`
-				S3KeyPrefix       string        `envconfig:"APP_STATIC_S3_KEY_PREFIX"`
-				EnableCloudFront       bool        `envconfig:"APP_STATIC_S3_ENABLE_CLOUDFRONT"`
+			Name        string `default:"web-app" envconfig:"APP_NAME"`
+			BaseUrl     string `default:"" envconfig:"APP_BASE_URL"`
+			TemplateDir string `default:"./templates" envconfig:"APP_TEMPLATE_DIR"`
+			StaticDir   string `default:"./static" envconfig:"APP_STATIC_DIR"`
+			StaticS3    struct {
+				S3Enabled         bool   `envconfig:"APP_STATIC_S3_ENABLED"`
+				S3Bucket          string `envconfig:"APP_STATIC_S3_BUCKET"`
+				S3KeyPrefix       string `default:"public/web_app/static" envconfig:"APP_STATIC_S3_KEY_PREFIX"`
+				CloudFrontEnabled bool   `envconfig:"APP_STATIC_S3_CLOUDFRONT_ENABLED"`
+				ImgResizeEnabled  bool   `envconfig:"APP_STATIC_S3_IMG_RESIZE_ENABLED"`
 			}
+			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"APP_DEBUG_HOST"`
+			ShutdownTimeout time.Duration `default:"5s" envconfig:"APP_SHUTDOWN_TIMEOUT"`
 		}
 		BuildInfo struct {
-			CiCommitRefName    string `envconfig:"CI_COMMIT_REF_NAME"`
-			CiCommitRefSlug    string `envconfig:"CI_COMMIT_REF_SLUG"`
-			CiCommitSha        string `envconfig:"CI_COMMIT_SHA"`
-			CiCommitTag        string `envconfig:"CI_COMMIT_TAG"`
-			CiCommitTitle      string `envconfig:"CI_COMMIT_TITLE"`
+			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
+			CiCommitRefSlug     string `envconfig:"CI_COMMIT_REF_SLUG"`
+			CiCommitSha         string `envconfig:"CI_COMMIT_SHA"`
+			CiCommitTag         string `envconfig:"CI_COMMIT_TAG"`
+			CiCommitTitle       string `envconfig:"CI_COMMIT_TITLE"`
 			CiCommitDescription string `envconfig:"CI_COMMIT_DESCRIPTION"`
-			CiJobId            string `envconfig:"CI_COMMIT_JOB_ID"`
-			CiJobUrl           string `envconfig:"CI_COMMIT_JOB_URL"`
-			CiPipelineId       string `envconfig:"CI_COMMIT_PIPELINE_ID"`
-			CiPipelineUrl      string `envconfig:"CI_COMMIT_PIPELINE_URL"`
+			CiJobId             string `envconfig:"CI_COMMIT_JOB_ID"`
+			CiJobUrl            string `envconfig:"CI_COMMIT_JOB_URL"`
+			CiPipelineId        string `envconfig:"CI_COMMIT_PIPELINE_ID"`
+			CiPipelineUrl       string `envconfig:"CI_COMMIT_PIPELINE_URL"`
+		}
+		Redis struct {
+			DialTimeout     time.Duration `default:"5s" envconfig:"REDIS_DIAL_TIMEOUT"`
+			Host            string        `default:":6379" envconfig:"REDIS_HOST"`
+			DB              int           `default:"1" envconfig:"REDIS_DB"`
+			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
 		}
 		DB struct {
-			DialTimeout time.Duration `default:"5s" envconfig:"DIAL_TIMEOUT"`
-			Host        string        `default:"mongo:27017/gotraining" envconfig:"HOST"`
+			DialTimeout time.Duration `default:"5s" envconfig:"DB_DIAL_TIMEOUT"`
+			Host        string        `default:"mongo:27017/gotraining" envconfig:"DB_HOST"`
 		}
 		Trace struct {
-			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"HOST"`
-			BatchSize    int           `default:"1000" envconfig:"BATCH_SIZE"`
-			SendInterval time.Duration `default:"15s" envconfig:"SEND_INTERVAL"`
-			SendTimeout  time.Duration `default:"500ms" envconfig:"SEND_TIMEOUT"`
+			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
+			BatchSize    int           `default:"1000" envconfig:"TRACE_BATCH_SIZE"`
+			SendInterval time.Duration `default:"15s" envconfig:"TRACE_SEND_INTERVAL"`
+			SendTimeout  time.Duration `default:"500ms" envconfig:"TRACE_SEND_TIMEOUT"`
+		}
+		AwsAccount struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY"`
+			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+
+			// Get an AWS session from an implicit source if no explicit
+			// configuration is provided. This is useful for taking advantage of
+			// EC2/ECS instance roles.
+			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			KeyID          string `envconfig:"KEY_ID"`
-			PrivateKeyFile string `default:"/app/private.pem" envconfig:"PRIVATE_KEY_FILE"`
-			Algorithm      string `default:"RS256" envconfig:"ALGORITHM"`
+			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
+			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
 		}
+		CMD string `envconfig:"CMD"`
 	}
 
+	// !!! This prefix seems buried, if you copy and paste this main.go
+	// 		file, its likely you will forget to update this.
 	if err := envconfig.Process("WEB_APP", &cfg); err != nil {
 		log.Fatalf("main : Parsing Config : %v", err)
 	}
@@ -107,6 +130,22 @@ func main() {
 			log.Fatalf("main : Parsing Command Line : %v", err)
 		}
 		return // We displayed help.
+	}
+
+	// If base URL is empty, set the default value from the HTTP Host
+	if cfg.App.BaseUrl == "" {
+		baseUrl := cfg.HTTP.Host
+		if !strings.HasPrefix(baseUrl, "http") {
+			if strings.HasPrefix(baseUrl, "0.0.0.0:") {
+				pts := strings.Split(baseUrl, ":")
+				pts[0] = "127.0.0.1"
+				baseUrl = strings.Join(pts, ":")
+			} else if strings.HasPrefix(baseUrl, ":") {
+				baseUrl = "127.0.0.1" + baseUrl
+			}
+			baseUrl = "http://" + baseUrl
+		}
+		cfg.App.BaseUrl = baseUrl
 	}
 
 	// =========================================================================
@@ -127,16 +166,111 @@ func main() {
 	log.Printf("main : Config : %v\n", string(cfgJSON))
 
 	// =========================================================================
+	// Init AWS Session
+	var awsSession *session.Session
+	if cfg.AwsAccount.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		awsSession = session.Must(session.NewSession())
+	} else {
+		creds := credentials.NewStaticCredentials(cfg.AwsAccount.AccessKeyID, cfg.AwsAccount.SecretAccessKey, "")
+		awsSession = session.New(&aws.Config{Region: aws.String(cfg.AwsAccount.Region), Credentials: creds})
+	}
+	awsSession = awstrace.WrapSession(awsSession)
+
+	// =========================================================================
+	// Start Redis
+	// Ensure the eviction policy on the redis cluster is set correctly.
+	// 		AWS Elastic cache redis clusters by default have the volatile-lru.
+	// 			volatile-lru: evict keys by trying to remove the less recently used (LRU) keys first, but only among keys that have an expire set, in order to make space for the new data added.
+	// 			allkeys-lru: evict keys by trying to remove the less recently used (LRU) keys first, in order to make space for the new data added.
+	//		Recommended to have eviction policy set to allkeys-lru
+	log.Println("main : Started : Initialize Redis")
+	redisClient := redistrace.NewClient(&redis.Options{
+		Addr:        cfg.Redis.Host,
+		DB:          cfg.Redis.DB,
+		DialTimeout: cfg.Redis.DialTimeout,
+	})
+	defer redisClient.Close()
+
+	evictPolicyConfigKey := "maxmemory-policy"
+
+	// if the maxmemory policy is set for redis, make sure its set on the cluster
+	// default not set and will based on the redis config values defined on the server
+	if cfg.Redis.MaxmemoryPolicy != "" {
+		err = redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
+		if err != nil {
+			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %v", err)
+		}
+	} else {
+		evictPolicy, err := redisClient.ConfigGet(evictPolicyConfigKey).Result()
+		if err != nil {
+			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %v", err)
+		}
+
+		if evictPolicy[1] != "allkeys-lru" {
+			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
+		}
+	}
+
+	// =========================================================================
+	// Deploy
+	switch cfg.CMD {
+	case "sync-static":
+		// sync static files to S3
+		if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
+			err = deploy.SyncS3StaticFiles(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticDir)
+			if err != nil {
+				log.Fatalf("main : deploy : %v", err)
+			}
+		}
+		return
+	}
+
+	// =========================================================================
+	// URL Formatter
+	// s3UrlFormatter is a help function used by to convert an s3 key to
+	// a publicly available image URL.
+	var staticS3UrlFormatter func(string) string
+	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled || cfg.App.StaticS3.ImgResizeEnabled {
+		s3UrlFormatter, err := deploy.S3UrlFormatter(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticS3.CloudFrontEnabled)
+		if err != nil {
+			log.Fatalf("main : S3UrlFormatter failed : %v", err)
+		}
+
+		staticS3UrlFormatter = func(p string) string {
+			// When the path starts with a forward slash its referencing a local file,
+			// make sure the static file prefix is included
+			if strings.HasPrefix(p, "/") {
+				p = filepath.Join(cfg.App.StaticS3.S3KeyPrefix, p)
+			}
+			return s3UrlFormatter(p)
+		}
+	}
+
+	// staticUrlFormatter is a help function used by template functions defined below.
+	// If the app has an S3 bucket defined for the static directory, all references in the app
+	// templates should be updated to use a fully qualified URL for either the public file on S3
+	// on from the cloudfront distribution.
+	var staticUrlFormatter func(string) string
+	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
+		staticUrlFormatter = staticS3UrlFormatter
+	} else {
+		baseUrl, err := url.Parse(cfg.App.BaseUrl)
+		if err != nil {
+			log.Fatalf("main : url Parse(%s) : %v", cfg.App.BaseUrl, err)
+		}
+
+		staticUrlFormatter = func(p string) string {
+			baseUrl.Path = p
+			return baseUrl.String()
+		}
+	}
+
+	// =========================================================================
 	// Template Renderer
 	// Implements interface web.Renderer to support alternative renderer
-
-	var (
-		staticS3BaseUrl string
-		staticS3CloudFrontOriginPrefix string
-	)
-	if cfg.App.StaticS3.S3Bucket != "" {
-		// TODO: lookup s3 url/cloud front distribution based on s3 bucket
-	}
 
 	// Append query string value to break browser cache used for services
 	// that render responses for a browser with the following:
@@ -178,8 +312,8 @@ func main() {
 		},
 		"AssetUrl": func(p string) string {
 			var u string
-			if staticS3BaseUrl != "" {
-				u = template_renderer.S3Url(staticS3BaseUrl, staticS3CloudFrontOriginPrefix, p)
+			if staticUrlFormatter != nil {
+				u = staticUrlFormatter(p)
 			} else {
 				if !strings.HasPrefix(p, "/") {
 					p = "/" + p
@@ -187,14 +321,14 @@ func main() {
 				u = p
 			}
 
-			u = browserCacheBusterFunc( u)
+			u = browserCacheBusterFunc(u)
 
 			return u
 		},
 		"SiteAssetUrl": func(p string) string {
 			var u string
-			if staticS3BaseUrl != "" {
-				u = template_renderer.S3Url(staticS3BaseUrl, staticS3CloudFrontOriginPrefix, filepath.Join(cfg.App.Name, p))
+			if staticUrlFormatter != nil {
+				u = staticUrlFormatter(filepath.Join(cfg.App.Name, p))
 			} else {
 				if !strings.HasPrefix(p, "/") {
 					p = "/" + p
@@ -202,14 +336,14 @@ func main() {
 				u = p
 			}
 
-			u = browserCacheBusterFunc( u)
+			u = browserCacheBusterFunc(u)
 
 			return u
 		},
 		"SiteS3Url": func(p string) string {
 			var u string
-			if staticS3BaseUrl != "" {
-				u = template_renderer.S3Url(staticS3BaseUrl, staticS3CloudFrontOriginPrefix, filepath.Join(cfg.App.Name, p))
+			if staticUrlFormatter != nil {
+				u = staticUrlFormatter(filepath.Join(cfg.App.Name, p))
 			} else {
 				u = p
 			}
@@ -217,13 +351,61 @@ func main() {
 		},
 		"S3Url": func(p string) string {
 			var u string
-			if staticS3BaseUrl != "" {
-				u = template_renderer.S3Url(staticS3BaseUrl, staticS3CloudFrontOriginPrefix, p)
+			if staticUrlFormatter != nil {
+				u = staticUrlFormatter(p)
 			} else {
 				u = p
 			}
 			return u
 		},
+	}
+
+	// Image Formatter - additional functions exposed to templates for resizing images
+	// to support response web applications.
+	if cfg.App.StaticS3.ImgResizeEnabled {
+
+		imgResizeS3KeyPrefix := filepath.Join(cfg.App.StaticS3.S3KeyPrefix, "images/responsive")
+
+		tmplFuncs["S3ImgSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 480, 800}, true)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgThumbSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 480, 800}, false)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 640}, true)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgThumbSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 640}, false)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320}, true)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgThumbSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320}, false)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgSrc"] = func(ctx context.Context, p string, sizes []int) template.HTMLAttr {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, sizes, true)
+			return template.HTMLAttr(res)
+		}
+		tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
+			u := staticUrlFormatter(p)
+			res, _ := img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, size)
+			return res
+		}
 	}
 
 	//
@@ -232,8 +414,8 @@ func main() {
 	// global variables exposed for rendering of responses with templates
 	gvd := map[string]interface{}{
 		"_App": map[string]interface{}{
-			"ENV":            cfg.Env,
-			"BuildInfo":      cfg.BuildInfo,
+			"ENV":          cfg.Env,
+			"BuildInfo":    cfg.BuildInfo,
 			"BuildVersion": build,
 		},
 	}
@@ -243,11 +425,11 @@ func main() {
 		data := map[string]interface{}{}
 
 		return renderer.Render(ctx, w, r,
-			"base.tmpl", // base layout file to be used for rendering of errors
+			"base.tmpl",  // base layout file to be used for rendering of errors
 			"error.tmpl", // generic format for errors, could select based on status code
-								web.MIMETextHTMLCharsetUTF8,
-								http.StatusOK,
-								data,
+			web.MIMETextHTMLCharsetUTF8,
+			http.StatusOK,
+			data,
 		)
 	}
 
@@ -259,7 +441,7 @@ func main() {
 	enableHotReload := cfg.Env == "dev"
 
 	// Template Renderer used to generate HTML response for web experience.
-	renderer, err := template_renderer.NewTemplateRenderer(cfg.HTTP.TemplateDir, enableHotReload, gvd, t, eh)
+	renderer, err := template_renderer.NewTemplateRenderer(cfg.App.TemplateDir, enableHotReload, gvd, t, eh)
 	if err != nil {
 		log.Fatalf("main : Marshalling Config to JSON : %v", err)
 	}
@@ -295,10 +477,10 @@ func main() {
 	//
 	// /debug/vars - Added to the default mux by the expvars package.
 	// /debug/pprof - Added to the default mux by the net/http/pprof package.
-	if cfg.HTTP.DebugHost != "" {
+	if cfg.App.DebugHost != "" {
 		go func() {
-			log.Printf("main : Debug Listening %s", cfg.HTTP.DebugHost)
-			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.HTTP.DebugHost, http.DefaultServeMux))
+			log.Printf("main : Debug Listening %s", cfg.App.DebugHost)
+			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.App.DebugHost, http.DefaultServeMux))
 		}()
 	}
 
@@ -312,7 +494,7 @@ func main() {
 
 	api := http.Server{
 		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.APP(shutdown, log, cfg.HTTP.StaticDir, cfg.HTTP.TemplateDir, nil, nil, renderer),
+		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, nil, nil, renderer),
 		ReadTimeout:    cfg.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,
@@ -340,13 +522,13 @@ func main() {
 		log.Printf("main : %v : Start shutdown..", sig)
 
 		// Create context for Shutdown call.
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
 		defer cancel()
 
 		// Asking listener to shutdown and load shed.
 		err := api.Shutdown(ctx)
 		if err != nil {
-			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.HTTP.ShutdownTimeout, err)
+			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
 			err = api.Close()
 		}
 
@@ -382,38 +564,3 @@ func browserCacheBuster(cacheBusterValueFunc func() string) func(uri string) str
 
 	return f
 }
-
-/*
-	"S3ImgSrcLarge": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320, 480, 800}, true)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgThumbSrcLarge": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320, 480, 800}, false)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgSrcMedium": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320, 640}, true)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgThumbSrcMedium": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320, 640}, false)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgSrcSmall": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320}, true)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgThumbSrcSmall": func(p string) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, []int{320}, false)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgSrc": func(p string, sizes []int) template.HTMLAttr {
-			res, _ := blower_display.S3ImgSrc(cfg, site, p, sizes, true)
-			return template.HTMLAttr(res)
-		},
-		"S3ImgUrl": func(p string, size int) string {
-			res, _ := blower_display.S3ImgUrl(cfg, site, p, size)
-			return res
-		},
- */

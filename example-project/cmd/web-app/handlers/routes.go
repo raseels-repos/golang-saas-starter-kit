@@ -21,14 +21,14 @@ func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
-		MasterDB:       masterDB,
+		MasterDB: masterDB,
 		Renderer: renderer,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 
 	// Register user management and authentication endpoints.
 	u := User{
-		MasterDB:       masterDB,
+		MasterDB: masterDB,
 		Renderer: renderer,
 	}
 
@@ -38,7 +38,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string
 
 	// Register root
 	r := Root{
-		MasterDB:       masterDB,
+		MasterDB: masterDB,
 		Renderer: renderer,
 	}
 	// This route is not authenticated
@@ -46,7 +46,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string
 	app.Handle("GET", "/", r.Index)
 
 	// Static file server
-	app.Handle("GET", "/*", web.Static(staticDir,""))
+	app.Handle("GET", "/*", web.Static(staticDir, ""))
 
 	return app
 }

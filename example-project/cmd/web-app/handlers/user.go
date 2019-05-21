@@ -11,7 +11,7 @@ import (
 
 // User represents the User API method handler set.
 type User struct {
-	MasterDB       *db.DB
+	MasterDB *db.DB
 	Renderer web.Renderer
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }

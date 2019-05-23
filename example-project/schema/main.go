@@ -9,11 +9,11 @@ import (
 	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
+	"github.com/gitwak/sqlxmigrate"
 	"github.com/kelseyhightower/envconfig"
+	_ "github.com/lib/pq"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
-	"github.com/gitwak/sqlxmigrate"
-	_ "github.com/lib/pq"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.

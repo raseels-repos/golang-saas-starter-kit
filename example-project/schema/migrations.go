@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	"github.com/gitwak/sqlxmigrate"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 )
 
 // migrationList returns a list of migrations to be executed. If the id of the

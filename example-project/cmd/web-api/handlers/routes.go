@@ -7,12 +7,12 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"github.com/jmoiron/sqlx"
 )
 
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, log *log.Logger, masterDB *db.DB, authenticator *auth.Authenticator) http.Handler {
+func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, authenticator *auth.Authenticator) http.Handler {
 
 	// Construct the web.App which holds all routes as well as common Middleware.
 	app := web.NewApp(shutdown, log, mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics())

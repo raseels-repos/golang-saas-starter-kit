@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"go.opencensus.io/trace"
-	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -23,16 +23,17 @@ var (
 )
 
 // List retrieves a list of existing projects from the database.
-func List(ctx context.Context, dbConn *db.DB) ([]Project, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.project.List")
-	defer span.End()
+func List(ctx context.Context, dbConn *sqlx.DB) ([]Project, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.List")
+	defer span.Finish()
 
 	p := []Project{}
 
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(nil).All(&p)
 	}
-	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+
+	if _, err := dbConn.ExecContext(ctx, projectsCollection, f); err != nil {
 		return nil, errors.Wrap(err, "db.projects.find()")
 	}
 
@@ -40,9 +41,9 @@ func List(ctx context.Context, dbConn *db.DB) ([]Project, error) {
 }
 
 // Retrieve gets the specified project from the database.
-func Retrieve(ctx context.Context, dbConn *db.DB, id string) (*Project, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.project.Retrieve")
-	defer span.End()
+func Retrieve(ctx context.Context, dbConn *sqlx.DB, id string) (*Project, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Retrieve")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return nil, ErrInvalidID
@@ -54,20 +55,20 @@ func Retrieve(ctx context.Context, dbConn *db.DB, id string) (*Project, error) {
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(q).One(&p)
 	}
-	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.find(%s)", db.Query(q)))
+		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.find(%s)", q))
 	}
 
 	return p, nil
 }
 
 // Create inserts a new project into the database.
-func Create(ctx context.Context, dbConn *db.DB, cp *NewProject, now time.Time) (*Project, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.project.Create")
-	defer span.End()
+func Create(ctx context.Context, dbConn *sqlx.DB, cp *NewProject, now time.Time) (*Project, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Create")
+	defer span.Finish()
 
 	// Mongo truncates times to milliseconds when storing. We and do the same
 	// here so the value we return is consistent with what we store.
@@ -85,17 +86,17 @@ func Create(ctx context.Context, dbConn *db.DB, cp *NewProject, now time.Time) (
 	f := func(collection *mgo.Collection) error {
 		return collection.Insert(&p)
 	}
-	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.insert(%s)", db.Query(&p)))
+	if _, err := dbConn.ExecContext(ctx, projectsCollection, f); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("db.projects.insert(%v)", &p))
 	}
 
 	return &p, nil
 }
 
 // Update replaces a project document in the database.
-func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProject, now time.Time) error {
-	ctx, span := trace.StartSpan(ctx, "internal.project.Update")
-	defer span.End()
+func Update(ctx context.Context, dbConn *sqlx.DB, id string, upd UpdateProject, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Update")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return ErrInvalidID
@@ -126,20 +127,20 @@ func Update(ctx context.Context, dbConn *db.DB, id string, upd UpdateProject, no
 	f := func(collection *mgo.Collection) error {
 		return collection.Update(q, m)
 	}
-	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}
-		return errors.Wrap(err, fmt.Sprintf("db.customers.update(%s, %s)", db.Query(q), db.Query(m)))
+		return errors.Wrap(err, fmt.Sprintf("db.customers.update(%s, %s)", q, m))
 	}
 
 	return nil
 }
 
 // Delete removes a project from the database.
-func Delete(ctx context.Context, dbConn *db.DB, id string) error {
-	ctx, span := trace.StartSpan(ctx, "internal.project.Delete")
-	defer span.End()
+func Delete(ctx context.Context, dbConn *sqlx.DB, id string) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return ErrInvalidID
@@ -150,7 +151,7 @@ func Delete(ctx context.Context, dbConn *db.DB, id string) error {
 	f := func(collection *mgo.Collection) error {
 		return collection.Remove(q)
 	}
-	if err := dbConn.Execute(ctx, projectsCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, projectsCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}

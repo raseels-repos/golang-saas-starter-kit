@@ -3,16 +3,16 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"log"
 	"os"
 	"runtime/debug"
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/docker"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"
 )
 
@@ -25,7 +25,7 @@ const (
 // Test owns state for running/shutting down tests.
 type Test struct {
 	Log        *log.Logger
-	MasterDB   *db.DB
+	MasterDB   *sqlx.DB
 	container  *docker.Container
 	AwsSession *session.Session
 }

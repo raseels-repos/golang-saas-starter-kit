@@ -84,13 +84,13 @@ func main() {
 			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
 		}
 		DB struct {
-			Host        string        `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
-			User        string        `default:"postgres" envconfig:"DB_USER"`
-			Pass        string        `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
-			Database        string        `default:"shared" envconfig:"DB_DATABASE"`
-			Driver        string        `default:"postgres" envconfig:"DB_DRIVER"`
-			Timezone        string        `default:"utc" envconfig:"DB_TIMEZONE"`
-			DisableTLS        bool        `default:"false" envconfig:"DB_DISABLE_TLS"`
+			Host       string `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
+			User       string `default:"postgres" envconfig:"DB_USER"`
+			Pass       string `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
+			Database   string `default:"shared" envconfig:"DB_DATABASE"`
+			Driver     string `default:"postgres" envconfig:"DB_DRIVER"`
+			Timezone   string `default:"utc" envconfig:"DB_TIMEZONE"`
+			DisableTLS bool   `default:"false" envconfig:"DB_DISABLE_TLS"`
 		}
 		Trace struct {
 			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
@@ -180,10 +180,6 @@ func main() {
 		}
 		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
-
-	// TODO: Validate what is being written to the logs. We don't
-	// want to leak credentials or anything that can be a security risk.
-	log.Printf("main : Config : %v\n", string(cfgJSON))
 
 	// =========================================================================
 	// Init AWS Session

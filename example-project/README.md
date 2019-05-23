@@ -198,6 +198,8 @@ additianal info required here in readme
 
 need to copy sample.env_docker_compose to .env_docker_compose and defined your aws configs for docker-compose
 
+need to add mid tracer for all requests
+
 
 /*
 ZipKin: http://localhost:9411

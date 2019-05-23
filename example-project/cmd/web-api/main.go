@@ -14,8 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-redis/redis"
-	"github.com/lib/pq"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
@@ -23,7 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/lib/pq"
 	"go.opencensus.io/trace"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
@@ -56,9 +56,9 @@ func main() {
 			WriteTimeout time.Duration `default:"5s" envconfig:"HTTPS_WRITE_TIMEOUT"`
 		}
 		App struct {
-			Name        string `default:"web-api" envconfig:"APP_NAME"`
-			BaseUrl     string `default:"" envconfig:"APP_BASE_URL"`
-			TemplateDir string `default:"./templates" envconfig:"APP_TEMPLATE_DIR"`
+			Name            string        `default:"web-api" envconfig:"APP_NAME"`
+			BaseUrl         string        `default:"" envconfig:"APP_BASE_URL"`
+			TemplateDir     string        `default:"./templates" envconfig:"APP_TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"APP_DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"APP_SHUTDOWN_TIMEOUT"`
 		}
@@ -69,13 +69,13 @@ func main() {
 			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
 		}
 		DB struct {
-			Host        string        `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
-			User        string        `default:"postgres" envconfig:"DB_USER"`
-			Pass        string        `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
-			Database        string        `default:"shared" envconfig:"DB_DATABASE"`
-			Driver        string        `default:"postgres" envconfig:"DB_DRIVER"`
-			Timezone        string        `default:"utc" envconfig:"DB_TIMEZONE"`
-			DisableTLS        bool        `default:"false" envconfig:"DB_DISABLE_TLS"`
+			Host       string `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
+			User       string `default:"postgres" envconfig:"DB_USER"`
+			Pass       string `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
+			Database   string `default:"shared" envconfig:"DB_DATABASE"`
+			Driver     string `default:"postgres" envconfig:"DB_DRIVER"`
+			Timezone   string `default:"utc" envconfig:"DB_TIMEZONE"`
+			DisableTLS bool   `default:"false" envconfig:"DB_DISABLE_TLS"`
 		}
 		Trace struct {
 			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
@@ -305,7 +305,7 @@ func main() {
 
 	api := http.Server{
 		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.API(shutdown, log, masterDB, authenticator),
+		Handler:        handlers.API(shutdown, log, masterDb, authenticator),
 		ReadTimeout:    cfg.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,
@@ -333,13 +333,13 @@ func main() {
 		log.Printf("main : %v : Start shutdown..", sig)
 
 		// Create context for Shutdown call.
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
 		defer cancel()
 
 		// Asking listener to shutdown and load shed.
 		err := api.Shutdown(ctx)
 		if err != nil {
-			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.HTTP.ShutdownTimeout, err)
+			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
 			err = api.Close()
 		}
 

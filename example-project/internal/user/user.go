@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/db"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"go.opencensus.io/trace"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -32,16 +32,16 @@ var (
 )
 
 // List retrieves a list of existing users from the database.
-func List(ctx context.Context, dbConn *db.DB) ([]User, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.user.List")
-	defer span.End()
+func List(ctx context.Context, dbConn *sqlx.DB) ([]User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.List")
+	defer span.Finish()
 
 	u := []User{}
 
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(nil).All(&u)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
 		return nil, errors.Wrap(err, "db.users.find()")
 	}
 
@@ -49,9 +49,9 @@ func List(ctx context.Context, dbConn *db.DB) ([]User, error) {
 }
 
 // Retrieve gets the specified user from the database.
-func Retrieve(ctx context.Context, claims auth.Claims, dbConn *db.DB, id string) (*User, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.user.Retrieve")
-	defer span.End()
+func Retrieve(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Retrieve")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return nil, ErrInvalidID
@@ -68,20 +68,20 @@ func Retrieve(ctx context.Context, claims auth.Claims, dbConn *db.DB, id string)
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(q).One(&u)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("db.users.find(%s)", db.Query(q)))
+		return nil, errors.Wrap(err, fmt.Sprintf("db.users.find(%s)", q))
 	}
 
 	return u, nil
 }
 
 // Create inserts a new user into the database.
-func Create(ctx context.Context, dbConn *db.DB, nu *NewUser, now time.Time) (*User, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.user.Create")
-	defer span.End()
+func Create(ctx context.Context, dbConn *sqlx.DB, nu *NewUser, now time.Time) (*User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Create")
+	defer span.Finish()
 
 	// Mongo truncates times to milliseconds when storing. We and do the same
 	// here so the value we return is consistent with what we store.
@@ -105,17 +105,17 @@ func Create(ctx context.Context, dbConn *db.DB, nu *NewUser, now time.Time) (*Us
 	f := func(collection *mgo.Collection) error {
 		return collection.Insert(&u)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("db.users.insert(%s)", db.Query(&u)))
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("db.users.insert(%s)", &u))
 	}
 
 	return &u, nil
 }
 
 // Update replaces a user document in the database.
-func Update(ctx context.Context, dbConn *db.DB, id string, upd *UpdateUser, now time.Time) error {
-	ctx, span := trace.StartSpan(ctx, "internal.user.Update")
-	defer span.End()
+func Update(ctx context.Context, dbConn *sqlx.DB, id string, upd *UpdateUser, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return ErrInvalidID
@@ -153,20 +153,20 @@ func Update(ctx context.Context, dbConn *db.DB, id string, upd *UpdateUser, now 
 	f := func(collection *mgo.Collection) error {
 		return collection.Update(q, m)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}
-		return errors.Wrap(err, fmt.Sprintf("db.customers.update(%s, %s)", db.Query(q), db.Query(m)))
+		return errors.Wrap(err, fmt.Sprintf("db.customers.update(%s, %s)", q, m))
 	}
 
 	return nil
 }
 
 // Delete removes a user from the database.
-func Delete(ctx context.Context, dbConn *db.DB, id string) error {
-	ctx, span := trace.StartSpan(ctx, "internal.user.Delete")
-	defer span.End()
+func Delete(ctx context.Context, dbConn *sqlx.DB, id string) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Delete")
+	defer span.Finish()
 
 	if !bson.IsObjectIdHex(id) {
 		return ErrInvalidID
@@ -177,11 +177,11 @@ func Delete(ctx context.Context, dbConn *db.DB, id string) error {
 	f := func(collection *mgo.Collection) error {
 		return collection.Remove(q)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
 		if err == mgo.ErrNotFound {
 			return ErrNotFound
 		}
-		return errors.Wrap(err, fmt.Sprintf("db.users.remove(%s)", db.Query(q)))
+		return errors.Wrap(err, fmt.Sprintf("db.users.remove(%s)", q))
 	}
 
 	return nil
@@ -195,9 +195,9 @@ type TokenGenerator interface {
 
 // Authenticate finds a user by their email and verifies their password. On
 // success it returns a Token that can be used to authenticate in the future.
-func Authenticate(ctx context.Context, dbConn *db.DB, tknGen TokenGenerator, now time.Time, email, password string) (Token, error) {
-	ctx, span := trace.StartSpan(ctx, "internal.user.Authenticate")
-	defer span.End()
+func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, now time.Time, email, password string) (Token, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Authenticate")
+	defer span.Finish()
 
 	q := bson.M{"email": email}
 
@@ -205,14 +205,14 @@ func Authenticate(ctx context.Context, dbConn *db.DB, tknGen TokenGenerator, now
 	f := func(collection *mgo.Collection) error {
 		return collection.Find(q).One(&u)
 	}
-	if err := dbConn.Execute(ctx, usersCollection, f); err != nil {
+	if _, err := dbConn.ExecContext(ctx, usersCollection, f); err != nil {
 
 		// Normally we would return ErrNotFound in this scenario but we do not want
 		// to leak to an unauthenticated user which emails are in the system.
 		if err == mgo.ErrNotFound {
 			return Token{}, ErrAuthenticationFailure
 		}
-		return Token{}, errors.Wrap(err, fmt.Sprintf("db.users.find(%s)", db.Query(q)))
+		return Token{}, errors.Wrap(err, fmt.Sprintf("db.users.find(%s)", q))
 	}
 
 	// Compare the provided password with the saved hash. Use the bcrypt

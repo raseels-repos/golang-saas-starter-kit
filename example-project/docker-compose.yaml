@@ -4,63 +4,117 @@
 # docker-compose down
 version: '3'
 
-networks:
-  shared-network:
-    driver: bridge
-
 services:
-
-  # This starts a local mongo DB.
-  mongo:
-    container_name: mongo
-    networks:
-      - shared-network
-    image: mongo:3-jessie
+  postgres:
+    container_name: postgres
+    image: postgres:11-alpine
+    expose:
+      - "5433"
     ports:
-      - 27017:27017
-    command: --bind_ip 0.0.0.0
-
-  # This is the core CRUD based service.
-  web-api:
-    container_name: web-api
-    networks:
-      - shared-network
-    image: gcr.io/web-api/web-api-amd64:1.0
-    ports:
-      - 3000:3000 # CRUD API
-      - 4000:4000 # DEBUG API
+      - "5433:5432"
     environment:
-      - WEB_APP_AUTH_KEY_ID=1
-      # - WEB_APP_DB_HOST=got:got2015@ds039441.mongolab.com:39441/gotraining
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=postgres
+      - POSTGRES_DB=shared
+
+  redis:
+    image: redis:latest
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+    entrypoint: redis-server --appendonly yes
+
+  datadog:
+    container_name: datadog
+    build:
+      context: .
+      dockerfile: docker/datadog-agent/Dockerfile
+      image: example-project/datadog:latest
+    ports:
+      - 8125:8125
+      - 8126:8126
+    env_file:
+      - .env_docker_compose
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_LOGS_ENABLED=true
+      - DD_APM_ENABLED=true
+      - DD_RECEIVER_PORT=8126
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_TAGS=source:docker env:dev
+      - DD_DOGSTATSD_ORIGIN_DETECTION=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - ECS_FARGATE=false
+
+  web-app:
+    container_name: web-app
+    build:
+      context: .
+      dockerfile: cmd/web-app/Dockerfile
+      image: example-project/web-api:latest
+    ports:
+      - 3000:3000 # WEB APP
+      - 4000:4000 # DEBUG API
+    links:
+      - postgres
+      - redis
+      - datadog
+    env_file:
+      - .env_docker_compose
+    environment:
+      - WEB_APP_HTTP_HOST=0.0.0.0:3000
+      - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
+      - WEB_APP_REDIS_HOST=redis
+      - WEB_APP_DB_HOST=postgres
+      - WEB_APP_DB_USER=postgres
+      - WEB_APP_DB_PASS=postgres
+      - WEB_APP_DB_DATABASE=shared
+      - WEB_APP_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - WEB_APP_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - WEB_APP_AWS_REGION=${AWS_REGION}
+      - WEB_APP_AWS_USE_ROLE=${AWS_USE_ROLE}
+      - DD_TRACE_AGENT_HOSTNAME=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE_NAME=web-app
+      - DD_ENV=dev
       # - GODEBUG=gctrace=1
 
-  # This sidecar publishes metrics to the console by default.
-  metrics:
-    container_name: metrics
-    networks:
-      - shared-network
-    image: gcr.io/web-api/metrics-amd64:1.0
+  web-api:
+    container_name: web-api
+    build:
+      context: .
+      dockerfile: cmd/web-api/Dockerfile
+      image: example-project/web-api:latest
     ports:
-      - 3001:3001 # EXPVAR API
+      - 3001:3001 # WEB API
       - 4001:4001 # DEBUG API
+    links:
+      - postgres
+      - redis
+      - datadog
+    env_file:
+      - .env_docker_compose
+    environment:
+      - WEB_API_HTTP_HOST=0.0.0.0:3001
+      - WEB_API_APP_BASE_URL=http://127.0.0.1:3001
+      - WEB_API_REDIS_HOST=redis
+      - WEB_API_DB_HOST=postgres
+      - WEB_API_DB_USER=postgres
+      - WEB_API_DB_PASS=postgres
+      - WEB_API_DB_DATABASE=shared
+      - WEB_API_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - WEB_API_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - WEB_API_AWS_REGION=${AWS_REGION}
+      - WEB_API_AWS_USE_ROLE=${AWS_USE_ROLE}
+      - DD_TRACE_AGENT_HOSTNAME=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE_NAME=web-app
+      - DD_ENV=dev
+      # - GODEBUG=gctrace=1
 
-  # This sidecar publishes tracing to the console by default.
-  tracer:
-    container_name: tracer
-    networks:
-      - shared-network
-    image: gcr.io/web-api/tracer-amd64:1.0
-    ports:
-      - 3002:3002 # TRACER API
-      - 4002:4002 # DEBUG API
-    # environment:
-      # - WEB_APP_ZIPKIN_HOST=http://zipkin:9411/api/v2/spans
 
-  # This sidecar allows for the viewing of traces.
-  zipkin:
-    container_name: zipkin
-    networks:
-      - shared-network
-    image: openzipkin/zipkin:2.11
-    ports:
-      - 9411:9411
+
+
+

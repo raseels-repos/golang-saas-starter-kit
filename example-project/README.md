@@ -143,9 +143,28 @@ To make authenticated requests put the token in the `Authorization` header with 
 $ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 ```
 
+
+## Making db calls
+Currently postgres is only supported for sqlxmigrate. MySQL should be easy to add after determing 
+better method for abstracting the create table and other SQL statements from the main
+testing logic. 
+
+### bindvars
+When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
+To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to 
+remap the placeholders to the correct database.
+
+```go
+sqlQueryStr = db.Rebind(sqlQueryStr)
+```
+
+For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
+
+
 ## What's Next
 
 We are in the process of writing more documentation about this code. Classes are being finalized as part of the Ultimate series.
+
 
 
 
@@ -171,3 +190,24 @@ Additional permissions required for unittests
 secretsmanager:DeleteSecret
 ```
 
+
+
+
+### TODO:
+additianal info required here in readme
+
+need to copy sample.env_docker_compose to .env_docker_compose and defined your aws configs for docker-compose
+
+
+/*
+ZipKin: http://localhost:9411
+AddLoad: hey -m GET -c 10 -n 10000 "http://localhost:3000/v1/users"
+expvarmon -ports=":3001" -endpoint="/metrics" -vars="requests,goroutines,errors,mem:memstats.Alloc"
+*/
+
+/*
+Need to figure out timeouts for http service.
+You might want to reset your DB_HOST env var during test tear down.
+Service should start even without a DB running yet.
+symbols in profiles: https://github.com/golang/go/issues/23376 / https://github.com/google/pprof/pull/366
+*/

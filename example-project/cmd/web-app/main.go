@@ -30,9 +30,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/lib/pq"
 	"go.opencensus.io/trace"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
+	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
+	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
@@ -74,6 +77,41 @@ func main() {
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"APP_DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"APP_SHUTDOWN_TIMEOUT"`
 		}
+		Redis struct {
+			DialTimeout     time.Duration `default:"5s" envconfig:"REDIS_DIAL_TIMEOUT"`
+			Host            string        `default:":6379" envconfig:"REDIS_HOST"`
+			DB              int           `default:"1" envconfig:"REDIS_DB"`
+			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
+		}
+		DB struct {
+			Host        string        `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
+			User        string        `default:"postgres" envconfig:"DB_USER"`
+			Pass        string        `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
+			Database        string        `default:"shared" envconfig:"DB_DATABASE"`
+			Driver        string        `default:"postgres" envconfig:"DB_DRIVER"`
+			Timezone        string        `default:"utc" envconfig:"DB_TIMEZONE"`
+			DisableTLS        bool        `default:"false" envconfig:"DB_DISABLE_TLS"`
+		}
+		Trace struct {
+			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
+			BatchSize    int           `default:"1000" envconfig:"TRACE_BATCH_SIZE"`
+			SendInterval time.Duration `default:"15s" envconfig:"TRACE_SEND_INTERVAL"`
+			SendTimeout  time.Duration `default:"500ms" envconfig:"TRACE_SEND_TIMEOUT"`
+		}
+		AwsAccount struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+
+			// Get an AWS session from an implicit source if no explicit
+			// configuration is provided. This is useful for taking advantage of
+			// EC2/ECS instance roles.
+			UseRole bool `envconfig:"AWS_USE_ROLE"`
+		}
+		Auth struct {
+			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
+			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
+		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
 			CiCommitRefSlug     string `envconfig:"CI_COMMIT_REF_SLUG"`
@@ -86,42 +124,15 @@ func main() {
 			CiPipelineId        string `envconfig:"CI_COMMIT_PIPELINE_ID"`
 			CiPipelineUrl       string `envconfig:"CI_COMMIT_PIPELINE_URL"`
 		}
-		Redis struct {
-			DialTimeout     time.Duration `default:"5s" envconfig:"REDIS_DIAL_TIMEOUT"`
-			Host            string        `default:":6379" envconfig:"REDIS_HOST"`
-			DB              int           `default:"1" envconfig:"REDIS_DB"`
-			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
-		}
-		DB struct {
-			DialTimeout time.Duration `default:"5s" envconfig:"DB_DIAL_TIMEOUT"`
-			Host        string        `default:"mongo:27017/gotraining" envconfig:"DB_HOST"`
-		}
-		Trace struct {
-			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
-			BatchSize    int           `default:"1000" envconfig:"TRACE_BATCH_SIZE"`
-			SendInterval time.Duration `default:"15s" envconfig:"TRACE_SEND_INTERVAL"`
-			SendTimeout  time.Duration `default:"500ms" envconfig:"TRACE_SEND_TIMEOUT"`
-		}
-		AwsAccount struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY"`
-			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
-
-			// Get an AWS session from an implicit source if no explicit
-			// configuration is provided. This is useful for taking advantage of
-			// EC2/ECS instance roles.
-			UseRole bool `envconfig:"AWS_USE_ROLE"`
-		}
-		Auth struct {
-			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
-			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
-		}
 		CMD string `envconfig:"CMD"`
 	}
 
-	// !!! This prefix seems buried, if you copy and paste this main.go
-	// 		file, its likely you will forget to update this.
-	if err := envconfig.Process("WEB_APP", &cfg); err != nil {
+	// The prefix used for loading env variables.
+	// ie: export WEB_APP_ENV=dev
+	envKeyPrefix := "WEB_APP"
+
+	// For additional details refer to https://github.com/kelseyhightower/envconfig
+	if err := envconfig.Process(envKeyPrefix, &cfg); err != nil {
 		log.Fatalf("main : Parsing Config : %v", err)
 	}
 
@@ -131,6 +142,9 @@ func main() {
 		}
 		return // We displayed help.
 	}
+
+	// =========================================================================
+	// Config Validation & Defaults
 
 	// If base URL is empty, set the default value from the HTTP Host
 	if cfg.App.BaseUrl == "" {
@@ -149,16 +163,22 @@ func main() {
 	}
 
 	// =========================================================================
-	// App Starting
+	// Log App Info
 
 	// Print the build version for our logs. Also expose it under /debug/vars.
 	expvar.NewString("build").Set(build)
 	log.Printf("main : Started : Application Initializing version %q", build)
 	defer log.Println("main : Completed")
 
-	cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		log.Fatalf("main : Marshalling Config to JSON : %v", err)
+	// Print the config for our logs. It's important to any credentials in the config
+	// that could expose a security risk are excluded from being json encoded by
+	// applying the tag `json:"-"` to the struct var.
+	{
+		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
+		if err != nil {
+			log.Fatalf("main : Marshalling Config to JSON : %v", err)
+		}
+		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
 
 	// TODO: Validate what is being written to the logs. We don't
@@ -199,7 +219,7 @@ func main() {
 	// if the maxmemory policy is set for redis, make sure its set on the cluster
 	// default not set and will based on the redis config values defined on the server
 	if cfg.Redis.MaxmemoryPolicy != "" {
-		err = redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
+		err := redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
 		if err != nil {
 			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %v", err)
 		}
@@ -213,6 +233,42 @@ func main() {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
 	}
+
+	// =========================================================================
+	// Start Database
+	var dbUrl url.URL
+	{
+		// Query parameters.
+		var q url.Values
+
+		// Handle SSL Mode
+		if cfg.DB.DisableTLS {
+			q.Set("sslmode", "disable")
+		} else {
+			q.Set("sslmode", "require")
+		}
+
+		q.Set("timezone", cfg.DB.Timezone)
+
+		// Construct url.
+		dbUrl = url.URL{
+			Scheme:   cfg.DB.Driver,
+			User:     url.UserPassword(cfg.DB.User, cfg.DB.Pass),
+			Host:     cfg.DB.Host,
+			Path:     cfg.DB.Database,
+			RawQuery: q.Encode(),
+		}
+	}
+
+	// Register informs the sqlxtrace package of the driver that we will be using in our program.
+	// It uses a default service name, in the below case "postgres.db". To use a custom service
+	// name use RegisterWithServiceName.
+	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName("my-service"))
+	masterDb, err := sqlxtrace.Open(cfg.DB.Driver, dbUrl.String())
+	if err != nil {
+		log.Fatalf("main : Register DB : %s : %v", cfg.DB.Driver, err)
+	}
+	defer masterDb.Close()
 
 	// =========================================================================
 	// Deploy
@@ -494,7 +550,7 @@ func main() {
 
 	api := http.Server{
 		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, nil, nil, renderer),
+		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, masterDb, nil, renderer),
 		ReadTimeout:    cfg.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,

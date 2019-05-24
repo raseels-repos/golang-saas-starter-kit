@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"runtime"
 
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"go.opencensus.io/trace"
 )
 
 // m contains the global program counters for the application.
@@ -29,8 +29,8 @@ func Metrics() web.Middleware {
 
 		// Wrap this handler around the next one provided.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-			ctx, span := trace.StartSpan(ctx, "internal.mid.Metrics")
-			defer span.End()
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Metrics")
+			defer span.Finish()
 
 			err := before(ctx, w, r, params)
 

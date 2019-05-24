@@ -2,8 +2,8 @@ FROM datadog/agent:latest
 
 LABEL maintainer="lee@geeksinthewoods.com"
 
-#COPY target/go_expvar.conf.yaml /etc/datadog-agent/conf.d/go_expvar.d/conf.yaml
-COPY target/custom-init.sh /custom-init.sh
+#COPY go_expvar.conf.yaml /etc/datadog-agent/conf.d/go_expvar.d/conf.yaml
+COPY custom-init.sh /custom-init.sh
 
 ARG service
 ENV SERVICE_NAME $service

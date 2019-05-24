@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"go.opencensus.io/trace"
 )
 
 // Logger writes some information about the request to the logs in the
@@ -19,8 +19,8 @@ func Logger(log *log.Logger) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-			ctx, span := trace.StartSpan(ctx, "internal.mid.Logger")
-			defer span.End()
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Logger")
+			defer span.Finish()
 
 			// If the context is missing this value, request the service
 			// to be shutdown gracefully.
@@ -31,8 +31,8 @@ func Logger(log *log.Logger) web.Middleware {
 
 			err := before(ctx, w, r, params)
 
-			log.Printf("%s : (%d) : %s %s -> %s (%s)\n",
-				v.TraceID,
+			log.Printf("%d : (%d) : %s %s -> %s (%s)\n",
+				span.Context().TraceID(),
 				v.StatusCode,
 				r.Method, r.URL.Path,
 				r.RemoteAddr, time.Since(v.Now),

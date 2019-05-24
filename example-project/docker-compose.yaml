@@ -4,14 +4,20 @@
 # docker-compose down
 version: '3'
 
+networks:
+  main:
+
 services:
   postgres:
-    container_name: postgres
     image: postgres:11-alpine
     expose:
       - "5433"
     ports:
       - "5433:5432"
+    networks:
+      main:
+        aliases:
+          - postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASS=postgres
@@ -23,21 +29,27 @@ services:
       - "6379"
     ports:
       - "6379:6379"
+    networks:
+      main:
+        aliases:
+          - redis
     entrypoint: redis-server --appendonly yes
 
   datadog:
-    container_name: datadog
+    image: example-project/datadog:latest
     build:
-      context: .
-      dockerfile: docker/datadog-agent/Dockerfile
-      image: example-project/datadog:latest
+      context: docker/datadog-agent
+      dockerfile: Dockerfile
     ports:
-      - 8125:8125
-      - 8126:8126
+      - 8125:8125 # metrics
+      - 8126:8126 # tracing
+    networks:
+      main:
+        aliases:
+          - datadog
     env_file:
       - .env_docker_compose
     environment:
-      - DD_API_KEY=${DD_API_KEY}
       - DD_LOGS_ENABLED=true
       - DD_APM_ENABLED=true
       - DD_RECEIVER_PORT=8126
@@ -46,17 +58,20 @@ services:
       - DD_TAGS=source:docker env:dev
       - DD_DOGSTATSD_ORIGIN_DETECTION=true
       - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
-      - ECS_FARGATE=false
-
+      #- ECS_FARGATE=false
+      - DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
   web-app:
-    container_name: web-app
+    image: example-project/web-app:latest
     build:
       context: .
       dockerfile: cmd/web-app/Dockerfile
-      image: example-project/web-api:latest
     ports:
       - 3000:3000 # WEB APP
       - 4000:4000 # DEBUG API
+    networks:
+      main:
+        aliases:
+          - web-app
     links:
       - postgres
       - redis
@@ -66,15 +81,12 @@ services:
     environment:
       - WEB_APP_HTTP_HOST=0.0.0.0:3000
       - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
-      - WEB_APP_REDIS_HOST=redis
-      - WEB_APP_DB_HOST=postgres
+      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4000
+      - WEB_APP_REDIS_HOST=redis:6379
+      - WEB_APP_DB_HOST=postgres:5433
       - WEB_APP_DB_USER=postgres
       - WEB_APP_DB_PASS=postgres
       - WEB_APP_DB_DATABASE=shared
-      - WEB_APP_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - WEB_APP_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - WEB_APP_AWS_REGION=${AWS_REGION}
-      - WEB_APP_AWS_USE_ROLE=${AWS_USE_ROLE}
       - DD_TRACE_AGENT_HOSTNAME=datadog
       - DD_TRACE_AGENT_PORT=8126
       - DD_SERVICE_NAME=web-app
@@ -82,14 +94,17 @@ services:
       # - GODEBUG=gctrace=1
 
   web-api:
-    container_name: web-api
+    image: example-project/web-api:latest
     build:
       context: .
       dockerfile: cmd/web-api/Dockerfile
-      image: example-project/web-api:latest
     ports:
       - 3001:3001 # WEB API
       - 4001:4001 # DEBUG API
+    networks:
+      main:
+        aliases:
+          - web-api
     links:
       - postgres
       - redis
@@ -99,22 +114,14 @@ services:
     environment:
       - WEB_API_HTTP_HOST=0.0.0.0:3001
       - WEB_API_APP_BASE_URL=http://127.0.0.1:3001
-      - WEB_API_REDIS_HOST=redis
-      - WEB_API_DB_HOST=postgres
+      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4001
+      - WEB_API_REDIS_HOST=redis:6379
+      - WEB_API_DB_HOST=postgres:5433
       - WEB_API_DB_USER=postgres
       - WEB_API_DB_PASS=postgres
       - WEB_API_DB_DATABASE=shared
-      - WEB_API_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - WEB_API_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - WEB_API_AWS_REGION=${AWS_REGION}
-      - WEB_API_AWS_USE_ROLE=${AWS_USE_ROLE}
       - DD_TRACE_AGENT_HOSTNAME=datadog
       - DD_TRACE_AGENT_PORT=8126
       - DD_SERVICE_NAME=web-app
       - DD_ENV=dev
       # - GODEBUG=gctrace=1
-
-
-
-
-

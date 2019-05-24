@@ -11,7 +11,7 @@ require (
 	github.com/go-playground/universal-translator v0.16.0
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/google/go-cmp v0.2.0
-	github.com/hashicorp/golang-lru v0.5.1
+	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kelseyhightower/envconfig v1.3.0
 	github.com/kr/pretty v0.1.0 // indirect
@@ -19,7 +19,7 @@ require (
 	github.com/lib/pq v1.1.1
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.1.0 // indirect
-	github.com/openzipkin/zipkin-go v0.1.1
+	github.com/openzipkin/zipkin-go v0.1.1 // indirect
 	github.com/pborman/uuid v0.0.0-20180122190007-c65b2f87fee3
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/philippgille/gokv v0.5.0 // indirect

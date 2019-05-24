@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"html/template"
 	"log"
 	"net/http"
@@ -22,7 +23,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/deploy"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/img-resize"
-	itrace "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/trace"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	template_renderer "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web/template-renderer"
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,7 +31,6 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
-	"go.opencensus.io/trace"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -53,54 +52,53 @@ func main() {
 	var cfg struct {
 		Env  string `default:"dev" envconfig:"ENV"`
 		HTTP struct {
-			Host         string        `default:"0.0.0.0:3000" envconfig:"HTTP_HOST"`
-			ReadTimeout  time.Duration `default:"10s" envconfig:"HTTP_READ_TIMEOUT"`
-			WriteTimeout time.Duration `default:"10s" envconfig:"HTTP_WRITE_TIMEOUT"`
+			Host         string        `default:"0.0.0.0:3000" envconfig:"HOST"`
+			ReadTimeout  time.Duration `default:"10s" envconfig:"READ_TIMEOUT"`
+			WriteTimeout time.Duration `default:"10s" envconfig:"WRITE_TIMEOUT"`
 		}
 		HTTPS struct {
-			Host         string        `default:"" envconfig:"HTTPS_HOST"`
-			ReadTimeout  time.Duration `default:"5s" envconfig:"HTTPS_READ_TIMEOUT"`
-			WriteTimeout time.Duration `default:"5s" envconfig:"HTTPS_WRITE_TIMEOUT"`
+			Host         string        `default:"" envconfig:"HOST"`
+			ReadTimeout  time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
+			WriteTimeout time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
 		}
 		App struct {
-			Name        string `default:"web-app" envconfig:"APP_NAME"`
-			BaseUrl     string `default:"" envconfig:"APP_BASE_URL"`
-			TemplateDir string `default:"./templates" envconfig:"APP_TEMPLATE_DIR"`
-			StaticDir   string `default:"./static" envconfig:"APP_STATIC_DIR"`
+			Name        string `default:"web-app" envconfig:"NAME"`
+			BaseUrl     string `default:"" envconfig:"BASE_URL"`
+			TemplateDir string `default:"./templates" envconfig:"TEMPLATE_DIR"`
+			StaticDir   string `default:"./static" envconfig:"STATIC_DIR"`
 			StaticS3    struct {
-				S3Enabled         bool   `envconfig:"APP_STATIC_S3_ENABLED"`
-				S3Bucket          string `envconfig:"APP_STATIC_S3_BUCKET"`
-				S3KeyPrefix       string `default:"public/web_app/static" envconfig:"APP_STATIC_S3_KEY_PREFIX"`
-				CloudFrontEnabled bool   `envconfig:"APP_STATIC_S3_CLOUDFRONT_ENABLED"`
-				ImgResizeEnabled  bool   `envconfig:"APP_STATIC_S3_IMG_RESIZE_ENABLED"`
+				S3Enabled         bool   `envconfig:"ENABLED"`
+				S3Bucket          string `envconfig:"S3_BUCKET"`
+				S3KeyPrefix       string `default:"public/web_app/static" envconfig:"KEY_PREFIX"`
+				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
+				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
-			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"APP_DEBUG_HOST"`
-			ShutdownTimeout time.Duration `default:"5s" envconfig:"APP_SHUTDOWN_TIMEOUT"`
+			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
+			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
 		Redis struct {
-			DialTimeout     time.Duration `default:"5s" envconfig:"REDIS_DIAL_TIMEOUT"`
-			Host            string        `default:":6379" envconfig:"REDIS_HOST"`
-			DB              int           `default:"1" envconfig:"REDIS_DB"`
-			MaxmemoryPolicy string        `envconfig:"REDIS_MAXMEMORY_POLICY"`
+			Host            string        `default:":6379" envconfig:"HOST"`
+			DB              int           `default:"1" envconfig:"DB"`
+			DialTimeout     time.Duration `default:"5s" envconfig:"DIAL_TIMEOUT"`
+			MaxmemoryPolicy string        `envconfig:"MAXMEMORY_POLICY"`
 		}
 		DB struct {
-			Host       string `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
-			User       string `default:"postgres" envconfig:"DB_USER"`
-			Pass       string `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
-			Database   string `default:"shared" envconfig:"DB_DATABASE"`
-			Driver     string `default:"postgres" envconfig:"DB_DRIVER"`
-			Timezone   string `default:"utc" envconfig:"DB_TIMEZONE"`
-			DisableTLS bool   `default:"false" envconfig:"DB_DISABLE_TLS"`
+			Host       string `default:"127.0.0.1:5433" envconfig:"HOST"`
+			User       string `default:"postgres" envconfig:"USER"`
+			Pass       string `default:"postgres" envconfig:"PASS" json:"-"` // don't print
+			Database   string `default:"shared" envconfig:"DATABASE"`
+			Driver     string `default:"postgres" envconfig:"DRIVER"`
+			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
+			DisableTLS bool   `default:"false" envconfig:"DISABLE_TLS"`
 		}
 		Trace struct {
-			Host         string        `default:"http://tracer:3002/v1/publish" envconfig:"TRACE_HOST"`
-			BatchSize    int           `default:"1000" envconfig:"TRACE_BATCH_SIZE"`
-			SendInterval time.Duration `default:"15s" envconfig:"TRACE_SEND_INTERVAL"`
-			SendTimeout  time.Duration `default:"500ms" envconfig:"TRACE_SEND_TIMEOUT"`
+			Host       string `default:"127.0.0.1" envconfig:"DD_TRACE_AGENT_HOSTNAME"`
+			Port       int `default:"8126" envconfig:"DD_TRACE_AGENT_PORT"`
+			AnalyticsRate float64  `default:"0.10" envconfig:"ANALYTICS_RATE"`
 		}
-		AwsAccount struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+		Aws struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID" required:"true"` // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" required:"true" json:"-"` // don't print
 			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
 
 			// Get an AWS session from an implicit source if no explicit
@@ -109,8 +107,8 @@ func main() {
 			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AUTH_AWS_SECRET_ID"`
-			KeyExpiration time.Duration `default:"3600s" envconfig:"AUTH_KEY_EXPIRATION"`
+			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
+			KeyExpiration time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
@@ -184,14 +182,14 @@ func main() {
 	// =========================================================================
 	// Init AWS Session
 	var awsSession *session.Session
-	if cfg.AwsAccount.UseRole {
+	if cfg.Aws.UseRole {
 		// Get an AWS session from an implicit source if no explicit
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
 		awsSession = session.Must(session.NewSession())
 	} else {
-		creds := credentials.NewStaticCredentials(cfg.AwsAccount.AccessKeyID, cfg.AwsAccount.SecretAccessKey, "")
-		awsSession = session.New(&aws.Config{Region: aws.String(cfg.AwsAccount.Region), Credentials: creds})
+		creds := credentials.NewStaticCredentials(cfg.Aws.AccessKeyID, cfg.Aws.SecretAccessKey, "")
+		awsSession = session.New(&aws.Config{Region: aws.String(cfg.Aws.Region), Credentials: creds})
 	}
 	awsSession = awstrace.WrapSession(awsSession)
 
@@ -235,7 +233,7 @@ func main() {
 	var dbUrl url.URL
 	{
 		// Query parameters.
-		var q url.Values
+		var q url.Values = make(map[string][]string)
 
 		// Handle SSL Mode
 		if cfg.DB.DisableTLS {
@@ -255,6 +253,7 @@ func main() {
 			RawQuery: q.Encode(),
 		}
 	}
+	log.Println("main : Started : Initialize Database")
 
 	// Register informs the sqlxtrace package of the driver that we will be using in our program.
 	// It uses a default service name, in the below case "postgres.db". To use a custom service
@@ -414,50 +413,46 @@ func main() {
 
 	// Image Formatter - additional functions exposed to templates for resizing images
 	// to support response web applications.
-	if cfg.App.StaticS3.ImgResizeEnabled {
+	imgResizeS3KeyPrefix := filepath.Join(cfg.App.StaticS3.S3KeyPrefix, "images/responsive")
 
-		imgResizeS3KeyPrefix := filepath.Join(cfg.App.StaticS3.S3KeyPrefix, "images/responsive")
+	imgSrcAttr := func(ctx context.Context, p string, sizes []int, includeOrig bool) template.HTMLAttr {
+		u := staticUrlFormatter(p)
+		var srcAttr string
+		if cfg.App.StaticS3.ImgResizeEnabled {
+			srcAttr, _ = img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, sizes, includeOrig)
+		} else {
+			srcAttr = fmt.Sprintf("src=\"%s\"", u)
+		}
+		return template.HTMLAttr(srcAttr)
+	}
 
-		tmplFuncs["S3ImgSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 480, 800}, true)
-			return template.HTMLAttr(res)
+	tmplFuncs["S3ImgSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320, 480, 800}, true)
+	}
+	tmplFuncs["S3ImgThumbSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320, 480, 800}, false)
+	}
+	tmplFuncs["S3ImgSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320, 640}, true)
+	}
+	tmplFuncs["S3ImgThumbSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320, 640}, false)
+	}
+	tmplFuncs["S3ImgSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320}, true)
+	}
+	tmplFuncs["S3ImgThumbSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, []int{320}, false)
+	}
+	tmplFuncs["S3ImgSrc"] = func(ctx context.Context, p string, sizes []int) template.HTMLAttr {
+		return imgSrcAttr(ctx, p, sizes, true)
+	}
+	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
+		imgUrl := staticUrlFormatter(p)
+		if cfg.App.StaticS3.ImgResizeEnabled {
+			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, imgUrl, size)
 		}
-		tmplFuncs["S3ImgThumbSrcLarge"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 480, 800}, false)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 640}, true)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgThumbSrcMedium"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320, 640}, false)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320}, true)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgThumbSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, []int{320}, false)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgSrc"] = func(ctx context.Context, p string, sizes []int) template.HTMLAttr {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, sizes, true)
-			return template.HTMLAttr(res)
-		}
-		tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
-			u := staticUrlFormatter(p)
-			res, _ := img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, size)
-			return res
-		}
+		return imgUrl
 	}
 
 	//
@@ -500,28 +495,11 @@ func main() {
 
 	// =========================================================================
 	// Start Tracing Support
-
-	logger := func(format string, v ...interface{}) {
-		log.Printf(format, v...)
-	}
-
-	log.Printf("main : Tracing Started : %s", cfg.Trace.Host)
-	exporter, err := itrace.NewExporter(logger, cfg.Trace.Host, cfg.Trace.BatchSize, cfg.Trace.SendInterval, cfg.Trace.SendTimeout)
-	if err != nil {
-		log.Fatalf("main : RegiTracingster : ERROR : %v", err)
-	}
-	defer func() {
-		log.Printf("main : Tracing Stopping : %s", cfg.Trace.Host)
-		batch, err := exporter.Close()
-		if err != nil {
-			log.Printf("main : Tracing Stopped : ERROR : Batch[%d] : %v", batch, err)
-		} else {
-			log.Printf("main : Tracing Stopped : Flushed Batch[%d]", batch)
-		}
-	}()
-
-	trace.RegisterExporter(exporter)
-	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	th := fmt.Sprintf("%s:%d", cfg.Trace.Host, cfg.Trace.Port)
+	log.Printf("main : Tracing Started : %s", th)
+	sr := tracer.NewRateSampler(cfg.Trace.AnalyticsRate)
+	tracer.Start(tracer.WithAgentAddr(th), tracer.WithSampler(sr))
+	defer tracer.Stop()
 
 	// =========================================================================
 	// Start Debug Service. Not concerned with shutting this down when the

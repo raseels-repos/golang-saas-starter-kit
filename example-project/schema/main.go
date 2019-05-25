@@ -30,13 +30,13 @@ func main() {
 	var cfg struct {
 		Env string `default:"dev" envconfig:"ENV"`
 		DB  struct {
-			Host       string `default:"127.0.0.1:5433" envconfig:"DB_HOST"`
-			User       string `default:"postgres" envconfig:"DB_USER"`
-			Pass       string `default:"postgres" envconfig:"DB_PASS" json:"-"` // don't print
-			Database   string `default:"shared" envconfig:"DB_DATABASE"`
-			Driver     string `default:"postgres" envconfig:"DB_DRIVER"`
-			Timezone   string `default:"utc" envconfig:"DB_TIMEZONE"`
-			DisableTLS bool   `default:"false" envconfig:"DB_DISABLE_TLS"`
+			Host       string `default:"127.0.0.1:5433" envconfig:"HOST"`
+			User       string `default:"postgres" envconfig:"USER"`
+			Pass       string `default:"postgres" envconfig:"PASS" json:"-"` // don't print
+			Database   string `default:"shared" envconfig:"DATABASE"`
+			Driver     string `default:"postgres" envconfig:"DRIVER"`
+			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
+			DisableTLS bool   `default:"false" envconfig:"DISABLE_TLS"`
 		}
 	}
 
@@ -80,7 +80,7 @@ func main() {
 	var dbUrl url.URL
 	{
 		// Query parameters.
-		var q url.Values
+		var q url.Values = make(map[string][]string)
 
 		// Handle SSL Mode
 		if cfg.DB.DisableTLS {
@@ -117,6 +117,7 @@ func main() {
 	// Load list of Schema migrations and init new sqlxmigrate client
 	migrations := migrationList(masterDb, log)
 	m := sqlxmigrate.New(masterDb, sqlxmigrate.DefaultOptions, migrations)
+	m.SetLogger(log)
 
 	// Append any schema that need to be applied if this is a fresh migration
 	// ie. the migrations database table does not exist.

@@ -14,6 +14,10 @@ github.com/gitwak/gondolier v0.0.0-20190521205431-504d297a6c42 h1:+lo4HFeG6Llcgw
 github.com/gitwak/gondolier v0.0.0-20190521205431-504d297a6c42/go.mod h1:ecEQ8e4eHeWKPf+g6ByatPM7l4QZgR3G5ZIZKvEAdCE=
 github.com/gitwak/sqlxmigrate v0.0.0-20190522211042-9625063dea5d h1:oaUPMY0F+lNUkyB5tzsQS3EC0m9Cxdglesp63i3UPso=
 github.com/gitwak/sqlxmigrate v0.0.0-20190522211042-9625063dea5d/go.mod h1:e7vYkZWKUHC2Vl0/dIiQRKR3z2HMuswoLf2IiQmnMoQ=
+github.com/gitwak/sqlxmigrate v0.0.0-20190525050002-e22c656832a9 h1:se8XE/N8ZWACgA/p86OPlE56AOuguWcS1E6eUCWP93I=
+github.com/gitwak/sqlxmigrate v0.0.0-20190525050002-e22c656832a9/go.mod h1:e7vYkZWKUHC2Vl0/dIiQRKR3z2HMuswoLf2IiQmnMoQ=
+github.com/gitwak/sqlxmigrate v0.0.0-20190525131054-1f06ba9f0748 h1:ln68Q5KHq1hCO2yxOek7ejF0ijfhRkWJqI5D5jjWF3g=
+github.com/gitwak/sqlxmigrate v0.0.0-20190525131054-1f06ba9f0748/go.mod h1:e7vYkZWKUHC2Vl0/dIiQRKR3z2HMuswoLf2IiQmnMoQ=
 github.com/go-playground/locales v0.12.1 h1:2FITxuFt/xuCNP1Acdhv62OzaCiviiE4kotfhkmOqEc=
 github.com/go-playground/locales v0.12.1/go.mod h1:IUMDtCfWo/w/mtMfIE/IG2K+Ey3ygWanZIBtBW0W2TM=
 github.com/go-playground/universal-translator v0.16.0 h1:X++omBR/4cE2MNg91AoC3rmGrCjJ8eAeUP/K/EKx4DM=

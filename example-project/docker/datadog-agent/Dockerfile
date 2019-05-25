@@ -11,6 +11,9 @@ ENV SERVICE_NAME $service
 ARG env="dev"
 ENV ENV $env
 
+ARG gogc="10"
+ENV GOGC $gogc
+
 ENV DD_TAGS="source:docker service:${service} service_name:${service} cluster:NA env:${ENV}"
 
 CMD ["/custom-init.sh"]

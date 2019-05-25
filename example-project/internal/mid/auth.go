@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/pkg/errors"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // ErrForbidden is returned when an authenticated user does not have a

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/pkg/errors"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // Panics recovers from panics and converts the panic to an error so it is

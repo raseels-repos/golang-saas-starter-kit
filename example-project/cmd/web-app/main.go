@@ -92,12 +92,12 @@ func main() {
 			DisableTLS bool   `default:"false" envconfig:"DISABLE_TLS"`
 		}
 		Trace struct {
-			Host       string `default:"127.0.0.1" envconfig:"DD_TRACE_AGENT_HOSTNAME"`
-			Port       int `default:"8126" envconfig:"DD_TRACE_AGENT_PORT"`
-			AnalyticsRate float64  `default:"0.10" envconfig:"ANALYTICS_RATE"`
+			Host          string  `default:"127.0.0.1" envconfig:"DD_TRACE_AGENT_HOSTNAME"`
+			Port          int     `default:"8126" envconfig:"DD_TRACE_AGENT_PORT"`
+			AnalyticsRate float64 `default:"0.10" envconfig:"ANALYTICS_RATE"`
 		}
 		Aws struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID" required:"true"` // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID" required:"true"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
 			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" required:"true" json:"-"` // don't print
 			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
 

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // Logger writes some information about the request to the logs in the

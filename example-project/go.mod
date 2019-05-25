@@ -6,7 +6,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/gitwak/gondolier v0.0.0-20190521205431-504d297a6c42 // indirect
-	github.com/gitwak/sqlxmigrate v0.0.0-20190522211042-9625063dea5d
+	github.com/gitwak/sqlxmigrate v0.0.0-20190525131054-1f06ba9f0748
 	github.com/go-playground/locales v0.12.1
 	github.com/go-playground/universal-translator v0.16.0
 	github.com/go-redis/redis v6.15.2+incompatible

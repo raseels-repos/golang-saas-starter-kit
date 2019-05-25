@@ -1,23 +1,8 @@
-# Ultimate Service
+# SaaS Service
 
-Copyright 2018, Ardan Labs  
-info@ardanlabs.com
+Copyright 2019, Geeks Accelerator  
+accelerator@geeksinthewoods.com.com
 
-## Licensing
-
-```
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
 
 ## Description
 
@@ -107,11 +92,6 @@ Running `make down` will properly stop and terminate the Docker Compose session.
 
 The service provides record keeping for someone running a multi-family garage sale. Authenticated users can maintain a list of projects for sale.
 
-<!--The service uses the following models:-->
-
-<!--<img src="https://raw.githubusercontent.com/ardanlabs/service/master/models.jpg" alt="Garage Sale Service Models" title="Garage Sale Service Models" />-->
-
-<!--(Diagram generated with draw.io using `models.xml` file)-->
 
 ### Making Requests
 

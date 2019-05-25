@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // Errors handles errors coming out of the call chain. It detects normal

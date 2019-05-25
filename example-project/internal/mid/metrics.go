@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"runtime"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // m contains the global program counters for the application.

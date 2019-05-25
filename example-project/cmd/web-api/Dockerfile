@@ -37,7 +37,7 @@ COPY --from=builder /gosrv /
 #COPY --from=builder /static /static
 COPY --from=builder /templates /templates
 
-ARG gogc="50"
+ARG gogc="20"
 ENV GOGC $gogc
 
 ENTRYPOINT ["/gosrv"]

@@ -41,6 +41,8 @@ func Trace() web.Middleware {
 			if !ok {
 				return web.NewShutdownError("web value missing from context")
 			}
+			v.TraceID = span.Context().TraceID()
+			v.SpanID = span.Context().SpanID()
 
 			// Execute the request handler
 			err := before(ctx, w, r, params)

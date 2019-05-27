@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"expvar"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
 	"github.com/lib/pq"
 	"log"
 	"net/url"
 	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
-	"github.com/gitwak/sqlxmigrate"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
@@ -114,17 +114,8 @@ func main() {
 	// =========================================================================
 	// Start Migrations
 
-	// Load list of Schema migrations and init new sqlxmigrate client
-	migrations := migrationList(masterDb, log)
-	m := sqlxmigrate.New(masterDb, sqlxmigrate.DefaultOptions, migrations)
-	m.SetLogger(log)
-
-	// Append any schema that need to be applied if this is a fresh migration
-	// ie. the migrations database table does not exist.
-	m.InitSchema(initSchema(masterDb, log))
-
 	// Execute the migrations
-	if err = m.Migrate(); err != nil {
+	if err = schema.Migrate(masterDb, log); err != nil {
 		log.Fatalf("main : Migrate : %v", err)
 	}
 	log.Printf("main : Migrate : Completed")

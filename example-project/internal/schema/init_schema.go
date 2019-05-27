@@ -1,4 +1,4 @@
-package main
+package schema
 
 import (
 	"github.com/jmoiron/sqlx"

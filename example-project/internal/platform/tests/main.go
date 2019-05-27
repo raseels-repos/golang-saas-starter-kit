@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
+	"io"
 	"log"
 	"os"
 	"runtime/debug"
@@ -13,7 +15,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
-	"github.com/pborman/uuid"
 )
 
 // Success and failure markers.
@@ -40,12 +41,13 @@ func New() *Test {
 
 	// ============================================================
 	// Init AWS Session
+
 	awsSession := session.Must(session.NewSession())
 
 	// ============================================================
-	// Startup Mongo container
+	// Startup Postgres container
 
-	container, err := docker.StartMongo(log)
+	container, err := docker.StartPostgres(log)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -53,17 +55,42 @@ func New() *Test {
 	// ============================================================
 	// Configuration
 
-	dbDialTimeout := 25 * time.Second
-	dbHost := fmt.Sprintf("mongodb://localhost:%s/gotraining", container.Port)
+	dbHost := fmt.Sprintf("postgres://%s:%s@127.0.0.1:%s/%s?timezone=UTC&sslmode=disable", container.User, container.Pass, container.Port, container.Database)
+
+	fmt.Println(dbHost)
 
 	// ============================================================
-	// Start Mongo
+	// Start Postgres
 
-	log.Println("main : Started : Initialize Mongo")
-	masterDB, err := db.New(dbHost, dbDialTimeout)
+	log.Println("main : Started : Initialize Postgres")
+	var masterDB *sqlx.DB
+	for i := 0; i <= 20; i++ {
+		masterDB, err = sqlx.Open("postgres", dbHost)
+		if err != nil {
+			break
+		}
+
+		// Make sure the database is ready for queries.
+		_, err = masterDB.Exec("SELECT 1")
+		if err != nil {
+			if err != io.EOF {
+				break
+			}
+			time.Sleep(time.Second)
+		} else {
+			break
+		}
+	}
+
 	if err != nil {
 		log.Fatalf("startup : Register DB : %v", err)
 	}
+
+	// Execute the migrations
+	if err = schema.Migrate(masterDB, log); err != nil {
+		log.Fatalf("main : Migrate : %v", err)
+	}
+	log.Printf("main : Migrate : Completed")
 
 	return &Test{log, masterDB, container, awsSession}
 }
@@ -72,7 +99,7 @@ func New() *Test {
 // done in a defer immediately after calling New.
 func (t *Test) TearDown() {
 	t.MasterDB.Close()
-	if err := docker.StopMongo(t.Log, t.container); err != nil {
+	if err := docker.StopPostgres(t.Log, t.container); err != nil {
 		t.Log.Println(err)
 	}
 }
@@ -87,7 +114,7 @@ func Recover(t *testing.T) {
 // Context returns an app level context for testing.
 func Context() context.Context {
 	values := web.Values{
-		TraceID: uuid.New(),
+		TraceID: uint64(time.Now().UnixNano()),
 		Now:     time.Now(),
 	}
 

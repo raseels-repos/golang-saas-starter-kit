@@ -185,7 +185,7 @@ func NewAuthenticator(awsSession *session.Session, awsSecretID string, now time.
 	// 			refreshed on instance launch. Could store keys in a kv store and update that value
 	// 			when new keys are generated
 	if len(keyContents) == 0 || curKeyId == "" {
-		privateKey, err := keygen()
+		privateKey, err := Keygen()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate new private key")
 		}
@@ -307,8 +307,8 @@ func (a *Authenticator) ParseClaims(tknStr string) (Claims, error) {
 	return claims, nil
 }
 
-// keygen creates an x509 private key for signing auth tokens.
-func keygen() ([]byte, error) {
+// Keygen creates an x509 private key for signing auth tokens.
+func Keygen() ([]byte, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "generating keys")

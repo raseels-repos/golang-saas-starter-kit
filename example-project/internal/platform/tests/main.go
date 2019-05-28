@@ -57,8 +57,6 @@ func New() *Test {
 
 	dbHost := fmt.Sprintf("postgres://%s:%s@127.0.0.1:%s/%s?timezone=UTC&sslmode=disable", container.User, container.Pass, container.Port, container.Database)
 
-	fmt.Println(dbHost)
-
 	// ============================================================
 	// Start Postgres
 

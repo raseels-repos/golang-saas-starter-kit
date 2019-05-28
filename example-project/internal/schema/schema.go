@@ -3,7 +3,7 @@ package schema
 import (
 	"log"
 
-	"github.com/gitwak/sqlxmigrate"
+	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 )
 

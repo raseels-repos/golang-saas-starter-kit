@@ -29,7 +29,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, n
 	query.Where(query.Equal("email", email))
 
 	// Run the find, use empty claims to bypass ACLs
-	res, err := find(ctx, auth.Claims{}, dbConn, query, false)
+	res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
 	if err != nil {
 		return Token{}, err
 	} else if res == nil || len(res) == 0 {
@@ -39,7 +39,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, n
 	u := res[0]
 
 	// Append the salt from the user record to the supplied password.
-	saltedPassword := password + string(u.PasswordHash)
+	saltedPassword := password + string(u.PasswordSalt)
 
 	// Compare the provided password with the saved hash. Use the bcrypt
 	// comparison function so it is cryptographically secure.
@@ -61,15 +61,17 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, n
 		roles     []string
 	)
 	if len(accounts) > 0 {
-		accountId = accounts[0].ID
-		roles = accounts[0].Roles
+		accountId = accounts[0].AccountID
+		for _, r := range accounts[0].Roles {
+			roles = append(roles, r.String())
+		}
 	}
 
 	// Generate a list of all the account IDs associated with the user so
 	// the use has the ability to switch between accounts.
 	accountIds := []string{}
 	for _, a := range accounts {
-		accountIds = append(accountIds, a.ID)
+		accountIds = append(accountIds, a.AccountID)
 	}
 
 	// If we are this far the request is valid. Create some claims for the user.
@@ -81,5 +83,5 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, n
 		return Token{}, errors.Wrap(err, "generating token")
 	}
 
-	return Token{Token: tkn}, nil
+	return Token{Token: tkn, claims: claims}, nil
 }

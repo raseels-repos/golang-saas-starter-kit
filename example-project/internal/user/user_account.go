@@ -71,7 +71,9 @@ func accountSelectQuery() *sqlbuilder.SelectBuilder {
 }
 
 // userFindRequestQuery generates the select query for the given find request.
-func accountFindRequestQuery(req UserAccountFindRequest) *sqlbuilder.SelectBuilder {
+// TODO: Need to figure out why can't parse the args when appending the where
+// 			to the query.
+func accountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := accountSelectQuery()
 	if req.Where != nil {
 		query.Where(*req.Where)
@@ -89,17 +91,17 @@ func accountFindRequestQuery(req UserAccountFindRequest) *sqlbuilder.SelectBuild
 	b := sqlbuilder.Buildf(query.String(), req.Args...)
 	query.BuilderAs(b, usersAccountsMapColumns)
 
-	return query
+	return query, req.Args
 }
 
 // Find gets all the users from the database based on the request params
 func FindAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountFindRequest) ([]*UserAccount, error) {
-	query := accountFindRequestQuery(req)
-	return findAccounts(ctx, claims, dbConn, query, req.IncludedArchived)
+	query, args := accountFindRequestQuery(req)
+	return findAccounts(ctx, claims, dbConn, query, args, req.IncludedArchived)
 }
 
 // Find gets all the users from the database based on the select query
-func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, includedArchived bool) ([]*UserAccount, error) {
+func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.FindAccounts")
 	defer span.Finish()
 
@@ -115,11 +117,12 @@ func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, quer
 	if err != nil {
 		return nil, err
 	}
-	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
+	queryStr, queryArgs := query.Build()
+	queryStr = dbConn.Rebind(queryStr)
+	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, sql, args...)
+	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find accounts failed")
@@ -151,7 +154,7 @@ func FindAccountsByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.
 	query.OrderBy("id")
 
 	// Execute the find accounts method.
-	res, err := findAccounts(ctx, claims, dbConn, query, includedArchived)
+	res, err := findAccounts(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +197,7 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 		existQuery.Equal("account_id", req.AccountID),
 		existQuery.Equal("user_id", req.UserID),
 	))
-	existing, err := findAccounts(ctx, claims, dbConn, existQuery, true)
+	existing, err := findAccounts(ctx, claims, dbConn, existQuery, []interface{}{}, true)
 	if err != nil {
 		return err
 	}
@@ -217,7 +220,7 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 	query := sqlbuilder.NewInsertBuilder()
 	query.InsertInto(usersAccountsTableName)
 	query.Cols("id", "user_id", "account_id", "roles", "created_at", "updated_at")
-	query.Values(1, id, req.UserID, req.AccountID, req.Roles, now, now)
+	query.Values(id, req.UserID, req.AccountID, req.Roles, now, now)
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()

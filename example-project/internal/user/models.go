@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -34,8 +35,8 @@ type CreateUserRequest struct {
 	Email           string      `json:"email" validate:"required,email,unique"`
 	Password        string      `json:"password" validate:"required"`
 	PasswordConfirm string      `json:"password_confirm" validate:"eqfield=Password"`
-	Status          *UserStatus `json:"status" validate:"oneof=active disabled"`
-	Timezone        *string     `json:"timezone"`
+	Status          *UserStatus `json:"status" validate:"omitempty,oneof=active disabled"`
+	Timezone        *string     `json:"timezone" validate:"omitempty"`
 }
 
 // UpdateUserRequest defines what information may be provided to modify an existing
@@ -46,10 +47,10 @@ type CreateUserRequest struct {
 // marshalling/unmarshalling.
 type UpdateUserRequest struct {
 	ID       string      `validate:"required,uuid"`
-	Name     *string     `json:"name"`
-	Email    *string     `json:"email" validate:"email,unique"`
-	Status   *UserStatus `json:"status" validate:"oneof=active disabled"`
-	Timezone *string     `json:"timezone"`
+	Name     *string     `json:"name" validate:"omitempty"`
+	Email    *string     `json:"email" validate:"omitempty,email,unique"`
+	Status   *UserStatus `json:"status" validate:"omitempty,oneof=active disabled"`
+	Timezone *string     `json:"timezone" validate:"omitempty"`
 }
 
 // UpdatePassword defines what information may be provided to update user password.
@@ -73,28 +74,28 @@ type UserFindRequest struct {
 // Each association of an user to an account has a set of roles defined for the user
 // that will be applied when accessing the account.
 type UserAccount struct {
-	ID         string      `db:"id" json:"id"`
-	UserID     string      `db:"user_id" json:"user_id"`
-	AccountID  string      `db:"account_id" json:"account_id"`
-	Roles      []string    `db:"roles" json:"roles"`
-	CreatedAt  time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt  time.Time   `db:"updated_at" json:"updated_at"`
-	ArchivedAt pq.NullTime `db:"archived_at" json:"archived_at"`
+	ID         string           `db:"id" json:"id"`
+	UserID     string           `db:"user_id" json:"user_id"`
+	AccountID  string           `db:"account_id" json:"account_id"`
+	Roles      UserAccountRoles `db:"roles" json:"roles"`
+	CreatedAt  time.Time        `db:"created_at" json:"created_at"`
+	UpdatedAt  time.Time        `db:"updated_at" json:"updated_at"`
+	ArchivedAt pq.NullTime      `db:"archived_at" json:"archived_at"`
 }
 
 // AddAccountRequest defines the information needed to add a new account to a user.
 type AddAccountRequest struct {
-	UserID    string   `validate:"required,uuid"`
-	AccountID string   `validate:"required,uuid"`
-	Roles     []string `json:"roles" validate:"oneof=admin user"`
+	UserID    string           `validate:"required,uuid"`
+	AccountID string           `validate:"required,uuid"`
+	Roles     UserAccountRoles `json:"roles" validate:"required,dive,oneof=ADMIN USER"`
 }
 
 // UpdateAccountRequest defines the information needed to update the roles for
 // an existing user account.
 type UpdateAccountRequest struct {
-	UserID    string   `validate:"required,uuid"`
-	AccountID string   `validate:"required,uuid"`
-	Roles     []string `json:"roles" validate:"oneof=admin user"`
+	UserID    string           `validate:"required,uuid"`
+	AccountID string           `validate:"required,uuid"`
+	Roles     UserAccountRoles `json:"roles" validate:"oneof=ADMIN USER"`
 	unArchive bool
 }
 
@@ -122,6 +123,9 @@ type UserAccountFindRequest struct {
 	IncludedArchived bool
 }
 
+// UserStatus represents the status of a user.
+type UserStatus string
+
 // UserStatus values
 const (
 	UserStatus_Active   UserStatus = "active"
@@ -133,9 +137,6 @@ var UserStatus_Values = []UserStatus{
 	UserStatus_Active,
 	UserStatus_Disabled,
 }
-
-// UserStatus represents the status of a user.
-type UserStatus string
 
 // Scan supports reading the UserStatus value from the database.
 func (s *UserStatus) Scan(value interface{}) error {
@@ -156,7 +157,6 @@ func (s UserStatus) Value() (driver.Value, error) {
 		return nil, errs
 	}
 
-	// validation would go here
 	return string(s), nil
 }
 
@@ -165,7 +165,61 @@ func (s UserStatus) String() string {
 	return string(s)
 }
 
+// UserAccountRole represents the role of a user for an account.
+type UserAccountRole string
+
+// UserAccountRole values
+const (
+	UserAccountRole_Admin UserAccountRole = auth.RoleAdmin
+	UserAccountRole_User  UserAccountRole = auth.RoleUser
+)
+
+// UserAccountRole_Values provides list of valid UserAccountRole values
+var UserAccountRole_Values = []UserAccountRole{
+	UserAccountRole_Admin,
+	UserAccountRole_User,
+}
+
+// String converts the UserAccountRole value to a string.
+func (s UserAccountRole) String() string {
+	return string(s)
+}
+
+// UserAccountRoles represents a set of roles for a user for an account.
+type UserAccountRoles []UserAccountRole
+
+// Scan supports reading the UserAccountRole value from the database.
+func (s *UserAccountRoles) Scan(value interface{}) error {
+	arr := &pq.StringArray{}
+	if err := arr.Scan(value); err != nil {
+		return err
+	}
+
+	for _, v := range *arr {
+		*s = append(*s, UserAccountRole(v))
+	}
+
+	return nil
+}
+
+// Value converts the UserAccountRole value to be stored in the database.
+func (s UserAccountRoles) Value() (driver.Value, error) {
+	v := validator.New()
+
+	var arr pq.StringArray
+	for _, r := range s {
+		errs := v.Var(r, "required,oneof=ADMIN USER")
+		if errs != nil {
+			return nil, errs
+		}
+		arr = append(arr, r.String())
+	}
+
+	return arr.Value()
+}
+
 // Token is the payload we deliver to users when they authenticate.
 type Token struct {
-	Token string `json:"token"`
+	Token  string      `json:"token"`
+	claims auth.Claims `json:"-"`
 }

@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.19.33
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
+	github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190527223850-4a863a2d30db
 	github.com/gitwak/gondolier v0.0.0-20190521205431-504d297a6c42 // indirect
 	github.com/gitwak/sqlxmigrate v0.0.0-20190527063335-e98d5d44fc0b
 	github.com/go-playground/locales v0.12.1

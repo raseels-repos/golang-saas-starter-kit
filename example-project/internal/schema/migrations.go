@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/gitwak/sqlxmigrate"
+	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -106,7 +106,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 		{
 			ID: "20190522-01c",
 			Migrate: func(tx *sql.Tx) error {
-				q1 := `CREATE TYPE user_account_role_t as enum('admin', 'user')`
+				q1 := `CREATE TYPE user_account_role_t as enum('ADMIN', 'USER')`
 				if _, err := tx.Exec(q1); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}

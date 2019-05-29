@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -35,7 +34,7 @@ var (
 )
 
 // usersMapColumns is the list of columns needed for mapRowsToUser
-var usersMapColumns = "id,name,email,password_salt,password_hash,password_reset,status,timezone,created_at,updated_at,archived_at"
+var usersMapColumns = "id,name,email,password_salt,password_hash,password_reset,timezone,created_at,updated_at,archived_at"
 
 // mapRowsToUser takes the SQL rows and maps it to the UserAccount struct
 // with the columns defined by usersMapColumns
@@ -44,7 +43,7 @@ func mapRowsToUser(rows *sql.Rows) (*User, error) {
 		u   User
 		err error
 	)
-	err = rows.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordSalt, &u.PasswordHash, &u.PasswordReset, &u.Status, &u.Timezone, &u.CreatedAt, &u.UpdatedAt, &u.ArchivedAt)
+	err = rows.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordSalt, &u.PasswordHash, &u.PasswordReset, &u.Timezone, &u.CreatedAt, &u.UpdatedAt, &u.ArchivedAt)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -52,8 +51,8 @@ func mapRowsToUser(rows *sql.Rows) (*User, error) {
 	return &u, nil
 }
 
-// CanReadUserId determines if claims has the authority to access the specified user ID.
-func CanReadUserId(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
+// CanReadUser determines if claims has the authority to access the specified user ID.
+func CanReadUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
 	// If the request has claims from a specific user, ensure that the user
 	// has the correct access to the user.
 	if claims.Subject != "" {
@@ -86,10 +85,10 @@ func CanReadUserId(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, use
 	return nil
 }
 
-// CanModifyUserId determines if claims has the authority to modify the specified user ID.
-func CanModifyUserId(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
+// CanModifyUser determines if claims has the authority to modify the specified user ID.
+func CanModifyUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
 	// First check to see if claims can read the user ID
-	err := CanReadUserId(ctx, claims, dbConn, userID)
+	err := CanReadUser(ctx, claims, dbConn, userID)
 	if err != nil {
 		return err
 	}
@@ -194,9 +193,6 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	queryStr = dbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
-	fmt.Println(queryStr)
-	fmt.Println(args)
-
 	// fetch all places from the db
 	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
@@ -215,8 +211,6 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		}
 		resp = append(resp, u)
 	}
-
-	fmt.Println("len", len(resp))
 
 	return resp, nil
 }
@@ -329,15 +323,11 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 		Email:        req.Email,
 		PasswordHash: passwordHash,
 		PasswordSalt: passwordSalt,
-		Status:       UserStatus_Active,
 		Timezone:     "America/Anchorage",
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 
-	if req.Status != nil {
-		u.Status = *req.Status
-	}
 	if req.Timezone != nil {
 		u.Timezone = *req.Timezone
 	}
@@ -345,8 +335,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
 	query.InsertInto(usersTableName)
-	query.Cols("id", "name", "email", "password_hash", "password_salt", "status", "timezone", "created_at", "updated_at")
-	query.Values(u.ID, u.Name, u.Email, u.PasswordHash, u.PasswordSalt, u.Status.String(), u.Timezone, u.CreatedAt, u.UpdatedAt)
+	query.Cols("id", "name", "email", "password_hash", "password_salt","timezone", "created_at", "updated_at")
+	query.Values(u.ID, u.Name, u.Email, u.PasswordHash, u.PasswordSalt, u.Timezone, u.CreatedAt, u.UpdatedAt)
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
@@ -390,7 +380,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserId(ctx, claims, dbConn, req.ID)
+	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		err = errors.WithMessagef(err, "Update %s failed", usersTableName)
 		return err
@@ -418,9 +408,6 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	}
 	if req.Email != nil {
 		fields = append(fields, query.Assign("email", req.Email))
-	}
-	if req.Status != nil {
-		fields = append(fields, query.Assign("status", req.Status))
 	}
 	if req.Timezone != nil {
 		fields = append(fields, query.Assign("timezone", req.Timezone))
@@ -462,7 +449,7 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserId(ctx, claims, dbConn, req.ID)
+	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
 	}
@@ -529,7 +516,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID st
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserId(ctx, claims, dbConn, req.ID)
+	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
 	}
@@ -607,7 +594,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID str
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserId(ctx, claims, dbConn, req.ID)
+	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
 	}

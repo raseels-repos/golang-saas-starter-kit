@@ -137,7 +137,6 @@ func TestApplyClaimsUserSelect(t *testing.T) {
 // TestCreateUser ensures all the validation tags work on Create
 func TestCreateUserValidation(t *testing.T) {
 
-	invalidStatus := UserStatus("moon")
 
 	var userTests = []struct {
 		name     string
@@ -166,19 +165,6 @@ func TestCreateUserValidation(t *testing.T) {
 			},
 			errors.New("Key: 'CreateUserRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
 		},
-		{"Valid Status",
-			CreateUserRequest{
-				Name:            "Lee Brown",
-				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
-				Password:        "akTechFr0n!ier",
-				PasswordConfirm: "akTechFr0n!ier",
-				Status:          &invalidStatus,
-			},
-			func(req CreateUserRequest, res *User) *User {
-				return nil
-			},
-			errors.New("Key: 'CreateUserRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
-		},
 		{"Passwords Match",
 			CreateUserRequest{
 				Name:            "Lee Brown",
@@ -191,7 +177,7 @@ func TestCreateUserValidation(t *testing.T) {
 			},
 			errors.New("Key: 'CreateUserRequest.PasswordConfirm' Error:Field validation for 'PasswordConfirm' failed on the 'eqfield' tag"),
 		},
-		{"Default Status & Timezone",
+		{"Default Timezone",
 			CreateUserRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -202,7 +188,6 @@ func TestCreateUserValidation(t *testing.T) {
 				return &User{
 					Name:     req.Name,
 					Email:    req.Email,
-					Status:   UserStatus_Active,
 					Timezone: "America/Anchorage",
 
 					// Copy this fields from the result.
@@ -412,15 +397,6 @@ func TestUpdateUserValidation(t *testing.T) {
 		errors.New("Key: 'UpdateUserRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
 	})
 
-	invalidStatus := UserStatus("xxxxxxxxx")
-	userTests = append(userTests, userTest{"Valid Status",
-		UpdateUserRequest{
-			ID:     uuid.NewRandom().String(),
-			Status: &invalidStatus,
-		},
-		errors.New("Key: 'UpdateUserRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
-	})
-
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
 	t.Log("Given the need ensure all validation tags are working for user update.")
@@ -534,6 +510,18 @@ func TestUpdateUserPassword(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
+		// Create a new random account and associate that with the user.
+		accountId := uuid.NewRandom().String()
+		_, err = AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
+			UserID:    user.ID,
+			AccountID: accountId,
+			Roles:     []UserAccountRole{UserAccountRole_User},
+		}, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+		}
+
 		// Verify that the user can be authenticated with the created user.
 		_, err = Authenticate(ctx, test.MasterDB, tknGen, now, user.Email, initPass)
 		if err != nil {
@@ -578,7 +566,7 @@ func TestUpdateUserPassword(t *testing.T) {
 	}
 }
 
-// TestUserCrud validates the full set of CRUD operations and ensures ACLs are correctly applied by claims.
+// TestUserCrud validates the full set of CRUD operations for users and ensures ACLs are correctly applied by claims.
 func TestUserCrud(t *testing.T) {
 	defer tests.Recover(t)
 
@@ -622,7 +610,6 @@ func TestUserCrud(t *testing.T) {
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
-				Status:        user.Status,
 				Timezone:      user.Timezone,
 				CreatedAt:     user.CreatedAt,
 				UpdatedAt:     user.UpdatedAt,
@@ -697,7 +684,6 @@ func TestUserCrud(t *testing.T) {
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
-				Status:        user.Status,
 				Timezone:      user.Timezone,
 				CreatedAt:     user.CreatedAt,
 				UpdatedAt:     user.UpdatedAt,
@@ -772,7 +758,6 @@ func TestUserCrud(t *testing.T) {
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
-				Status:        user.Status,
 				Timezone:      user.Timezone,
 				CreatedAt:     user.CreatedAt,
 				UpdatedAt:     user.UpdatedAt,
@@ -801,7 +786,7 @@ func TestUserCrud(t *testing.T) {
 
 				// Create a new random account and associate that with the user.
 				accountId := uuid.NewRandom().String()
-				err = AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
+				_, err = AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
 					UserID:    user.ID,
 					AccountID: accountId,
 					Roles:     []UserAccountRole{UserAccountRole_User},
@@ -840,7 +825,7 @@ func TestUserCrud(t *testing.T) {
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
-					t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
+					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result in not found.
 					_, err = FindById(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, false)
@@ -882,6 +867,22 @@ func TestUserCrud(t *testing.T) {
 
 // TestUserFind validates all the request params are correctly parsed into a select query.
 func TestUserFind(t *testing.T) {
+
+	// Ensure all the existing users are deleted.
+	{
+		// Build the delete SQL statement.
+		query := sqlbuilder.NewDeleteBuilder()
+		query.DeleteFrom(usersTableName)
+
+		// Execute the query with the provided context.
+		sql, args := query.Build()
+		sql = test.MasterDB.Rebind(sql)
+		_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
+		if err != nil {
+			t.Logf("\t\tGot : %+v", err)
+			t.Fatalf("\t%s\tDelete failed.", tests.Failed)
+		}
+	}
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 

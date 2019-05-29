@@ -10,8 +10,8 @@ import (
 
 // These are the expected values for Claims.Roles.
 const (
-	RoleAdmin = "ADMIN"
-	RoleUser  = "USER"
+	RoleAdmin = "admin"
+	RoleUser  = "user"
 )
 
 // ctxKey represents the type of value for the context key.

@@ -21,7 +21,6 @@ type User struct {
 	PasswordHash  []byte         `db:"password_hash" json:"-"`
 	PasswordReset sql.NullString `db:"password_reset" json:"-"`
 
-	Status   UserStatus `db:"status" json:"status"`
 	Timezone string     `db:"timezone" json:"timezone"`
 
 	CreatedAt  time.Time   `db:"created_at" json:"created_at"`
@@ -35,7 +34,6 @@ type CreateUserRequest struct {
 	Email           string      `json:"email" validate:"required,email,unique"`
 	Password        string      `json:"password" validate:"required"`
 	PasswordConfirm string      `json:"password_confirm" validate:"eqfield=Password"`
-	Status          *UserStatus `json:"status" validate:"omitempty,oneof=active disabled"`
 	Timezone        *string     `json:"timezone" validate:"omitempty"`
 }
 
@@ -49,7 +47,6 @@ type UpdateUserRequest struct {
 	ID       string      `validate:"required,uuid"`
 	Name     *string     `json:"name" validate:"omitempty"`
 	Email    *string     `json:"email" validate:"omitempty,email,unique"`
-	Status   *UserStatus `json:"status" validate:"omitempty,oneof=active disabled"`
 	Timezone *string     `json:"timezone" validate:"omitempty"`
 }
 
@@ -78,6 +75,7 @@ type UserAccount struct {
 	UserID     string           `db:"user_id" json:"user_id"`
 	AccountID  string           `db:"account_id" json:"account_id"`
 	Roles      UserAccountRoles `db:"roles" json:"roles"`
+	Status   UserAccountStatus `db:"status" json:"status"`
 	CreatedAt  time.Time        `db:"created_at" json:"created_at"`
 	UpdatedAt  time.Time        `db:"updated_at" json:"updated_at"`
 	ArchivedAt pq.NullTime      `db:"archived_at" json:"archived_at"`
@@ -87,7 +85,8 @@ type UserAccount struct {
 type AddAccountRequest struct {
 	UserID    string           `validate:"required,uuid"`
 	AccountID string           `validate:"required,uuid"`
-	Roles     UserAccountRoles `json:"roles" validate:"required,dive,oneof=ADMIN USER"`
+	Roles     UserAccountRoles `json:"roles" validate:"required,dive,oneof=admin user"`
+	Status          *UserAccountStatus `json:"status" validate:"omitempty,oneof=active disabled"`
 }
 
 // UpdateAccountRequest defines the information needed to update the roles for
@@ -95,7 +94,8 @@ type AddAccountRequest struct {
 type UpdateAccountRequest struct {
 	UserID    string           `validate:"required,uuid"`
 	AccountID string           `validate:"required,uuid"`
-	Roles     UserAccountRoles `json:"roles" validate:"oneof=ADMIN USER"`
+	Roles     *UserAccountRoles `json:"roles" validate:"required,dive,oneof=admin user"`
+	Status   *UserAccountStatus `json:"status" validate:"omitempty,oneof=active disabled"`
 	unArchive bool
 }
 
@@ -123,33 +123,33 @@ type UserAccountFindRequest struct {
 	IncludedArchived bool
 }
 
-// UserStatus represents the status of a user.
-type UserStatus string
+// UserAccountStatus represents the status of a user.
+type UserAccountStatus string
 
-// UserStatus values
+// UserAccountStatus values
 const (
-	UserStatus_Active   UserStatus = "active"
-	UserStatus_Disabled UserStatus = "disabled"
+	UserAccountStatus_Active   UserAccountStatus = "active"
+	UserAccountStatus_Disabled UserAccountStatus = "disabled"
 )
 
-// UserStatus_Values provides list of valid UserStatus values
-var UserStatus_Values = []UserStatus{
-	UserStatus_Active,
-	UserStatus_Disabled,
+// UserAccountStatus_Values provides list of valid UserAccountStatus values
+var UserAccountStatus_Values = []UserAccountStatus{
+	UserAccountStatus_Active,
+	UserAccountStatus_Disabled,
 }
 
-// Scan supports reading the UserStatus value from the database.
-func (s *UserStatus) Scan(value interface{}) error {
+// Scan supports reading the UserAccountStatus value from the database.
+func (s *UserAccountStatus) Scan(value interface{}) error {
 	asBytes, ok := value.([]byte)
 	if !ok {
 		return errors.New("Scan source is not []byte")
 	}
-	*s = UserStatus(string(asBytes))
+	*s = UserAccountStatus(string(asBytes))
 	return nil
 }
 
-// Value converts the UserStatus value to be stored in the database.
-func (s UserStatus) Value() (driver.Value, error) {
+// Value converts the UserAccountStatus value to be stored in the database.
+func (s UserAccountStatus) Value() (driver.Value, error) {
 	v := validator.New()
 
 	errs := v.Var(s, "required,oneof=active disabled")
@@ -160,8 +160,8 @@ func (s UserStatus) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
-// String converts the UserStatus value to a string.
-func (s UserStatus) String() string {
+// String converts the UserAccountStatus value to a string.
+func (s UserAccountStatus) String() string {
 	return string(s)
 }
 
@@ -208,7 +208,7 @@ func (s UserAccountRoles) Value() (driver.Value, error) {
 
 	var arr pq.StringArray
 	for _, r := range s {
-		errs := v.Var(r, "required,oneof=ADMIN USER")
+		errs := v.Var(r, "required,oneof=admin user")
 		if errs != nil {
 			return nil, errs
 		}

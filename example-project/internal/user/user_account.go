@@ -61,7 +61,6 @@ func CanModifyUserAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.
 	return nil
 }
 
-
 // applyClaimsUserAccountSelect applies a sub query to enforce ACL for
 // the supplied claims. If claims is empty then request must be internal and
 // no sub-query is applied. Else a list of user IDs is found all associated
@@ -175,7 +174,7 @@ func FindAccountsByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.
 	// Filter base select query by ID
 	query := sqlbuilder.NewSelectBuilder()
 	query.Where(query.Equal("user_id", userID))
-	query.OrderBy("id")
+	query.OrderBy("created_at")
 
 	// Execute the find accounts method.
 	res, err := findAccounts(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
@@ -251,13 +250,13 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 	}
 
 	ua := UserAccount{
-		ID:           uuid.NewRandom().String(),
-		UserID: req.UserID,
+		ID:        uuid.NewRandom().String(),
+		UserID:    req.UserID,
 		AccountID: req.AccountID,
-		Roles: req.Roles,
-		Status:       UserAccountStatus_Active,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Roles:     req.Roles,
+		Status:    UserAccountStatus_Active,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if req.Status != nil {

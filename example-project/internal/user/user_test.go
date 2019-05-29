@@ -137,7 +137,6 @@ func TestApplyClaimsUserSelect(t *testing.T) {
 // TestCreateUser ensures all the validation tags work on Create
 func TestCreateUserValidation(t *testing.T) {
 
-
 	var userTests = []struct {
 		name     string
 		req      CreateUserRequest
@@ -495,7 +494,7 @@ func TestUpdateUserPassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		var tknGen mockTokenGenerator
+		tknGen := &mockTokenGenerator{}
 
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
@@ -523,7 +522,7 @@ func TestUpdateUserPassword(t *testing.T) {
 		}
 
 		// Verify that the user can be authenticated with the created user.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, now, user.Email, initPass)
+		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, initPass, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
@@ -557,7 +556,7 @@ func TestUpdateUserPassword(t *testing.T) {
 		t.Logf("\t%s\tUpdatePassword ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, now, user.Email, newPass)
+		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, newPass, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
@@ -868,23 +867,10 @@ func TestUserCrud(t *testing.T) {
 // TestUserFind validates all the request params are correctly parsed into a select query.
 func TestUserFind(t *testing.T) {
 
-	// Ensure all the existing users are deleted.
-	{
-		// Build the delete SQL statement.
-		query := sqlbuilder.NewDeleteBuilder()
-		query.DeleteFrom(usersTableName)
+	now := time.Now().Add(time.Hour * -1).UTC()
 
-		// Execute the query with the provided context.
-		sql, args := query.Build()
-		sql = test.MasterDB.Rebind(sql)
-		_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
-		if err != nil {
-			t.Logf("\t\tGot : %+v", err)
-			t.Fatalf("\t%s\tDelete failed.", tests.Failed)
-		}
-	}
-
-	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
+	startTime := now.Truncate(time.Millisecond)
+	var endTime time.Time
 
 	var users []*User
 	for i := 0; i <= 4; i++ {
@@ -899,6 +885,7 @@ func TestUserFind(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 		users = append(users, user)
+		endTime = user.CreatedAt
 	}
 
 	type userTest struct {
@@ -910,9 +897,13 @@ func TestUserFind(t *testing.T) {
 
 	var userTests []userTest
 
+	createdFilter := "created_at BETWEEN ? AND ?"
+
 	// Test sort users.
-	userTests = append(userTests, userTest{"Find all order by created_at asx",
+	userTests = append(userTests, userTest{"Find all order by created_at asc",
 		UserFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
 		users,
@@ -926,6 +917,8 @@ func TestUserFind(t *testing.T) {
 	}
 	userTests = append(userTests, userTest{"Find all order by created_at desc",
 		UserFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
 		expected,
@@ -936,6 +929,8 @@ func TestUserFind(t *testing.T) {
 	var limit uint = 2
 	userTests = append(userTests, userTest{"Find limit",
 		UserFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
 		},
@@ -947,6 +942,8 @@ func TestUserFind(t *testing.T) {
 	var offset uint = 3
 	userTests = append(userTests, userTest{"Find limit, offset",
 		UserFindRequest{
+			Where:  &createdFilter,
+			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
 			Offset: &offset,
@@ -957,27 +954,25 @@ func TestUserFind(t *testing.T) {
 
 	// Test where filter.
 	whereParts := []string{}
-	whereArgs := []interface{}{}
+	whereArgs := []interface{}{startTime, endTime}
 	expected = []*User{}
-	selected := make(map[string]bool)
-	for i := 0; i <= 2; i++ {
-		ranIdx := rand.Intn(len(users))
-
-		email := users[ranIdx].Email
-		if selected[email] {
+	for i := 0; i <= len(users); i++ {
+		if rand.Intn(100) < 50 {
 			continue
 		}
-		selected[email] = true
+		u := *users[i]
 
 		whereParts = append(whereParts, "email = ?")
-		whereArgs = append(whereArgs, email)
-		expected = append(expected, users[ranIdx])
+		whereArgs = append(whereArgs, u.Email)
+		expected = append(expected, &u)
 	}
-	where := strings.Join(whereParts, " OR ")
+
+	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
 	userTests = append(userTests, userTest{"Find where",
 		UserFindRequest{
 			Where: &where,
 			Args:  whereArgs,
+			Order: []string{"created_at"},
 		},
 		expected,
 		nil,
@@ -998,6 +993,14 @@ func TestUserFind(t *testing.T) {
 				} else if diff := cmp.Diff(res, tt.expected); diff != "" {
 					t.Logf("\t\tGot: %d items", len(res))
 					t.Logf("\t\tWant: %d items", len(tt.expected))
+
+					for _, u := range res {
+						t.Logf("\t\tGot: %s ID", u.ID)
+					}
+					for _, u := range tt.expected {
+						t.Logf("\t\tExpected: %s ID", u.ID)
+					}
+
 					t.Fatalf("\t%s\tExpected find result to match expected. Diff:\n%s", tests.Failed, diff)
 				}
 				t.Logf("\t%s\tFind ok.", tests.Success)

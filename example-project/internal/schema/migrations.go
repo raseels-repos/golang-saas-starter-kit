@@ -100,7 +100,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
-				q2 := `CREATE TYPE user_account_status_t as enum('active','disabled')`
+				q2 := `CREATE TYPE user_account_status_t as enum('active', 'invited','disabled')`
 				if _, err := tx.Exec(q2); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q2)
 				}

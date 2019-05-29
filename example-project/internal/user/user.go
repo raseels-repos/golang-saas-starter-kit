@@ -335,7 +335,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
 	query.InsertInto(usersTableName)
-	query.Cols("id", "name", "email", "password_hash", "password_salt","timezone", "created_at", "updated_at")
+	query.Cols("id", "name", "email", "password_hash", "password_salt", "timezone", "created_at", "updated_at")
 	query.Values(u.ID, u.Name, u.Email, u.PasswordHash, u.PasswordSalt, u.Timezone, u.CreatedAt, u.UpdatedAt)
 
 	// Execute the query with the provided context.

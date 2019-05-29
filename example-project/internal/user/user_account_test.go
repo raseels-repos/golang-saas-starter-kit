@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/go-cmp/cmp"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pborman/uuid"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 )
 
@@ -127,7 +127,6 @@ func TestAddAccountValidation(t *testing.T) {
 	invalidRole := UserAccountRole("moon")
 	invalidStatus := UserAccountStatus("moon")
 
-
 	var accountTests = []struct {
 		name     string
 		req      AddAccountRequest
@@ -139,15 +138,15 @@ func TestAddAccountValidation(t *testing.T) {
 			func(req AddAccountRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'AddAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n"+
-					"Key: 'AddAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n"+
-					"Key: 'AddAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			errors.New("Key: 'AddAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
+				"Key: 'AddAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'AddAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
 			AddAccountRequest{
-				UserID: uuid.NewRandom().String(),
+				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
-				Roles:          []UserAccountRole{invalidRole},
+				Roles:     []UserAccountRole{invalidRole},
 			},
 			func(req AddAccountRequest, res *UserAccount) *UserAccount {
 				return nil
@@ -156,10 +155,10 @@ func TestAddAccountValidation(t *testing.T) {
 		},
 		{"Valid Status",
 			AddAccountRequest{
-				UserID: uuid.NewRandom().String(),
+				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
-				Roles:          []UserAccountRole{UserAccountRole_User},
-				Status:          &invalidStatus,
+				Roles:     []UserAccountRole{UserAccountRole_User},
+				Status:    &invalidStatus,
 			},
 			func(req AddAccountRequest, res *UserAccount) *UserAccount {
 				return nil
@@ -168,21 +167,21 @@ func TestAddAccountValidation(t *testing.T) {
 		},
 		{"Default Status",
 			AddAccountRequest{
-				UserID: uuid.NewRandom().String(),
+				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
-				Roles:          []UserAccountRole{UserAccountRole_User},
+				Roles:     []UserAccountRole{UserAccountRole_User},
 			},
 			func(req AddAccountRequest, res *UserAccount) *UserAccount {
 				return &UserAccount{
-					UserID:     req.UserID,
-					AccountID:     req.AccountID,
-					Roles:    req.Roles,
-					Status:   UserAccountStatus_Active,
+					UserID:    req.UserID,
+					AccountID: req.AccountID,
+					Roles:     req.Roles,
+					Status:    UserAccountStatus_Active,
 
 					// Copy this fields from the result.
-					ID:            res.ID,
-					CreatedAt:     res.CreatedAt,
-					UpdatedAt:     res.UpdatedAt,
+					ID:        res.ID,
+					CreatedAt: res.CreatedAt,
+					UpdatedAt: res.UpdatedAt,
 					//ArchivedAt: nil,
 				}
 			},
@@ -245,9 +244,9 @@ func TestAddAccountExistingEntry(t *testing.T) {
 		ctx := tests.Context()
 
 		req1 := AddAccountRequest{
-			UserID: uuid.NewRandom().String(),
+			UserID:    uuid.NewRandom().String(),
 			AccountID: uuid.NewRandom().String(),
-			Roles:          []UserAccountRole{UserAccountRole_User},
+			Roles:     []UserAccountRole{UserAccountRole_User},
 		}
 		ua1, err := AddAccount(ctx, auth.Claims{}, test.MasterDB, req1, now)
 		if err != nil {
@@ -260,9 +259,9 @@ func TestAddAccountExistingEntry(t *testing.T) {
 		}
 
 		req2 := AddAccountRequest{
-			UserID: req1.UserID,
+			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
-			Roles:          []UserAccountRole{UserAccountRole_Admin},
+			Roles:     []UserAccountRole{UserAccountRole_Admin},
 		}
 		ua2, err := AddAccount(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err != nil {
@@ -285,33 +284,33 @@ func TestUpdateAccountValidation(t *testing.T) {
 	invalidStatus := UserAccountStatus("xxxxxxxxx")
 
 	var accountTests = []struct {
-		name     string
-		req      UpdateAccountRequest
-		error    error
+		name  string
+		req   UpdateAccountRequest
+		error error
 	}{
 		{"Required Fields",
 			UpdateAccountRequest{},
 			errors.New("Key: 'UpdateAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-					"Key: 'UpdateAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-					"Key: 'UpdateAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+				"Key: 'UpdateAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'UpdateAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
 			UpdateAccountRequest{
-				UserID: uuid.NewRandom().String(),
+				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
-				Roles:          &UserAccountRoles{invalidRole},
+				Roles:     &UserAccountRoles{invalidRole},
 			},
 			errors.New("Key: 'UpdateAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
 		},
 
 		{"Valid Status",
 			UpdateAccountRequest{
-				UserID: uuid.NewRandom().String(),
+				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
-				Roles:          &UserAccountRoles{UserAccountRole_User},
-				Status: &invalidStatus,
+				Roles:     &UserAccountRoles{UserAccountRole_User},
+				Status:    &invalidStatus,
 			},
-		errors.New("Key: 'UpdateAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UpdateAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 	}
 
@@ -461,9 +460,9 @@ func TestAccountCrud(t *testing.T) {
 				// Create a new random account and associate that with the user.
 				accountID := uuid.NewRandom().String()
 				createReq := AddAccountRequest{
-					UserID: user.ID,
+					UserID:    user.ID,
 					AccountID: accountID,
-					Roles:          []UserAccountRole{UserAccountRole_User},
+					Roles:     []UserAccountRole{UserAccountRole_User},
 				}
 				ua, err := AddAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, createReq, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
@@ -479,9 +478,9 @@ func TestAccountCrud(t *testing.T) {
 
 				// Update the account.
 				updateReq := UpdateAccountRequest{
-					UserID: user.ID,
+					UserID:    user.ID,
 					AccountID: accountID,
-					Roles:         &UserAccountRoles{UserAccountRole_Admin},
+					Roles:     &UserAccountRoles{UserAccountRole_Admin},
 				}
 				err = UpdateAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, updateReq, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
@@ -501,12 +500,12 @@ func TestAccountCrud(t *testing.T) {
 				} else if tt.findErr == nil {
 					expected := []*UserAccount{
 						&UserAccount{
-							ID: ua.ID,
-							UserID: ua.UserID,
+							ID:        ua.ID,
+							UserID:    ua.UserID,
 							AccountID: ua.AccountID,
-							Roles: *updateReq.Roles,
-							Status: ua.Status,
-							CreatedAt:ua.CreatedAt,
+							Roles:     *updateReq.Roles,
+							Status:    ua.Status,
+							CreatedAt: ua.CreatedAt,
 							UpdatedAt: now,
 						},
 					}
@@ -518,7 +517,7 @@ func TestAccountCrud(t *testing.T) {
 
 				// Archive (soft-delete) the user account.
 				err = RemoveAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, RemoveAccountRequest{
-					UserID: user.ID,
+					UserID:    user.ID,
 					AccountID: accountID,
 				}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
@@ -543,14 +542,14 @@ func TestAccountCrud(t *testing.T) {
 
 					expected := []*UserAccount{
 						&UserAccount{
-							ID: ua.ID,
-							UserID: ua.UserID,
-							AccountID: ua.AccountID,
-							Roles: *updateReq.Roles,
-							Status: ua.Status,
-							CreatedAt:ua.CreatedAt,
-							UpdatedAt: now,
-							ArchivedAt: pq.NullTime{Time: now, Valid:true},
+							ID:         ua.ID,
+							UserID:     ua.UserID,
+							AccountID:  ua.AccountID,
+							Roles:      *updateReq.Roles,
+							Status:     ua.Status,
+							CreatedAt:  ua.CreatedAt,
+							UpdatedAt:  now,
+							ArchivedAt: pq.NullTime{Time: now, Valid: true},
 						},
 					}
 					if diff := cmp.Diff(findRes, expected); diff != "" {
@@ -561,7 +560,7 @@ func TestAccountCrud(t *testing.T) {
 
 				// Delete (hard-delete) the user account.
 				err = DeleteAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, DeleteAccountRequest{
-					UserID: user.ID,
+					UserID:    user.ID,
 					AccountID: accountID,
 				})
 				if err != nil && errors.Cause(err) != tt.updateErr {
@@ -586,23 +585,10 @@ func TestAccountCrud(t *testing.T) {
 // TestAccountFind validates all the request params are correctly parsed into a select query.
 func TestAccountFind(t *testing.T) {
 
-	// Ensure all the existing user accounts are deleted.
-	{
-		// Build the delete SQL statement.
-		query := sqlbuilder.NewDeleteBuilder()
-		query.DeleteFrom(usersAccountsTableName)
+	now := time.Now().Add(time.Hour * -2).UTC()
 
-		// Execute the query with the provided context.
-		sql, args := query.Build()
-		sql = test.MasterDB.Rebind(sql)
-		_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
-		if err != nil {
-			t.Logf("\t\tGot : %+v", err)
-			t.Fatalf("\t%s\tDelete failed.", tests.Failed)
-		}
-	}
-
-	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
+	startTime := now.Truncate(time.Millisecond)
+	var endTime time.Time
 
 	var userAccounts []*UserAccount
 	for i := 0; i <= 4; i++ {
@@ -620,9 +606,9 @@ func TestAccountFind(t *testing.T) {
 		// Create a new random account and associate that with the user.
 		accountID := uuid.NewRandom().String()
 		ua, err := AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
-			UserID: user.ID,
+			UserID:    user.ID,
 			AccountID: accountID,
-			Roles:          []UserAccountRole{UserAccountRole_User},
+			Roles:     []UserAccountRole{UserAccountRole_User},
 		}, now.Add(time.Second*time.Duration(i)))
 		if err != nil {
 			t.Logf("\t\tGot : %+v", err)
@@ -630,6 +616,7 @@ func TestAccountFind(t *testing.T) {
 		}
 
 		userAccounts = append(userAccounts, ua)
+		endTime = user.CreatedAt
 	}
 
 	type accountTest struct {
@@ -641,9 +628,13 @@ func TestAccountFind(t *testing.T) {
 
 	var accountTests []accountTest
 
+	createdFilter := "created_at BETWEEN ? AND ?"
+
 	// Test sort users.
 	accountTests = append(accountTests, accountTest{"Find all order by created_at asx",
 		UserAccountFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
 		userAccounts,
@@ -657,6 +648,8 @@ func TestAccountFind(t *testing.T) {
 	}
 	accountTests = append(accountTests, accountTest{"Find all order by created_at desc",
 		UserAccountFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
 		expected,
@@ -667,6 +660,8 @@ func TestAccountFind(t *testing.T) {
 	var limit uint = 2
 	accountTests = append(accountTests, accountTest{"Find limit",
 		UserAccountFindRequest{
+			Where: &createdFilter,
+			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
 		},
@@ -678,6 +673,8 @@ func TestAccountFind(t *testing.T) {
 	var offset uint = 3
 	accountTests = append(accountTests, accountTest{"Find limit, offset",
 		UserAccountFindRequest{
+			Where:  &createdFilter,
+			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
 			Offset: &offset,
@@ -688,27 +685,24 @@ func TestAccountFind(t *testing.T) {
 
 	// Test where filter.
 	whereParts := []string{}
-	whereArgs := []interface{}{}
+	whereArgs := []interface{}{startTime, endTime}
 	expected = []*UserAccount{}
-	selected := make(map[string]bool)
-	for i := 0; i <= 2; i++ {
-		ranIdx := rand.Intn(len(userAccounts))
-
-		id := userAccounts[ranIdx].ID
-		if selected[id] {
+	for i := 0; i <= len(userAccounts); i++ {
+		if rand.Intn(100) < 50 {
 			continue
 		}
-		selected[id] = true
+		ua := *userAccounts[i]
 
 		whereParts = append(whereParts, "id = ?")
-		whereArgs = append(whereArgs, id)
-		expected = append(expected, userAccounts[ranIdx])
+		whereArgs = append(whereArgs, ua.ID)
+		expected = append(expected, &ua)
 	}
-	where := strings.Join(whereParts, " OR ")
+	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
 	accountTests = append(accountTests, accountTest{"Find where",
 		UserAccountFindRequest{
 			Where: &where,
 			Args:  whereArgs,
+			Order: []string{"created_at"},
 		},
 		expected,
 		nil,

@@ -13,19 +13,19 @@ import (
 
 // User represents someone with access to our system.
 type User struct {
-	ID    string `db:"id" json:"id"`
-	Name  string `db:"name" json:"name"`
-	Email string `db:"email" json:"email"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 
-	PasswordSalt  string         `db:"password_salt" json:"-"`
-	PasswordHash  []byte         `db:"password_hash" json:"-"`
-	PasswordReset sql.NullString `db:"password_reset" json:"-"`
+	PasswordSalt  string         `json:"-"`
+	PasswordHash  []byte         `json:"-"`
+	PasswordReset sql.NullString `json:"-"`
 
-	Timezone string `db:"timezone" json:"timezone"`
+	Timezone string `json:"timezone"`
 
-	CreatedAt  time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt  time.Time   `db:"updated_at" json:"updated_at"`
-	ArchivedAt pq.NullTime `db:"archived_at" json:"archived_at"`
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
+	ArchivedAt pq.NullTime `json:"archived_at"`
 }
 
 // CreateUserRequest contains information needed to create a new User.
@@ -75,14 +75,14 @@ type UserFindRequest struct {
 // application. The status will allow users to be managed on by account with users
 // being global to the application.
 type UserAccount struct {
-	ID         string            `db:"id" json:"id"`
-	UserID     string            `db:"user_id" json:"user_id"`
-	AccountID  string            `db:"account_id" json:"account_id"`
-	Roles      UserAccountRoles  `db:"roles" json:"roles"`
-	Status     UserAccountStatus `db:"status" json:"status"`
-	CreatedAt  time.Time         `db:"created_at" json:"created_at"`
-	UpdatedAt  time.Time         `db:"updated_at" json:"updated_at"`
-	ArchivedAt pq.NullTime       `db:"archived_at" json:"archived_at"`
+	ID         string            `json:"id"`
+	UserID     string            `json:"user_id"`
+	AccountID  string            `json:"account_id"`
+	Roles      UserAccountRoles  `json:"roles"`
+	Status     UserAccountStatus `json:"status"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	ArchivedAt pq.NullTime       `json:"archived_at"`
 }
 
 // AddAccountRequest defines the information is needed to associate a user to an

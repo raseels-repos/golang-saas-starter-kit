@@ -402,7 +402,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	query := sqlbuilder.NewUpdateBuilder()
 	query.Update(usersTableName)
 
-	fields := []string{}
+	var fields []string
 	if req.Name != nil {
 		fields = append(fields, query.Assign("name", req.Name))
 	}

@@ -351,7 +351,7 @@ func UpdateAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 	return nil
 }
 
-// RemoveAccount...
+// RemoveAccount soft deleted the user account from the database.
 func RemoveAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req RemoveAccountRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.RemoveAccount")
 	defer span.Finish()
@@ -402,7 +402,7 @@ func RemoveAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 	return nil
 }
 
-// DeleteAccount...
+// DeleteAccount removes a user account from the database.
 func DeleteAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req DeleteAccountRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.RemoveAccount")
 	defer span.Finish()

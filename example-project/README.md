@@ -1,12 +1,12 @@
 # SaaS Service
 
 Copyright 2019, Geeks Accelerator  
-accelerator@geeksinthewoods.com.com
+twins@geeksaccelerator.com
 
 
 ## Description
 
-Service is a project that provides a starter-kit for a REST based web service. It provides best practices around Go web services using POD architecture and design. It contains the following features:
+This is a project that provides a starter-kit for a REST based web service. It provides best practices around Go web services using POD architecture and design. It contains the following features:
 
 * Minimal application web framework.
 * Middleware integration.
@@ -19,31 +19,57 @@ Service is a project that provides a starter-kit for a REST based web service. I
 * Use of Docker, Docker Compose, and Makefiles.
 * Vendoring dependencies with Modules, requires Go 1.11 or higher.
 
+This project has the following example services:
+
+* web api - Used to publically expose handlers
+* web app - Display and render html.
+* schema - Tool for initializing of db and schema migration.
+
+
 ## Local Installation
 
-This project contains three services and uses 3rd party services such as MongoDB and Zipkin. Docker is required to run this software on your local machine.
+This project contains three services and uses 3rd party services: 
+* redis - key / value storage for sessions and other web data. Used only as emphemeral storage.
+* postgres - transaction database for persitance of all data.
+* datadog - metrics, logging, and tracing
+
+Docker is required to run this software on your local machine.
+
+An AWS account is required for the project to run because of the following dependancies on AWS:
+* secret manager
+* s3
+
+Required for deploymenet:
+* ECS Fargate
+* RDS 
+* Route
 
 ### Getting the project
 
 You can use the traditional `go get` command to download this project into your configured GOPATH.
 
 ```
-$ go get -u geeks-accelerator/oss/saas-starter-kit/example-project
+$ go get -u gitlab.com/geeks-accelerator/oss/saas-starter-kit
 ```
 
 ### Go Modules
 
-This project is using Go Module support for vendoring dependencies. We are using the `tidy` and `vendor` commands to maintain the dependencies and make sure the project can create reproducible builds. This project assumes the source code will be inside your GOPATH within the traditional location.
+This project is using Go Module support for vendoring dependencies. We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. This project assumes the source code will be inside your GOPATH within the traditional location.
 
 ```
 cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
 GO111MODULE=on go mod tidy
-GO111MODULE=on go mod vendor
+```
+
+It's recommended to set use at least go 1.12 and enable go modules.
+
+```bash
+echo "export  GO111MODULE=on" >> ~/.bash_profile
 ```
 
 ### Installing Docker
 
-Docker is a critical component to managing and running this project. It kills me to just send you to the Docker installation page but it's all I got for now.
+Docker is a critical component to managing and running this project. 
 
 https://docs.docker.com/install/
 
@@ -51,7 +77,7 @@ If you are having problems installing docker reach out or jump on [Gopher Slack]
 
 ## Running The Project
 
-All the source code, including any dependencies, have been vendored into the project. There is a single `dockerfile`and a `docker-compose` file that knows how to build and run all the services.
+There is a `docker-compose` file that knows how to build and run all the services. Each service has it's own a `dockerfile`.
 
 A `makefile` has also been provide to make building, running and testing the software easier.
 
@@ -140,6 +166,13 @@ sqlQueryStr = db.Rebind(sqlQueryStr)
 
 For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
 
+### datadog
+
+Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then can set a single env variable.
+```bash
+DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
+```
+
 
 ## What's Next
 
@@ -174,6 +207,8 @@ secretsmanager:DeleteSecret
 
 
 ### TODO:
+* update makefile
+
 additianal info required here in readme
 
 need to copy sample.env_docker_compose to .env_docker_compose and defined your aws configs for docker-compose

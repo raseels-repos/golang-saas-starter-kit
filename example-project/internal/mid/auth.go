@@ -8,7 +8,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/pkg/errors"
-	"go.opencensus.io/trace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // ErrForbidden is returned when an authenticated user does not have a
@@ -26,8 +26,8 @@ func Authenticate(authenticator *auth.Authenticator) web.Middleware {
 
 		// Wrap this handler around the next one provided.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-			ctx, span := trace.StartSpan(ctx, "internal.mid.Authenticate")
-			defer span.End()
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Authenticate")
+			defer span.Finish()
 
 			authHdr := r.Header.Get("Authorization")
 			if authHdr == "" {
@@ -65,8 +65,8 @@ func HasRole(roles ...string) web.Middleware {
 	f := func(after web.Handler) web.Handler {
 
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-			ctx, span := trace.StartSpan(ctx, "internal.mid.HasRole")
-			defer span.End()
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.HasRole")
+			defer span.Finish()
 
 			claims, ok := ctx.Value(auth.Key).(auth.Claims)
 			if !ok {

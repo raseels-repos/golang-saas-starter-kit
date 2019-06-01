@@ -5,62 +5,123 @@
 version: '3'
 
 networks:
-  shared-network:
-    driver: bridge
+  main:
 
 services:
-
-  # This starts a local mongo DB.
-  mongo:
-    container_name: mongo
-    networks:
-      - shared-network
-    image: mongo:3-jessie
+  postgres:
+    image: postgres:11-alpine
+    expose:
+      - "5433"
     ports:
-      - 27017:27017
-    command: --bind_ip 0.0.0.0
-
-  # This is the core CRUD based service.
-  web-api:
-    container_name: web-api
+      - "5433:5432"
     networks:
-      - shared-network
-    image: gcr.io/web-api/web-api-amd64:1.0
-    ports:
-      - 3000:3000 # CRUD API
-      - 4000:4000 # DEBUG API
+      main:
+        aliases:
+          - postgres
     environment:
-      - WEB_APP_AUTH_KEY_ID=1
-      # - WEB_APP_DB_HOST=got:got2015@ds039441.mongolab.com:39441/gotraining
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=postgres
+      - POSTGRES_DB=shared
+
+  redis:
+    image: redis:latest
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+    networks:
+      main:
+        aliases:
+          - redis
+    entrypoint: redis-server --appendonly yes
+
+  datadog:
+    image: example-project/datadog:latest
+    build:
+      context: docker/datadog-agent
+      dockerfile: Dockerfile
+    ports:
+      - 8125:8125 # metrics
+      - 8126:8126 # tracing
+    networks:
+      main:
+        aliases:
+          - datadog
+    env_file:
+      - .env_docker_compose
+    environment:
+      - DD_LOGS_ENABLED=true
+      - DD_APM_ENABLED=true
+      - DD_RECEIVER_PORT=8126
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_TAGS=source:docker env:dev
+      - DD_DOGSTATSD_ORIGIN_DETECTION=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      #- ECS_FARGATE=false
+      - DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
+  web-app:
+    image: example-project/web-app:latest
+    build:
+      context: .
+      dockerfile: cmd/web-app/Dockerfile
+    ports:
+      - 3000:3000 # WEB APP
+      - 4000:4000 # DEBUG API
+    networks:
+      main:
+        aliases:
+          - web-app
+    links:
+      - postgres
+      - redis
+      - datadog
+    env_file:
+      - .env_docker_compose
+    environment:
+      - WEB_APP_HTTP_HOST=0.0.0.0:3000
+      - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
+      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4000
+      - WEB_APP_REDIS_HOST=redis:6379
+      - WEB_APP_DB_HOST=postgres:5433
+      - WEB_APP_DB_USER=postgres
+      - WEB_APP_DB_PASS=postgres
+      - WEB_APP_DB_DATABASE=shared
+      - DD_TRACE_AGENT_HOSTNAME=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE_NAME=web-app
+      - DD_ENV=dev
       # - GODEBUG=gctrace=1
 
-  # This sidecar publishes metrics to the console by default.
-  metrics:
-    container_name: metrics
-    networks:
-      - shared-network
-    image: gcr.io/web-api/metrics-amd64:1.0
+  web-api:
+    image: example-project/web-api:latest
+    build:
+      context: .
+      dockerfile: cmd/web-api/Dockerfile
     ports:
-      - 3001:3001 # EXPVAR API
+      - 3001:3001 # WEB API
       - 4001:4001 # DEBUG API
-
-  # This sidecar publishes tracing to the console by default.
-  tracer:
-    container_name: tracer
     networks:
-      - shared-network
-    image: gcr.io/web-api/tracer-amd64:1.0
-    ports:
-      - 3002:3002 # TRACER API
-      - 4002:4002 # DEBUG API
-    # environment:
-      # - WEB_APP_ZIPKIN_HOST=http://zipkin:9411/api/v2/spans
-
-  # This sidecar allows for the viewing of traces.
-  zipkin:
-    container_name: zipkin
-    networks:
-      - shared-network
-    image: openzipkin/zipkin:2.11
-    ports:
-      - 9411:9411
+      main:
+        aliases:
+          - web-api
+    links:
+      - postgres
+      - redis
+      - datadog
+    env_file:
+      - .env_docker_compose
+    environment:
+      - WEB_API_HTTP_HOST=0.0.0.0:3001
+      - WEB_API_APP_BASE_URL=http://127.0.0.1:3001
+      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4001
+      - WEB_API_REDIS_HOST=redis:6379
+      - WEB_API_DB_HOST=postgres:5433
+      - WEB_API_DB_USER=postgres
+      - WEB_API_DB_PASS=postgres
+      - WEB_API_DB_DATABASE=shared
+      - DD_TRACE_AGENT_HOSTNAME=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE_NAME=web-app
+      - DD_ENV=dev
+      # - GODEBUG=gctrace=1

@@ -3,10 +3,11 @@ package mid
 import (
 	"context"
 	"net/http"
+	"runtime/debug"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/pkg/errors"
-	"go.opencensus.io/trace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // Panics recovers from panics and converts the panic to an error so it is
@@ -18,14 +19,14 @@ func Panics() web.Middleware {
 
 		// Wrap this handler around the next one provided.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) (err error) {
-			ctx, span := trace.StartSpan(ctx, "internal.mid.Panics")
-			defer span.End()
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Panics")
+			defer span.Finish()
 
 			// Defer a function to recover from a panic and set the err return variable
 			// after the fact. Using the errors package will generate a stack trace.
 			defer func() {
 				if r := recover(); r != nil {
-					err = errors.Errorf("panic: %v", r)
+					err = errors.Errorf("panic: %+v %s", r, string(debug.Stack()))
 				}
 			}()
 

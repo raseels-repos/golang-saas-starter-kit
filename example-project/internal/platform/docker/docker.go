@@ -10,13 +10,19 @@ import (
 
 // Container contains the information about the container.
 type Container struct {
-	ID   string
-	Port string
+	ID       string
+	Port     string
+	User     string
+	Pass     string
+	Database string
 }
 
-// StartMongo runs a mongo container to execute commands.
-func StartMongo(log *log.Logger) (*Container, error) {
-	cmd := exec.Command("docker", "run", "-P", "-d", "mongo:3-jessie")
+// StartPostgres runs a postgres container to execute commands.
+func StartPostgres(log *log.Logger) (*Container, error) {
+	user := "postgres"
+	pass := "postgres"
+
+	cmd := exec.Command("docker", "run", "--env", "POSTGRES_USER="+user, "--env", "POSTGRES_PASSWORD="+pass, "-P", "-d", "postgres:11-alpine")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -36,9 +42,9 @@ func StartMongo(log *log.Logger) (*Container, error) {
 	var doc []struct {
 		NetworkSettings struct {
 			Ports struct {
-				TCP27017 []struct {
+				TCP5432 []struct {
 					HostPort string `json:"HostPort"`
-				} `json:"27017/tcp"`
+				} `json:"5432/tcp"`
 			} `json:"Ports"`
 		} `json:"NetworkSettings"`
 	}
@@ -47,8 +53,11 @@ func StartMongo(log *log.Logger) (*Container, error) {
 	}
 
 	c := Container{
-		ID:   id,
-		Port: doc[0].NetworkSettings.Ports.TCP27017[0].HostPort,
+		ID:       id,
+		Port:     doc[0].NetworkSettings.Ports.TCP5432[0].HostPort,
+		User:     user,
+		Pass:     pass,
+		Database: "postgres",
 	}
 
 	log.Println("DB Port:", c.Port)
@@ -56,8 +65,8 @@ func StartMongo(log *log.Logger) (*Container, error) {
 	return &c, nil
 }
 
-// StopMongo stops and removes the specified container.
-func StopMongo(log *log.Logger, c *Container) error {
+// StopPostgres stops and removes the specified container.
+func StopPostgres(log *log.Logger, c *Container) error {
 	if err := exec.Command("docker", "stop", c.ID).Run(); err != nil {
 		return err
 	}

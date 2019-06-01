@@ -1,0 +1,48 @@
+{{ define "base" }}
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <title>
+            {{block "title" .}}{{end}} Web App
+        </title>
+        <meta name="description" content="{{block "description" .}}{{end}} ">
+        <meta name="author" content="{{block "author" .}}{{end}}">
+        <meta charset="utf-8">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ SiteAssetUrl "/assets/images/favicon.png" }}">
+
+        <!-- ============================================================== -->
+        <!-- CSS -->
+        <!-- ============================================================== -->
+        <link href="{{ SiteAssetUrl "/assets/css/base.css" }}" id="theme" rel="stylesheet">
+
+        <!-- ============================================================== -->
+        <!-- Page specific CSS  -->
+        <!-- ============================================================== -->
+        {{block "style" .}} {{end}}
+    </head>
+    <body>
+        <!-- ============================================================== -->
+        <!-- Page content -->
+        <!-- ============================================================== -->
+        {{ template "content" . }}
+
+        <!-- ============================================================== -->
+        <!-- footer -->
+        <!-- ============================================================== -->
+        <footer class="footer">
+            © 2019 Keeni Space<br/>
+            {{ template "partials/buildinfo" . }}
+        </footer>
+
+        <!-- ============================================================== -->
+        <!-- Javascript -->
+        <!-- ============================================================== -->
+        <script src="{{ SiteAssetUrl "/js/base.js" }}"></script>
+
+        <!-- ============================================================== -->
+        <!-- Page specific Javascript  -->
+        <!-- ============================================================== -->
+        {{block "js" .}} {{end}}
+    </body>
+</html>
+{{end}}

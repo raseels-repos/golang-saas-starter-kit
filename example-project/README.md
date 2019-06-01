@@ -1,27 +1,12 @@
-# Ultimate Service
+# SaaS Service
 
-Copyright 2018, Ardan Labs  
-info@ardanlabs.com
+Copyright 2019, Geeks Accelerator  
+twins@geeksaccelerator.com
 
-## Licensing
-
-```
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
 
 ## Description
 
-Service is a project that provides a starter-kit for a REST based web service. It provides best practices around Go web services using POD architecture and design. It contains the following features:
+This is a project that provides a starter-kit for a REST based web service. It provides best practices around Go web services using POD architecture and design. It contains the following features:
 
 * Minimal application web framework.
 * Middleware integration.
@@ -34,31 +19,57 @@ Service is a project that provides a starter-kit for a REST based web service. I
 * Use of Docker, Docker Compose, and Makefiles.
 * Vendoring dependencies with Modules, requires Go 1.11 or higher.
 
+This project has the following example services:
+
+* web api - Used to publically expose handlers
+* web app - Display and render html.
+* schema - Tool for initializing of db and schema migration.
+
+
 ## Local Installation
 
-This project contains three services and uses 3rd party services such as MongoDB and Zipkin. Docker is required to run this software on your local machine.
+This project contains three services and uses 3rd party services: 
+* redis - key / value storage for sessions and other web data. Used only as emphemeral storage.
+* postgres - transaction database for persitance of all data.
+* datadog - metrics, logging, and tracing
+
+Docker is required to run this software on your local machine.
+
+An AWS account is required for the project to run because of the following dependancies on AWS:
+* secret manager
+* s3
+
+Required for deploymenet:
+* ECS Fargate
+* RDS 
+* Route
 
 ### Getting the project
 
 You can use the traditional `go get` command to download this project into your configured GOPATH.
 
 ```
-$ go get -u geeks-accelerator/oss/saas-starter-kit/example-project
+$ go get -u gitlab.com/geeks-accelerator/oss/saas-starter-kit
 ```
 
 ### Go Modules
 
-This project is using Go Module support for vendoring dependencies. We are using the `tidy` and `vendor` commands to maintain the dependencies and make sure the project can create reproducible builds. This project assumes the source code will be inside your GOPATH within the traditional location.
+This project is using Go Module support for vendoring dependencies. We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. This project assumes the source code will be inside your GOPATH within the traditional location.
 
 ```
 cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
 GO111MODULE=on go mod tidy
-GO111MODULE=on go mod vendor
+```
+
+It's recommended to set use at least go 1.12 and enable go modules.
+
+```bash
+echo "export  GO111MODULE=on" >> ~/.bash_profile
 ```
 
 ### Installing Docker
 
-Docker is a critical component to managing and running this project. It kills me to just send you to the Docker installation page but it's all I got for now.
+Docker is a critical component to managing and running this project. 
 
 https://docs.docker.com/install/
 
@@ -66,7 +77,7 @@ If you are having problems installing docker reach out or jump on [Gopher Slack]
 
 ## Running The Project
 
-All the source code, including any dependencies, have been vendored into the project. There is a single `dockerfile`and a `docker-compose` file that knows how to build and run all the services.
+There is a `docker-compose` file that knows how to build and run all the services. Each service has it's own a `dockerfile`.
 
 A `makefile` has also been provide to make building, running and testing the software easier.
 
@@ -107,11 +118,6 @@ Running `make down` will properly stop and terminate the Docker Compose session.
 
 The service provides record keeping for someone running a multi-family garage sale. Authenticated users can maintain a list of projects for sale.
 
-<!--The service uses the following models:-->
-
-<!--<img src="https://raw.githubusercontent.com/ardanlabs/service/master/models.jpg" alt="Garage Sale Service Models" title="Garage Sale Service Models" />-->
-
-<!--(Diagram generated with draw.io using `models.xml` file)-->
 
 ### Making Requests
 
@@ -143,6 +149,82 @@ To make authenticated requests put the token in the `Authorization` header with 
 $ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 ```
 
+
+## Making db calls
+Currently postgres is only supported for sqlxmigrate. MySQL should be easy to add after determing 
+better method for abstracting the create table and other SQL statements from the main
+testing logic. 
+
+### bindvars
+When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
+To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to 
+remap the placeholders to the correct database.
+
+```go
+sqlQueryStr = db.Rebind(sqlQueryStr)
+```
+
+For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
+
+### datadog
+
+Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then can set a single env variable.
+```bash
+DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
+```
+
+
 ## What's Next
 
 We are in the process of writing more documentation about this code. Classes are being finalized as part of the Ultimate series.
+
+
+
+
+
+## AWS Permissions
+
+Base required permissions
+```
+secretsmanager:CreateSecret 
+secretsmanager:GetSecretValue 
+secretsmanager:ListSecretVersionIds 
+secretsmanager:PutSecretValue 
+secretsmanager:UpdateSecret 
+```
+
+If cloudfront enabled for static files
+```
+cloudFront:ListDistributions
+```
+
+Additional permissions required for unittests
+```
+secretsmanager:DeleteSecret
+```
+
+
+
+
+### TODO:
+* update makefile
+
+additianal info required here in readme
+
+need to copy sample.env_docker_compose to .env_docker_compose and defined your aws configs for docker-compose
+
+need to add mid tracer for all requests
+
+
+/*
+ZipKin: http://localhost:9411
+AddLoad: hey -m GET -c 10 -n 10000 "http://localhost:3000/v1/users"
+expvarmon -ports=":3001" -endpoint="/metrics" -vars="requests,goroutines,errors,mem:memstats.Alloc"
+*/
+
+/*
+Need to figure out timeouts for http service.
+You might want to reset your DB_HOST env var during test tear down.
+Service should start even without a DB running yet.
+symbols in profiles: https://github.com/golang/go/issues/23376 / https://github.com/google/pprof/pull/366
+*/

@@ -1,135 +1,69 @@
-# SaaS Service
+# SaaS Starter Kit Example Project
 
-Copyright 2019, Geeks Accelerator  
+Copyright 2019, Geeks Accelerator 
 twins@geeksaccelerator.com
 
 
 ## Description
 
-This is a project that provides a starter-kit for a REST based web service. It provides best practices around Go web services using POD architecture and design. It contains the following features:
+The example project provides the ability clients to manage projects. New clients can sign up which creates an account and a user with role admin. Two basic roles are available for users: admins and users. Admins have the ability to perform all CRUD actions on projects and users. Those users with role user only have the ability to view projects and users. 
 
-* Minimal application web framework.
-* Middleware integration.
-* Database support using MongoDB.
-* CRUD based pattern.
-* Distributed logging and tracing.
-* Testing patterns.
-* User authentication.
-* POD architecture with sidecars for metrics and tracing.
-* Use of Docker, Docker Compose, and Makefiles.
-* Vendoring dependencies with Modules, requires Go 1.11 or higher.
+All business logic should be contained as a package outside both the web app and web API. This enables both the web app and web API to use the same API (Golang packages) with the only main difference between them is their response, HTML or JSON.
 
-This project has the following example services:
-
-* web api - Used to publically expose handlers
-* web app - Display and render html.
-* schema - Tool for initializing of db and schema migration.
-
-
-## Local Installation
-
-This project contains three services and uses 3rd party services: 
-* redis - key / value storage for sessions and other web data. Used only as emphemeral storage.
-* postgres - transaction database for persitance of all data.
-* datadog - metrics, logging, and tracing
-
-Docker is required to run this software on your local machine.
-
-An AWS account is required for the project to run because of the following dependancies on AWS:
-* secret manager
-* s3
-
-Required for deploymenet:
-* ECS Fargate
-* RDS 
-* Route
-
-### Getting the project
-
-You can use the traditional `go get` command to download this project into your configured GOPATH.
-
-```
-$ go get -u gitlab.com/geeks-accelerator/oss/saas-starter-kit
-```
-
-### Go Modules
-
-This project is using Go Module support for vendoring dependencies. We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. This project assumes the source code will be inside your GOPATH within the traditional location.
-
-```
-cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
-GO111MODULE=on go mod tidy
-```
-
-It's recommended to set use at least go 1.12 and enable go modules.
-
-```bash
-echo "export  GO111MODULE=on" >> ~/.bash_profile
-```
-
-### Installing Docker
-
-Docker is a critical component to managing and running this project. 
-
-https://docs.docker.com/install/
-
-If you are having problems installing docker reach out or jump on [Gopher Slack](http://invite.slack.golangbridge.org/) for help.
 
 ## Running The Project
 
-There is a `docker-compose` file that knows how to build and run all the services. Each service has it's own a `dockerfile`.
+There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a `dockerfile`.
 
-A `makefile` has also been provide to make building, running and testing the software easier.
-
-### Building the project
-
-Navigate to the root of the project and use the `makefile` to build all of the services.
-
-```
-$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
-$ make all
-```
 
 ### Running the project
 
-Navigate to the root of the project and use the `makefile` to run all of the services.
+Navigate to the root of the project and first set your AWS configs. Copy `sample.env_docker_compose` to `.env_docker_compose` and update the credentials for docker-compose.
 
 ```
 $ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
-$ make up
+$ cp sample.env_docker_compose .env_docker_compose
 ```
 
-The `make up` command will leverage Docker Compose to run all the services, including the 3rd party services. The first time to run this command, Docker will download the required images for the 3rd party services.
+Use the `docker-compose.yaml` to run all of the services, including the 3rd party services. The first time to run this command, Docker will download the required images for the 3rd party services.
 
-Default configuration is set which should be valid for most systems. Use the `docker-compose.yaml` file to configure the services differently is necessary. Email me if you have issues or questions.
+```
+$ docker-compose up
+```
+
+Default configuration is set which should be valid for most systems. Use the `docker-compose.yaml` file to configure the services differently using environment variables when necessary. 
+
 
 ### Stopping the project
 
-You can hit <ctrl>C in the terminal window running `make up`. Once that shutdown sequence is complete, it is important to run the `make down` command.
+You can hit <ctrl>C in the terminal window running `docker-compose up`. Once that shutdown sequence is complete, it is important to run the `docker-compose down` command.
 
 ```
 $ <ctrl>C
-$ make down
+$ docker-compose down
 ```
 
-Running `make down` will properly stop and terminate the Docker Compose session.
+Running `docker-compose down` will properly stop and terminate the Docker Compose session.
 
-## About The Project
 
-The service provides record keeping for someone running a multi-family garage sale. Authenticated users can maintain a list of projects for sale.
+## Web App
+[cmd/web-app](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/web-app)
+
+Responsive web application that renders HTML using the `html/template` package from the standard library to enable direct interaction with clients and their users. It allows clients to sign up new accounts and provides user authentication with HTTP sessions. The web app relies on the Golang business logic packages developed to provide an API for internal development. 
+
+
+## Web API
+[cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/web-api)
+
+REST API available to clients for supporting deeper integrations. The API implements JWT authentication that renders results as JSON to clients. This API is not directly used by the web app to prevent locking the functionally needed internally for development of the web app to the same functionality exposed to clients. It’s believed that in the beginning, having to define an additional API for internal purposes is worth at additional effort as the internal API can handle more flexible updates. The API exposed to clients can then be maintained in a more rigid/structured process to manage client expectations.
+
 
 
 ### Making Requests
 
 #### Initial User
 
-To make a request to the service you must have an authenticated user. Users can be created with the API but an initial admin user must first be created. While the service is running you can create the initial user with the command `make admin`
-
-```
-$ make admin
-```
-
-This will create a user with email `admin@example.com` and password `gophers`.
+To make a request to the service you must have an authenticated user. Users can be created with the API but an initial admin user must first be created.  While the Web App service is running, signup to create a new account. The email and password used to create the initial account can be used to make API requests. 
 
 #### Authenticating
 
@@ -139,7 +73,7 @@ Before any authenticated requests can be sent you must acquire an auth token. Ma
 $ curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token
 ```
 
-I suggest putting the resulting token in an environment variable like `$TOKEN`.
+It’s best to put the resulting token in an environment variable like `$TOKEN`.
 
 #### Authenticated Requests
 
@@ -149,15 +83,33 @@ To make authenticated requests put the token in the `Authorization` header with 
 $ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 ```
 
+## Schema 
+[cmd/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/schema)
+
+Schema is a minimalistic database migration helper that can manually be invoked via CLI. It provides schema versioning and migration rollback.  To support POD architecture, the schema for the entire project is defined globally and is located inside internal: [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/internal/schema)
+
+Keeping a global schema helps ensure business logic then can be decoupled across multiple packages. It’s a firm belief that data models should not be part of feature functionality. Globally defined structs are dangerous as they create large code dependencies. Structs for the same database table can be defined by package to help mitigate large code dependencies. 
+
+The example schema package provides two separate methods for handling schema migration.
+[Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/example-project/internal/schema/migrations.go) 
+List of direct SQL statements for each migration with defined version ID. A database table is created to persist executed migrations. Upon run of each schema migration run, the migraction logic checks the migration database table to check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a function to enable complex migrations so results from query manipulated before being piped to the next query. 
+[Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/example-project/internal/schema/init_schema.go) 
+If you have a lot of migrations, it can be a pain to run all them, as example, when you are deploying a new instance of the app, in a clean database. To prevent this, use the initSchema function that will run if no migration was run before (in a new clean database). Remember to create everything here, all tables, foreign keys and what more you need in your app.
+
+Another bonus with the globally defined schema allows testing to spin up database containers on demand include all the migrations. The testing package enables unit tests to programmatically execute schema migrations before running any unit tests. 
+
+
+## Development Notes
+
 
 ## Making db calls
-Currently postgres is only supported for sqlxmigrate. MySQL should be easy to add after determing 
-better method for abstracting the create table and other SQL statements from the main
-testing logic. 
+
+Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after determining better method for abstracting the create table and other SQL statements from the main testing logic.
 
 ### bindvars
+
 When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
-To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to 
+To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to
 remap the placeholders to the correct database.
 
 ```go
@@ -174,23 +126,18 @@ DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|servic
 ```
 
 
-## What's Next
-
-We are in the process of writing more documentation about this code. Classes are being finalized as part of the Ultimate series.
 
 
 
-
-
-## AWS Permissions
+### AWS Permissions
 
 Base required permissions
 ```
-secretsmanager:CreateSecret 
-secretsmanager:GetSecretValue 
-secretsmanager:ListSecretVersionIds 
-secretsmanager:PutSecretValue 
-secretsmanager:UpdateSecret 
+secretsmanager:CreateSecret
+secretsmanager:GetSecretValue
+secretsmanager:ListSecretVersionIds
+secretsmanager:PutSecretValue
+secretsmanager:UpdateSecret
 ```
 
 If cloudfront enabled for static files
@@ -204,27 +151,6 @@ secretsmanager:DeleteSecret
 ```
 
 
+## What's Next
 
-
-### TODO:
-* update makefile
-
-additianal info required here in readme
-
-need to copy sample.env_docker_compose to .env_docker_compose and defined your aws configs for docker-compose
-
-need to add mid tracer for all requests
-
-
-/*
-ZipKin: http://localhost:9411
-AddLoad: hey -m GET -c 10 -n 10000 "http://localhost:3000/v1/users"
-expvarmon -ports=":3001" -endpoint="/metrics" -vars="requests,goroutines,errors,mem:memstats.Alloc"
-*/
-
-/*
-Need to figure out timeouts for http service.
-You might want to reset your DB_HOST env var during test tear down.
-Service should start even without a DB running yet.
-symbols in profiles: https://github.com/golang/go/issues/23376 / https://github.com/google/pprof/pull/366
-*/
+We are in the process of writing more documentation about this code. 

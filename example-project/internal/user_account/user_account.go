@@ -3,6 +3,8 @@ package user
 import (
 	"context"
 	"database/sql"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
 	"github.com/lib/pq"
 	"time"
 
@@ -15,14 +17,29 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
+var (
+	// ErrNotFound abstracts the mgo not found error.
+	ErrNotFound = errors.New("Entity not found")
+
+	// ErrInvalidID occurs when an ID is not in a valid form.
+	ErrInvalidID = errors.New("ID is not in its proper form")
+
+	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
+	// anything goes wrong.
+	ErrAuthenticationFailure = errors.New("Authentication failed")
+
+	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
+	ErrForbidden = errors.New("Attempted action is not allowed")
+)
+
 // The database table for UserAccount
-const usersAccountsTableName = "users_accounts"
+const userAccountTableName = "users_accounts"
 
 // The list of columns needed for mapRowsToUserAccount
-var usersAccountsMapColumns = "id,user_id,account_id,roles,status,created_at,updated_at,archived_at"
+var userAccountMapColumns = "id,user_id,account_id,roles,status,created_at,updated_at,archived_at"
 
 // mapRowsToUserAccount takes the SQL rows and maps it to the UserAccount struct
-// with the columns defined by usersAccountsMapColumns
+// with the columns defined by userAccountMapColumns
 func mapRowsToUserAccount(rows *sql.Rows) (*UserAccount, error) {
 	var (
 		ua  UserAccount
@@ -36,10 +53,31 @@ func mapRowsToUserAccount(rows *sql.Rows) (*UserAccount, error) {
 	return &ua, nil
 }
 
+// CanReadUserAccount determines if claims has the authority to access the specified user account by user ID.
+func CanReadUserAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID, accountID string) error {
+	// First check to see if claims can read the user ID
+	err := user.CanReadUser(ctx, claims, dbConn, userID)
+	if err != nil {
+		if claims.Audience != accountID {
+			return err
+		}
+	}
+
+	// Second check to see if claims can read the account ID
+	err = account.CanReadAccount(ctx, claims, dbConn, accountID)
+	if err != nil {
+		if claims.Audience != accountID {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // CanModifyUserAccount determines if claims has the authority to modify the specified user ID.
 func CanModifyUserAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID, accountID string) error {
 	// First check to see if claims can read the user ID
-	err := CanReadUser(ctx, claims, dbConn, userID)
+	err := CanReadUserAccount(ctx, claims, dbConn, userID, accountID)
 	if err != nil {
 		if claims.Audience != accountID {
 			return err
@@ -71,7 +109,7 @@ func applyClaimsUserAccountSelect(ctx context.Context, claims auth.Claims, query
 	}
 
 	// Build select statement for users_accounts table
-	subQuery := sqlbuilder.NewSelectBuilder().Select("user_id").From(usersAccountsTableName)
+	subQuery := sqlbuilder.NewSelectBuilder().Select("user_id").From(userAccountTableName)
 
 	var or []string
 	if claims.Audience != "" {
@@ -89,18 +127,18 @@ func applyClaimsUserAccountSelect(ctx context.Context, claims auth.Claims, query
 }
 
 // AccountSelectQuery
-func accountSelectQuery() *sqlbuilder.SelectBuilder {
+func userAccountSelectQuery() *sqlbuilder.SelectBuilder {
 	query := sqlbuilder.NewSelectBuilder()
-	query.Select(usersAccountsMapColumns)
-	query.From(usersAccountsTableName)
+	query.Select(userAccountMapColumns)
+	query.From(userAccountTableName)
 	return query
 }
 
 // userFindRequestQuery generates the select query for the given find request.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func accountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
-	query := accountSelectQuery()
+func userAccountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
+	query := userAccountSelectQuery()
 	if req.Where != nil {
 		query.Where(query.And(*req.Where))
 	}
@@ -117,19 +155,19 @@ func accountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuil
 	return query, req.Args
 }
 
-// Find gets all the users from the database based on the request params
-func FindAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountFindRequest) ([]*UserAccount, error) {
-	query, args := accountFindRequestQuery(req)
-	return findAccounts(ctx, claims, dbConn, query, args, req.IncludedArchived)
+// Find gets all the user accounts from the database based on the request params
+func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountFindRequest) ([]*UserAccount, error) {
+	query, args := userAccountFindRequestQuery(req)
+	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
 }
 
-// Find gets all the users from the database based on the select query
-func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*UserAccount, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.FindAccounts")
+// Find gets all the user accounts from the database based on the select query
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*UserAccount, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Find")
 	defer span.Finish()
 
-	query.Select(usersAccountsMapColumns)
-	query.From(usersAccountsTableName)
+	query.Select(userAccountMapColumns)
+	query.From(userAccountTableName)
 
 	if !includedArchived {
 		query.Where(query.IsNull("archived_at"))
@@ -148,7 +186,7 @@ func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, quer
 	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessage(err, "find accounts failed")
+		err = errors.WithMessage(err, "find user accounts failed")
 		return nil, err
 	}
 
@@ -167,8 +205,8 @@ func findAccounts(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, quer
 }
 
 // Retrieve gets the specified user from the database.
-func FindAccountsByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string, includedArchived bool) ([]*UserAccount, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.FindAccountsByUserId")
+func FindByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string, includedArchived bool) ([]*UserAccount, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.FindByUserID")
 	defer span.Finish()
 
 	// Filter base select query by ID
@@ -177,7 +215,7 @@ func FindAccountsByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.
 	query.OrderBy("created_at")
 
 	// Execute the find accounts method.
-	res, err := findAccounts(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -189,8 +227,8 @@ func FindAccountsByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.
 }
 
 // AddAccount an account for a given user with specified roles.
-func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AddAccountRequest, now time.Time) (*UserAccount, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.AddAccount")
+func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req CreateUserAccountRequest, now time.Time) (*UserAccount, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Create")
 	defer span.Finish()
 
 	// Validate the request.
@@ -218,25 +256,25 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 	now = now.Truncate(time.Millisecond)
 
 	// Check to see if there is an existing user account, including archived.
-	existQuery := accountSelectQuery()
+	existQuery := userAccountSelectQuery()
 	existQuery.Where(existQuery.And(
 		existQuery.Equal("account_id", req.AccountID),
 		existQuery.Equal("user_id", req.UserID),
 	))
-	existing, err := findAccounts(ctx, claims, dbConn, existQuery, []interface{}{}, true)
+	existing, err := find(ctx, claims, dbConn, existQuery, []interface{}{}, true)
 	if err != nil {
 		return nil, err
 	}
 
 	// If there is an existing entry, then update instead of insert.
 	if len(existing) > 0 {
-		upReq := UpdateAccountRequest{
+		upReq := UpdateUserAccountRequest{
 			UserID:    req.UserID,
 			AccountID: req.AccountID,
 			Roles:     &req.Roles,
 			unArchive: true,
 		}
-		err = UpdateAccount(ctx, claims, dbConn, upReq, now)
+		err = Update(ctx, claims, dbConn, upReq, now)
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +303,7 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
-	query.InsertInto(usersAccountsTableName)
+	query.InsertInto(userAccountTableName)
 	query.Cols("id", "user_id", "account_id", "roles", "status", "created_at", "updated_at")
 	query.Values(ua.ID, ua.UserID, ua.AccountID, ua.Roles, ua.Status.String(), ua.CreatedAt, ua.UpdatedAt)
 
@@ -283,8 +321,8 @@ func AddAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Ad
 }
 
 // UpdateAccount...
-func UpdateAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateAccountRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
+func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateUserAccountRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Update")
 	defer span.Finish()
 
 	// Validate the request.
@@ -313,7 +351,7 @@ func UpdateAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 
 	// Build the update SQL statement.
 	query := sqlbuilder.NewUpdateBuilder()
-	query.Update(usersAccountsTableName)
+	query.Update(userAccountTableName)
 
 	fields := []string{}
 	if req.Roles != nil {
@@ -351,9 +389,9 @@ func UpdateAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 	return nil
 }
 
-// RemoveAccount soft deleted the user account from the database.
-func RemoveAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req RemoveAccountRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.RemoveAccount")
+// Archive soft deleted the user account from the database.
+func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ArchiveUserAccountRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Archive")
 	defer span.Finish()
 
 	// Validate the request.
@@ -382,7 +420,7 @@ func RemoveAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 
 	// Build the update SQL statement.
 	query := sqlbuilder.NewUpdateBuilder()
-	query.Update(usersAccountsTableName)
+	query.Update(userAccountTableName)
 	query.Set(query.Assign("archived_at", now))
 	query.Where(query.And(
 		query.Equal("user_id", req.UserID),
@@ -402,9 +440,9 @@ func RemoveAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 	return nil
 }
 
-// DeleteAccount removes a user account from the database.
-func DeleteAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req DeleteAccountRequest) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.RemoveAccount")
+// Delete removes a user account from the database.
+func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req DeleteUserAccountRequest) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Delete")
 	defer span.Finish()
 
 	// Validate the request.
@@ -421,7 +459,7 @@ func DeleteAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req
 
 	// Build the delete SQL statement.
 	query := sqlbuilder.NewDeleteBuilder()
-	query.DeleteFrom(usersAccountsTableName)
+	query.DeleteFrom(userAccountTableName)
 	query.Where(query.And(
 		query.Equal("user_id", req.UserID),
 		query.Equal("account_id", req.AccountID),

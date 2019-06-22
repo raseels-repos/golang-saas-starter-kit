@@ -50,6 +50,7 @@ type Authenticator struct {
 	parser     *jwt.Parser
 }
 
+
 // NewAuthenticator creates an *Authenticator for use.
 // key expiration is optional to filter out old keys
 // It will error if:

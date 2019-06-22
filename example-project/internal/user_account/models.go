@@ -1,7 +1,6 @@
 package user
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"time"
 
@@ -10,63 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
-
-// User represents someone with access to our system.
-type User struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-
-	PasswordSalt  string         `json:"-"`
-	PasswordHash  []byte         `json:"-"`
-	PasswordReset sql.NullString `json:"-"`
-
-	Timezone string `json:"timezone"`
-
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
-	ArchivedAt pq.NullTime `json:"archived_at"`
-}
-
-// CreateUserRequest contains information needed to create a new User.
-type CreateUserRequest struct {
-	Name            string  `json:"name" validate:"required"`
-	Email           string  `json:"email" validate:"required,email,unique"`
-	Password        string  `json:"password" validate:"required"`
-	PasswordConfirm string  `json:"password_confirm" validate:"eqfield=Password"`
-	Timezone        *string `json:"timezone" validate:"omitempty"`
-}
-
-// UpdateUserRequest defines what information may be provided to modify an existing
-// User. All fields are optional so clients can send just the fields they want
-// changed. It uses pointer fields so we can differentiate between a field that
-// was not provided and a field that was provided as explicitly blank. Normally
-// we do not want to use pointers to basic types but we make exceptions around
-// marshalling/unmarshalling.
-type UpdateUserRequest struct {
-	ID       string  `validate:"required,uuid"`
-	Name     *string `json:"name" validate:"omitempty"`
-	Email    *string `json:"email" validate:"omitempty,email,unique"`
-	Timezone *string `json:"timezone" validate:"omitempty"`
-}
-
-// UpdatePassword defines what information is required to update a user password.
-type UpdatePasswordRequest struct {
-	ID              string `validate:"required,uuid"`
-	Password        string `json:"password" validate:"required"`
-	PasswordConfirm string `json:"password_confirm" validate:"omitempty,eqfield=Password"`
-}
-
-// UserFindRequest defines the possible options to search for users. By default
-// archived users will be excluded from response.
-type UserFindRequest struct {
-	Where            *string
-	Args             []interface{}
-	Order            []string
-	Limit            *uint
-	Offset           *uint
-	IncludedArchived bool
-}
 
 // UserAccount defines the one to many relationship of an user to an account. This
 // will enable a single user access to multiple accounts without having duplicate
@@ -85,20 +27,20 @@ type UserAccount struct {
 	ArchivedAt pq.NullTime       `json:"archived_at"`
 }
 
-// AddAccountRequest defines the information is needed to associate a user to an
+// CreateUserAccountRequest defines the information is needed to associate a user to an
 // account. Users are global to the application and each users access can be managed
 // on an account level. If a current entry exists in the database but is archived,
 // it will be un-archived.
-type AddAccountRequest struct {
+type CreateUserAccountRequest struct {
 	UserID    string             `validate:"required,uuid"`
 	AccountID string             `validate:"required,uuid"`
 	Roles     UserAccountRoles   `json:"roles" validate:"required,dive,oneof=admin user"`
 	Status    *UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled"`
 }
 
-// UpdateAccountRequest defines the information needed to update the roles or the
+// UpdateUserAccountRequest defines the information needed to update the roles or the
 // status for an existing user account.
-type UpdateAccountRequest struct {
+type UpdateUserAccountRequest struct {
 	UserID    string             `validate:"required,uuid"`
 	AccountID string             `validate:"required,uuid"`
 	Roles     *UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user"`
@@ -106,16 +48,16 @@ type UpdateAccountRequest struct {
 	unArchive bool               `json:"-"` // Internal use only.
 }
 
-// RemoveAccountRequest defines the information needed to remove an existing account
+// ArchiveUserAccountRequest defines the information needed to remove an existing account
 // for a user. This will archive (soft-delete) the existing database entry.
-type RemoveAccountRequest struct {
+type ArchiveUserAccountRequest struct {
 	UserID    string `validate:"required,uuid"`
 	AccountID string `validate:"required,uuid"`
 }
 
-// DeleteAccountRequest defines the information needed to delete an existing account
+// DeleteUserAccountRequest defines the information needed to delete an existing account
 // for a user. This will hard delete the existing database entry.
-type DeleteAccountRequest struct {
+type DeleteUserAccountRequest struct {
 	UserID    string `validate:"required,uuid"`
 	AccountID string `validate:"required,uuid"`
 }
@@ -237,10 +179,4 @@ func (s UserAccountRoles) Value() (driver.Value, error) {
 	}
 
 	return arr.Value()
-}
-
-// Token is the payload we deliver to users when they authenticate.
-type Token struct {
-	Token  string      `json:"token"`
-	claims auth.Claims `json:"-"`
 }

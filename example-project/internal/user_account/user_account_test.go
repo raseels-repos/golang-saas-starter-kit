@@ -37,9 +37,9 @@ func TestAccountFindRequestQuery(t *testing.T) {
 		Limit:  &limit,
 		Offset: &offset,
 	}
-	expected := "SELECT " + usersAccountsMapColumns + " FROM " + usersAccountsTableName + " WHERE (account_id = ? or user_id = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+	expected := "SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE (account_id = ? or user_id = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 
-	res, args := accountFindRequestQuery(req)
+	res, args := userAccountFindRequestQuery(req)
 
 	if diff := cmp.Diff(res.String(), expected); diff != "" {
 		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
@@ -59,7 +59,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 	}{
 		{"EmptyClaims",
 			auth.Claims{},
-			"SELECT " + usersAccountsMapColumns + " FROM " + usersAccountsTableName,
+			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName,
 			nil,
 		},
 		{"RoleUser",
@@ -70,7 +70,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			"SELECT " + usersAccountsMapColumns + " FROM " + usersAccountsTableName + " WHERE user_id IN (SELECT user_id FROM " + usersAccountsTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
+			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE user_id IN (SELECT user_id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
 			nil,
 		},
 		{"RoleAdmin",
@@ -81,7 +81,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			"SELECT " + usersAccountsMapColumns + " FROM " + usersAccountsTableName + " WHERE user_id IN (SELECT user_id FROM " + usersAccountsTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
+			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE user_id IN (SELECT user_id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
 			nil,
 		},
 	}
@@ -93,7 +93,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				query := accountSelectQuery()
+				query := userAccountSelectQuery()
 
 				err := applyClaimsUserAccountSelect(ctx, tt.claims, query)
 				if err != tt.error {

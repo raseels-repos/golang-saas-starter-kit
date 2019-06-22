@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
@@ -21,7 +22,17 @@ type User struct {
 
 // List returns all the existing users in the system.
 func (u *User) List(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	usrs, err := user.List(ctx, u.MasterDB)
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
+	var req user.UserFindRequest
+	if err := web.Decode(r, &req); err != nil {
+		return errors.Wrap(err, "")
+	}
+
+	usrs, err := user.Find(ctx, claims, u.MasterDB, req)
 	if err != nil {
 		return err
 	}
@@ -36,7 +47,7 @@ func (u *User) Retrieve(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return errors.New("claims missing from context")
 	}
 
-	usr, err := user.Retrieve(ctx, claims, u.MasterDB, params["id"])
+	usr, err := user.FindById(ctx, claims, u.MasterDB, params["id"], false)
 	if err != nil {
 		switch err {
 		case user.ErrInvalidID:
@@ -55,17 +66,22 @@ func (u *User) Retrieve(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 // Create inserts a new user into the system.
 func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {
 		return web.NewShutdownError("web value missing from context")
 	}
 
-	var newU user.NewUser
+	var newU user.CreateUserRequest
 	if err := web.Decode(r, &newU); err != nil {
 		return errors.Wrap(err, "")
 	}
 
-	usr, err := user.Create(ctx, u.MasterDB, &newU, v.Now)
+	usr, err := user.Create(ctx, claims, u.MasterDB, newU, v.Now)
 	if err != nil {
 		return errors.Wrapf(err, "User: %+v", &usr)
 	}
@@ -75,17 +91,23 @@ func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 
 // Update updates the specified user in the system.
 func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
+
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {
 		return web.NewShutdownError("web value missing from context")
 	}
 
-	var upd user.UpdateUser
+	var upd user.UpdateUserRequest
 	if err := web.Decode(r, &upd); err != nil {
 		return errors.Wrap(err, "")
 	}
 
-	err := user.Update(ctx, u.MasterDB, params["id"], &upd, v.Now)
+	err := user.Update(ctx, claims, u.MasterDB, upd, v.Now)
 	if err != nil {
 		switch err {
 		case user.ErrInvalidID:
@@ -104,7 +126,12 @@ func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 
 // Delete removes the specified user from the system.
 func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	err := user.Delete(ctx, u.MasterDB, params["id"])
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
+	err := user.Delete(ctx, claims, u.MasterDB, params["id"])
 	if err != nil {
 		switch err {
 		case user.ErrInvalidID:
@@ -135,7 +162,8 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		return web.NewRequestError(err, http.StatusUnauthorized)
 	}
 
-	tkn, err := user.Authenticate(ctx, u.MasterDB, u.TokenGenerator, v.Now, email, pass)
+	// TODO Constant for token lifespan?
+	tkn, err := user.Authenticate(ctx, u.MasterDB, u.TokenGenerator, email, pass, time.Hour * 24, v.Now)
 	if err != nil {
 		switch err {
 		case user.ErrAuthenticationFailure:

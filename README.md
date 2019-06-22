@@ -61,10 +61,13 @@ An AWS account is required for deployment for the following AWS dependencies:
 
 ### Getting the project
 
-You can use the traditional `go get` command to download this project into your configured GOPATH.
+Clone the repo into your desired location. This project uses Go modules and does not need to be in your GOPATH. You will need to be using Go >= 1.11.
+
+You should now be able to compile the project locally.
 
 ```
-$ go get -u gitlab.com/geeks-accelerator/oss/saas-starter-kit
+cd example-project/
+GO111MODULE=on go install ./...
 ```
 
 
@@ -74,10 +77,8 @@ This project is using Go Module support for vendoring dependencies.
 
 We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. 
 
-This project assumes the source code will be inside your GOPATH within the traditional location.
-
 ```
-cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
+cd example-project
 GO111MODULE=on go mod tidy
 ```
 

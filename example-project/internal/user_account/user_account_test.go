@@ -3,6 +3,7 @@ package user
 import (
 	"github.com/lib/pq"
 	"math/rand"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,8 +17,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TestAccountFindRequestQuery validates accountFindRequestQuery
-func TestAccountFindRequestQuery(t *testing.T) {
+var test *tests.Test
+
+// TestMain is the entry point for testing.
+func TestMain(m *testing.M) {
+	os.Exit(testMain(m))
+}
+
+func testMain(m *testing.M) int {
+	test = tests.New()
+	defer test.TearDown()
+	return m.Run()
+}
+
+// TestFindRequestQuery validates findRequestQuery
+func TestFindRequestQuery(t *testing.T) {
 	where := "account_id = ? or user_id = ?"
 	var (
 		limit  uint = 12
@@ -37,9 +51,9 @@ func TestAccountFindRequestQuery(t *testing.T) {
 		Limit:  &limit,
 		Offset: &offset,
 	}
-	expected := "SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE (account_id = ? or user_id = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+	expected := "SELECT " + userAccountMapColumns + " FROM " + userAccountTableName + " WHERE (account_id = ? or user_id = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 
-	res, args := userAccountFindRequestQuery(req)
+	res, args := findRequestQuery(req)
 
 	if diff := cmp.Diff(res.String(), expected); diff != "" {
 		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
@@ -49,8 +63,8 @@ func TestAccountFindRequestQuery(t *testing.T) {
 	}
 }
 
-// TestApplyClaimsUserAccountSelect validates applyClaimsUserAccountSelect
-func TestApplyClaimsUserAccountSelect(t *testing.T) {
+// TestApplyClaimsSelectvalidates applyClaimsSelect
+func TestApplyClaimsSelectvalidates(t *testing.T) {
 	var claimTests = []struct {
 		name        string
 		claims      auth.Claims
@@ -59,7 +73,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 	}{
 		{"EmptyClaims",
 			auth.Claims{},
-			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName,
+			"SELECT " + userAccountMapColumns + " FROM " + userAccountTableName,
 			nil,
 		},
 		{"RoleUser",
@@ -70,7 +84,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE user_id IN (SELECT user_id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
+			"SELECT " + userAccountMapColumns + " FROM " + userAccountTableName + " WHERE id IN (SELECT id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
 			nil,
 		},
 		{"RoleAdmin",
@@ -81,7 +95,7 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			"SELECT " + usersAccountsMapColumns + " FROM " + userAccountTableName + " WHERE user_id IN (SELECT user_id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
+			"SELECT " + userAccountMapColumns + " FROM " + userAccountTableName + " WHERE id IN (SELECT id FROM " + userAccountTableName + " WHERE (account_id = 'acc1' OR user_id = 'user1'))",
 			nil,
 		},
 	}
@@ -93,13 +107,13 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				query := userAccountSelectQuery()
+				query := selectQuery()
 
-				err := applyClaimsUserAccountSelect(ctx, tt.claims, query)
+				err := applyClaimsSelect(ctx, tt.claims, query)
 				if err != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)
-					t.Fatalf("\t%s\tapplyClaimsUserAccountSelect failed.", tests.Failed)
+					t.Fatalf("\t%s\tapplyClaimsSelect failed.", tests.Failed)
 				}
 
 				sql, args := query.Build()
@@ -108,70 +122,70 @@ func TestApplyClaimsUserAccountSelect(t *testing.T) {
 				sql, err = sqlbuilder.MySQL.Interpolate(sql, args)
 				if err != nil {
 					t.Log("\t\tGot :", err)
-					t.Fatalf("\t%s\tapplyClaimsUserAccountSelect failed.", tests.Failed)
+					t.Fatalf("\t%s\tapplyClaimsSelect failed.", tests.Failed)
 				}
 
 				if diff := cmp.Diff(sql, tt.expectedSql); diff != "" {
 					t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
 				}
 
-				t.Logf("\t%s\tapplyClaimsUserAccountSelect ok.", tests.Success)
+				t.Logf("\t%s\tapplyClaimsSelect ok.", tests.Success)
 			}
 		}
 	}
 }
 
-// TestAddAccountValidation ensures all the validation tags work on account add.
-func TestAddAccountValidation(t *testing.T) {
+// TestCreateValidation ensures all the validation tags work on user account create.
+func TestCreateValidation(t *testing.T) {
 
 	invalidRole := UserAccountRole("moon")
 	invalidStatus := UserAccountStatus("moon")
 
 	var accountTests = []struct {
 		name     string
-		req      AddAccountRequest
-		expected func(req AddAccountRequest, res *UserAccount) *UserAccount
+		req      CreateUserAccountRequest
+		expected func(req CreateUserAccountRequest, res *UserAccount) *UserAccount
 		error    error
 	}{
 		{"Required Fields",
-			AddAccountRequest{},
-			func(req AddAccountRequest, res *UserAccount) *UserAccount {
+			CreateUserAccountRequest{},
+			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'AddAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'AddAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'AddAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			errors.New("Key: 'CreateUserAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
+				"Key: 'CreateUserAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'CreateUserAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
-			AddAccountRequest{
+			CreateUserAccountRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{invalidRole},
 			},
-			func(req AddAccountRequest, res *UserAccount) *UserAccount {
+			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'AddAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'CreateUserAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
 		},
 		{"Valid Status",
-			AddAccountRequest{
+			CreateUserAccountRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{UserAccountRole_User},
 				Status:    &invalidStatus,
 			},
-			func(req AddAccountRequest, res *UserAccount) *UserAccount {
+			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'AddAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'CreateUserAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 		{"Default Status",
-			AddAccountRequest{
+			CreateUserAccountRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{UserAccountRole_User},
 			},
-			func(req AddAccountRequest, res *UserAccount) *UserAccount {
+			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
 				return &UserAccount{
 					UserID:    req.UserID,
 					AccountID: req.AccountID,
@@ -191,14 +205,14 @@ func TestAddAccountValidation(t *testing.T) {
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	t.Log("Given the need ensure all validation tags are working for add account.")
+	t.Log("Given the need ensure all validation tags are working for create user account.")
 	{
 		for i, tt := range accountTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
 				ctx := tests.Context()
 
-				res, err := AddAccount(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				res, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -213,29 +227,30 @@ func TestAddAccountValidation(t *testing.T) {
 					if errStr != expectStr {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", tt.error)
-						t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+						t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 					}
 				}
 
 				// If there was an error that was expected, then don't go any further
 				if tt.error != nil {
-					t.Logf("\t%s\tAddAccount ok.", tests.Success)
+					t.Logf("\t%s\tCreate user account ok.", tests.Success)
 					continue
 				}
 
 				expected := tt.expected(tt.req, res)
 				if diff := cmp.Diff(res, expected); diff != "" {
-					t.Fatalf("\t%s\tAddAccount result should match. Diff:\n%s", tests.Failed, diff)
+					t.Fatalf("\t%s\tCreate user account result should match. Diff:\n%s", tests.Failed, diff)
 				}
 
-				t.Logf("\t%s\tAddAccount ok.", tests.Success)
+				t.Logf("\t%s\tCreate user account ok.", tests.Success)
 			}
 		}
 	}
 }
 
-// TestAddAccountExistingEntry validates emails must be unique on add account.
-func TestAddAccountExistingEntry(t *testing.T) {
+// TestCreateExistingEntry ensures that if an archived user account exist,
+// the entry is updated rather than erroring on duplicate constraint.
+func TestCreateExistingEntry(t *testing.T) {
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
@@ -243,87 +258,125 @@ func TestAddAccountExistingEntry(t *testing.T) {
 	{
 		ctx := tests.Context()
 
-		req1 := AddAccountRequest{
+		req1 := CreateUserAccountRequest{
 			UserID:    uuid.NewRandom().String(),
 			AccountID: uuid.NewRandom().String(),
 			Roles:     []UserAccountRole{UserAccountRole_User},
 		}
-		ua1, err := AddAccount(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		ua1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+		} else if diff := cmp.Diff(ua1.Roles, req1.Roles); diff != "" {
+			t.Fatalf("\t%s\tCreate user account roles should match request. Diff:\n%s", tests.Failed, diff)
 		}
 
-		if diff := cmp.Diff(ua1.Roles, req1.Roles); diff != "" {
-			t.Fatalf("\t%s\tAddAccount roles should match request. Diff:\n%s", tests.Failed, diff)
-		}
-
-		req2 := AddAccountRequest{
+		req2 := CreateUserAccountRequest{
 			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
 			Roles:     []UserAccountRole{UserAccountRole_Admin},
 		}
-		ua2, err := AddAccount(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		ua2, err := Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+		} else if diff := cmp.Diff(ua2.Roles, req2.Roles); diff != "" {
+			t.Fatalf("\t%s\tCreate user account roles should match request. Diff:\n%s", tests.Failed, diff)
 		}
 
-		if diff := cmp.Diff(ua2.Roles, req2.Roles); diff != "" {
-			t.Fatalf("\t%s\tAddAccount roles should match request. Diff:\n%s", tests.Failed, diff)
+		// Now archive the user account to test trying to create a new entry for an archived entry
+		err = Archive(tests.Context(), auth.Claims{}, test.MasterDB, ArchiveUserAccountRequest{
+			UserID:    req1.UserID,
+			AccountID: req1.AccountID,
+		}, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tArchive user account failed.", tests.Failed)
 		}
 
-		t.Logf("\t%s\tAddAccount ok.", tests.Success)
+		// Find the archived user account
+		arcRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB, ua2.ID, true)
+		if err != nil || arcRes == nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
+		} else if !arcRes.ArchivedAt.Valid || arcRes.ArchivedAt.Time.IsZero() {
+			t.Fatalf("\t%s\tExpected user account to have archived_at set", tests.Failed)
+		}
+
+		// Attempt to create the duplicate user account which should set archived_at back to nil
+		req3 := CreateUserAccountRequest{
+			UserID:    req1.UserID,
+			AccountID: req1.AccountID,
+			Roles:     []UserAccountRole{UserAccountRole_User},
+		}
+		ua3, err := Create(ctx, auth.Claims{}, test.MasterDB, req3, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+		} else if diff := cmp.Diff(ua3.Roles, req3.Roles); diff != "" {
+			t.Fatalf("\t%s\tCreate user account roles should match request. Diff:\n%s", tests.Failed, diff)
+		}
+
+		// Ensure the user account has archived_at empty
+		findRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB, ua3.ID, false)
+		if err != nil || arcRes == nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
+		} else if findRes.ArchivedAt.Valid && !findRes.ArchivedAt.Time.IsZero() {
+			t.Fatalf("\t%s\tExpected user account to have archived_at empty", tests.Failed)
+		}
+
+		t.Logf("\t%s\tCreate user account ok.", tests.Success)
 	}
 }
 
-// TestUpdateAccountValidation ensures all the validation tags work on account update.
-func TestUpdateAccountValidation(t *testing.T) {
+// TestUpdateValidation ensures all the validation tags work on user account update.
+func TestUpdateValidation(t *testing.T) {
 
 	invalidRole := UserAccountRole("moon")
 	invalidStatus := UserAccountStatus("xxxxxxxxx")
 
 	var accountTests = []struct {
 		name  string
-		req   UpdateAccountRequest
+		req   UpdateUserAccountRequest
 		error error
 	}{
 		{"Required Fields",
-			UpdateAccountRequest{},
-			errors.New("Key: 'UpdateAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'UpdateAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'UpdateAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			UpdateUserAccountRequest{},
+			errors.New("Key: 'UpdateUserAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
+				"Key: 'UpdateUserAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'UpdateUserAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
-			UpdateAccountRequest{
+			UpdateUserAccountRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     &UserAccountRoles{invalidRole},
 			},
-			errors.New("Key: 'UpdateAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'UpdateUserAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
 		},
 
 		{"Valid Status",
-			UpdateAccountRequest{
+			UpdateUserAccountRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     &UserAccountRoles{UserAccountRole_User},
 				Status:    &invalidStatus,
 			},
-			errors.New("Key: 'UpdateAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UpdateUserAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 	}
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	t.Log("Given the need ensure all validation tags are working for update account.")
+	t.Log("Given the need ensure all validation tags are working for update user account.")
 	{
 		for i, tt := range accountTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
 				ctx := tests.Context()
 
-				err := UpdateAccount(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				err := Update(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -338,30 +391,31 @@ func TestUpdateAccountValidation(t *testing.T) {
 					if errStr != expectStr {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", tt.error)
-						t.Fatalf("\t%s\tUpdateAccount failed.", tests.Failed)
+						t.Fatalf("\t%s\tUpdate user account failed.", tests.Failed)
 					}
 				}
 
 				// If there was an error that was expected, then don't go any further
 				if tt.error != nil {
-					t.Logf("\t%s\tUpdateAccount ok.", tests.Success)
+					t.Logf("\t%s\tUpdate user account ok.", tests.Success)
 					continue
 				}
 
-				t.Logf("\t%s\tUpdateAccount ok.", tests.Success)
+				t.Logf("\t%s\tUpdate user account ok.", tests.Success)
 			}
 		}
 	}
 }
 
-// TestAccountCrud validates the full set of CRUD operations for user accounts and
+// TestCrud validates the full set of CRUD operations for user accounts and
 // ensures ACLs are correctly applied by claims.
-func TestAccountCrud(t *testing.T) {
+func TestCrud(t *testing.T) {
 	defer tests.Recover(t)
 
 	type accountTest struct {
 		name      string
 		claims    func(string, string) auth.Claims
+		createErr error
 		updateErr error
 		findErr   error
 	}
@@ -375,9 +429,10 @@ func TestAccountCrud(t *testing.T) {
 		},
 		nil,
 		nil,
+		nil,
 	})
 
-	// Role of user but claim user does not match update user so forbidden.
+	// Role of user but claim user does not match update user so forbidden for update.
 	accountTests = append(accountTests, accountTest{"RoleUserDiffUser",
 		func(userID, accountId string) auth.Claims {
 			return auth.Claims{
@@ -389,7 +444,8 @@ func TestAccountCrud(t *testing.T) {
 			}
 		},
 		ErrForbidden,
-		ErrNotFound,
+		ErrForbidden,
+		ErrForbidden,
 	})
 
 	// Role of user AND claim user matches update user so OK.
@@ -403,7 +459,8 @@ func TestAccountCrud(t *testing.T) {
 				},
 			}
 		},
-		nil,
+		ErrForbidden,
+		ErrForbidden,
 		nil,
 	})
 
@@ -418,6 +475,7 @@ func TestAccountCrud(t *testing.T) {
 				},
 			}
 		},
+		ErrForbidden,
 		ErrForbidden,
 		ErrNotFound,
 	})
@@ -435,6 +493,7 @@ func TestAccountCrud(t *testing.T) {
 		},
 		nil,
 		nil,
+		nil,
 	})
 
 	t.Log("Given the need to validate CRUD functionality for user accounts and ensure claims are applied as ACL.")
@@ -444,100 +503,105 @@ func TestAccountCrud(t *testing.T) {
 		for i, tt := range accountTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
-				// Always create the new user with empty claims, testing claims for create user
-				// will be handled separately.
-				user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserRequest{
-					Name:            "Lee Brown",
-					Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
-					Password:        "akTechFr0n!ier",
-					PasswordConfirm: "akTechFr0n!ier",
-				}, now)
-				if err != nil {
-					t.Log("\t\tGot :", err)
-					t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
-				}
-
 				// Create a new random account and associate that with the user.
+				userID := uuid.NewRandom().String()
 				accountID := uuid.NewRandom().String()
-				createReq := AddAccountRequest{
-					UserID:    user.ID,
+				createReq := CreateUserAccountRequest{
+					UserID:    userID,
 					AccountID: accountID,
 					Roles:     []UserAccountRole{UserAccountRole_User},
 				}
-				ua, err := AddAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, createReq, now)
-				if err != nil && errors.Cause(err) != tt.updateErr {
+				ua, err := Create(tests.Context(), tt.claims(userID, accountID), test.MasterDB, createReq, now)
+				if err != nil && errors.Cause(err) != tt.createErr {
 					t.Logf("\t\tGot : %+v", err)
-					t.Logf("\t\tWant: %+v", tt.updateErr)
-					t.Fatalf("\t%s\tUpdateAccount failed.", tests.Failed)
-				} else if tt.updateErr == nil {
+					t.Logf("\t\tWant: %+v", tt.createErr)
+					t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+				} else if tt.createErr == nil {
 					if diff := cmp.Diff(ua.Roles, createReq.Roles); diff != "" {
-						t.Fatalf("\t%s\tExpected find result to match update. Diff:\n%s", tests.Failed, diff)
+						t.Fatalf("\t%s\tExpected user account roles result to match for create. Diff:\n%s", tests.Failed, diff)
 					}
-					t.Logf("\t%s\tAddAccount ok.", tests.Success)
+					t.Logf("\t%s\tCreate user account ok.", tests.Success)
+				}
+
+				if tt.createErr == ErrForbidden {
+					ua, err = Create(tests.Context(), auth.Claims{}, test.MasterDB, createReq, now)
+					if err != nil && errors.Cause(err) != tt.createErr {
+						t.Logf("\t\tGot : %+v", err)
+						t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+					}
 				}
 
 				// Update the account.
-				updateReq := UpdateAccountRequest{
-					UserID:    user.ID,
+				updateReq := UpdateUserAccountRequest{
+					UserID:    userID,
 					AccountID: accountID,
 					Roles:     &UserAccountRoles{UserAccountRole_Admin},
 				}
-				err = UpdateAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, updateReq, now)
-				if err != nil && errors.Cause(err) != tt.updateErr {
-					t.Logf("\t\tGot : %+v", err)
-					t.Logf("\t\tWant: %+v", tt.updateErr)
-					t.Fatalf("\t%s\tUpdateAccount failed.", tests.Failed)
+				err = Update(tests.Context(), tt.claims(userID, accountID), test.MasterDB, updateReq, now)
+				if err != nil {
+					if errors.Cause(err) != tt.updateErr {
+						t.Logf("\t\tGot : %+v", err)
+						t.Logf("\t\tWant: %+v", tt.updateErr)
+						t.Fatalf("\t%s\tUpdate user account failed.", tests.Failed)
+					}
+				} else {
+					ua.Roles = *updateReq.Roles
 				}
-				t.Logf("\t%s\tUpdateAccount ok.", tests.Success)
+				t.Logf("\t%s\tUpdate user account ok.", tests.Success)
 
 				// Find the account for the user to verify the updates where made. There should only
 				// be one account associated with the user for this test.
-				findRes, err := FindAccountsByUserID(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, user.ID, false)
+				ff := "user_id = ? or account_id = ?"
+				findRes, err := Find(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountFindRequest{
+					Where: &ff,
+					Args:  []interface{}{userID, accountID},
+					Order: []string{"created_at"},
+				})
 				if err != nil && errors.Cause(err) != tt.findErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.findErr)
-					t.Fatalf("\t%s\tVerify UpdateAccount failed.", tests.Failed)
+					t.Fatalf("\t%s\tVerify update user account failed.", tests.Failed)
 				} else if tt.findErr == nil {
 					expected := []*UserAccount{
 						&UserAccount{
 							ID:        ua.ID,
 							UserID:    ua.UserID,
 							AccountID: ua.AccountID,
-							Roles:     *updateReq.Roles,
+							Roles:     ua.Roles,
 							Status:    ua.Status,
 							CreatedAt: ua.CreatedAt,
 							UpdatedAt: now,
 						},
 					}
 					if diff := cmp.Diff(findRes, expected); diff != "" {
-						t.Fatalf("\t%s\tExpected find result to match update. Diff:\n%s", tests.Failed, diff)
+						t.Fatalf("\t%s\tExpected user account find result to match update. Diff:\n%s", tests.Failed, diff)
 					}
-					t.Logf("\t%s\tVerify UpdateAccount ok.", tests.Success)
+					t.Logf("\t%s\tVerify update user account ok.", tests.Success)
 				}
 
 				// Archive (soft-delete) the user account.
-				err = RemoveAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, RemoveAccountRequest{
-					UserID:    user.ID,
+				err = Archive(tests.Context(), tt.claims(userID, accountID), test.MasterDB, ArchiveUserAccountRequest{
+					UserID:    userID,
 					AccountID: accountID,
 				}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
-					t.Fatalf("\t%s\tRemoveAccount failed.", tests.Failed)
+					t.Fatalf("\t%s\tArchive user account failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result in not found.
-					_, err = FindAccountsByUserID(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, user.ID, false)
+					_, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, false)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
-						t.Fatalf("\t%s\tVerify RemoveAccount failed when excluding archived.", tests.Failed)
+						t.Fatalf("\t%s\tVerify archive user account failed when excluding archived.", tests.Failed)
 					}
 
 					// Trying to find the archived user with the includeArchived true should result no error.
-					findRes, err = FindAccountsByUserID(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, user.ID, true)
+					findRes, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, true)
 					if err != nil {
 						t.Logf("\t\tGot : %+v", err)
-						t.Fatalf("\t%s\tVerify RemoveAccount failed when including archived.", tests.Failed)
+						t.Fatalf("\t%s\tVerify archive user account failed when including archived.", tests.Failed)
 					}
 
 					expected := []*UserAccount{
@@ -553,37 +617,37 @@ func TestAccountCrud(t *testing.T) {
 						},
 					}
 					if diff := cmp.Diff(findRes, expected); diff != "" {
-						t.Fatalf("\t%s\tExpected find result to be archived. Diff:\n%s", tests.Failed, diff)
+						t.Fatalf("\t%s\tExpected user account find result to be archived. Diff:\n%s", tests.Failed, diff)
 					}
 				}
-				t.Logf("\t%s\tRemoveAccount ok.", tests.Success)
+				t.Logf("\t%s\tArchive user account ok.", tests.Success)
 
 				// Delete (hard-delete) the user account.
-				err = DeleteAccount(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, DeleteAccountRequest{
-					UserID:    user.ID,
+				err = Delete(tests.Context(), tt.claims(userID, accountID), test.MasterDB, DeleteUserAccountRequest{
+					UserID:    userID,
 					AccountID: accountID,
 				})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
-					t.Fatalf("\t%s\tDeleteAccount failed.", tests.Failed)
+					t.Fatalf("\t%s\tDelete user account failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted user with the includeArchived true should result in not found.
-					_, err = FindAccountsByUserID(tests.Context(), tt.claims(user.ID, accountID), test.MasterDB, user.ID, true)
+					_, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, true)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
-						t.Fatalf("\t%s\tVerify DeleteAccount failed when including archived.", tests.Failed)
+						t.Fatalf("\t%s\tVerify delete user account failed when including archived.", tests.Failed)
 					}
 				}
-				t.Logf("\t%s\tDeleteAccount ok.", tests.Success)
+				t.Logf("\t%s\tDelete user account ok.", tests.Success)
 			}
 		}
 	}
 }
 
-// TestAccountFind validates all the request params are correctly parsed into a select query.
-func TestAccountFind(t *testing.T) {
+// TestFind validates all the request params are correctly parsed into a select query.
+func TestFind(t *testing.T) {
 
 	now := time.Now().Add(time.Hour * -2).UTC()
 
@@ -592,31 +656,21 @@ func TestAccountFind(t *testing.T) {
 
 	var userAccounts []*UserAccount
 	for i := 0; i <= 4; i++ {
-		user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserRequest{
-			Name:            "Lee Brown",
-			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
-			Password:        "akTechFr0n!ier",
-			PasswordConfirm: "akTechFr0n!ier",
-		}, now.Add(time.Second*time.Duration(i)))
-		if err != nil {
-			t.Logf("\t\tGot : %+v", err)
-			t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
-		}
-
 		// Create a new random account and associate that with the user.
+		userID := uuid.NewRandom().String()
 		accountID := uuid.NewRandom().String()
-		ua, err := AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
-			UserID:    user.ID,
+		ua, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserAccountRequest{
+			UserID:    userID,
 			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
 		}, now.Add(time.Second*time.Duration(i)))
 		if err != nil {
 			t.Logf("\t\tGot : %+v", err)
-			t.Fatalf("\t%s\tAdd account failed.", tests.Failed)
+			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 		}
 
 		userAccounts = append(userAccounts, ua)
-		endTime = user.CreatedAt
+		endTime = ua.CreatedAt
 	}
 
 	type accountTest struct {
@@ -708,24 +762,24 @@ func TestAccountFind(t *testing.T) {
 		nil,
 	})
 
-	t.Log("Given the need to ensure find users returns the expected results.")
+	t.Log("Given the need to ensure find user accounts returns the expected results.")
 	{
 		for i, tt := range accountTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
 				ctx := tests.Context()
 
-				res, err := FindAccounts(ctx, auth.Claims{}, test.MasterDB, tt.req)
-				if err != nil && errors.Cause(err) != tt.error {
+				res, err := Find(ctx, auth.Claims{}, test.MasterDB, tt.req)
+				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)
-					t.Fatalf("\t%s\tFind failed.", tests.Failed)
+					t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
 				} else if diff := cmp.Diff(res, tt.expected); diff != "" {
 					t.Logf("\t\tGot: %d items", len(res))
 					t.Logf("\t\tWant: %d items", len(tt.expected))
-					t.Fatalf("\t%s\tExpected find result to match expected. Diff:\n%s", tests.Failed, diff)
+					t.Fatalf("\t%s\tExpected user account find result to match expected. Diff:\n%s", tests.Failed, diff)
 				}
-				t.Logf("\t%s\tFind ok.", tests.Success)
+				t.Logf("\t%s\tFind user account ok.", tests.Success)
 			}
 		}
 	}

@@ -6,42 +6,42 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"gopkg.in/go-playground/validator.v9"
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // Account represents someone with access to our system.
 type Account struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Address1 string `json:"address1"`
-	Address2 string `json:"address2"`
-	City string `json:"city"`
-	Region string `json:"region"`
-	Country string `json:"country"`
-	Zipcode string `json:"zipcode"`
-	Status     AccountStatus `json:"status"`
-	Timezone string `json:"timezone"`
-	SignupUserID sql.NullString `json:"signup_user_id"`
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Address1      string         `json:"address1"`
+	Address2      string         `json:"address2"`
+	City          string         `json:"city"`
+	Region        string         `json:"region"`
+	Country       string         `json:"country"`
+	Zipcode       string         `json:"zipcode"`
+	Status        AccountStatus  `json:"status"`
+	Timezone      string         `json:"timezone"`
+	SignupUserID  sql.NullString `json:"signup_user_id"`
 	BillingUserID sql.NullString `json:"billing_user_id"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
-	ArchivedAt pq.NullTime `json:"archived_at"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	ArchivedAt    pq.NullTime    `json:"archived_at"`
 }
 
 // CreateAccountRequest contains information needed to create a new Account.
 type CreateAccountRequest struct {
-	Name            string  `json:"name" validate:"required,unique"`
-	Address1        string  `json:"address1" validate:"required"`
-	Address2        string `json:"address2" validate:"omitempty"`
-	City string `json:"city" validate:"required"`
-	Region string `json:"region" validate:"required"`
-	Country string `json:"country" validate:"required"`
-	Zipcode string `json:"zipcode" validate:"required"`
-	Status    *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
-	Timezone        *string `json:"timezone" validate:"omitempty"`
-	SignupUserID *string `json:"signup_user_id" validate:"omitempty,uuid"`
-	BillingUserID *string `json:"billing_user_id" validate:"omitempty,uuid"`
+	Name          string         `json:"name" validate:"required,unique"`
+	Address1      string         `json:"address1" validate:"required"`
+	Address2      string         `json:"address2" validate:"omitempty"`
+	City          string         `json:"city" validate:"required"`
+	Region        string         `json:"region" validate:"required"`
+	Country       string         `json:"country" validate:"required"`
+	Zipcode       string         `json:"zipcode" validate:"required"`
+	Status        *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
+	Timezone      *string        `json:"timezone" validate:"omitempty"`
+	SignupUserID  *string        `json:"signup_user_id" validate:"omitempty,uuid"`
+	BillingUserID *string        `json:"billing_user_id" validate:"omitempty,uuid"`
 }
 
 // UpdateAccountRequest defines what information may be provided to modify an existing
@@ -51,18 +51,18 @@ type CreateAccountRequest struct {
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
 type UpdateAccountRequest struct {
-	ID       string  `validate:"required,uuid"`
-	Name        *string  `json:"name" validate:"omitempty,unique"`
-	Address1        *string  `json:"address1" validate:"omitempty"`
-	Address2        *string `json:"address2" validate:"omitempty"`
-	City *string `json:"city" validate:"omitempty"`
-	Region *string `json:"region" validate:"omitempty"`
-	Country *string `json:"country" validate:"omitempty"`
-	Zipcode *string `json:"zipcode" validate:"omitempty"`
-	Status    *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
-	Timezone        *string `json:"timezone" validate:"omitempty"`
-	SignupUserID *string `json:"signup_user_id" validate:"omitempty,uuid"`
-	BillingUserID *string `json:"billing_user_id" validate:"omitempty,uuid"`
+	ID            string         `validate:"required,uuid"`
+	Name          *string        `json:"name" validate:"omitempty,unique"`
+	Address1      *string        `json:"address1" validate:"omitempty"`
+	Address2      *string        `json:"address2" validate:"omitempty"`
+	City          *string        `json:"city" validate:"omitempty"`
+	Region        *string        `json:"region" validate:"omitempty"`
+	Country       *string        `json:"country" validate:"omitempty"`
+	Zipcode       *string        `json:"zipcode" validate:"omitempty"`
+	Status        *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
+	Timezone      *string        `json:"timezone" validate:"omitempty"`
+	SignupUserID  *string        `json:"signup_user_id" validate:"omitempty,uuid"`
+	BillingUserID *string        `json:"billing_user_id" validate:"omitempty,uuid"`
 }
 
 // AccountFindRequest defines the possible options to search for accounts. By default
@@ -124,4 +124,3 @@ func (s AccountStatus) Value() (driver.Value, error) {
 func (s AccountStatus) String() string {
 	return string(s)
 }
-

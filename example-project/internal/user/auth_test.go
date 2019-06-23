@@ -116,31 +116,36 @@ func TestAuthenticate(t *testing.T) {
 			}
 			t.Logf("\t%s\tCreate user ok.", tests.Success)
 
-			// Create a new random account and associate that with the user.
-			// This defined role should be the claims.
+			// Create a new random account.
 			account1Id := uuid.NewRandom().String()
-			account1Role := UserAccountRole_Admin
-			_, err = AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
-				UserID:    user.ID,
-				AccountID: account1Id,
-				Roles:     []UserAccountRole{account1Role},
-			}, now)
+			err = mockAccount(account1Id, user.CreatedAt)
 			if err != nil {
 				t.Log("\t\tGot :", err)
-				t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+				t.Fatalf("\t%s\tCreate account failed.", tests.Failed)
 			}
 
-			// Create a second new random account and associate that with the user.
-			account2Id := uuid.NewRandom().String()
-			account2Role := UserAccountRole_User
-			_, err = AddAccount(tests.Context(), auth.Claims{}, test.MasterDB, AddAccountRequest{
-				UserID:    user.ID,
-				AccountID: account2Id,
-				Roles:     []UserAccountRole{account2Role},
-			}, now.Add(time.Second))
+			// Associate new account with user user. This defined role should be the claims.
+			account1Role := auth.RoleAdmin
+			err = mockUserAccount(user.ID, account1Id, user.CreatedAt, account1Role)
 			if err != nil {
 				t.Log("\t\tGot :", err)
-				t.Fatalf("\t%s\tAddAccount failed.", tests.Failed)
+				t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+			}
+
+			// Create a second new random account.
+			account2Id := uuid.NewRandom().String()
+			err = mockAccount(account2Id, user.CreatedAt)
+			if err != nil {
+				t.Log("\t\tGot :", err)
+				t.Fatalf("\t%s\tCreate account failed.", tests.Failed)
+			}
+
+			// Associate secoend new account with user user.
+			account2Role := auth.RoleUser
+			err = mockUserAccount(user.ID, account2Id, user.CreatedAt, account2Role)
+			if err != nil {
+				t.Log("\t\tGot :", err)
+				t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 			}
 
 			// Add 30 minutes to now to simulate time passing.
@@ -170,7 +175,7 @@ func TestAuthenticate(t *testing.T) {
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
 			} else if diff := cmp.Diff(claims1, tkn1.claims); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims to match from token. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims1.Roles, []string{account1Role.String()}); diff != "" {
+			} else if diff := cmp.Diff(claims1.Roles, []string{account1Role}); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims roles to match user account. Diff:\n%s", tests.Failed, diff)
 			} else if diff := cmp.Diff(claims1.AccountIds, []string{account1Id, account2Id}); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims account IDs to match the single user account. Diff:\n%s", tests.Failed, diff)
@@ -192,7 +197,7 @@ func TestAuthenticate(t *testing.T) {
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
 			} else if diff := cmp.Diff(claims2, tkn2.claims); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims to match from token. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims2.Roles, []string{account2Role.String()}); diff != "" {
+			} else if diff := cmp.Diff(claims2.Roles, []string{account2Role}); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims roles to match user account. Diff:\n%s", tests.Failed, diff)
 			} else if diff := cmp.Diff(claims2.AccountIds, []string{account1Id, account2Id}); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims account IDs to match the single user account. Diff:\n%s", tests.Failed, diff)

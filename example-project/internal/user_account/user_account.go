@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
 	"github.com/lib/pq"
 	"time"
 
@@ -23,10 +22,6 @@ var (
 
 	// ErrInvalidID occurs when an ID is not in a valid form.
 	ErrInvalidID = errors.New("ID is not in its proper form")
-
-	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
-	// anything goes wrong.
-	ErrAuthenticationFailure = errors.New("Authentication failed")
 
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
@@ -53,63 +48,43 @@ func mapRowsToUserAccount(rows *sql.Rows) (*UserAccount, error) {
 	return &ua, nil
 }
 
-// CanReadUserAccount determines if claims has the authority to access the specified user account by user ID.
-func CanReadUserAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID, accountID string) error {
-	// First check to see if claims can read the user ID
-	err := user.CanReadUser(ctx, claims, dbConn, userID)
-	if err != nil {
-		if claims.Audience != accountID {
-			return err
-		}
-	}
-
-	// Second check to see if claims can read the account ID
-	err = account.CanReadAccount(ctx, claims, dbConn, accountID)
-	if err != nil {
-		if claims.Audience != accountID {
-			return err
-		}
-	}
-
-	return nil
+// CanReadAccount determines if claims has the authority to access the specified user account by user ID.
+func CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
+	err := account.CanReadAccount(ctx, claims, dbConn, accountID)
+	return mapAccountError(err)
 }
 
-// CanModifyUserAccount determines if claims has the authority to modify the specified user ID.
-func CanModifyUserAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID, accountID string) error {
-	// First check to see if claims can read the user ID
-	err := CanReadUserAccount(ctx, claims, dbConn, userID, accountID)
-	if err != nil {
-		if claims.Audience != accountID {
-			return err
-		}
-	}
-
-	// If the request has claims from a specific user, ensure that the user
-	// has the correct role for updating an existing user.
-	if claims.Subject != "" {
-		if claims.Subject == userID {
-			// All users are allowed to update their own record
-		} else if claims.HasRole(auth.RoleAdmin) {
-			// Admin users can update users they have access to.
-		} else {
-			return errors.WithStack(ErrForbidden)
-		}
-	}
-
-	return nil
+// CanModifyAccount determines if claims has the authority to modify the specified user ID.
+func CanModifyAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
+	err := account.CanModifyAccount(ctx, claims, dbConn, accountID)
+	return mapAccountError(err)
 }
 
-// applyClaimsUserAccountSelect applies a sub query to enforce ACL for
-// the supplied claims. If claims is empty then request must be internal and
-// no sub-query is applied. Else a list of user IDs is found all associated
-// user accounts.
-func applyClaimsUserAccountSelect(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder) error {
+// mapAccountError maps account errors to local defined errors.
+func mapAccountError(err error) error {
+	switch errors.Cause(err) {
+	case account.ErrNotFound:
+		err = ErrNotFound
+	case account.ErrInvalidID:
+		err = ErrInvalidID
+	case account.ErrForbidden:
+		err = ErrForbidden
+	}
+	return err
+}
+
+// applyClaimsSelect applies a sub-query to the provided query
+// to enforce ACL based on the claims provided.
+// 	1. All role types can access their user ID
+// 	2. Any user with the same account ID
+// 	3. No claims, request is internal, no ACL applied
+func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder) error {
 	if claims.Audience == "" && claims.Subject == "" {
 		return nil
 	}
 
 	// Build select statement for users_accounts table
-	subQuery := sqlbuilder.NewSelectBuilder().Select("user_id").From(userAccountTableName)
+	subQuery := sqlbuilder.NewSelectBuilder().Select("id").From(userAccountTableName)
 
 	var or []string
 	if claims.Audience != "" {
@@ -121,24 +96,24 @@ func applyClaimsUserAccountSelect(ctx context.Context, claims auth.Claims, query
 	subQuery.Where(subQuery.Or(or...))
 
 	// Append sub query
-	query.Where(query.In("user_id", subQuery))
+	query.Where(query.In("id", subQuery))
 
 	return nil
 }
 
-// AccountSelectQuery
-func userAccountSelectQuery() *sqlbuilder.SelectBuilder {
+// selectQuery constructs a base select query for User Account
+func selectQuery() *sqlbuilder.SelectBuilder {
 	query := sqlbuilder.NewSelectBuilder()
 	query.Select(userAccountMapColumns)
 	query.From(userAccountTableName)
 	return query
 }
 
-// userFindRequestQuery generates the select query for the given find request.
+// findRequestQuery generates the select query for the given find request.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func userAccountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
-	query := userAccountSelectQuery()
+func findRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
+	query := selectQuery()
 	if req.Where != nil {
 		query.Where(query.And(*req.Where))
 	}
@@ -155,9 +130,9 @@ func userAccountFindRequestQuery(req UserAccountFindRequest) (*sqlbuilder.Select
 	return query, req.Args
 }
 
-// Find gets all the user accounts from the database based on the request params
+// Find gets all the user accounts from the database based on the request params.
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountFindRequest) ([]*UserAccount, error) {
-	query, args := userAccountFindRequestQuery(req)
+	query, args := findRequestQuery(req)
 	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
 }
 
@@ -174,7 +149,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	}
 
 	// Check to see if a sub query needs to be applied for the claims
-	err := applyClaimsUserAccountSelect(ctx, claims, query)
+	err := applyClaimsSelect(ctx, claims, query)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +201,7 @@ func FindByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, user
 	return res, nil
 }
 
-// AddAccount an account for a given user with specified roles.
+// Create a user account for a given user with specified roles.
 func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req CreateUserAccountRequest, now time.Time) (*UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Create")
 	defer span.Finish()
@@ -237,8 +212,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 		return nil, err
 	}
 
-	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserAccount(ctx, claims, dbConn, req.UserID, req.AccountID)
+	// Ensure the claims can modify the account specified in the request.
+	err = CanModifyAccount(ctx, claims, dbConn, req.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +231,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 	now = now.Truncate(time.Millisecond)
 
 	// Check to see if there is an existing user account, including archived.
-	existQuery := userAccountSelectQuery()
+	existQuery := selectQuery()
 	existQuery.Where(existQuery.And(
 		existQuery.Equal("account_id", req.AccountID),
 		existQuery.Equal("user_id", req.UserID),
@@ -267,6 +242,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 	}
 
 	// If there is an existing entry, then update instead of insert.
+	var ua UserAccount
 	if len(existing) > 0 {
 		upReq := UpdateUserAccountRequest{
 			UserID:    req.UserID,
@@ -279,48 +255,67 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 			return nil, err
 		}
 
-		ua := existing[0]
+		ua = *existing[0]
 		ua.Roles = req.Roles
 		ua.UpdatedAt = now
 		ua.ArchivedAt = pq.NullTime{}
+	} else {
+		ua = UserAccount{
+			ID:        uuid.NewRandom().String(),
+			UserID:    req.UserID,
+			AccountID: req.AccountID,
+			Roles:     req.Roles,
+			Status:    UserAccountStatus_Active,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
 
-		return ua, nil
-	}
+		if req.Status != nil {
+			ua.Status = *req.Status
+		}
 
-	ua := UserAccount{
-		ID:        uuid.NewRandom().String(),
-		UserID:    req.UserID,
-		AccountID: req.AccountID,
-		Roles:     req.Roles,
-		Status:    UserAccountStatus_Active,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
+		// Build the insert SQL statement.
+		query := sqlbuilder.NewInsertBuilder()
+		query.InsertInto(userAccountTableName)
+		query.Cols("id", "user_id", "account_id", "roles", "status", "created_at", "updated_at")
+		query.Values(ua.ID, ua.UserID, ua.AccountID, ua.Roles, ua.Status.String(), ua.CreatedAt, ua.UpdatedAt)
 
-	if req.Status != nil {
-		ua.Status = *req.Status
-	}
-
-	// Build the insert SQL statement.
-	query := sqlbuilder.NewInsertBuilder()
-	query.InsertInto(userAccountTableName)
-	query.Cols("id", "user_id", "account_id", "roles", "status", "created_at", "updated_at")
-	query.Values(ua.ID, ua.UserID, ua.AccountID, ua.Roles, ua.Status.String(), ua.CreatedAt, ua.UpdatedAt)
-
-	// Execute the query with the provided context.
-	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
-	if err != nil {
-		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "add account %s to user %s failed", req.AccountID, req.UserID)
-		return nil, err
+		// Execute the query with the provided context.
+		sql, args := query.Build()
+		sql = dbConn.Rebind(sql)
+		_, err = dbConn.ExecContext(ctx, sql, args...)
+		if err != nil {
+			err = errors.Wrapf(err, "query - %s", query.String())
+			err = errors.WithMessagef(err, "add account %s to user %s failed", req.AccountID, req.UserID)
+			return nil, err
+		}
 	}
 
 	return &ua, nil
 }
 
-// UpdateAccount...
+// Read gets the specified user account from the database.
+func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*UserAccount, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Read")
+	defer span.Finish()
+
+	// Filter base select query by ID
+	query := selectQuery()
+	query.Where(query.Equal("id", id))
+
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
+	if err != nil {
+		return nil, err
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "user account %s not found", id)
+		return nil, err
+	}
+	u := res[0]
+
+	return u, nil
+}
+
+// Update replaces a user account in the database.
 func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateUserAccountRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Update")
 	defer span.Finish()
@@ -332,7 +327,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserAccount(ctx, claims, dbConn, req.UserID, req.AccountID)
+	err = CanModifyAccount(ctx, claims, dbConn, req.AccountID)
 	if err != nil {
 		return err
 	}
@@ -359,6 +354,9 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	}
 	if req.Status != nil {
 		fields = append(fields, query.Assign("status", req.Status))
+	}
+	if req.unArchive {
+		fields = append(fields, query.Assign("archived_at", nil))
 	}
 
 	// If there's nothing to update we can quit early.
@@ -401,7 +399,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Archi
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserAccount(ctx, claims, dbConn, req.UserID, req.AccountID)
+	err = CanModifyAccount(ctx, claims, dbConn, req.AccountID)
 	if err != nil {
 		return err
 	}
@@ -433,7 +431,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Archi
 	_, err = dbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "remove account %s from user %s failed", req.AccountID, req.UserID)
+		err = errors.WithMessagef(err, "archive account %s from user %s failed", req.AccountID, req.UserID)
 		return err
 	}
 
@@ -452,7 +450,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Delete
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUserAccount(ctx, claims, dbConn, req.UserID, req.AccountID)
+	err = CanModifyAccount(ctx, claims, dbConn, req.AccountID)
 	if err != nil {
 		return err
 	}

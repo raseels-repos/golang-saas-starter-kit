@@ -120,6 +120,29 @@ If you have a lot of migrations, it can be a pain to run all them, as an example
 Another bonus with the globally defined schema allows testing to spin up database containers on demand include all the migrations. The testing package enables unit tests to programmatically execute schema migrations before running any unit tests. 
 
 
+### Accessing Postgres 
+
+Login to the local postgres container 
+```bash
+docker exec -it example-project_postgres_1 /bin/bash
+bash-4.4# psql -u postgres shared
+```
+
+Show tables
+```commandline
+shared=# \dt
+             List of relations
+ Schema |      Name      | Type  |  Owner   
+--------+----------------+-------+----------
+ public | accounts       | table | postgres
+ public | migrations     | table | postgres
+ public | projects       | table | postgres
+ public | users          | table | postgres
+ public | users_accounts | table | postgres
+(5 rows)
+```
+
+
 ## Development Notes
 
 

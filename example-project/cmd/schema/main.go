@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/json"
 	"expvar"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
-	"github.com/lib/pq"
 	"log"
 	"net/url"
 	"os"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
+	"github.com/lib/pq"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
@@ -19,11 +19,16 @@ import (
 // build is the git version of this program. It is set using build flags in the makefile.
 var build = "develop"
 
+// service is the name of the program used for logging, tracing and the
+// the prefix used for loading env variables
+// ie: export SCHEMA_ENV=dev
+var service = "SCHEMA"
+
 func main() {
 	// =========================================================================
 	// Logging
 
-	log := log.New(os.Stdout, "Schema : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	// =========================================================================
 	// Configuration
@@ -40,12 +45,8 @@ func main() {
 		}
 	}
 
-	// The prefix used for loading env variables.
-	// ie: export SCHEMA_ENV=dev
-	envKeyPrefix := "SCHEMA"
-
 	// For additional details refer to https://github.com/kelseyhightower/envconfig
-	if err := envconfig.Process(envKeyPrefix, &cfg); err != nil {
+	if err := envconfig.Process(service, &cfg); err != nil {
 		log.Fatalf("main : Parsing Config : %v", err)
 	}
 
@@ -104,7 +105,7 @@ func main() {
 	// Register informs the sqlxtrace package of the driver that we will be using in our program.
 	// It uses a default service name, in the below case "postgres.db". To use a custom service
 	// name use RegisterWithServiceName.
-	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName("my-service"))
+	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName(service))
 	masterDb, err := sqlxtrace.Open(cfg.DB.Driver, dbUrl.String())
 	if err != nil {
 		log.Fatalf("main : Register DB : %s : %v", cfg.DB.Driver, err)

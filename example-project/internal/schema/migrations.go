@@ -65,8 +65,8 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					  zipcode varchar(20) NOT NULL DEFAULT '',
 					  status account_status_t NOT NULL DEFAULT 'active',
 					  timezone varchar(128) NOT NULL DEFAULT 'America/Anchorage',
-					  signup_user_id char(36) DEFAULT NULL,
-					  billing_user_id char(36) DEFAULT NULL,
+					  signup_user_id char(36) DEFAULT NULL  REFERENCES users(id),
+					  billing_user_id char(36) DEFAULT NULL  REFERENCES users(id),
 					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 					  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -107,8 +107,8 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 
 				q3 := `CREATE TABLE IF NOT EXISTS users_accounts (
 					  id char(36) NOT NULL,
-					  account_id char(36) NOT NULL,
-					  user_id char(36) NOT NULL,
+					  account_id char(36) NOT NULL  REFERENCES accounts(id),
+					  user_id char(36) NOT NULL  REFERENCES users(id),
 					  roles user_account_role_t[] NOT NULL,
 					  status user_account_status_t NOT NULL DEFAULT 'active',
 					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -139,6 +139,43 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					return errors.WithMessagef(err, "Query failed %s", q3)
 				}
 
+				return nil
+			},
+		},
+		// create new table projects
+		{
+			ID: "20190622-01",
+			Migrate: func(tx *sql.Tx) error {
+				q1 := `CREATE TYPE project_status_t as enum('active','disabled')`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
+				}
+
+				q2 := `CREATE TABLE IF NOT EXISTS projects (
+					  id char(36) NOT NULL,
+					  account_id char(36) NOT NULL REFERENCES accounts(id),
+					  name varchar(255) NOT NULL,
+					  status project_status_t NOT NULL DEFAULT 'active',
+					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+					  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+					  PRIMARY KEY (id)
+					)`
+				if _, err := tx.Exec(q2); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q2)
+				}
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				q1 := `DROP TYPE project_status_t`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
+				}
+
+				q2 := `DROP TABLE IF EXISTS projects`
+				if _, err := tx.Exec(q2); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q2)
+				}
 				return nil
 			},
 		},

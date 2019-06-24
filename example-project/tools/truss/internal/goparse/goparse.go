@@ -88,6 +88,11 @@ func ParseLines(lines []string, depth int) (objs *GoObjects, err error) {
 
 		ld := lineDepth(l)
 
+
+		//fmt.Println("l", l)
+		//fmt.Println("> Depth", ld, "???", depth)
+
+
 		if ld == depth {
 			if strings.HasPrefix(ls, "/*") {
 				multiLine = true
@@ -107,6 +112,11 @@ func ParseLines(lines []string, depth int) (objs *GoObjects, err error) {
 					}
 				}
 			}
+
+
+			//fmt.Println("> multiLine", multiLine)
+			//fmt.Println("> multiComment", multiComment)
+			//fmt.Println("> muiliVar", muiliVar)
 
 			objLines = append(objLines, l)
 
@@ -130,6 +140,8 @@ func ParseLines(lines []string, depth int) (objs *GoObjects, err error) {
 						break
 					}
 				}
+
+				//fmt.Println(" > objLines", objLines)
 
 				obj, err := ParseGoObject(objLines, depth)
 				if err != nil {
@@ -197,8 +209,22 @@ func ParseGoObject(lines []string, depth int) (obj *GoObject, err error) {
 
 	if strings.HasPrefix(firstStrip, "var") {
 		obj.Type = GoObjectType_Var
+
+		if !strings.HasSuffix(firstStrip, "(") {
+			if strings.HasPrefix(firstStrip, "var ") {
+				firstStrip = strings.TrimSpace(strings.Replace(firstStrip, "var ", "", 1))
+			}
+			obj.Name = strings.Split(firstStrip, " ")[0]
+		}
 	} else if strings.HasPrefix(firstStrip, "const") {
 		obj.Type = GoObjectType_Const
+
+		if !strings.HasSuffix(firstStrip, "(") {
+			if strings.HasPrefix(firstStrip, "const ") {
+				firstStrip = strings.TrimSpace(strings.Replace(firstStrip, "const ", "", 1))
+			}
+			obj.Name = strings.Split(firstStrip, " ")[0]
+		}
 	} else if strings.HasPrefix(firstStrip, "func") {
 		obj.Type = GoObjectType_Func
 

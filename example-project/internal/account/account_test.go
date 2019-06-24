@@ -63,8 +63,8 @@ func TestFindRequestQuery(t *testing.T) {
 	}
 }
 
-// TestApplyClaimsSelectvalidates applyClaimsSelect
-func TestApplyClaimsSelectvalidates(t *testing.T) {
+// TestApplyClaimsSelect validates applyClaimsSelect
+func TestApplyClaimsSelect(t *testing.T) {
 	var claimTests = []struct {
 		name        string
 		claims      auth.Claims

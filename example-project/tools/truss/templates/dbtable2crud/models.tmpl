@@ -38,7 +38,7 @@ type {{ $f.FieldType }} string
 const (
     {{ range $evk, $ev := $f.DbColumn.EnumValues }}
     // {{ $f.FieldType }}_{{ FormatCamel $ev }} defines the {{ $f.ColumnName }} of {{ $ev }} for {{ FormatCamelLowerTitle $.Model.Name }}.
-    {{ $f.FieldType }}_{{ FormatCamel $ev }}{{ $f.FieldType }} = "{{ $ev }}"
+    {{ $f.FieldType }}_{{ FormatCamel $ev }} {{ $f.FieldType }} = "{{ $ev }}"
     {{ end }}
 )
 

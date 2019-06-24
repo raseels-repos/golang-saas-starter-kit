@@ -46,15 +46,15 @@ func mapRowsTo{{ $.Model.Name }}(rows *sql.Rows) (*{{ $.Model.Name }}, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	return &a, nil
+	return &m, nil
 }
 {{ end }}
 {{ define "ACL"}}
-{{ $hasAccountId := (StringListHasValue $.Model.ColumnNames "account_id") }}
+{{ $hasAccountID := (StringListHasValue $.Model.ColumnNames "account_id") }}
 // CanRead{{ $.Model.Name }} determines if claims has the authority to access the specified {{ FormatCamelLowerTitle $.Model.Name}} by {{ $.Model.PrimaryColumn }}.
 func CanRead{{ $.Model.Name }}(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, {{ FormatCamelLower $.Model.PrimaryField }} string) error {
 
-	{{ if $hasAccountId }}
+	{{ if $hasAccountID }}
 	// If the request has claims from a specific {{ FormatCamelLower $.Model.Name }}, ensure that the claims
 	// has the correct access to the {{ FormatCamelLower $.Model.Name }}.
 	if claims.Audience != "" {
@@ -90,7 +90,7 @@ func CanRead{{ $.Model.Name }}(ctx context.Context, claims auth.Claims, dbConn *
 
 // CanModify{{ $.Model.Name }} determines if claims has the authority to modify the specified {{ FormatCamelLowerTitle $.Model.Name}} by {{ $.Model.PrimaryColumn }}.
 func CanModify{{ $.Model.Name }}(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, {{ FormatCamelLower $.Model.PrimaryField }} string) error {
-	err = CanRead{{ $.Model.Name }}(ctx, claims, dbConn, {{ FormatCamelLower $.Model.PrimaryField }})
+	err := CanRead{{ $.Model.Name }}(ctx, claims, dbConn, {{ FormatCamelLower $.Model.PrimaryField }})
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func CanModify{{ $.Model.Name }}(ctx context.Context, claims auth.Claims, dbConn
 
 // applyClaimsSelect applies a sub-query to the provided query to enforce ACL based on the claims provided.
 // 	1. No claims, request is internal, no ACL applied
-{{ if $hasAccountId }}
+{{ if $hasAccountID }}
 // 	2. All role types can access their user ID
 {{ end }}
 func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder) error {
@@ -114,7 +114,7 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 		return nil
 	}
 
-	{{ if $hasAccountId }}
+	{{ if $hasAccountID }}
 	query.Where(query.Equal("account_id", claims.Audience))
 	{{ end }}
 
@@ -226,9 +226,10 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, {{ FormatCam
 }
 {{ end }}
 {{ define "Create"}}
-{{ $hasAccountId := (StringListHasValue $.Model.ColumnNames "account_id") }}
+{{ $hasAccountID := (StringListHasValue $.Model.ColumnNames "account_id") }}
 {{ $reqName := (Concat $.Model.Name "CreateRequest") }}
 {{ $createFields := (index $.StructFields $reqName) }}
+{{ $reqHasAccountID := false }}{{ $reqAccountID := (index $createFields "AccountID") }}{{ if $reqAccountID }}{{ $reqHasAccountID = true }}{{ end }}
 // Create inserts a new {{ FormatCamelLowerTitle $.Model.Name }} into the database.
 func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req {{ $reqName }}, now time.Time) (*{{ $.Model.Name }}, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.{{ FormatCamelLowerUnderscore $.Model.Name }}.Create")
@@ -237,18 +238,18 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req {{ $re
 	if claims.Audience != "" {
 		// Admin users can update {{ FormatCamelPluralTitleLower $.Model.Name }} they have access to.
 		if !claims.HasRole(auth.RoleAdmin) {
-			return errors.WithStack(ErrForbidden)
+			return nil, errors.WithStack(ErrForbidden)
 		}
 
-		{{ if $hasAccountId }}
-		if req.AccountId != "" {
+		{{ if $reqHasAccountID }}
+		if req.AccountID != "" {
 			// Request accountId must match claims.
-			if req.AccountId != claims.Audience {
-				return errors.WithStack(ErrForbidden)
+			if req.AccountID != claims.Audience {
+				return nil, errors.WithStack(ErrForbidden)
 			}
 		} else {
 			// Set the accountId from claims.
-			req.AccountId = claims.Audience
+			req.AccountID = claims.Audience
 		}
 		{{ end }}
 	}
@@ -256,7 +257,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req {{ $re
 	v := validator.New()
 
 	// Validate the request.
-	err = v.Struct(req)
+	err := v.Struct(req)
 	if err != nil {
 		return nil, err
 	}
@@ -280,6 +281,13 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req {{ $re
 		{{ else if $cf }}{{ $required := (FieldTagHasOption $cf "validate" "required") }}{{ if $required  }}{{ $cf.FieldName }}: req.{{ $cf.FieldName }},{{ else if ne $cf.DefaultValue "" }}{{ $cf.FieldName }}: {{ $cf.DefaultValue }},{{ end }}
 		{{ end }}{{ end }}
 	}
+
+	{{ if and (not $reqHasAccountID) ($hasAccountID) }}
+	// Set the accountId from claims.
+	if claims.Audience != "" && m.AccountID == "" {
+		req.AccountID = claims.Audience
+	}
+	{{ end }}
 
 	{{ range $fk, $f := $createFields }}{{ $required := (FieldTagHasOption $f "validate" "required") }}{{ if not $required }}
 	if req.{{ $f.FieldName }} != nil {
@@ -315,7 +323,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req {{ $re
 		return nil, err
 	}
 
-	return &a, nil
+	return &m, nil
 }
 {{ end }}
 {{ define "Update"}}

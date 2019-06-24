@@ -303,7 +303,57 @@ func updateModelCrudFile(db *sqlx.DB, log *log.Logger, dbName, dbTable, template
 			continue
 		}
 
-		if crudDoc.HasType(obj.Name, obj.Type) {
+		if obj.Name == "" && (obj.Type == goparse.GoObjectType_Var || obj.Type == goparse.GoObjectType_Const) {
+			var curDocObj *goparse.GoObject
+			for _, subObj := range obj.Objects().List() {
+				for _, do := range crudDoc.Objects().List() {
+					if do.Name == "" && (do.Type == goparse.GoObjectType_Var || do.Type == goparse.GoObjectType_Const) {
+						for _, subDocObj := range do.Objects().List() {
+							if subDocObj.String() == subObj.String() && subObj.Type != goparse.GoObjectType_LineBreak {
+								curDocObj = do
+								break
+							}
+
+						}
+					}
+				}
+			}
+
+			if curDocObj != nil {
+				for _, subObj := range obj.Objects().List() {
+					var hasSubObj bool
+					for _, subDocObj := range curDocObj.Objects().List() {
+						if subDocObj.String() == subObj.String() {
+							hasSubObj = true
+							break
+						}
+					}
+
+					if !hasSubObj {
+						curDocObj.Objects().Add(subObj)
+						if err != nil {
+							err = errors.WithMessagef(err, "Failed to add object %s %s for %s", obj.Type, obj.Name, baseModel.Name)
+							return err
+						}
+					}
+				}
+			} else {
+				// Append comments and line breaks before adding the object
+				for _, c := range objHeaders {
+					err := crudDoc.Objects().Add(c)
+					if err != nil {
+						err = errors.WithMessagef(err, "Failed to add object %s %s for %s", c.Type, c.Name, baseModel.Name)
+						return err
+					}
+				}
+
+				err := crudDoc.Objects().Add(obj)
+				if err != nil {
+					err = errors.WithMessagef(err, "Failed to add object %s %s for %s", obj.Type, obj.Name, baseModel.Name)
+					return err
+				}
+			}
+		} else if crudDoc.HasType(obj.Name, obj.Type) {
 			cur := crudDoc.Objects().Get(obj.Name, obj.Type)
 
 			newObjs := []*goparse.GoObject{}

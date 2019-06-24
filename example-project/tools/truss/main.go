@@ -124,8 +124,8 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name:    "dbtable2crud",
-			Aliases: []string{"dbtable2crud"},
-			Usage:   "dbtable2crud -table=projects -file=../../internal/project/models.go -model=Project -saveChanges=false",
+			Aliases: []string{},
+			Usage:   "-table=projects -file=../../internal/project/models.go -model=Project [-dbtable=TABLE] [-templateDir=DIR] [-projectPath=DIR] [-saveChanges=false] ",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "dbtable, table"},
 				cli.StringFlag{Name: "modelFile, modelfile, file"},

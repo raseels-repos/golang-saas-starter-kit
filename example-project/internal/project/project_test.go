@@ -1,14 +1,14 @@
-{{ define "imports"}}
+package project
+
 import (
-	"{{ $.GoSrcPath }}/internal/platform/auth"
-	"{{ $.GoSrcPath }}/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/google/go-cmp/cmp"
 	"github.com/huandu/go-sqlbuilder"
 	"os"
 	"testing"
 )
-{{ end }}
-{{ define "Globals"}}
+
 var test *tests.Test
 
 // TestMain is the entry point for testing.
@@ -21,8 +21,7 @@ func testMain(m *testing.M) int {
 	defer test.TearDown()
 	return m.Run()
 }
-{{ end }}
-{{ define "TestFindRequestQuery"}}
+
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
 	where := "field1 = ? or field2 = ?"
@@ -31,32 +30,34 @@ func TestFindRequestQuery(t *testing.T) {
 		offset uint = 34
 	)
 
-	req := {{ $.Model.Name }}FindRequest{
+	req := ProjectFindRequest{
 		Where: &where,
 		Args: []interface{}{
 			"lee brown",
 			"103 East Main St.",
 		},
+
 		Order: []string{
 			"id asc",
 			"created_at desc",
 		},
+
 		Limit:  &limit,
 		Offset: &offset,
 	}
-	expected := "SELECT " + {{ FormatCamelLower $.Model.Name }}MapColumns + " FROM " + {{ FormatCamelLower $.Model.Name }}TableName + " WHERE (field1 = ? or field2 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 
+	expected := "SELECT " + projectMapColumns + " FROM " + projectTableName + " WHERE (field1 = ? or field2 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 	res, args := findRequestQuery(req)
-
 	if diff := cmp.Diff(res.String(), expected); diff != "" {
 		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
 	}
+
 	if diff := cmp.Diff(args, req.Args); diff != "" {
 		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
 	}
+
 }
-{{ end }}
-{{ define "TestApplyClaimsSelect"}}
+
 // TestApplyClaimsSelect applyClaimsSelect
 func TestApplyClaimsSelect(t *testing.T) {
 	var claimTests = []struct {
@@ -64,45 +65,14 @@ func TestApplyClaimsSelect(t *testing.T) {
 		claims      auth.Claims
 		expectedSql string
 		error       error
-	}{
-		{"EmptyClaims",
-			auth.Claims{},
-			"SELECT " + {{ FormatCamelLower $.Model.Name }}MapColumns + " FROM " + {{ FormatCamelLower $.Model.Name }}TableName,
-			nil,
-		},
-		{"RoleAccount",
-			auth.Claims{
-				Roles: []string{auth.RoleAdmin},
-				StandardClaims: jwt.StandardClaims{
-					Subject:  "user1",
-					Audience: "acc1",
-				},
-			},
-			"SELECT " + {{ FormatCamelLower $.Model.Name }}MapColumns + " FROM " + {{ FormatCamelLower $.Model.Name }}TableName + " WHERE account_id = 'acc1'",
-			nil,
-		},
-		{"RoleAdmin",
-			auth.Claims{
-				Roles: []string{auth.RoleAdmin},
-				StandardClaims: jwt.StandardClaims{
-					Subject:  "user1",
-					Audience: "acc1",
-				},
-			},
-			"SELECT " + {{ FormatCamelLower $.Model.Name }}MapColumns + " FROM " + {{ FormatCamelLower $.Model.Name }}TableName + " WHERE account_id = 'acc1'",
-			nil,
-		},
-	}
-
+	}{}
 	t.Log("Given the need to validate ACLs are enforced by claims to a select query.")
 	{
 		for i, tt := range claimTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
 				ctx := tests.Context()
-
 				query := selectQuery()
-
 				err := applyClaimsSelect(ctx, tt.claims, query)
 				if err != tt.error {
 					t.Logf("\t\tGot : %+v", err)
@@ -111,7 +81,6 @@ func TestApplyClaimsSelect(t *testing.T) {
 				}
 
 				sql, args := query.Build()
-
 				// Use mysql flavor so placeholders will get replaced for comparison.
 				sql, err = sqlbuilder.MySQL.Interpolate(sql, args)
 				if err != nil {
@@ -125,7 +94,9 @@ func TestApplyClaimsSelect(t *testing.T) {
 
 				t.Logf("\t%s\tapplyClaimsSelect ok.", tests.Success)
 			}
+
 		}
+
 	}
+
 }
-{{ end }}

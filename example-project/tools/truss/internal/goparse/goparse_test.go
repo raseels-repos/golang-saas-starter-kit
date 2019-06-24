@@ -64,7 +64,8 @@ func TestNewDocImports(t *testing.T) {
 func TestParseLines1(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	code := `func testCreate(t *testing.T, ctx context.Context, sess *datamodels.Session) *datamodels.Model {
+	codeTests := []string{
+		`func testCreate(t *testing.T, ctx context.Context, sess *datamodels.Session) *datamodels.Model {
 	g := gomega.NewGomegaWithT(t)
 	obj := datamodels.MockModelNew()
 	resp, err := ModelCreate(ctx, DB, &obj)
@@ -76,15 +77,30 @@ func TestParseLines1(t *testing.T) {
 	g.Expect(resp.Status).Should(gomega.Equal(datamodels.{{ .Name }}Status_Active))
 	return resp
 }
-`
-	lines := strings.Split(code, "\n")
-
-	objs, err := ParseLines(lines, 0)
-	if err != nil {
-		t.Fatalf("got error %v", err)
+`,
+		`var (
+	// ErrNotFound abstracts the postgres not found error.
+	ErrNotFound = errors.New("Entity not found")
+	// ErrInvalidID occurs when an ID is not in a valid form.
+	ErrInvalidID = errors.New("ID is not in its proper form")
+	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
+	ErrForbidden = errors.New("Attempted action is not allowed")
+)
+`,
 	}
 
-	g.Expect(objs.Lines()).Should(gomega.Equal(lines))
+	for _, code := range codeTests {
+		lines := strings.Split(code, "\n")
+
+		objs, err := ParseLines(lines, 0)
+		if err != nil {
+			t.Fatalf("got error %v", err)
+		}
+
+		g.Expect(objs.Lines()).Should(gomega.Equal(lines))
+	}
+
+
 }
 
 func TestParseLines2(t *testing.T) {

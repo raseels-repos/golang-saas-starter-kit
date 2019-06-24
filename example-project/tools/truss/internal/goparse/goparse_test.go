@@ -15,15 +15,6 @@ func init() {
 	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 }
 
-func TestParseFileModel1(t *testing.T) {
-
-	_, err := ParseFile(logger, "test_gofile_model1.txt")
-	if err != nil {
-		t.Fatalf("got error %v", err)
-	}
-
-}
-
 func TestMultilineVar(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 

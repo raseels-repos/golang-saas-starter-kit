@@ -125,13 +125,15 @@ func main() {
 		{
 			Name:    "dbtable2crud",
 			Aliases: []string{"dbtable2crud"},
-			Usage:   "dbtable2crud -table=projects -file=../../internal/project/models.go -model=Project",
+			Usage:   "dbtable2crud -table=projects -file=../../internal/project/models.go -model=Project -saveChanges=false",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "dbtable, table"},
 				cli.StringFlag{Name: "modelFile, modelfile, file"},
 				cli.StringFlag{Name: "modelName, modelname, model"},
 				cli.StringFlag{Name: "templateDir, templates", Value: "./templates/dbtable2crud"},
-				cli.StringFlag{Name: "projectPath", Value: ""},
+				cli.StringFlag{Name: "projectPath"},
+				cli.BoolFlag{Name: "saveChanges, save"},
+
 			},
 			Action: func(c *cli.Context) error {
 				dbTable := strings.TrimSpace(c.String("dbtable"))
@@ -201,7 +203,7 @@ func main() {
 					modelName = strings.Replace(modelName, " ", "", -1)
 				}
 
-				return dbtable2crud.Run(masterDb, log, cfg.DB.Database, dbTable, modelFile, modelName, templateDir, projectPath)
+				return dbtable2crud.Run(masterDb, log, cfg.DB.Database, dbTable, modelFile, modelName, templateDir, projectPath, c.Bool("saveChanges"))
 			},
 		},
 	}

@@ -17,7 +17,7 @@ import (
 )
 
 // Run in the main entry point for the dbtable2crud cmd.
-func Run(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, modelName, templateDir, goSrcPath string) error {
+func Run(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, modelName, templateDir, goSrcPath string, saveChanges bool) error {
 	log.SetPrefix(log.Prefix() + " : dbtable2crud")
 
 	// Ensure the schema is up to date
@@ -50,13 +50,13 @@ func Run(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, modelName, te
 	}
 
 	// Update the model file with new or updated code.
-	err = updateModel(log, model, templateDir, tmplData)
+	err = updateModel(log, model, modelFile, templateDir, tmplData, saveChanges)
 	if err != nil {
 		return err
 	}
 
 	// Update the model crud file with new or updated code.
-	err = updateModelCrud(db, log, dbName, dbTable, modelFile, modelName, templateDir, model, tmplData)
+	err = updateModelCrud(db, log, dbName, dbTable, modelFile, modelName, templateDir, model, tmplData, saveChanges)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func validateModel(log *log.Logger, model *modelDef) error {
 }
 
 // updateModel updated the parsed code file with the new code.
-func updateModel(log *log.Logger, model *modelDef, templateDir string, tmplData map[string]interface{}) error {
+func updateModel(log *log.Logger, model *modelDef, modelFile, templateDir string, tmplData map[string]interface{}, saveChanges bool) error {
 
 	// Execute template and parse code to be used to compare against modelFile.
 	tmplObjs, err := loadTemplateObjects(log, model, templateDir, "models.tmpl", tmplData)
@@ -204,34 +204,24 @@ func updateModel(log *log.Logger, model *modelDef, templateDir string, tmplData 
 		}
 	}
 
-	// Produce a diff after the updates have been applied.
-	dmp := diffmatchpatch.New()
-	diffs := dmp.DiffMain(curCode, model.String(), true)
-
-	fmt.Println(dmp.DiffPrettyText(diffs))
+	if saveChanges {
+		err = model.Save(modelFile)
+		if err != nil {
+			err = errors.WithMessagef(err, "Failed to save changes for %s to %s", model.Name, modelFile)
+			return err
+		}
+	} else {
+		// Produce a diff after the updates have been applied.
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(curCode, model.String(), true)
+		fmt.Println(dmp.DiffPrettyText(diffs))
+	}
 
 	return nil
 }
 
 // updateModelCrud updated the parsed code file with the new code.
-func updateModelCrud(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, modelName, templateDir string, baseModel *modelDef, tmplData map[string]interface{}) error {
-
-	modelDir := filepath.Dir(modelFile)
-	crudFile := filepath.Join(modelDir, FormatCamelLowerUnderscore(baseModel.Name)+".go")
-
-	var crudDoc *goparse.GoDocument
-	if _, err := os.Stat(crudFile); os.IsNotExist(err) {
-		crudDoc, err = goparse.NewGoDocument(baseModel.Package)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Parse the supplied model file.
-		crudDoc, err = goparse.ParseFile(log, modelFile)
-		if err != nil {
-			return err
-		}
-	}
+func updateModelCrud(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, modelName, templateDir string, baseModel *modelDef, tmplData map[string]interface{}, saveChanges bool) error {
 
 	// Load all the updated struct fields from the base model file.
 	structFields := make(map[string]map[string]modelField)
@@ -257,10 +247,49 @@ func updateModelCrud(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, m
 	}
 	tmplData["StructFields"] = structFields
 
-	// Execute template and parse code to be used to compare against modelFile.
-	tmplObjs, err := loadTemplateObjects(log, baseModel, templateDir, "model_crud.tmpl", tmplData)
+	// Get the dir to store crud methods and test files.
+	modelDir := filepath.Dir(modelFile)
+
+	// Process the CRUD hanlders template and write to file.
+	crudFilePath := filepath.Join(modelDir, FormatCamelLowerUnderscore(baseModel.Name)+".go")
+	crudTmplFile := "model_crud.tmpl"
+	err := updateModelCrudFile(db, log, dbName, dbTable, templateDir, crudFilePath, crudTmplFile, baseModel, tmplData, saveChanges)
 	if err != nil {
 		return err
+	}
+
+	// Process the CRUD test template and write to file.
+	testFilePath := filepath.Join(modelDir, FormatCamelLowerUnderscore(baseModel.Name)+"_test.go")
+	testTmplFile := "model_crud_test.tmpl"
+	err = updateModelCrudFile(db, log, dbName, dbTable, templateDir, testFilePath, testTmplFile, baseModel, tmplData, saveChanges)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// updateModelCrudFile processes the input file.
+func updateModelCrudFile(db *sqlx.DB, log *log.Logger, dbName, dbTable, templateDir, crudFilePath, tmplFile string, baseModel *modelDef, tmplData map[string]interface{}, saveChanges bool) error {
+
+	// Execute template and parse code to be used to compare against modelFile.
+	tmplObjs, err := loadTemplateObjects(log, baseModel, templateDir, tmplFile, tmplData)
+	if err != nil {
+		return err
+	}
+
+	var crudDoc *goparse.GoDocument
+	if _, err := os.Stat(crudFilePath); os.IsNotExist(err) {
+		crudDoc, err = goparse.NewGoDocument(baseModel.Package)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Parse the supplied model file.
+		crudDoc, err = goparse.ParseFile(log, crudFilePath)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Store the current code as a string to produce a diff.
@@ -335,44 +364,18 @@ func updateModelCrud(db *sqlx.DB, log *log.Logger, dbName, dbTable, modelFile, m
 		objHeaders = []*goparse.GoObject{}
 	}
 
-	/*
-		// Set some flags to determine additional imports and need to be added.
-		var hasEnum bool
-		var hasPq bool
-		for _, f := range crudModel.Fields {
-			if f.DbColumn != nil && f.DbColumn.IsEnum {
-				hasEnum = true
-			}
-			if strings.HasPrefix(strings.Trim(f.FieldType, "*"), "pq.") {
-				hasPq = true
-			}
+	if saveChanges {
+		err = crudDoc.Save(crudFilePath)
+		if err != nil {
+			err = errors.WithMessagef(err, "Failed to save changes for %s to %s", baseModel.Name, crudFilePath)
+			return err
 		}
-
-		reqImports := []string{}
-		if hasEnum {
-			reqImports = append(reqImports,  "database/sql/driver")
-			reqImports = append(reqImports,  "gopkg.in/go-playground/validator.v9")
-			reqImports = append(reqImports, "github.com/pkg/errors")
-		}
-
-		if hasPq {
-			reqImports = append(reqImports,   "github.com/lib/pq")
-		}
-
-		for _, in := range reqImports {
-			err := model.AddImport(goparse.GoImport{Name: in})
-			if err != nil {
-				err = errors.WithMessagef(err, "Failed to add import %s for %s", in, crudModel.Name)
-				return err
-			}
-		}
-	*/
-
-	// Produce a diff after the updates have been applied.
-	dmp := diffmatchpatch.New()
-	diffs := dmp.DiffMain(curCode, crudDoc.String(), true)
-
-	fmt.Println(dmp.DiffPrettyText(diffs))
+	} else {
+		// Produce a diff after the updates have been applied.
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(curCode, crudDoc.String(), true)
+		fmt.Println(dmp.DiffPrettyText(diffs))
+	}
 
 	return nil
 }

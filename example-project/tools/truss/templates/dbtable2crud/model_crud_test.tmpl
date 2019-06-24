@@ -1,0 +1,66 @@
+{{ define "imports"}}
+import (
+	"github.com/lib/pq"
+	"math/rand"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"{{ $.GoSrcPath }}/internal/platform/auth"
+	"{{ $.GoSrcPath }}/internal/platform/tests"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/google/go-cmp/cmp"
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/pborman/uuid"
+	"github.com/pkg/errors"
+)
+{{ end }}
+{{ define "Globals"}}
+var test *tests.Test
+
+// TestMain is the entry point for testing.
+func TestMain(m *testing.M) {
+	os.Exit(testMain(m))
+}
+
+func testMain(m *testing.M) int {
+	test = tests.New()
+	defer test.TearDown()
+	return m.Run()
+}
+{{ end }}
+{{ define "TestFindRequestQuery"}}
+// TestFindRequestQuery validates findRequestQuery
+func TestFindRequestQuery(t *testing.T) {
+	where := "name = ? or address1 = ?"
+	var (
+		limit  uint = 12
+		offset uint = 34
+	)
+
+	req := {{ $.Model.Name }}FindRequest{
+		Where: &where,
+		Args: []interface{}{
+			"lee brown",
+			"103 East Main St.",
+		},
+		Order: []string{
+			"id asc",
+			"created_at desc",
+		},
+		Limit:  &limit,
+		Offset: &offset,
+	}
+	expected := "SELECT " + accountMapColumns + " FROM " + accountTableName + " WHERE (name = ? or address1 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+
+	res, args := findRequestQuery(req)
+
+	if diff := cmp.Diff(res.String(), expected); diff != "" {
+		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
+	}
+	if diff := cmp.Diff(args, req.Args); diff != "" {
+		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
+	}
+}
+{{ end }}

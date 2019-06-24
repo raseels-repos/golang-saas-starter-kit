@@ -31,7 +31,6 @@ var (
 )
 {{ end }}
 {{ define "Helpers"}}
-
 // {{ FormatCamelLower $.Model.Name }}MapColumns is the list of columns needed for mapRowsTo{{ $.Model.Name }}
 var {{ FormatCamelLower $.Model.Name }}MapColumns = "{{ JoinStrings $.Model.ColumnNames "," }}"
 

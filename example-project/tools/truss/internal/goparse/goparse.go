@@ -203,7 +203,7 @@ func ParseGoObject(lines []string, depth int) (obj *GoObject, err error) {
 		obj.Type = GoObjectType_Func
 
 		if strings.HasPrefix(firstStrip, "func (") {
-			funcLine := strings.TrimLeft(strings.TrimSpace(strings.TrimLeft(firstStrip, "func ")), "(")
+			funcLine := strings.TrimLeft(strings.TrimSpace(strings.Replace(firstStrip, "func ", "", 1)), "(")
 
 			var structName string
 			pts := strings.Split(strings.Split(funcLine, ")")[0], " ")
@@ -227,7 +227,7 @@ func ParseGoObject(lines []string, depth int) (obj *GoObject, err error) {
 
 			obj.Name = fmt.Sprintf("%s.%s", structName, funcName)
 		} else {
-			obj.Name = strings.TrimLeft(firstStrip, "func ")
+			obj.Name = strings.Replace(firstStrip, "func ", "", 1)
 			obj.Name = strings.Split(obj.Name, "(")[0]
 		}
 	} else if strings.HasSuffix(firstStrip, "struct {") || strings.HasSuffix(firstStrip, "struct{") {
@@ -242,7 +242,7 @@ func ParseGoObject(lines []string, depth int) (obj *GoObject, err error) {
 		firstStrip = strings.TrimSpace(strings.Replace(firstStrip, "type ", "", 1))
 		obj.Name = strings.Split(firstStrip, " ")[0]
 	} else if strings.HasPrefix(firstStrip, "package") {
-		obj.Name = strings.TrimSpace(strings.TrimLeft(firstStrip, "package "))
+		obj.Name = strings.TrimSpace(strings.Replace(firstStrip, "package ", "", 1))
 
 		obj.Type = GoObjectType_Package
 	} else if strings.HasPrefix(firstStrip, "import") {

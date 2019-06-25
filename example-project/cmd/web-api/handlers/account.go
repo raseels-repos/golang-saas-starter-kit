@@ -43,10 +43,10 @@ func (a *Account) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Summary Read returns the specified account from the system.
 // @Description get string by ID
 // @Tags account
-// @ID get-string-by-int
 // @Accept  json
 // @Produce  json
-// @Param id path int true "Account ID"
+// @Security OAuth2Password
+// @Param id path string true "Account ID"
 // @Success 200 {object} account.Account
 // @Header 200 {string} Token "qwerty"
 // @Failure 400 {object} web.Error

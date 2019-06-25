@@ -105,7 +105,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tAuthenticate user ok.", tests.Success)
 
 			// Ensure the token string was correctly generated.
-			claims1, err := tknGen.ParseClaims(tkn1.Token)
+			claims1, err := tknGen.ParseClaims(tkn1.AccessToken)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -127,7 +127,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tSwitchAccount user ok.", tests.Success)
 
 			// Ensure the token string was correctly generated.
-			claims2, err := tknGen.ParseClaims(tkn2.Token)
+			claims2, err := tknGen.ParseClaims(tkn2.AccessToken)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)

@@ -48,10 +48,10 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 // @Summary Read returns the specified user from the system.
 // @Description get string by ID
 // @Tags user
-// @ID get-string-by-int
 // @Accept  json
 // @Produce  json
-// @Param id path int true "User ID"
+// @Security OAuth2Password
+// @Param id path string true "User ID"
 // @Success 200 {object} user.User
 // @Header 200 {string} Token "qwerty"
 // @Failure 400 {object} web.Error
@@ -268,8 +268,19 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 	return web.RespondJson(ctx, w, tkn, http.StatusNoContent)
 }
 
-// Token handles a request to authenticate a user. It expects a request using
-// Basic Auth with a user's email and password. It responds with a JWT.
+// Token godoc
+// @Summary Token handles a request to authenticate a user.
+// @Description Token generates an oauth2 accessToken using Basic Auth with a user's email and password.
+// @Tags user
+// @Accept  json
+// @Produce  json
+// @Security BasicAuth
+// @Success 200 {object} user.Token
+// @Header 200 {string} Token "qwerty"
+// @Failure 400 {object} web.Error
+// @Failure 403 {object} web.Error
+// @Failure 404 {object} web.Error
+// @Router /oauth/token [post]
 func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {

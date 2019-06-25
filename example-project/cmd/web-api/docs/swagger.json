@@ -20,6 +20,11 @@
     "paths": {
         "/accounts/{id}": {
             "get": {
+                "security": [
+                    {
+                        "OAuth2Password": []
+                    }
+                ],
                 "description": "get string by ID",
                 "consumes": [
                     "application/json"
@@ -31,10 +36,9 @@
                     "account"
                 ],
                 "summary": "Read returns the specified account from the system.",
-                "operationId": "get-string-by-int",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Account ID",
                         "name": "id",
                         "in": "path",
@@ -47,6 +51,62 @@
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/account.Account"
+                        },
+                        "headers": {
+                            "Token": {
+                                "type": "string",
+                                "description": "qwerty"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/oauth/token": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Token generates an oauth2 accessToken using Basic Auth with a user's email and password.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Token handles a request to authenticate a user.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/user.Token"
                         },
                         "headers": {
                             "Token": {
@@ -137,6 +197,11 @@
         },
         "/users/{id}": {
             "get": {
+                "security": [
+                    {
+                        "OAuth2Password": []
+                    }
+                ],
                 "description": "get string by ID",
                 "consumes": [
                     "application/json"
@@ -148,13 +213,19 @@
                     "user"
                 ],
                 "summary": "Read returns the specified user from the system.",
-                "operationId": "get-string-by-int",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "User ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Authentication header",
+                        "name": "Authorization",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -347,6 +418,20 @@
                 }
             }
         },
+        "user.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expiry": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
         "user.User": {
             "type": "object",
             "required": [
@@ -399,10 +484,18 @@
         }
     },
     "securityDefinitions": {
+        "BasicAuth": {
+            "type": "basic"
+        },
         "OAuth2Password": {
             "type": "oauth2",
             "flow": "password",
-            "tokenUrl": "/v1/oauth/token"
+            "tokenUrl": "/v1/oauth/token",
+            "scopes": {
+                "admin": " Grants read and write access to administrative information",
+                "read": " Grants read access",
+                "write": " Grants write access"
+            }
         }
     }
 }

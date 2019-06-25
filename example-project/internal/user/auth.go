@@ -219,12 +219,22 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	claims = auth.NewClaims(userID, accountID, accountIds, account.Roles, now, expires)
 
 	// Generate a token for the user with the defined claims.
-	tkn, err := tknGen.GenerateToken(claims)
+	tknStr, err := tknGen.GenerateToken(claims)
 	if err != nil {
 		return Token{}, errors.Wrap(err, "generating token")
 	}
 
-	return Token{Token: tkn, claims: claims}, nil
+	tkn := Token{
+		AccessToken: tknStr,
+		TokenType:   "Bearer",
+		claims:      claims,
+	}
+
+	if expires.Seconds() > 0 {
+		tkn.Expiry = now.Add(expires)
+	}
+
+	return tkn, nil
 }
 
 // mockTokenGenerator is used for testing that Authenticate calls its provided

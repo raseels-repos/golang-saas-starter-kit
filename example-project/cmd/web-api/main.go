@@ -51,8 +51,13 @@ var service = "WEB_API"
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
+// @securityDefinitions.basic BasicAuth
+
 // @securitydefinitions.oauth2.password OAuth2Password
 // @tokenUrl /v1/oauth/token
+// @scope.read Grants read access
+// @scope.write Grants write access
+// @scope.admin Grants read and write access to administrative information
 
 func main() {
 

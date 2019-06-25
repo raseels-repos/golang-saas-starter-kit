@@ -108,6 +108,15 @@ definitions:
         $ref: '#/definitions/user.User'
         type: object
     type: object
+  user.Token:
+    properties:
+      access_token:
+        type: string
+      expiry:
+        type: string
+      token_type:
+        type: string
+    type: object
   user.User:
     properties:
       archived_at:
@@ -161,13 +170,12 @@ paths:
       consumes:
       - application/json
       description: get string by ID
-      operationId: get-string-by-int
       parameters:
       - description: Account ID
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -195,9 +203,49 @@ paths:
           schema:
             $ref: '#/definitions/web.Error'
             type: object
+      security:
+      - OAuth2Password: []
       summary: Read returns the specified account from the system.
       tags:
       - account
+  /oauth/token:
+    post:
+      consumes:
+      - application/json
+      description: Token generates an oauth2 accessToken using Basic Auth with a user's
+        email and password.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            Token:
+              description: qwerty
+              type: string
+          schema:
+            $ref: '#/definitions/user.Token'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+      security:
+      - BasicAuth: []
+      summary: Token handles a request to authenticate a user.
+      tags:
+      - user
   /signup:
     post:
       consumes:
@@ -241,13 +289,17 @@ paths:
       consumes:
       - application/json
       description: get string by ID
-      operationId: get-string-by-int
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
-        type: integer
+        type: string
+      - description: Authentication header
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -275,12 +327,20 @@ paths:
           schema:
             $ref: '#/definitions/web.Error'
             type: object
+      security:
+      - OAuth2Password: []
       summary: Read returns the specified user from the system.
       tags:
       - user
 securityDefinitions:
+  BasicAuth:
+    type: basic
   OAuth2Password:
     flow: password
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      read: ' Grants read access'
+      write: ' Grants write access'
     tokenUrl: /v1/oauth/token
     type: oauth2
 swagger: "2.0"

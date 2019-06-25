@@ -1,4 +1,4 @@
-package user
+package user_account
 
 import (
 	"database/sql/driver"

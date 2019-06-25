@@ -1,13 +1,13 @@
 package account
 
 import (
-	"github.com/lib/pq"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/lib/pq"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
@@ -142,25 +142,25 @@ func TestCreateValidation(t *testing.T) {
 
 	var accountTests = []struct {
 		name     string
-		req      CreateAccountRequest
-		expected func(req CreateAccountRequest, res *Account) *Account
+		req      AccountCreateRequest
+		expected func(req AccountCreateRequest, res *Account) *Account
 		error    error
 	}{
 		{"Required Fields",
-			CreateAccountRequest{},
-			func(req CreateAccountRequest, res *Account) *Account {
+			AccountCreateRequest{},
+			func(req AccountCreateRequest, res *Account) *Account {
 				return nil
 			},
-			errors.New("Key: 'CreateAccountRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'CreateAccountRequest.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
-				"Key: 'CreateAccountRequest.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
-				"Key: 'CreateAccountRequest.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
-				"Key: 'CreateAccountRequest.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
-				"Key: 'CreateAccountRequest.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag"),
+			errors.New("Key: 'AccountCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag"),
 		},
 
 		{"Default Timezone & Status",
-			CreateAccountRequest{
+			AccountCreateRequest{
 				Name:     uuid.NewRandom().String(),
 				Address1: "103 East Main St",
 				Address2: "Unit 546",
@@ -169,7 +169,7 @@ func TestCreateValidation(t *testing.T) {
 				Country:  "USA",
 				Zipcode:  "99686",
 			},
-			func(req CreateAccountRequest, res *Account) *Account {
+			func(req AccountCreateRequest, res *Account) *Account {
 				return &Account{
 					Name:     req.Name,
 					Address1: req.Address1,
@@ -191,7 +191,7 @@ func TestCreateValidation(t *testing.T) {
 			nil,
 		},
 		{"Valid Status",
-			CreateAccountRequest{
+			AccountCreateRequest{
 				Name:     uuid.NewRandom().String(),
 				Address1: "103 East Main St",
 				Address2: "Unit 546",
@@ -201,10 +201,10 @@ func TestCreateValidation(t *testing.T) {
 				Zipcode:  "99686",
 				Status:   &invalidStatus,
 			},
-			func(req CreateAccountRequest, res *Account) *Account {
+			func(req AccountCreateRequest, res *Account) *Account {
 				return nil
 			},
-			errors.New("Key: 'CreateAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'AccountCreateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 	}
 
@@ -262,7 +262,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 	{
 		ctx := tests.Context()
 
-		req1 := CreateAccountRequest{
+		req1 := AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -277,7 +277,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		req2 := CreateAccountRequest{
+		req2 := AccountCreateRequest{
 			Name:     account1.Name,
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -286,7 +286,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		}
-		expectedErr := errors.New("Key: 'CreateAccountRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'AccountCreateRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
 		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -310,13 +310,13 @@ func TestCreateClaims(t *testing.T) {
 	var accountTests = []struct {
 		name   string
 		claims auth.Claims
-		req    CreateAccountRequest
+		req    AccountCreateRequest
 		error  error
 	}{
 		// Internal request, should bypass ACL.
 		{"EmptyClaims",
 			auth.Claims{},
-			CreateAccountRequest{
+			AccountCreateRequest{
 				Name:     uuid.NewRandom().String(),
 				Address1: "103 East Main St",
 				Address2: "Unit 546",
@@ -336,7 +336,7 @@ func TestCreateClaims(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			CreateAccountRequest{
+			AccountCreateRequest{
 				Name:     uuid.NewRandom().String(),
 				Address1: "103 East Main St",
 				Address2: "Unit 546",
@@ -356,7 +356,7 @@ func TestCreateClaims(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			CreateAccountRequest{
+			AccountCreateRequest{
 				Name:     uuid.NewRandom().String(),
 				Address1: "103 East Main St",
 				Address2: "Unit 546",
@@ -396,24 +396,24 @@ func TestUpdateValidation(t *testing.T) {
 	// TODO: actually create the account so can test the output of findbyId
 	type accountTest struct {
 		name  string
-		req   UpdateAccountRequest
+		req   AccountUpdateRequest
 		error error
 	}
 
 	var accountTests = []accountTest{
 		{"Required Fields",
-			UpdateAccountRequest{},
-			errors.New("Key: 'UpdateAccountRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
+			AccountUpdateRequest{},
+			errors.New("Key: 'AccountUpdateRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
 		},
 	}
 
 	invalidStatus := AccountStatus("xxxxxx")
 	accountTests = append(accountTests, accountTest{"Valid Status",
-		UpdateAccountRequest{
+		AccountUpdateRequest{
 			ID:     uuid.NewRandom().String(),
 			Status: &invalidStatus,
 		},
-		errors.New("Key: 'UpdateAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+		errors.New("Key: 'AccountUpdateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 	})
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
@@ -459,7 +459,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 	{
 		ctx := tests.Context()
 
-		req1 := CreateAccountRequest{
+		req1 := AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -474,7 +474,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		req2 := CreateAccountRequest{
+		req2 := AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -490,11 +490,11 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 		}
 
 		// Try to set the email for account 1 on account 2
-		updateReq := UpdateAccountRequest{
+		updateReq := AccountUpdateRequest{
 			ID:   account2.ID,
 			Name: &account1.Name,
 		}
-		expectedErr := errors.New("Key: 'UpdateAccountRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'AccountUpdateRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
 		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -518,10 +518,10 @@ func TestCrud(t *testing.T) {
 	type accountTest struct {
 		name      string
 		claims    func(*Account, string) auth.Claims
-		create    CreateAccountRequest
-		update    func(*Account) UpdateAccountRequest
+		create    AccountCreateRequest
+		update    func(*Account) AccountUpdateRequest
 		updateErr error
-		expected  func(*Account, UpdateAccountRequest) *Account
+		expected  func(*Account, AccountUpdateRequest) *Account
 		findErr   error
 	}
 
@@ -532,7 +532,7 @@ func TestCrud(t *testing.T) {
 		func(account *Account, userId string) auth.Claims {
 			return auth.Claims{}
 		},
-		CreateAccountRequest{
+		AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -541,15 +541,15 @@ func TestCrud(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		func(account *Account) UpdateAccountRequest {
+		func(account *Account) AccountUpdateRequest {
 			name := uuid.NewRandom().String()
-			return UpdateAccountRequest{
+			return AccountUpdateRequest{
 				ID:   account.ID,
 				Name: &name,
 			}
 		},
 		nil,
-		func(account *Account, req UpdateAccountRequest) *Account {
+		func(account *Account, req AccountUpdateRequest) *Account {
 			return &Account{
 				Name: *req.Name,
 				// Copy this fields from the created account.
@@ -583,7 +583,7 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateAccountRequest{
+		AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -592,15 +592,15 @@ func TestCrud(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		func(account *Account) UpdateAccountRequest {
+		func(account *Account) AccountUpdateRequest {
 			name := uuid.NewRandom().String()
-			return UpdateAccountRequest{
+			return AccountUpdateRequest{
 				ID:   account.ID,
 				Name: &name,
 			}
 		},
 		ErrForbidden,
-		func(account *Account, req UpdateAccountRequest) *Account {
+		func(account *Account, req AccountUpdateRequest) *Account {
 			return account
 		},
 		ErrNotFound,
@@ -617,7 +617,7 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateAccountRequest{
+		AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -626,15 +626,15 @@ func TestCrud(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		func(account *Account) UpdateAccountRequest {
+		func(account *Account) AccountUpdateRequest {
 			name := uuid.NewRandom().String()
-			return UpdateAccountRequest{
+			return AccountUpdateRequest{
 				ID:   account.ID,
 				Name: &name,
 			}
 		},
 		nil,
-		func(account *Account, req UpdateAccountRequest) *Account {
+		func(account *Account, req AccountUpdateRequest) *Account {
 			return &Account{
 				Name: *req.Name,
 				// Copy this fields from the created account.
@@ -668,7 +668,7 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateAccountRequest{
+		AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -677,15 +677,15 @@ func TestCrud(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		func(account *Account) UpdateAccountRequest {
+		func(account *Account) AccountUpdateRequest {
 			name := uuid.NewRandom().String()
-			return UpdateAccountRequest{
+			return AccountUpdateRequest{
 				ID:   account.ID,
 				Name: &name,
 			}
 		},
 		ErrForbidden,
-		func(account *Account, req UpdateAccountRequest) *Account {
+		func(account *Account, req AccountUpdateRequest) *Account {
 			return nil
 		},
 		ErrNotFound,
@@ -702,7 +702,7 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateAccountRequest{
+		AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -711,15 +711,15 @@ func TestCrud(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		func(account *Account) UpdateAccountRequest {
+		func(account *Account) AccountUpdateRequest {
 			name := uuid.NewRandom().String()
-			return UpdateAccountRequest{
+			return AccountUpdateRequest{
 				ID:   account.ID,
 				Name: &name,
 			}
 		},
 		nil,
-		func(account *Account, req UpdateAccountRequest) *Account {
+		func(account *Account, req AccountUpdateRequest) *Account {
 			return &Account{
 				Name: *req.Name,
 				// Copy this fields from the created account.
@@ -846,7 +846,7 @@ func TestFind(t *testing.T) {
 
 	var accounts []*Account
 	for i := 0; i <= 4; i++ {
-		account, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateAccountRequest{
+		account, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -990,11 +990,36 @@ func mockUserAccount(accountId, userId string, now time.Time, roles ...string) e
 		roleArr = append(roleArr, r)
 	}
 
+	err := mockUser(userId, now)
+	if err != nil {
+		return err
+	}
+
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
 	query.InsertInto(userAccountTableName)
 	query.Cols("id", "user_id", "account_id", "roles", "created_at", "updated_at")
 	query.Values(uuid.NewRandom().String(), userId, accountId, roleArr, now, now)
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = test.MasterDB.Rebind(sql)
+	_, err = test.MasterDB.ExecContext(tests.Context(), sql, args...)
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		return err
+	}
+
+	return nil
+}
+
+func mockUser(userId string, now time.Time) error {
+
+	// Build the insert SQL statement.
+	query := sqlbuilder.NewInsertBuilder()
+	query.InsertInto("users")
+	query.Cols("id", "email", "password_hash", "password_salt", "created_at", "updated_at")
+	query.Values(userId, uuid.NewRandom().String(), "-", "-", now, now)
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()

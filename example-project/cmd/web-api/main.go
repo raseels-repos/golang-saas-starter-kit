@@ -42,23 +42,17 @@ var service = "WEB_API"
 
 // @title SaaS Example API
 // @description This is a sample server celler server.
-// @termsOfService http://geeksinthewoods.com/terms
+// @termsOfService http://example.com/terms
 
 // @contact.name API Support
 // @contact.email support@geeksinthewoods.com
-// @contact.url https://gitlab.com/geeks-accelerator/oss/saas-starter-kit
+// @contact.url http://example.com/support
 
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @securityDefinitions.basic BasicAuth
-
-// @securityDefinitions.apikey ApiKeyAuth
-// @in header
-// @name Authorization
-
 // @securitydefinitions.oauth2.password OAuth2Password
-// @tokenUrl https://example.com/v1/oauth/token
+// @tokenUrl /v1/oauth/token
 
 func main() {
 
@@ -101,7 +95,7 @@ func main() {
 			Database   string `default:"shared" envconfig:"DATABASE"`
 			Driver     string `default:"postgres" envconfig:"DRIVER"`
 			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
-			DisableTLS bool   `default:"false" envconfig:"DISABLE_TLS"`
+			DisableTLS bool   `default:"true" envconfig:"DISABLE_TLS"`
 		}
 		Trace struct {
 			Host          string  `default:"127.0.0.1" envconfig:"DD_TRACE_AGENT_HOSTNAME"`

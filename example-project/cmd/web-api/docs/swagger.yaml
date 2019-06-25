@@ -1,27 +1,106 @@
 basePath: '{{.BasePath}}'
+definitions:
+  account.Account:
+    properties:
+      address1:
+        type: string
+      address2:
+        type: string
+      archived_at:
+        type: string
+      billing_user_id:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      signup_user_id:
+        type: string
+      status:
+        type: AccountStatus
+      timezone:
+        type: string
+      updated_at:
+        type: string
+      zipcode:
+        type: string
+    type: object
+  web.Error:
+    properties:
+      err:
+        type: error
+      fields:
+        items:
+          type: FieldError
+        type: array
+      status:
+        type: integer
+    type: object
 host: '{{.Host}}'
 info:
   contact:
     email: support@geeksinthewoods.com
     name: API Support
-    url: https://gitlab.com/geeks-accelerator/oss/saas-starter-kit
+    url: /support
   description: This is a sample server celler server.
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://geeksinthewoods.com/terms
+  termsOfService: /terms
   title: SaaS Example API
   version: '{{.Version}}'
-paths: {}
+paths:
+  /accounts/{id}:
+    get:
+      consumes:
+      - application/json
+      description: get string by ID
+      operationId: get-string-by-int
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            Token:
+              description: qwerty
+              type: string
+          schema:
+            $ref: '#/definitions/account.Account'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+      summary: Read returns the specified account from the system.
 securityDefinitions:
-  ApiKeyAuth:
-    in: header
-    name: Authorization
-    type: apiKey
-  BasicAuth:
-    type: basic
   OAuth2Password:
     flow: password
-    tokenUrl: https://example.com/v1/oauth/token
+    tokenUrl: /v1/oauth/token
     type: oauth2
 swagger: "2.0"

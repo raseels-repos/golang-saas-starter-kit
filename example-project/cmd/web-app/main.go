@@ -94,7 +94,7 @@ func main() {
 			Database   string `default:"shared" envconfig:"DATABASE"`
 			Driver     string `default:"postgres" envconfig:"DRIVER"`
 			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
-			DisableTLS bool   `default:"false" envconfig:"DISABLE_TLS"`
+			DisableTLS bool   `default:"true" envconfig:"DISABLE_TLS"`
 		}
 		Trace struct {
 			Host          string  `default:"127.0.0.1" envconfig:"DD_TRACE_AGENT_HOSTNAME"`

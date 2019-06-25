@@ -1,4 +1,4 @@
-package user
+package user_account
 
 import (
 	"github.com/lib/pq"
@@ -212,6 +212,20 @@ func TestCreateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
+				// Generate a new random user.
+				err := mockUser(tt.req.UserID, now)
+				if err != nil {
+					t.Logf("\t\tGot : %+v", err)
+					t.Fatalf("\t%s\tMock user failed.", tests.Failed)
+				}
+
+				// Generate a new random account.
+				err = mockAccount(tt.req.AccountID, now)
+				if err != nil {
+					t.Logf("\t\tGot : %+v", err)
+					t.Fatalf("\t%s\tMock account failed.", tests.Failed)
+				}
+
 				res, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
@@ -258,9 +272,25 @@ func TestCreateExistingEntry(t *testing.T) {
 	{
 		ctx := tests.Context()
 
+		// Generate a new random user.
+		userID := uuid.NewRandom().String()
+		err := mockUser(userID, now)
+		if err != nil {
+			t.Logf("\t\tGot : %+v", err)
+			t.Fatalf("\t%s\tMock user failed.", tests.Failed)
+		}
+
+		// Generate a new random account.
+		accountID := uuid.NewRandom().String()
+		err = mockAccount(accountID, now)
+		if err != nil {
+			t.Logf("\t\tGot : %+v", err)
+			t.Fatalf("\t%s\tMock account failed.", tests.Failed)
+		}
+
 		req1 := CreateUserAccountRequest{
-			UserID:    uuid.NewRandom().String(),
-			AccountID: uuid.NewRandom().String(),
+			UserID:    userID,
+			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
 		}
 		ua1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
@@ -503,9 +533,23 @@ func TestCrud(t *testing.T) {
 		for i, tt := range accountTests {
 			t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
 			{
-				// Create a new random account and associate that with the user.
+				// Generate a new random user.
 				userID := uuid.NewRandom().String()
+				err := mockUser(userID, now)
+				if err != nil {
+					t.Logf("\t\tGot : %+v", err)
+					t.Fatalf("\t%s\tMock user failed.", tests.Failed)
+				}
+
+				// Generate a new random account.
 				accountID := uuid.NewRandom().String()
+				err = mockAccount(accountID, now)
+				if err != nil {
+					t.Logf("\t\tGot : %+v", err)
+					t.Fatalf("\t%s\tMock account failed.", tests.Failed)
+				}
+
+				// Associate that with the user.
 				createReq := CreateUserAccountRequest{
 					UserID:    userID,
 					AccountID: accountID,
@@ -656,9 +700,23 @@ func TestFind(t *testing.T) {
 
 	var userAccounts []*UserAccount
 	for i := 0; i <= 4; i++ {
-		// Create a new random account and associate that with the user.
+		// Generate a new random user.
 		userID := uuid.NewRandom().String()
+		err := mockUser(userID, now)
+		if err != nil {
+			t.Logf("\t\tGot : %+v", err)
+			t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
+		}
+
+		// Generate a new random account.
 		accountID := uuid.NewRandom().String()
+		err = mockAccount(accountID, now)
+		if err != nil {
+			t.Logf("\t\tGot : %+v", err)
+			t.Fatalf("\t%s\tCreate account failed.", tests.Failed)
+		}
+
+		// Execute Create that will associate the user with the account.
 		ua, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserAccountRequest{
 			UserID:    userID,
 			AccountID: accountID,
@@ -783,4 +841,44 @@ func TestFind(t *testing.T) {
 			}
 		}
 	}
+}
+
+func mockAccount(accountId string, now time.Time) error {
+
+	// Build the insert SQL statement.
+	query := sqlbuilder.NewInsertBuilder()
+	query.InsertInto("accounts")
+	query.Cols("id", "name", "created_at", "updated_at")
+	query.Values(accountId, uuid.NewRandom().String(), now, now)
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = test.MasterDB.Rebind(sql)
+	_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		return err
+	}
+
+	return nil
+}
+
+func mockUser(userId string, now time.Time) error {
+
+	// Build the insert SQL statement.
+	query := sqlbuilder.NewInsertBuilder()
+	query.InsertInto("users")
+	query.Cols("id", "email", "password_hash", "password_salt", "created_at", "updated_at")
+	query.Values(userId, uuid.NewRandom().String(), "-", "-", now, now)
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = test.MasterDB.Rebind(sql)
+	_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		return err
+	}
+
+	return nil
 }

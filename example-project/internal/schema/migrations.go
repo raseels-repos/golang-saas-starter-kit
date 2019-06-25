@@ -65,8 +65,8 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					  zipcode varchar(20) NOT NULL DEFAULT '',
 					  status account_status_t NOT NULL DEFAULT 'active',
 					  timezone varchar(128) NOT NULL DEFAULT 'America/Anchorage',
-					  signup_user_id char(36) DEFAULT NULL  REFERENCES users(id),
-					  billing_user_id char(36) DEFAULT NULL  REFERENCES users(id),
+					  signup_user_id char(36) DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
+					  billing_user_id char(36) DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
 					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 					  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -93,7 +93,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 		},
 		// create new table user_accounts
 		{
-			ID: "20190522-01c",
+			ID: "20190522-01d",
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `CREATE TYPE user_account_role_t as enum('admin', 'user')`
 				if _, err := tx.Exec(q1); err != nil {
@@ -107,15 +107,15 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 
 				q3 := `CREATE TABLE IF NOT EXISTS users_accounts (
 					  id char(36) NOT NULL,
-					  account_id char(36) NOT NULL  REFERENCES accounts(id),
-					  user_id char(36) NOT NULL  REFERENCES users(id),
+					  account_id char(36) NOT NULL  REFERENCES accounts(id) ON DELETE NO ACTION,
+					  user_id char(36) NOT NULL  REFERENCES users(id) ON DELETE NO ACTION,
 					  roles user_account_role_t[] NOT NULL,
 					  status user_account_status_t NOT NULL DEFAULT 'active',
 					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 					  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 					  PRIMARY KEY (id),
-					  CONSTRAINT user_account UNIQUE (user_id,account_id)
+					  CONSTRAINT user_account UNIQUE (user_id,account_id) 
 					)`
 				if _, err := tx.Exec(q3); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q3)
@@ -153,7 +153,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 
 				q2 := `CREATE TABLE IF NOT EXISTS projects (
 					  id char(36) NOT NULL,
-					  account_id char(36) NOT NULL REFERENCES accounts(id),
+					  account_id char(36) NOT NULL REFERENCES accounts(id) ON DELETE SET NULL,
 					  name varchar(255) NOT NULL,
 					  status project_status_t NOT NULL DEFAULT 'active',
 					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,

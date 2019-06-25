@@ -97,7 +97,7 @@ func (a *Authenticator) GenerateToken(claims Claims) (string, error) {
 	tkn := jwt.NewWithClaims(method, claims)
 	tkn.Header["kid"] = a.keyID
 
-	str, err := tkn.SignedString(a.privateKey)
+	str, err := tkn.SignedString(a.privateKey.PrivateKey)
 	if err != nil {
 		return "", errors.Wrap(err, "signing token")
 	}

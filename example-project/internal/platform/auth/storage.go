@@ -107,7 +107,7 @@ func NewStorageFile(localDir string, now time.Time, keyExpiration time.Duration)
 	}
 
 	// Values used to format filename.
-	filePrefix := "auth_"
+	filePrefix := "sassauth_"
 	fileExt := ".privatekey"
 
 	files, err := ioutil.ReadDir(localDir)
@@ -171,14 +171,14 @@ func NewStorageFile(localDir string, now time.Time, keyExpiration time.Duration)
 
 	// If there are no keys or the current key needs to be rotated, generate a new key.
 	if len(keyContents) == 0 || curKeyId == "" {
-		privateKey, err := keyGen()
+		privateKey, err := KeyGen()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate new private key")
 		}
 
 		kID := uuid.NewRandom().String()
 
-		fname := fmt.Sprintf("%s_%d_%s%s", filePrefix, now.UTC().Unix(), kID, fileExt)
+		fname := fmt.Sprintf("%s%d_%s%s", filePrefix, now.UTC().Unix(), kID, fileExt)
 
 		filePath := filepath.Join(localDir, fname)
 

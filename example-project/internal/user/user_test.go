@@ -140,51 +140,51 @@ func TestCreateValidation(t *testing.T) {
 
 	var userTests = []struct {
 		name     string
-		req      CreateUserRequest
-		expected func(req CreateUserRequest, res *User) *User
+		req      UserCreateRequest
+		expected func(req UserCreateRequest, res *User) *User
 		error    error
 	}{
 		{"Required Fields",
-			CreateUserRequest{},
-			func(req CreateUserRequest, res *User) *User {
+			UserCreateRequest{},
+			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'CreateUserRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'CreateUserRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
-				"Key: 'CreateUserRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
+			errors.New("Key: 'UserCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
 		},
 		{"Valid Email",
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           "xxxxxxxxxx",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
 			},
-			func(req CreateUserRequest, res *User) *User {
+			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'CreateUserRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
+			errors.New("Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
 		},
 		{"Passwords Match",
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "W0rkL1fe#",
 			},
-			func(req CreateUserRequest, res *User) *User {
+			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'CreateUserRequest.PasswordConfirm' Error:Field validation for 'PasswordConfirm' failed on the 'eqfield' tag"),
+			errors.New("Key: 'UserCreateRequest.PasswordConfirm' Error:Field validation for 'PasswordConfirm' failed on the 'eqfield' tag"),
 		},
 		{"Default Timezone",
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
 			},
-			func(req CreateUserRequest, res *User) *User {
+			func(req UserCreateRequest, res *User) *User {
 				return &User{
 					Name:     req.Name,
 					Email:    req.Email,
@@ -258,7 +258,7 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 	{
 		ctx := tests.Context()
 
-		req1 := CreateUserRequest{
+		req1 := UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
@@ -270,13 +270,13 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		req2 := CreateUserRequest{
+		req2 := UserCreateRequest{
 			Name:            "Lucas Brown",
 			Email:           user1.Email,
 			Password:        "W0rkL1fe#",
 			PasswordConfirm: "W0rkL1fe#",
 		}
-		expectedErr := errors.New("Key: 'CreateUserRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
 		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -300,13 +300,13 @@ func TestCreateClaims(t *testing.T) {
 	var userTests = []struct {
 		name   string
 		claims auth.Claims
-		req    CreateUserRequest
+		req    UserCreateRequest
 		error  error
 	}{
 		// Internal request, should bypass ACL.
 		{"EmptyClaims",
 			auth.Claims{},
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
@@ -323,7 +323,7 @@ func TestCreateClaims(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
@@ -340,7 +340,7 @@ func TestCreateClaims(t *testing.T) {
 					Audience: "acc1",
 				},
 			},
-			CreateUserRequest{
+			UserCreateRequest{
 				Name:            "Lee Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
@@ -377,24 +377,24 @@ func TestUpdateValidation(t *testing.T) {
 	// TODO: actually create the user so can test the output of findbyId
 	type userTest struct {
 		name  string
-		req   UpdateUserRequest
+		req   UserUpdateRequest
 		error error
 	}
 
 	var userTests = []userTest{
 		{"Required Fields",
-			UpdateUserRequest{},
-			errors.New("Key: 'UpdateUserRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
+			UserUpdateRequest{},
+			errors.New("Key: 'UserUpdateRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
 		},
 	}
 
 	invalidEmail := "xxxxxxxxxx"
 	userTests = append(userTests, userTest{"Valid Email",
-		UpdateUserRequest{
+		UserUpdateRequest{
 			ID:    uuid.NewRandom().String(),
 			Email: &invalidEmail,
 		},
-		errors.New("Key: 'UpdateUserRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
+		errors.New("Key: 'UserUpdateRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
 	})
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
@@ -440,7 +440,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 	{
 		ctx := tests.Context()
 
-		req1 := CreateUserRequest{
+		req1 := UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
@@ -452,7 +452,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		req2 := CreateUserRequest{
+		req2 := UserCreateRequest{
 			Name:            "Lucas Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "W0rkL1fe#",
@@ -465,11 +465,11 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 		}
 
 		// Try to set the email for user 1 on user 2
-		updateReq := UpdateUserRequest{
+		updateReq := UserUpdateRequest{
 			ID:    user2.ID,
 			Email: &user1.Email,
 		}
-		expectedErr := errors.New("Key: 'UpdateUserRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'UserUpdateRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
 		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -495,11 +495,11 @@ func TestUpdatePassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		tknGen := &mockTokenGenerator{}
+		tknGen := &MockTokenGenerator{}
 
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
-		user, err := Create(ctx, auth.Claims{}, test.MasterDB, CreateUserRequest{
+		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        initPass,
@@ -533,9 +533,9 @@ func TestUpdatePassword(t *testing.T) {
 		}
 
 		// Ensure validation is working by trying UpdatePassword with an empty request.
-		expectedErr := errors.New("Key: 'UpdatePasswordRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag\n" +
-			"Key: 'UpdatePasswordRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag")
-		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UpdatePasswordRequest{}, now)
+		expectedErr := errors.New("Key: 'UserUpdatePasswordRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag\n" +
+			"Key: 'UserUpdatePasswordRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag")
+		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{}, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
@@ -548,7 +548,7 @@ func TestUpdatePassword(t *testing.T) {
 
 		// Update the users password.
 		newPass := uuid.NewRandom().String()
-		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UpdatePasswordRequest{
+		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{
 			ID:              user.ID,
 			Password:        newPass,
 			PasswordConfirm: newPass,
@@ -576,10 +576,10 @@ func TestCrud(t *testing.T) {
 	type userTest struct {
 		name      string
 		claims    func(*User, string) auth.Claims
-		create    CreateUserRequest
-		update    func(*User) UpdateUserRequest
+		create    UserCreateRequest
+		update    func(*User) UserUpdateRequest
 		updateErr error
-		expected  func(*User, UpdateUserRequest) *User
+		expected  func(*User, UserUpdateRequest) *User
 		findErr   error
 	}
 
@@ -590,21 +590,21 @@ func TestCrud(t *testing.T) {
 		func(user *User, accountId string) auth.Claims {
 			return auth.Claims{}
 		},
-		CreateUserRequest{
+		UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		},
-		func(user *User) UpdateUserRequest {
+		func(user *User) UserUpdateRequest {
 			email := uuid.NewRandom().String() + "@geeksinthewoods.com"
-			return UpdateUserRequest{
+			return UserUpdateRequest{
 				ID:    user.ID,
 				Email: &email,
 			}
 		},
 		nil,
-		func(user *User, req UpdateUserRequest) *User {
+		func(user *User, req UserUpdateRequest) *User {
 			return &User{
 				Email: *req.Email,
 				// Copy this fields from the created user.
@@ -633,21 +633,21 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateUserRequest{
+		UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		},
-		func(user *User) UpdateUserRequest {
+		func(user *User) UserUpdateRequest {
 			email := uuid.NewRandom().String() + "@geeksinthewoods.com"
-			return UpdateUserRequest{
+			return UserUpdateRequest{
 				ID:    user.ID,
 				Email: &email,
 			}
 		},
 		ErrForbidden,
-		func(user *User, req UpdateUserRequest) *User {
+		func(user *User, req UserUpdateRequest) *User {
 			return user
 		},
 		ErrNotFound,
@@ -664,21 +664,21 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateUserRequest{
+		UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		},
-		func(user *User) UpdateUserRequest {
+		func(user *User) UserUpdateRequest {
 			email := uuid.NewRandom().String() + "@geeksinthewoods.com"
-			return UpdateUserRequest{
+			return UserUpdateRequest{
 				ID:    user.ID,
 				Email: &email,
 			}
 		},
 		nil,
-		func(user *User, req UpdateUserRequest) *User {
+		func(user *User, req UserUpdateRequest) *User {
 			return &User{
 				Email: *req.Email,
 				// Copy this fields from the created user.
@@ -707,21 +707,21 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateUserRequest{
+		UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		},
-		func(user *User) UpdateUserRequest {
+		func(user *User) UserUpdateRequest {
 			email := uuid.NewRandom().String() + "@geeksinthewoods.com"
-			return UpdateUserRequest{
+			return UserUpdateRequest{
 				ID:    user.ID,
 				Email: &email,
 			}
 		},
 		ErrForbidden,
-		func(user *User, req UpdateUserRequest) *User {
+		func(user *User, req UserUpdateRequest) *User {
 			return nil
 		},
 		ErrNotFound,
@@ -738,21 +738,21 @@ func TestCrud(t *testing.T) {
 				},
 			}
 		},
-		CreateUserRequest{
+		UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		},
-		func(user *User) UpdateUserRequest {
+		func(user *User) UserUpdateRequest {
 			email := uuid.NewRandom().String() + "@geeksinthewoods.com"
-			return UpdateUserRequest{
+			return UserUpdateRequest{
 				ID:    user.ID,
 				Email: &email,
 			}
 		},
 		nil,
-		func(user *User, req UpdateUserRequest) *User {
+		func(user *User, req UserUpdateRequest) *User {
 			return &User{
 				Email: *req.Email,
 				// Copy this fields from the created user.
@@ -784,15 +784,22 @@ func TestCrud(t *testing.T) {
 				user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, tt.create, now)
 				if err != nil {
 					t.Log("\t\tGot :", err)
-					t.Fatalf("\t%s\tCreate failed.", tests.Failed)
+					t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
 				}
 
-				// Create a new random account and associate that with the user.
+				// Create a random account for the new user.
 				accountId := uuid.NewRandom().String()
+				err = mockAccount(accountId, user.CreatedAt)
+				if err != nil {
+					t.Log("\t\tGot :", err)
+					t.Fatalf("\t%s\tCreate account failed.", tests.Failed)
+				}
+
+				// Associate the account with the new test user.
 				err = mockUserAccount(user.ID, accountId, user.CreatedAt, auth.RoleAdmin)
 				if err != nil {
 					t.Log("\t\tGot :", err)
-					t.Fatalf("\t%s\tAdd user account failed.", tests.Failed)
+					t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 				}
 
 				// Update the user.
@@ -874,7 +881,7 @@ func TestFind(t *testing.T) {
 
 	var users []*User
 	for i := 0; i <= 4; i++ {
-		user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserRequest{
+		user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, UserCreateRequest{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",

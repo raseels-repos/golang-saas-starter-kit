@@ -3,10 +3,10 @@
     "info": {
         "description": "This is a sample server celler server.",
         "title": "SaaS Example API",
-        "termsOfService": "http://geeksinthewoods.com/terms",
+        "termsOfService": "/terms",
         "contact": {
             "name": "API Support",
-            "url": "https://gitlab.com/geeks-accelerator/oss/saas-starter-kit",
+            "url": "/support",
             "email": "support@geeksinthewoods.com"
         },
         "license": {
@@ -17,20 +17,140 @@
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
-    "paths": {},
+    "paths": {
+        "/accounts/{id}": {
+            "get": {
+                "description": "get string by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Read returns the specified account from the system.",
+                "operationId": "get-string-by-int",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/account.Account"
+                        },
+                        "headers": {
+                            "Token": {
+                                "type": "string",
+                                "description": "qwerty"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/web.Error"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "account.Account": {
+            "type": "object",
+            "properties": {
+                "address1": {
+                    "type": "string"
+                },
+                "address2": {
+                    "type": "string"
+                },
+                "archived_at": {
+                    "type": "string"
+                },
+                "billing_user_id": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "signup_user_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "AccountStatus"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "zipcode": {
+                    "type": "string"
+                }
+            }
+        },
+        "web.Error": {
+            "type": "object",
+            "properties": {
+                "err": {
+                    "type": "error"
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "FieldError"
+                    }
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        }
+    },
     "securityDefinitions": {
-        "ApiKeyAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        },
-        "BasicAuth": {
-            "type": "basic"
-        },
         "OAuth2Password": {
             "type": "oauth2",
             "flow": "password",
-            "tokenUrl": "https://example.com/v1/oauth/token"
+            "tokenUrl": "/v1/oauth/token"
         }
     }
 }

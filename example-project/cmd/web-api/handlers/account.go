@@ -39,7 +39,19 @@ func (a *Account) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	return web.RespondJson(ctx, w, res, http.StatusOK)
 }
 
-// Read returns the specified account from the system.
+// Read godoc
+// @Summary Read returns the specified account from the system.
+// @Description get string by ID
+// @ID get-string-by-int
+// @Accept  json
+// @Produce  json
+// @Param id path int true "Account ID"
+// @Success 200 {object} account.Account
+// @Header 200 {string} Token "qwerty"
+// @Failure 400 {object} web.Error
+// @Failure 403 {object} web.Error
+// @Failure 404 {object} web.Error
+// @Router /accounts/{id} [get]
 func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {

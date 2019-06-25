@@ -186,7 +186,7 @@ func NewStorageAws(awsSession *session.Session, awsSecretID string, now time.Tim
 	// 			refreshed on instance launch. Could store keys in a kv store and update that value
 	// 			when new keys are generated
 	if len(keyContents) == 0 || curKeyId == "" {
-		privateKey, err := keyGen()
+		privateKey, err := KeyGen()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate new private key")
 		}

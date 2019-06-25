@@ -232,7 +232,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 }
 
 // Validation an name is unique excluding the current account ID.
-func uniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (bool, error) {
+func UniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (bool, error) {
 	query := sqlbuilder.NewSelectBuilder().Select("id").From(accountTableName)
 	query.Where(query.And(
 		query.Equal("name", name),
@@ -264,7 +264,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	v := validator.New()
 
 	// Validation email address is unique in the database.
-	uniq, err := uniqueName(ctx, dbConn, req.Name, "")
+	uniq, err := UniqueName(ctx, dbConn, req.Name, "")
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	// Validation name is unique in the database.
 	if req.Name != nil {
-		uniq, err := uniqueName(ctx, dbConn, *req.Name, req.ID)
+		uniq, err := UniqueName(ctx, dbConn, *req.Name, req.ID)
 		if err != nil {
 			return err
 		}
@@ -583,22 +583,14 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 		return err
 	}
 
-	// Build the delete SQL statement.
-	query := sqlbuilder.NewDeleteBuilder()
-	query.DeleteFrom(accountTableName)
-	query.Where(query.Equal("id", req.ID))
-
-	// Execute the query with the provided context.
-	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	// Start a new transaction to handle rollbacks on error.
+	tx, err := dbConn.Begin()
 	if err != nil {
-		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "delete account %s failed", req.ID)
-		return err
+		return errors.WithStack(err)
 	}
 
-	// Delete all the associated user accounts
+	// Delete all the associated user accounts.
+	// Required to execute first to avoid foreign key constraints.
 	{
 		// Build the delete SQL statement.
 		query := sqlbuilder.NewDeleteBuilder()
@@ -610,13 +602,54 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
 		sql = dbConn.Rebind(sql)
-		_, err = dbConn.ExecContext(ctx, sql, args...)
+		_, err = tx.ExecContext(ctx, sql, args...)
 		if err != nil {
+			tx.Rollback()
+
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "delete users for account %s failed", req.ID)
 			return err
 		}
 	}
 
+	// Build the delete SQL statement.
+	query := sqlbuilder.NewDeleteBuilder()
+	query.DeleteFrom(accountTableName)
+	query.Where(query.Equal("id", req.ID))
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = dbConn.Rebind(sql)
+	_, err = tx.ExecContext(ctx, sql, args...)
+	if err != nil {
+		tx.Rollback()
+
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessagef(err, "delete account %s failed", req.ID)
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	return nil
+}
+
+// MockAccount returns a fake Account for testing.
+func MockAccount(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*Account, error) {
+	s := AccountStatus_Active
+
+	req := AccountCreateRequest{
+		Name:     uuid.NewRandom().String(),
+		Address1: "103 East Main St",
+		Address2: "Unit 546",
+		City:     "Valdez",
+		Region:   "AK",
+		Country:  "USA",
+		Zipcode:  "99686",
+		Status: &s,
+	}
+	return Create(ctx, auth.Claims{}, dbConn, req, now)
 }

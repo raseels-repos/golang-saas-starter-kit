@@ -92,7 +92,7 @@ func SaasWrapHandler(confs ...func(c *Config)) web.Handler {
 			if err != nil {
 				return web.NewRequestError(err, http.StatusInternalServerError)
 			}
-			return web.RespondJson(ctx, w, doc, http.StatusOK)
+			return web.RespondJson(ctx, w, []byte(doc), http.StatusOK)
 		default:
 			if strings.HasSuffix(path, ".html") {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")

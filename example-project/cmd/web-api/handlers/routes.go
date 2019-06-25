@@ -40,7 +40,7 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	app.Handle("PATCH", "/v1/users/switch-account/:accountId", u.SwitchAccount, mid.Authenticate(authenticator))
 
 	// This route is not authenticated
-	app.Handle("GET", "/v1/oauth/token", u.Token)
+	app.Handle("POST", "/v1/oauth/token", u.Token)
 
 	// Register account endpoints.
 	a := Account{
@@ -65,8 +65,10 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register swagger documentation.
-	app.Handle("GET", "/swagger/", saasSwagger.WrapHandler, mid.Authenticate(authenticator))
-	app.Handle("GET", "/swagger/*", saasSwagger.WrapHandler, mid.Authenticate(authenticator))
+	// TODO: Add authentication. Current authenticator requires an Authorization header
+	// 		 which breaks the browser experience.
+	app.Handle("GET", "/swagger/", saasSwagger.WrapHandler)
+	app.Handle("GET", "/swagger/*", saasSwagger.WrapHandler)
 
 	return app
 }

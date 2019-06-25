@@ -13,7 +13,7 @@ import (
 const algorithm = "RS256"
 
 // keyGen creates an x509 private key for signing auth tokens.
-func keyGen() ([]byte, error) {
+func KeyGen() ([]byte, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "generating keys")

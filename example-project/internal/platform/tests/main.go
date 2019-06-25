@@ -31,6 +31,9 @@ type Test struct {
 	AwsSession *session.Session
 }
 
+// Flag used to disable setting up database.
+var DisableDb bool
+
 // New is the entry point for tests.
 func New() *Test {
 
@@ -44,51 +47,58 @@ func New() *Test {
 
 	awsSession := session.Must(session.NewSession())
 
+
 	// ============================================================
 	// Startup Postgres container
 
-	container, err := docker.StartPostgres(log)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	// ============================================================
-	// Configuration
-
-	dbHost := fmt.Sprintf("postgres://%s:%s@127.0.0.1:%s/%s?timezone=UTC&sslmode=disable", container.User, container.Pass, container.Port, container.Database)
-
-	// ============================================================
-	// Start Postgres
-
-	log.Println("main : Started : Initialize Postgres")
-	var masterDB *sqlx.DB
-	for i := 0; i <= 20; i++ {
-		masterDB, err = sqlx.Open("postgres", dbHost)
+	var (
+		masterDB   *sqlx.DB
+		container  *docker.Container
+	)
+	if !DisableDb {
+		var err error
+		container, err = docker.StartPostgres(log)
 		if err != nil {
-			break
+			log.Fatalln(err)
 		}
 
-		// Make sure the database is ready for queries.
-		_, err = masterDB.Exec("SELECT 1")
-		if err != nil {
-			if err != io.EOF {
+		// ============================================================
+		// Configuration
+
+		dbHost := fmt.Sprintf("postgres://%s:%s@127.0.0.1:%s/%s?timezone=UTC&sslmode=disable", container.User, container.Pass, container.Port, container.Database)
+
+		// ============================================================
+		// Start Postgres
+
+		log.Println("main : Started : Initialize Postgres")
+		for i := 0; i <= 20; i++ {
+			masterDB, err = sqlx.Open("postgres", dbHost)
+			if err != nil {
 				break
 			}
-			time.Sleep(time.Second)
-		} else {
-			break
+
+			// Make sure the database is ready for queries.
+			_, err = masterDB.Exec("SELECT 1")
+			if err != nil {
+				if err != io.EOF {
+					break
+				}
+				time.Sleep(time.Second)
+			} else {
+				break
+			}
 		}
-	}
 
-	if err != nil {
-		log.Fatalf("startup : Register DB : %v", err)
-	}
+		if err != nil {
+			log.Fatalf("startup : Register DB : %v", err)
+		}
 
-	// Execute the migrations
-	if err = schema.Migrate(masterDB, log); err != nil {
-		log.Fatalf("main : Migrate : %v", err)
+		// Execute the migrations
+		if err = schema.Migrate(masterDB, log); err != nil {
+			log.Fatalf("main : Migrate : %v", err)
+		}
+		log.Printf("main : Migrate : Completed")
 	}
-	log.Printf("main : Migrate : Completed")
 
 	return &Test{log, masterDB, container, awsSession}
 }
@@ -96,9 +106,14 @@ func New() *Test {
 // TearDown is used for shutting down tests. Calling this should be
 // done in a defer immediately after calling New.
 func (t *Test) TearDown() {
-	t.MasterDB.Close()
-	if err := docker.StopPostgres(t.Log, t.container); err != nil {
-		t.Log.Println(err)
+	if t.MasterDB != nil {
+		t.MasterDB.Close()
+	}
+
+	if t.container != nil {
+		if err := docker.StopPostgres(t.Log, t.container); err != nil {
+			t.Log.Println(err)
+		}
 	}
 }
 

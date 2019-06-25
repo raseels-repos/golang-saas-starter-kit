@@ -1,0 +1,16 @@
+basePath: /v1
+host: example-api.saas.geeksinthewoods.com
+info:
+  contact:
+    email: support@geeksinthewoods.com
+    name: API Support
+    url: https://gitlab.com/geeks-accelerator/oss/saas-starter-kit
+  description: This is a sample server celler server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://geeksinthewoods.com/terms
+  title: SaaS Example API
+  version: "1.0"
+paths: {}
+swagger: "2.0"

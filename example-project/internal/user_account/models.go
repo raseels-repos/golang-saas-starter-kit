@@ -65,12 +65,12 @@ type DeleteUserAccountRequest struct {
 // UserAccountFindRequest defines the possible options to search for users accounts.
 // By default archived user accounts will be excluded from response.
 type UserAccountFindRequest struct {
-	Where            *string
-	Args             []interface{}
-	Order            []string
-	Limit            *uint
-	Offset           *uint
-	IncludedArchived bool
+	Where            *string       `schema:"where"`
+	Args             []interface{} `schema:"args"`
+	Order            []string      `schema:"order"`
+	Limit            *uint         `schema:"limit"`
+	Offset           *uint         `schema:"offset"`
+	IncludedArchived bool          `schema:"included-archived"`
 }
 
 // UserAccountStatus represents the status of a user for an account.

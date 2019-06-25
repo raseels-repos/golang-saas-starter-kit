@@ -257,7 +257,7 @@ func uniqueEmail(ctx context.Context, dbConn *sqlx.DB, email, userId string) (bo
 }
 
 // Create inserts a new user into the database.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req CreateUserRequest, now time.Time) (*User, error) {
+func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCreateRequest, now time.Time) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Create")
 	defer span.Finish()
 
@@ -368,7 +368,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 }
 
 // Update replaces a user in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateUserRequest, now time.Time) error {
+func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
 	defer span.Finish()
 
@@ -452,9 +452,9 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 	return nil
 }
 
-// Update replaces a user in the database.
-func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdatePasswordRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
+// Update changes the password for a user in the database.
+func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUpdatePasswordRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.UpdatePassword")
 	defer span.Finish()
 
 	// Validate the request.

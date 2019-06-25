@@ -29,8 +29,8 @@ type Account struct {
 	ArchivedAt    pq.NullTime    `json:"archived_at"`
 }
 
-// CreateAccountRequest contains information needed to create a new Account.
-type CreateAccountRequest struct {
+// AccountCreateRequest contains information needed to create a new Account.
+type AccountCreateRequest struct {
 	Name          string         `json:"name" validate:"required,unique"`
 	Address1      string         `json:"address1" validate:"required"`
 	Address2      string         `json:"address2" validate:"omitempty"`
@@ -44,13 +44,13 @@ type CreateAccountRequest struct {
 	BillingUserID *string        `json:"billing_user_id" validate:"omitempty,uuid"`
 }
 
-// UpdateAccountRequest defines what information may be provided to modify an existing
+// AccountUpdateRequest defines what information may be provided to modify an existing
 // Account. All fields are optional so clients can send just the fields they want
 // changed. It uses pointer fields so we can differentiate between a field that
 // was not provided and a field that was provided as explicitly blank. Normally
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
-type UpdateAccountRequest struct {
+type AccountUpdateRequest struct {
 	ID            string         `validate:"required,uuid"`
 	Name          *string        `json:"name" validate:"omitempty,unique"`
 	Address1      *string        `json:"address1" validate:"omitempty"`
@@ -68,12 +68,12 @@ type UpdateAccountRequest struct {
 // AccountFindRequest defines the possible options to search for accounts. By default
 // archived accounts will be excluded from response.
 type AccountFindRequest struct {
-	Where            *string
-	Args             []interface{}
-	Order            []string
-	Limit            *uint
-	Offset           *uint
-	IncludedArchived bool
+	Where            *string       `schema:"where"`
+	Args             []interface{} `schema:"args"`
+	Order            []string      `schema:"order"`
+	Limit            *uint         `schema:"limit"`
+	Offset           *uint         `schema:"offset"`
+	IncludedArchived bool          `schema:"included-archived"`
 }
 
 // AccountStatus represents the status of an account.

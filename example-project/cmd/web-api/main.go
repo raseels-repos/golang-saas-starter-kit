@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
@@ -29,6 +29,7 @@ import (
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
@@ -38,6 +39,26 @@ var build = "develop"
 // the prefix used for loading env variables
 // ie: export WEB_API_ENV=dev
 var service = "WEB_API"
+
+// @title SaaS Example API
+// @description This is a sample server celler server.
+// @termsOfService http://geeksinthewoods.com/terms
+
+// @contact.name API Support
+// @contact.email support@geeksinthewoods.com
+// @contact.url https://gitlab.com/geeks-accelerator/oss/saas-starter-kit
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @securityDefinitions.basic BasicAuth
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
+// @securitydefinitions.oauth2.password OAuth2Password
+// @tokenUrl https://example.com/v1/oauth/token
 
 func main() {
 
@@ -98,8 +119,9 @@ func main() {
 			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
-			KeyExpiration time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
+			UseAwsSecretManager bool          `default:false envconfig:"USE_AWS_SECRET_MANAGER"`
+			AwsSecretID         string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
+			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
@@ -252,8 +274,13 @@ func main() {
 	defer masterDb.Close()
 
 	// =========================================================================
-	// Load auth keys from AWS and init new Authenticator
-	authenticator, err := auth.NewAuthenticator(awsSession, cfg.Auth.AwsSecretID, time.Now().UTC(), cfg.Auth.KeyExpiration)
+	// Init new Authenticator
+	var authenticator *auth.Authenticator
+	if cfg.Auth.UseAwsSecretManager {
+		authenticator, err = auth.NewAuthenticatorAws(awsSession, cfg.Auth.AwsSecretID, time.Now().UTC(), cfg.Auth.KeyExpiration)
+	} else {
+		authenticator, err = auth.NewAuthenticatorFile("", time.Now().UTC(), cfg.Auth.KeyExpiration)
+	}
 	if err != nil {
 		log.Fatalf("main : Constructing authenticator : %v", err)
 	}
@@ -282,6 +309,19 @@ func main() {
 	// =========================================================================
 	// Start API Service
 
+	// Programmatically set swagger info.
+	{
+		docs.SwaggerInfo.Version = build
+
+		u, err := url.Parse(cfg.App.BaseUrl)
+		if err != nil {
+			log.Fatalf("main : Parse app base url %s : %v", cfg.App.BaseUrl, err)
+		}
+
+		docs.SwaggerInfo.Host = u.Host
+		docs.SwaggerInfo.BasePath = "/v1"
+	}
+
 	// Make a channel to listen for an interrupt or terminate signal from the OS.
 	// Use a buffered channel because the signal package requires it.
 	shutdown := make(chan os.Signal, 1)
@@ -289,7 +329,7 @@ func main() {
 
 	api := http.Server{
 		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.API(shutdown, log, masterDb, authenticator),
+		Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
 		ReadTimeout:    cfg.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,

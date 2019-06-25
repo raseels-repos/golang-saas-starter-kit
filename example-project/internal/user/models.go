@@ -25,8 +25,8 @@ type User struct {
 	ArchivedAt pq.NullTime `json:"archived_at"`
 }
 
-// CreateUserRequest contains information needed to create a new User.
-type CreateUserRequest struct {
+// UserCreateRequest contains information needed to create a new User.
+type UserCreateRequest struct {
 	Name            string  `json:"name" validate:"required"`
 	Email           string  `json:"email" validate:"required,email,unique"`
 	Password        string  `json:"password" validate:"required"`
@@ -34,21 +34,21 @@ type CreateUserRequest struct {
 	Timezone        *string `json:"timezone" validate:"omitempty"`
 }
 
-// UpdateUserRequest defines what information may be provided to modify an existing
+// UserUpdateRequest defines what information may be provided to modify an existing
 // User. All fields are optional so clients can send just the fields they want
 // changed. It uses pointer fields so we can differentiate between a field that
 // was not provided and a field that was provided as explicitly blank. Normally
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
-type UpdateUserRequest struct {
+type UserUpdateRequest struct {
 	ID       string  `validate:"required,uuid"`
 	Name     *string `json:"name" validate:"omitempty"`
 	Email    *string `json:"email" validate:"omitempty,email,unique"`
 	Timezone *string `json:"timezone" validate:"omitempty"`
 }
 
-// UpdatePassword defines what information is required to update a user password.
-type UpdatePasswordRequest struct {
+// UserUpdatePasswordRequest defines what information is required to update a user password.
+type UserUpdatePasswordRequest struct {
 	ID              string `validate:"required,uuid"`
 	Password        string `json:"password" validate:"required"`
 	PasswordConfirm string `json:"password_confirm" validate:"omitempty,eqfield=Password"`
@@ -57,12 +57,12 @@ type UpdatePasswordRequest struct {
 // UserFindRequest defines the possible options to search for users. By default
 // archived users will be excluded from response.
 type UserFindRequest struct {
-	Where            *string
-	Args             []interface{}
-	Order            []string
-	Limit            *uint
-	Offset           *uint
-	IncludedArchived bool
+	Where            *string       `schema:"where"`
+	Args             []interface{} `schema:"args"`
+	Order            []string      `schema:"order"`
+	Limit            *uint         `schema:"limit"`
+	Offset           *uint         `schema:"offset"`
+	IncludedArchived bool          `schema:"included-archived"`
 }
 
 // Token is the payload we deliver to users when they authenticate.

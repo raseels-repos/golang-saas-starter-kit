@@ -257,7 +257,7 @@ func uniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (b
 }
 
 // Create inserts a new account into the database.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req CreateAccountRequest, now time.Time) (*Account, error) {
+func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountCreateRequest, now time.Time) (*Account, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Create")
 	defer span.Finish()
 
@@ -364,7 +364,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 }
 
 // Update replaces an account in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateAccountRequest, now time.Time) error {
+func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Update")
 	defer span.Finish()
 

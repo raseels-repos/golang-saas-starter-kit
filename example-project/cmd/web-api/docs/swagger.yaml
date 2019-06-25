@@ -1,0 +1,27 @@
+basePath: '{{.BasePath}}'
+host: '{{.Host}}'
+info:
+  contact:
+    email: support@geeksinthewoods.com
+    name: API Support
+    url: https://gitlab.com/geeks-accelerator/oss/saas-starter-kit
+  description: This is a sample server celler server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://geeksinthewoods.com/terms
+  title: SaaS Example API
+  version: '{{.Version}}'
+paths: {}
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+  BasicAuth:
+    type: basic
+  OAuth2Password:
+    flow: password
+    tokenUrl: https://example.com/v1/oauth/token
+    type: oauth2
+swagger: "2.0"

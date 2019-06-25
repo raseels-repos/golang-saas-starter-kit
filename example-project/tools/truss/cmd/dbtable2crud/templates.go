@@ -36,7 +36,7 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 	tempFilePath := filepath.Join(templateDir, filename)
 	dat, err := ioutil.ReadFile(tempFilePath)
 	if err != nil {
-		err = errors.WithMessagef(err, "Failed to read template file %s",  tempFilePath)
+		err = errors.WithMessagef(err, "Failed to read template file %s", tempFilePath)
 		return nil, err
 	}
 
@@ -46,17 +46,17 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 		"Concat": func(vals ...string) string {
 			return strings.Join(vals, "")
 		},
-		"JoinStrings": func(vals []string, sep string ) string {
+		"JoinStrings": func(vals []string, sep string) string {
 			return strings.Join(vals, sep)
 		},
-		"PrefixAndJoinStrings": func(vals []string, pre, sep string ) string {
+		"PrefixAndJoinStrings": func(vals []string, pre, sep string) string {
 			l := []string{}
 			for _, v := range vals {
-				l = append(l, pre + v)
+				l = append(l, pre+v)
 			}
 			return strings.Join(l, sep)
 		},
-		"FmtAndJoinStrings": func(vals []string, fmtStr, sep string ) string {
+		"FmtAndJoinStrings": func(vals []string, fmtStr, sep string) string {
 			l := []string{}
 			for _, v := range vals {
 				l = append(l, fmt.Sprintf(fmtStr, v))
@@ -74,35 +74,35 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 				return "id"
 			}
 			return FormatCamelLower(name)
-		} ,
+		},
 		"FormatCamelLowerTitle": func(name string) string {
 			return FormatCamelLowerTitle(name)
-		} ,
+		},
 		"FormatCamelPluralTitle": func(name string) string {
 			return FormatCamelPluralTitle(name)
-		} ,
+		},
 		"FormatCamelPluralTitleLower": func(name string) string {
 			return FormatCamelPluralTitleLower(name)
-		} ,
+		},
 		"FormatCamelPluralCamel": func(name string) string {
 			return FormatCamelPluralCamel(name)
-		} ,
+		},
 		"FormatCamelPluralLower": func(name string) string {
 			return FormatCamelPluralLower(name)
-		} ,
+		},
 		"FormatCamelPluralUnderscore": func(name string) string {
 			return FormatCamelPluralUnderscore(name)
-		} ,
+		},
 		"FormatCamelPluralLowerUnderscore": func(name string) string {
 			return FormatCamelPluralLowerUnderscore(name)
-		} ,
+		},
 		"FormatCamelUnderscore": func(name string) string {
 			return FormatCamelUnderscore(name)
-		} ,
+		},
 		"FormatCamelLowerUnderscore": func(name string) string {
 			return FormatCamelLowerUnderscore(name)
-		} ,
-		"FieldTagHasOption": func(f modelField, tagName, optName string ) bool {
+		},
+		"FieldTagHasOption": func(f modelField, tagName, optName string) bool {
 			if f.Tags == nil {
 				return false
 			}
@@ -143,7 +143,7 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 					}
 				}
 			} else if !ft.HasOption(newVal) {
-				if ft.Name == ""{
+				if ft.Name == "" {
 					ft.Name = newVal
 				} else {
 					ft.Options = append(ft.Options, newVal)
@@ -165,7 +165,7 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 	// Load the template file using the text/template package.
 	tmpl, err := baseTmpl.Parse(string(dat))
 	if err != nil {
-		err = errors.WithMessagef(err, "Failed to parse template file %s",  tempFilePath)
+		err = errors.WithMessagef(err, "Failed to parse template file %s", tempFilePath)
 		log.Printf("loadTemplateObjects : %v\n%v", err, string(dat))
 		return nil, err
 	}
@@ -189,18 +189,18 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 		// Executed the defined template with the given data.
 		var tpl bytes.Buffer
 		if err := tmpl.Lookup(tmplName).Execute(&tpl, tmptData); err != nil {
-			err = errors.WithMessagef(err, "Failed to execute %s from template file %s",  tmplName, tempFilePath)
+			err = errors.WithMessagef(err, "Failed to execute %s from template file %s", tmplName, tempFilePath)
 			return resp, err
 		}
 
 		// Format the source code to ensure its valid and code to parsed consistently.
 		codeBytes, err := format.Source(tpl.Bytes())
 		if err != nil {
-			err = errors.WithMessagef(err, "Failed to format source for %s in template file %s",  tmplName, filename)
+			err = errors.WithMessagef(err, "Failed to format source for %s in template file %s", tmplName, filename)
 
 			dl := []string{}
 			for idx, l := range strings.Split(tpl.String(), "\n") {
-				dl = append(dl, fmt.Sprintf("%d -> ", idx) + l)
+				dl = append(dl, fmt.Sprintf("%d -> ", idx)+l)
 			}
 
 			log.Printf("loadTemplateObjects : %v\n%v", err, strings.Join(dl, "\n"))
@@ -216,7 +216,7 @@ func loadTemplateObjects(log *log.Logger, model *modelDef, templateDir, filename
 		// Parse the code lines into a set of objects.
 		objs, err := goparse.ParseLines(codeLines, 0)
 		if err != nil {
-			err = errors.WithMessagef(err, "Failed to parse %s in template file %s",  tmplName, filename)
+			err = errors.WithMessagef(err, "Failed to parse %s in template file %s", tmplName, filename)
 			log.Printf("loadTemplateObjects : %v\n%v", err, codeStr)
 			return resp, err
 		}
@@ -316,7 +316,7 @@ func templateFileOrderedNames(localPath string, names []string) (resp []string, 
 	idx := 0
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if !strings.HasPrefix(scanner.Text(), "{{") ||  !strings.Contains(scanner.Text(), "define ") {
+		if !strings.HasPrefix(scanner.Text(), "{{") || !strings.Contains(scanner.Text(), "define ") {
 			continue
 		}
 

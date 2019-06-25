@@ -5,33 +5,33 @@ import (
 	"net/http"
 	"strconv"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/project"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
-// Project represents the Project API method handler set.
-type Project struct {
+// Account represents the Account API method handler set.
+type Account struct {
 	MasterDB *sqlx.DB
 
-	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
+	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
 
-// List returns all the existing projects in the system.
-func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// List returns all the existing accounts in the system.
+func (a *Account) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
 	}
 
-	var req project.ProjectFindRequest
+	var req account.AccountFindRequest
 	if err := web.Decode(r, &req); err != nil {
 		return errors.Wrap(err, "")
 	}
 
-	res, err := project.Find(ctx, claims, p.MasterDB, req)
+	res, err := account.Find(ctx, claims, a.MasterDB, req)
 	if err != nil {
 		return err
 	}
@@ -39,8 +39,8 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	return web.RespondJson(ctx, w, res, http.StatusOK)
 }
 
-// Read returns the specified project from the system.
-func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Read returns the specified account from the system.
+func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -55,14 +55,14 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	res, err := project.Read(ctx, claims, p.MasterDB, params["id"], includeArchived)
+	res, err := account.Read(ctx, claims, a.MasterDB, params["id"], includeArchived)
 	if err != nil {
 		switch err {
-		case project.ErrInvalidID:
+		case account.ErrInvalidID:
 			return web.NewRequestError(err, http.StatusBadRequest)
-		case project.ErrNotFound:
+		case account.ErrNotFound:
 			return web.NewRequestError(err, http.StatusNotFound)
-		case project.ErrForbidden:
+		case account.ErrForbidden:
 			return web.NewRequestError(err, http.StatusForbidden)
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
@@ -72,8 +72,8 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	return web.RespondJson(ctx, w, res, http.StatusOK)
 }
 
-// Create inserts a new project into the system.
-func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Create inserts a new account into the system.
+func (a *Account) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {
 		return web.NewShutdownError("web value missing from context")
@@ -84,26 +84,26 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return errors.New("claims missing from context")
 	}
 
-	var req project.ProjectCreateRequest
+	var req account.AccountCreateRequest
 	if err := web.Decode(r, &req); err != nil {
 		return errors.Wrap(err, "")
 	}
 
-	res, err := project.Create(ctx, claims, p.MasterDB, req, v.Now)
+	res, err := account.Create(ctx, claims, a.MasterDB, req, v.Now)
 	if err != nil {
 		switch err {
-		case project.ErrForbidden:
+		case account.ErrForbidden:
 			return web.NewRequestError(err, http.StatusForbidden)
 		default:
-			return errors.Wrapf(err, "Project: %+v", &req)
+			return errors.Wrapf(err, "User: %+v", &req)
 		}
 	}
 
 	return web.RespondJson(ctx, w, res, http.StatusCreated)
 }
 
-// Update updates the specified project in the system.
-func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Update updates the specified account in the system.
+func (a *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {
 		return web.NewShutdownError("web value missing from context")
@@ -114,31 +114,31 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return errors.New("claims missing from context")
 	}
 
-	var req project.ProjectUpdateRequest
+	var req account.AccountUpdateRequest
 	if err := web.Decode(r, &req); err != nil {
 		return errors.Wrap(err, "")
 	}
 	req.ID = params["id"]
 
-	err := project.Update(ctx, claims, p.MasterDB, req, v.Now)
+	err := account.Update(ctx, claims, a.MasterDB, req, v.Now)
 	if err != nil {
 		switch err {
-		case project.ErrInvalidID:
+		case account.ErrInvalidID:
 			return web.NewRequestError(err, http.StatusBadRequest)
-		case project.ErrNotFound:
+		case account.ErrNotFound:
 			return web.NewRequestError(err, http.StatusNotFound)
-		case project.ErrForbidden:
+		case account.ErrForbidden:
 			return web.NewRequestError(err, http.StatusForbidden)
 		default:
-			return errors.Wrapf(err, "ID: %s Update: %+v", params["id"], req)
+			return errors.Wrapf(err, "Id: %s Account: %+v", params["id"], &req)
 		}
 	}
 
 	return web.RespondJson(ctx, w, nil, http.StatusNoContent)
 }
 
-// Archive soft-deletes the specified project from the system.
-func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Archive soft-deletes the specified account from the system.
+func (a *Account) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
 	if !ok {
 		return web.NewShutdownError("web value missing from context")
@@ -149,14 +149,14 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return errors.New("claims missing from context")
 	}
 
-	err := project.Archive(ctx, claims, p.MasterDB, params["id"], v.Now)
+	err := account.Archive(ctx, claims, a.MasterDB, params["id"], v.Now)
 	if err != nil {
 		switch err {
-		case project.ErrInvalidID:
+		case account.ErrInvalidID:
 			return web.NewRequestError(err, http.StatusBadRequest)
-		case project.ErrNotFound:
+		case account.ErrNotFound:
 			return web.NewRequestError(err, http.StatusNotFound)
-		case project.ErrForbidden:
+		case account.ErrForbidden:
 			return web.NewRequestError(err, http.StatusForbidden)
 		default:
 			return errors.Wrapf(err, "Id: %s", params["id"])
@@ -166,21 +166,21 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 	return web.RespondJson(ctx, w, nil, http.StatusNoContent)
 }
 
-// Delete removes the specified project from the system.
-func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Delete removes the specified account from the system.
+func (a *Account) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
 	}
 
-	err := project.Delete(ctx, claims, p.MasterDB, params["id"])
+	err := account.Delete(ctx, claims, a.MasterDB, params["id"])
 	if err != nil {
 		switch err {
-		case project.ErrInvalidID:
+		case account.ErrInvalidID:
 			return web.NewRequestError(err, http.StatusBadRequest)
-		case project.ErrNotFound:
+		case account.ErrNotFound:
 			return web.NewRequestError(err, http.StatusNotFound)
-		case project.ErrForbidden:
+		case account.ErrForbidden:
 			return web.NewRequestError(err, http.StatusForbidden)
 		default:
 			return errors.Wrapf(err, "Id: %s", params["id"])

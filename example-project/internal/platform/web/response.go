@@ -72,10 +72,15 @@ func RespondJson(ctx context.Context, w http.ResponseWriter, data interface{}, s
 		return nil
 	}
 
-	// Convert the response value to JSON.
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
+	// Check to see if the json has already been encoded.
+	jsonData, ok := data.([]byte)
+	if !ok {
+		// Convert the response value to JSON.
+		var err error
+		jsonData, err = json.Marshal(data)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Set the content type and headers once we know marshaling has succeeded.
@@ -111,6 +116,7 @@ func RespondErrorStatus(ctx context.Context, w http.ResponseWriter, er error, st
 // Respond writes the data to the client with the specified HTTP status code and
 // content type.
 func Respond(ctx context.Context, w http.ResponseWriter, data []byte, statusCode int, contentType string) error {
+
 	// Set the status code for the request logger middleware.
 	// If the context is missing this value, request the service
 	// to be shutdown gracefully.

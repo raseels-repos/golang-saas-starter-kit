@@ -7,9 +7,10 @@ import (
 	"reflect"
 	"strings"
 
-	en "github.com/go-playground/locales/en"
+	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
-	validator "gopkg.in/go-playground/validator.v9"
+	"github.com/gorilla/schema"
+	"gopkg.in/go-playground/validator.v9"
 	en_translations "gopkg.in/go-playground/validator.v9/translations/en"
 )
 
@@ -47,10 +48,18 @@ func init() {
 //
 // If the provided value is a struct then it is checked for validation tags.
 func Decode(r *http.Request, val interface{}) error {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(val); err != nil {
-		return NewRequestError(err, http.StatusBadRequest)
+
+	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete {
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(val); err != nil {
+			return NewRequestError(err, http.StatusBadRequest)
+		}
+	} else {
+		decoder := schema.NewDecoder()
+		if err := decoder.Decode(val, r.URL.Query()); err != nil {
+			return NewRequestError(err, http.StatusBadRequest)
+		}
 	}
 
 	if err := validate.Struct(val); err != nil {

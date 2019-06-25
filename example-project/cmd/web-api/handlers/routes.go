@@ -6,13 +6,15 @@ import (
 	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
+	saasSwagger "geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/jmoiron/sqlx"
+	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, authenticator *auth.Authenticator) http.Handler {
+func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator) http.Handler {
 
 	// Construct the web.App which holds all routes as well as common Middleware.
 	app := web.NewApp(shutdown, log, mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics())
@@ -28,24 +30,43 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, authentica
 		MasterDB:       masterDB,
 		TokenGenerator: authenticator,
 	}
-	app.Handle("GET", "/v1/users", u.List, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/users", u.Find, mid.Authenticate(authenticator))
 	app.Handle("POST", "/v1/users", u.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/users/:id", u.Retrieve, mid.Authenticate(authenticator))
-	app.Handle("PUT", "/v1/users/:id", u.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/users/:id", u.Read, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/users/:id", u.Update, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/users/:id/password", u.UpdatePassword, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/:id/archive", u.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/switch-account/:accountId", u.SwitchAccount, mid.Authenticate(authenticator))
 
 	// This route is not authenticated
-	app.Handle("GET", "/v1/users/token", u.Token)
+	app.Handle("GET", "/v1/oauth/token", u.Token)
 
-	// Register project and sale endpoints.
+	// Register account endpoints.
+	a := Account{
+		MasterDB: masterDB,
+	}
+	app.Handle("GET", "/v1/accounts", a.Find, mid.Authenticate(authenticator))
+	app.Handle("POST", "/v1/accounts", a.Create, mid.Authenticate(authenticator))
+	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/accounts/:id", a.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/accounts/:id/archive", a.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/accounts/:id", a.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+
+	// Register project.
 	p := Project{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/projects", p.List, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/projects", p.Create, mid.Authenticate(authenticator))
-	app.Handle("GET", "/v1/projects/:id", p.Retrieve, mid.Authenticate(authenticator))
-	app.Handle("PUT", "/v1/projects/:id", p.Update, mid.Authenticate(authenticator))
-	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator))
+	app.Handle("GET", "/v1/projects", p.Find, mid.Authenticate(authenticator))
+	app.Handle("POST", "/v1/projects", p.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/projects/:id", p.Read, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/projects/:id", p.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/projects/:id/archive", p.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+
+	// Register swagger documentation.
+	app.Handle("GET", "/swagger/", saasSwagger.WrapHandler, mid.Authenticate(authenticator))
+	app.Handle("GET", "/swagger/*", saasSwagger.WrapHandler, mid.Authenticate(authenticator))
 
 	return app
 }

@@ -1,0 +1,21 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a sample server celler server.",
+        "title": "SaaS Example API",
+        "termsOfService": "http://geeksinthewoods.com/terms",
+        "contact": {
+            "name": "API Support",
+            "url": "https://gitlab.com/geeks-accelerator/oss/saas-starter-kit",
+            "email": "support@geeksinthewoods.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "example-api.saas.geeksinthewoods.com",
+    "basePath": "/v1",
+    "paths": {}
+}

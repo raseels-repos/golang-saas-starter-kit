@@ -100,7 +100,6 @@ func TestParseLines1(t *testing.T) {
 		g.Expect(objs.Lines()).Should(gomega.Equal(lines))
 	}
 
-
 }
 
 func TestParseLines2(t *testing.T) {

@@ -112,8 +112,9 @@ func main() {
 			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			AwsSecretID   string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
-			KeyExpiration time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
+			UseAwsSecretManager bool          `default:false envconfig:"USE_AWS_SECRET_MANAGER"`
+			AwsSecretID         string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
+			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`

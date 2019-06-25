@@ -39,12 +39,12 @@ type ProjectUpdateRequest struct {
 // ProjectFindRequest defines the possible options to search for projects. By default
 // archived project will be excluded from response.
 type ProjectFindRequest struct {
-	Where            *string
-	Args             []interface{}
-	Order            []string
-	Limit            *uint
-	Offset           *uint
-	IncludedArchived bool
+	Where            *string       `schema:"where"`
+	Args             []interface{} `schema:"args"`
+	Order            []string      `schema:"order"`
+	Limit            *uint         `schema:"limit"`
+	Offset           *uint         `schema:"offset"`
+	IncludedArchived bool          `schema:"included-archived"`
 }
 
 // ProjectStatus represents the status of project.

@@ -5,6 +5,8 @@ LABEL maintainer="lee@geeksinthewoods.com"
 RUN apk --update --no-cache add \
             git
 
+RUN go get -u github.com/swaggo/swag/cmd/swag
+
 # go to base project
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit/example-project
 
@@ -25,6 +27,9 @@ COPY cmd/web-api/templates /templates
 #COPY cmd/web-api/static /static
 
 WORKDIR ./cmd/web-api
+
+# Update the API documentation.
+RUN swag init
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /gosrv .
 

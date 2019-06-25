@@ -133,7 +133,6 @@ func main() {
 				cli.StringFlag{Name: "templateDir, templates", Value: "./templates/dbtable2crud"},
 				cli.StringFlag{Name: "projectPath"},
 				cli.BoolFlag{Name: "saveChanges, save"},
-
 			},
 			Action: func(c *cli.Context) error {
 				dbTable := strings.TrimSpace(c.String("dbtable"))

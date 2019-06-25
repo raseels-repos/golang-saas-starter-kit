@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"os"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
-	"github.com/lib/pq"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"

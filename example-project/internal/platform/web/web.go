@@ -53,9 +53,13 @@ func NewApp(shutdown chan os.Signal, log *log.Logger, mw ...Middleware) *App {
 
 // SignalShutdown is used to gracefully shutdown the app when an integrity
 // issue is identified.
-func (a *App) SignalShutdown() {
+func (a *App) SignalShutdown() bool {
+	if a.shutdown == nil {
+		return false
+	}
 	a.log.Println("error returned from handler indicated integrity issue, shutting down service")
 	a.shutdown <- syscall.SIGSTOP
+	return true
 }
 
 // Handle is our mechanism for mounting Handlers for a given HTTP verb and path
@@ -78,9 +82,24 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 		ctx := context.WithValue(r.Context(), KeyValues, &v)
 
 		// Call the wrapped handler functions.
-		if err := handler(ctx, w, r, params); err != nil {
+		err := handler(ctx, w, r, params)
+		if err != nil {
+			// If we have specifically handled the error, then no need
+			// to initiate a shutdown.
+			if webErr, ok := err.(*Error); ok {
+				// Render an error response.
+				if rerr := RespondErrorStatus(ctx, w, webErr.Err, webErr.Status); rerr == nil {
+					// If there was not error rending the error, then no need to continue.
+					return
+				}
+			}
+
 			a.log.Printf("*****> critical shutdown error: %v", err)
-			a.SignalShutdown()
+			if ok := a.SignalShutdown(); !ok {
+				// When shutdown chan is nil, in the case of unit testing
+				// we need to force display of the error.
+				panic(err)
+			}
 			return
 		}
 	}

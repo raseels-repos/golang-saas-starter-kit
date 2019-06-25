@@ -30,6 +30,8 @@ func TestProjects(t *testing.T) {
 	t.Run("crudProjects", crudProject)
 }
 
+// TODO: need to test Archive
+
 // getProjects200Empty validates an empty projects list can be retrieved with the endpoint.
 func getProjects200Empty(t *testing.T) {
 	r := httptest.NewRequest("GET", "/v1/projects", nil)

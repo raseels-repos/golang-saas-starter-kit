@@ -21,12 +21,13 @@ type {{ FormatCamel $.Model.Name }}UpdateRequest struct {
 // {{ FormatCamel $.Model.Name }}FindRequest defines the possible options to search for {{ FormatCamelPluralTitleLower $.Model.Name }}. By default
 // archived {{ FormatCamelLowerTitle $.Model.Name }} will be excluded from response.
 type {{ FormatCamel $.Model.Name }}FindRequest struct {
-    Where            *string
-    Args             []interface{}
-    Order            []string
-    Limit            *uint
-    Offset           *uint
-    {{ $hasArchived := (StringListHasValue $.Model.ColumnNames "archived_at") }}{{ if $hasArchived }}IncludedArchived bool{{ end }}
+    Where            *string `schema:"where"`
+    Args             []interface{} `schema:"args"`
+    Order            []string `schema:"order"`
+    Limit            *uint `schema:"limit"`
+    Offset           *uint `schema:"offset"`
+    IncludedArchived bool
+    {{ $hasArchived := (StringListHasValue $.Model.ColumnNames "archived_at") }}{{ if $hasArchived }}IncludedArchived bool `schema:"included-archived"`{{ end }}
 }
 {{ end }}
 {{ define "Enums"}}

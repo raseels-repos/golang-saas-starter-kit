@@ -88,10 +88,8 @@ func ParseLines(lines []string, depth int) (objs *GoObjects, err error) {
 
 		ld := lineDepth(l)
 
-
 		//fmt.Println("l", l)
 		//fmt.Println("> Depth", ld, "???", depth)
-
 
 		if ld == depth {
 			if strings.HasPrefix(ls, "/*") {
@@ -112,7 +110,6 @@ func ParseLines(lines []string, depth int) (objs *GoObjects, err error) {
 					}
 				}
 			}
-
 
 			//fmt.Println("> multiLine", multiLine)
 			//fmt.Println("> multiComment", multiComment)

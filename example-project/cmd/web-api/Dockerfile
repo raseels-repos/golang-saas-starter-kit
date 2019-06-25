@@ -1,16 +1,26 @@
-FROM golang:alpine3.9 AS build_base
+FROM golang:1.12.6-alpine3.9 AS build_base
 
 LABEL maintainer="lee@geeksinthewoods.com"
 
 RUN apk --update --no-cache add \
-            git
+            git build-base gcc
 
-RUN go get -u github.com/swaggo/swag/cmd/swag
+# Hack to get swag init to work correctly.
+RUN GO111MODULE=off go get gopkg.in/go-playground/validator.v9 && \
+    GO111MODULE=off go get github.com/go-playground/universal-translator && \
+    GO111MODULE=off go get github.com/leodido/go-urn && \
+    GO111MODULE=off go get github.com/lib/pq/oid && \
+    GO111MODULE=off go get github.com/lib/pq/scram && \
+    GO111MODULE=off go get github.com/tinylib/msgp/msgp && \
+    GO111MODULE=off go get gopkg.in/DataDog/dd-trace-go.v1/ddtrace
 
-# go to base project
+# Install swag with go modules enabled.
+RUN GO111MODULE=on go get -u github.com/swaggo/swag/cmd/swag
+
+# Change dir to project base.
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit/example-project
 
-# enable go modules
+# Enable go modules.
 ENV GO111MODULE="on"
 COPY go.mod .
 COPY go.sum .
@@ -18,10 +28,10 @@ RUN go mod download
 
 FROM build_base AS builder
 
-# copy shared packages
+# Copy shared packages.
 COPY internal ./internal
 
-# copy cmd specific package
+# Copy cmd specific packages.
 COPY cmd/web-api ./cmd/web-api
 COPY cmd/web-api/templates /templates
 #COPY cmd/web-api/static /static

@@ -3,35 +3,133 @@ definitions:
   account.Account:
     properties:
       address1:
+        example: 221 Tatitlek Ave
         type: string
       address2:
+        example: 'Box #1832'
         type: string
       archived_at:
         type: string
       billing_user_id:
         type: string
       city:
+        example: Valdez
         type: string
       country:
+        example: USA
         type: string
       created_at:
         type: string
       id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
         type: string
       name:
+        example: Company Name
         type: string
       region:
+        example: AK
         type: string
       signup_user_id:
         type: string
       status:
-        type: AccountStatus
+        example: active
+        type: string
       timezone:
+        example: America/Anchorage
         type: string
       updated_at:
         type: string
       zipcode:
+        example: "99686"
         type: string
+    type: object
+  signup.SignupRequest:
+    properties:
+      account:
+        properties:
+          address1:
+            example: 221 Tatitlek Ave
+            type: string
+          address2:
+            example: 'Box #1832'
+            type: string
+          city:
+            example: Valdez
+            type: string
+          country:
+            example: USA
+            type: string
+          name:
+            example: Company {RANDOM_UUID}
+            type: string
+          region:
+            example: AK
+            type: string
+          timezone:
+            example: America/Anchorage
+            type: string
+          zipcode:
+            example: "99686"
+            type: string
+        required:
+        - name
+        - address1
+        - city
+        - region
+        - country
+        - zipcode
+        type: object
+      user:
+        properties:
+          email:
+            example: '{RANDOM_EMAIL}'
+            type: string
+          name:
+            example: Gabi May
+            type: string
+          password:
+            example: SecretString
+            type: string
+          password_confirm:
+            example: SecretString
+            type: string
+        required:
+        - name
+        - email
+        - password
+        type: object
+    type: object
+  signup.SignupResponse:
+    properties:
+      account:
+        $ref: '#/definitions/account.Account'
+        type: object
+      user:
+        $ref: '#/definitions/user.User'
+        type: object
+    type: object
+  user.User:
+    properties:
+      archived_at:
+        type: string
+      created_at:
+        type: string
+      email:
+        example: gabi@geeksinthewoods.com
+        type: string
+      id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      name:
+        example: Gabi May
+        type: string
+      timezone:
+        example: America/Anchorage
+        type: string
+      updated_at:
+        type: string
+    required:
+    - name
     type: object
   web.Error:
     properties:
@@ -49,12 +147,12 @@ info:
   contact:
     email: support@geeksinthewoods.com
     name: API Support
-    url: /support
+    url: http://example.com/support
   description: This is a sample server celler server.
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: /terms
+  termsOfService: http://example.com/terms
   title: SaaS Example API
   version: '{{.Version}}'
 paths:
@@ -98,6 +196,88 @@ paths:
             $ref: '#/definitions/web.Error'
             type: object
       summary: Read returns the specified account from the system.
+      tags:
+      - account
+  /signup:
+    post:
+      consumes:
+      - application/json
+      description: Signup creates a new account and user in the system.
+      parameters:
+      - description: Signup details
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/signup.SignupRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            Token:
+              description: qwerty
+              type: string
+          schema:
+            $ref: '#/definitions/signup.SignupResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+      summary: Signup handles new account creation.
+      tags:
+      - signup
+  /users/{id}:
+    get:
+      consumes:
+      - application/json
+      description: get string by ID
+      operationId: get-string-by-int
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            Token:
+              description: qwerty
+              type: string
+          schema:
+            $ref: '#/definitions/user.User'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.Error'
+            type: object
+      summary: Read returns the specified user from the system.
+      tags:
+      - user
 securityDefinitions:
   OAuth2Password:
     flow: password

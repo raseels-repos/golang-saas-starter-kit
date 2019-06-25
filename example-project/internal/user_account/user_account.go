@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
-	"github.com/lib/pq"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -258,7 +257,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 		ua = *existing[0]
 		ua.Roles = req.Roles
 		ua.UpdatedAt = now
-		ua.ArchivedAt = pq.NullTime{}
+		ua.ArchivedAt = nil
 	} else {
 		ua = UserAccount{
 			ID:        uuid.NewRandom().String(),

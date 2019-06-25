@@ -10,20 +10,20 @@ import (
 
 // Project represents a workflow.
 type Project struct {
-	ID         string        `json:"id" validate:"required,uuid"`
+	ID         string        `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
 	AccountID  string        `json:"account_id" validate:"required,uuid" truss:"api-create"`
 	Name       string        `json:"name"  validate:"required"`
-	Status     ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled"`
+	Status     ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
 	CreatedAt  time.Time     `json:"created_at" truss:"api-read"`
 	UpdatedAt  time.Time     `json:"updated_at" truss:"api-read"`
-	ArchivedAt pq.NullTime   `json:"archived_at" truss:"api-hide"`
+	ArchivedAt *pq.NullTime  `json:"archived_at,omitempty" truss:"api-hide"`
 }
 
 // ProjectCreateRequest contains information needed to create a new Project.
 type ProjectCreateRequest struct {
 	AccountID string         `json:"account_id" validate:"required,uuid"`
 	Name      string         `json:"name" validate:"required"`
-	Status    *ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled"`
+	Status    *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
 }
 
 // ProjectUpdateRequest defines what information may be provided to modify an existing
@@ -32,19 +32,19 @@ type ProjectCreateRequest struct {
 // was not provided and a field that was provided as explicitly blank.
 type ProjectUpdateRequest struct {
 	ID     string         `json:"id" validate:"required,uuid"`
-	Name   *string        `json:"name" validate:"omitempty"`
-	Status *ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled"`
+	Name   *string        `json:"name,omitempty" validate:"omitempty"`
+	Status *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
 }
 
 // ProjectFindRequest defines the possible options to search for projects. By default
 // archived project will be excluded from response.
 type ProjectFindRequest struct {
-	Where            *string       `schema:"where"`
-	Args             []interface{} `schema:"args"`
-	Order            []string      `schema:"order"`
-	Limit            *uint         `schema:"limit"`
-	Offset           *uint         `schema:"offset"`
-	IncludedArchived bool          `schema:"included-archived"`
+	Where            *string       `json:"where"`
+	Args             []interface{} `json:"args" swaggertype:"array,string"`
+	Order            []string      `json:"order"`
+	Limit            *uint         `json:"limit"`
+	Offset           *uint         `json:"offset"`
+	IncludedArchived bool          `json:"included-archived"`
 }
 
 // ProjectStatus represents the status of project.
@@ -52,7 +52,6 @@ type ProjectStatus string
 
 // ProjectStatus values define the status field of project.
 const (
-
 	// ProjectStatus_Active defines the status of active for project.
 	ProjectStatus_Active ProjectStatus = "active"
 	// ProjectStatus_Disabled defines the status of disabled for project.
@@ -61,7 +60,6 @@ const (
 
 // ProjectStatus_Values provides list of valid ProjectStatus values.
 var ProjectStatus_Values = []ProjectStatus{
-
 	ProjectStatus_Active,
 	ProjectStatus_Disabled,
 }

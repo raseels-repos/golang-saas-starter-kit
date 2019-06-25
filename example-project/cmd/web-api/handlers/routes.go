@@ -53,6 +53,12 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	app.Handle("PATCH", "/v1/accounts/:id/archive", a.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/accounts/:id", a.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 
+	// Register signup endpoints.
+	s := Signup{
+		MasterDB: masterDB,
+	}
+	app.Handle("POST", "/v1/signup", s.Signup)
+
 	// Register project.
 	p := Project{
 		MasterDB: masterDB,

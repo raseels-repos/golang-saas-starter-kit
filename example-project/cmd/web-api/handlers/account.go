@@ -42,6 +42,7 @@ func (a *Account) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // Read godoc
 // @Summary Read returns the specified account from the system.
 // @Description get string by ID
+// @Tags account
 // @ID get-string-by-int
 // @Accept  json
 // @Produce  json

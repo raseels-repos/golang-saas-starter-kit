@@ -317,10 +317,10 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	}
 
 	if req.SignupUserID != nil {
-		a.SignupUserID = sql.NullString{String: *req.SignupUserID, Valid: true}
+		a.SignupUserID = &sql.NullString{String: *req.SignupUserID, Valid: true}
 	}
 	if req.BillingUserID != nil {
-		a.BillingUserID = sql.NullString{String: *req.BillingUserID, Valid: true}
+		a.BillingUserID = &sql.NullString{String: *req.BillingUserID, Valid: true}
 	}
 
 	// Build the insert SQL statement.

@@ -12,36 +12,36 @@ import (
 
 // Account represents someone with access to our system.
 type Account struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Address1      string         `json:"address1"`
-	Address2      string         `json:"address2"`
-	City          string         `json:"city"`
-	Region        string         `json:"region"`
-	Country       string         `json:"country"`
-	Zipcode       string         `json:"zipcode"`
-	Status        AccountStatus  `json:"status"`
-	Timezone      string         `json:"timezone"`
-	SignupUserID  sql.NullString `json:"signup_user_id"`
-	BillingUserID sql.NullString `json:"billing_user_id"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	ArchivedAt    pq.NullTime    `json:"archived_at"`
+	ID            string          `json:"id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Name          string          `json:"name" example:"Company Name"`
+	Address1      string          `json:"address1" example:"221 Tatitlek Ave"`
+	Address2      string          `json:"address2" example:"Box #1832"`
+	City          string          `json:"city" example:"Valdez"`
+	Region        string          `json:"region" example:"AK"`
+	Country       string          `json:"country" example:"USA"`
+	Zipcode       string          `json:"zipcode" example:"99686"`
+	Status        AccountStatus   `json:"status" swaggertype:"string" example:"active"`
+	Timezone      string          `json:"timezone" example:"America/Anchorage"`
+	SignupUserID  *sql.NullString `json:"signup_user_id,omitempty" swaggertype:"string"`
+	BillingUserID *sql.NullString `json:"billing_user_id,omitempty" swaggertype:"string"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	ArchivedAt    *pq.NullTime    `json:"archived_at,omitempty"`
 }
 
 // AccountCreateRequest contains information needed to create a new Account.
 type AccountCreateRequest struct {
-	Name          string         `json:"name" validate:"required,unique"`
-	Address1      string         `json:"address1" validate:"required"`
-	Address2      string         `json:"address2" validate:"omitempty"`
-	City          string         `json:"city" validate:"required"`
-	Region        string         `json:"region" validate:"required"`
-	Country       string         `json:"country" validate:"required"`
-	Zipcode       string         `json:"zipcode" validate:"required"`
-	Status        *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
-	Timezone      *string        `json:"timezone" validate:"omitempty"`
-	SignupUserID  *string        `json:"signup_user_id" validate:"omitempty,uuid"`
-	BillingUserID *string        `json:"billing_user_id" validate:"omitempty,uuid"`
+	Name          string         `json:"name" validate:"required,unique" example:"Company Name"`
+	Address1      string         `json:"address1" validate:"required" example:"221 Tatitlek Ave"`
+	Address2      string         `json:"address2" validate:"omitempty" example:"Box #1832"`
+	City          string         `json:"city" validate:"required" example:"Valdez"`
+	Region        string         `json:"region" validate:"required" example:"AK"`
+	Country       string         `json:"country" validate:"required" example:"USA"`
+	Zipcode       string         `json:"zipcode" validate:"required" example:"99686"`
+	Status        *AccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active pending disabled" swaggertype:"string" enums:"active,pending,disabled" example:"active"`
+	Timezone      *string        `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
+	SignupUserID  *string        `json:"signup_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string"`
+	BillingUserID *string        `json:"billing_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string"`
 }
 
 // AccountUpdateRequest defines what information may be provided to modify an existing
@@ -51,29 +51,29 @@ type AccountCreateRequest struct {
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
 type AccountUpdateRequest struct {
-	ID            string         `validate:"required,uuid"`
-	Name          *string        `json:"name" validate:"omitempty,unique"`
-	Address1      *string        `json:"address1" validate:"omitempty"`
-	Address2      *string        `json:"address2" validate:"omitempty"`
-	City          *string        `json:"city" validate:"omitempty"`
-	Region        *string        `json:"region" validate:"omitempty"`
-	Country       *string        `json:"country" validate:"omitempty"`
-	Zipcode       *string        `json:"zipcode" validate:"omitempty"`
-	Status        *AccountStatus `json:"status" validate:"omitempty,oneof=active pending disabled"`
-	Timezone      *string        `json:"timezone" validate:"omitempty"`
-	SignupUserID  *string        `json:"signup_user_id" validate:"omitempty,uuid"`
-	BillingUserID *string        `json:"billing_user_id" validate:"omitempty,uuid"`
+	ID            string         `json:"id" validate:"required,uuid"`
+	Name          *string        `json:"name,omitempty" validate:"omitempty,unique"`
+	Address1      *string        `json:"address1,omitempty" validate:"omitempty"`
+	Address2      *string        `json:"address2,omitempty" validate:"omitempty"`
+	City          *string        `json:"city,omitempty" validate:"omitempty"`
+	Region        *string        `json:"region,omitempty" validate:"omitempty"`
+	Country       *string        `json:"country,omitempty" validate:"omitempty"`
+	Zipcode       *string        `json:"zipcode,omitempty" validate:"omitempty"`
+	Status        *AccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active pending disabled" swaggertype:"string" enums:"active,pending,disabled"`
+	Timezone      *string        `json:"timezone,omitempty" validate:"omitempty"`
+	SignupUserID  *string        `json:"signup_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string"`
+	BillingUserID *string        `json:"billing_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string"`
 }
 
 // AccountFindRequest defines the possible options to search for accounts. By default
 // archived accounts will be excluded from response.
 type AccountFindRequest struct {
-	Where            *string       `schema:"where"`
-	Args             []interface{} `schema:"args"`
-	Order            []string      `schema:"order"`
-	Limit            *uint         `schema:"limit"`
-	Offset           *uint         `schema:"offset"`
-	IncludedArchived bool          `schema:"included-archived"`
+	Where            *string       `json:"where"`
+	Args             []interface{} `json:"args" swaggertype:"array,string"`
+	Order            []string      `json:"order"`
+	Limit            *uint         `json:"limit"`
+	Offset           *uint         `json:"offset"`
+	IncludedArchived bool          `json:"included-archived"`
 }
 
 // AccountStatus represents the status of an account.

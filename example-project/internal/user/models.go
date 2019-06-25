@@ -10,28 +10,28 @@ import (
 
 // User represents someone with access to our system.
 type User struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID    string `json:"id"  example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	Name  string `json:"name" validate:"required"  example:"Gabi May"`
+	Email string `json:"email"  example:"gabi@geeksinthewoods.com"`
 
-	PasswordSalt  string         `json:"-"`
-	PasswordHash  []byte         `json:"-"`
-	PasswordReset sql.NullString `json:"-"`
+	PasswordSalt  string          `json:"-"`
+	PasswordHash  []byte          `json:"-"`
+	PasswordReset *sql.NullString `json:"-"`
 
-	Timezone string `json:"timezone"`
+	Timezone string `json:"timezone" example:"America/Anchorage"`
 
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
-	ArchivedAt pq.NullTime `json:"archived_at"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
+	ArchivedAt *pq.NullTime `json:"archived_at,omitempty"`
 }
 
 // UserCreateRequest contains information needed to create a new User.
 type UserCreateRequest struct {
-	Name            string  `json:"name" validate:"required"`
-	Email           string  `json:"email" validate:"required,email,unique"`
-	Password        string  `json:"password" validate:"required"`
-	PasswordConfirm string  `json:"password_confirm" validate:"eqfield=Password"`
-	Timezone        *string `json:"timezone" validate:"omitempty"`
+	Name            string  `json:"name" validate:"required"  example:"Gabi May"`
+	Email           string  `json:"email" validate:"required,email,unique"  example:"gabi@geeksinthewoods.com"`
+	Password        string  `json:"password" validate:"required" example:"SecretString"`
+	PasswordConfirm string  `json:"password_confirm" validate:"eqfield=Password" example:"SecretString"`
+	Timezone        *string `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
 }
 
 // UserUpdateRequest defines what information may be provided to modify an existing
@@ -41,15 +41,15 @@ type UserCreateRequest struct {
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
 type UserUpdateRequest struct {
-	ID       string  `validate:"required,uuid"`
-	Name     *string `json:"name" validate:"omitempty"`
-	Email    *string `json:"email" validate:"omitempty,email,unique"`
-	Timezone *string `json:"timezone" validate:"omitempty"`
+	ID       string  `json:"id" validate:"required,uuid"`
+	Name     *string `json:"name,omitempty" validate:"omitempty"`
+	Email    *string `json:"email,omitempty" validate:"omitempty,email,unique"`
+	Timezone *string `json:"timezone,omitempty" validate:"omitempty"`
 }
 
 // UserUpdatePasswordRequest defines what information is required to update a user password.
 type UserUpdatePasswordRequest struct {
-	ID              string `validate:"required,uuid"`
+	ID              string `json:"id" validate:"required,uuid"`
 	Password        string `json:"password" validate:"required"`
 	PasswordConfirm string `json:"password_confirm" validate:"omitempty,eqfield=Password"`
 }
@@ -57,16 +57,16 @@ type UserUpdatePasswordRequest struct {
 // UserFindRequest defines the possible options to search for users. By default
 // archived users will be excluded from response.
 type UserFindRequest struct {
-	Where            *string       `schema:"where"`
-	Args             []interface{} `schema:"args"`
-	Order            []string      `schema:"order"`
-	Limit            *uint         `schema:"limit"`
-	Offset           *uint         `schema:"offset"`
-	IncludedArchived bool          `schema:"included-archived"`
+	Where            *string       `json:"where"`
+	Args             []interface{} `json:"args" swaggertype:"array,string"`
+	Order            []string      `json:"order"`
+	Limit            *uint         `json:"limit"`
+	Offset           *uint         `json:"offset"`
+	IncludedArchived bool          `json:"included-archived"`
 }
 
 // Token is the payload we deliver to users when they authenticate.
 type Token struct {
-	Token  string      `json:"token"`
+	Token  string      `json:"token"  validate:"required"`
 	claims auth.Claims `json:"-"`
 }

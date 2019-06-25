@@ -41,6 +41,11 @@ func init() {
 		}
 		return name
 	})
+
+	f := func(fl validator.FieldLevel) bool {
+		return true
+	}
+	validate.RegisterValidation("unique", f)
 }
 
 // Decode reads the body of an HTTP request looking for a JSON document. The

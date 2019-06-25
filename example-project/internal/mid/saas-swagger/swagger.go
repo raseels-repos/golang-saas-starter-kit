@@ -2,6 +2,8 @@ package saasSwagger
 
 import (
 	"context"
+	"fmt"
+	"github.com/pborman/uuid"
 	"html/template"
 	"net/http"
 	"regexp"
@@ -92,6 +94,24 @@ func SaasWrapHandler(confs ...func(c *Config)) web.Handler {
 			if err != nil {
 				return web.NewRequestError(err, http.StatusInternalServerError)
 			}
+
+			// Replace the dynamic placeholder {RANDOM_UUID}
+			for {
+				if !strings.Contains(doc, "{RANDOM_UUID}") {
+					break
+				}
+				doc = strings.Replace(doc, "{RANDOM_UUID}", uuid.NewRandom().String(), 1)
+			}
+
+			// Replace the dynamic placeholder {RANDOM_EMAIL}
+			for {
+				if !strings.Contains(doc, "{RANDOM_EMAIL}") {
+					break
+				}
+				randEmail := fmt.Sprintf("%s@example.com", uuid.NewRandom().String())
+				doc = strings.Replace(doc, "{RANDOM_EMAIL}", randEmail, 1)
+			}
+
 			return web.RespondJson(ctx, w, []byte(doc), http.StatusOK)
 		default:
 			if strings.HasSuffix(path, ".html") {

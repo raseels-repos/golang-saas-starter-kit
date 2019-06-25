@@ -19,12 +19,6 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.signup.Signup")
 	defer span.Finish()
 
-	// Default account status to active for signup if now set.
-	if req.Account.Status == nil {
-		s := account.AccountStatus_Active
-		req.Account.Status = &s
-	}
-
 	v := validator.New()
 
 	// Validate the user email address is unique in the database.
@@ -64,18 +58,38 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 
 	var resp SignupResponse
 
+	// UserCreateRequest contains information needed to create a new User.
+	userReq := user.UserCreateRequest{
+		Name:            req.User.Name,
+		Email:           req.User.Email,
+		Password:        req.User.Password,
+		PasswordConfirm: req.User.PasswordConfirm,
+		Timezone:        req.Account.Timezone,
+	}
+
 	// Execute user creation.
-	resp.User, err = user.Create(ctx, claims, dbConn, req.User, now)
+	resp.User, err = user.Create(ctx, claims, dbConn, userReq, now)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set the signup and billing user IDs for reference.
-	req.Account.SignupUserID = &resp.User.ID
-	req.Account.BillingUserID = &resp.User.ID
+	accountStatus := account.AccountStatus_Active
+	accountReq := account.AccountCreateRequest{
+		Name:          req.Account.Name,
+		Address1:      req.Account.Address1,
+		Address2:      req.Account.Address2,
+		City:          req.Account.City,
+		Region:        req.Account.Region,
+		Country:       req.Account.Country,
+		Zipcode:       req.Account.Zipcode,
+		Status:        &accountStatus,
+		Timezone:      req.Account.Timezone,
+		SignupUserID:  &resp.User.ID,
+		BillingUserID: &resp.User.ID,
+	}
 
 	// Execute account creation.
-	resp.Account, err = account.Create(ctx, claims, dbConn, req.Account, now)
+	resp.Account, err = account.Create(ctx, claims, dbConn, accountReq, now)
 	if err != nil {
 		return nil, err
 	}

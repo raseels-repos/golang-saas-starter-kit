@@ -44,7 +44,20 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	return web.RespondJson(ctx, w, res, http.StatusOK)
 }
 
-// Read returns the specified user from the system.
+// Read godoc
+// @Summary Read returns the specified user from the system.
+// @Description get string by ID
+// @Tags user
+// @ID get-string-by-int
+// @Accept  json
+// @Produce  json
+// @Param id path int true "User ID"
+// @Success 200 {object} user.User
+// @Header 200 {string} Token "qwerty"
+// @Failure 400 {object} web.Error
+// @Failure 403 {object} web.Error
+// @Failure 404 {object} web.Error
+// @Router /users/{id} [get]
 func (u *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {

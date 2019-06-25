@@ -1,14 +1,14 @@
-FROM golang:alpine3.9 AS build_base
+FROM golang:1.12.6-alpine3.9 AS build_base
 
 LABEL maintainer="lee@geeksinthewoods.com"
 
 RUN apk --update --no-cache add \
             git
 
-# go to base project
+# Change dir to project base.
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit/example-project
 
-# enable go modules
+# Enable go modules.
 ENV GO111MODULE="on"
 COPY go.mod .
 COPY go.sum .
@@ -16,10 +16,10 @@ RUN go mod download
 
 FROM build_base AS builder
 
-# copy shared packages
+# Copy shared packages.
 COPY internal ./internal
 
-# copy cmd specific package
+# Copy cmd specific packages.
 COPY cmd/web-app ./cmd/web-app
 COPY cmd/web-app/templates /templates
 COPY cmd/web-app/static /static

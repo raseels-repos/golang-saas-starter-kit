@@ -17,14 +17,14 @@ import (
 // application. The status will allow users to be managed on by account with users
 // being global to the application.
 type UserAccount struct {
-	ID         string            `json:"id"`
-	UserID     string            `json:"user_id"`
-	AccountID  string            `json:"account_id"`
-	Roles      UserAccountRoles  `json:"roles"`
-	Status     UserAccountStatus `json:"status"`
+	ID         string            `json:"id" example:"72938896-a998-4258-a17b-6418dcdb80e3"`
+	UserID     string            `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID  string            `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Roles      UserAccountRoles  `json:"roles" swaggertype:"array,string" enums:"admin,user" example:"admin"`
+	Status     UserAccountStatus `json:"status" swaggertype:"string" enums:"active,invited,disabled" example:"active"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
-	ArchivedAt pq.NullTime       `json:"archived_at"`
+	ArchivedAt *pq.NullTime      `json:"archived_at,omitempty"`
 }
 
 // CreateUserAccountRequest defines the information is needed to associate a user to an
@@ -32,45 +32,45 @@ type UserAccount struct {
 // on an account level. If a current entry exists in the database but is archived,
 // it will be un-archived.
 type CreateUserAccountRequest struct {
-	UserID    string             `validate:"required,uuid"`
-	AccountID string             `validate:"required,uuid"`
-	Roles     UserAccountRoles   `json:"roles" validate:"required,dive,oneof=admin user"`
-	Status    *UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled"`
+	UserID    string             `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Roles     UserAccountRoles   `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
 }
 
 // UpdateUserAccountRequest defines the information needed to update the roles or the
 // status for an existing user account.
 type UpdateUserAccountRequest struct {
-	UserID    string             `validate:"required,uuid"`
-	AccountID string             `validate:"required,uuid"`
-	Roles     *UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user"`
-	Status    *UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled"`
+	UserID    string             `json:"user_id" validate:"required,uuid"`
+	AccountID string             `json:"account_id" validate:"required,uuid"`
+	Roles     *UserAccountRoles  `json:"roles,omitempty" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"user"`
+	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"disabled"`
 	unArchive bool               `json:"-"` // Internal use only.
 }
 
 // ArchiveUserAccountRequest defines the information needed to remove an existing account
 // for a user. This will archive (soft-delete) the existing database entry.
 type ArchiveUserAccountRequest struct {
-	UserID    string `validate:"required,uuid"`
-	AccountID string `validate:"required,uuid"`
+	UserID    string `json:"user_id" validate:"required,uuid"`
+	AccountID string `json:"account_id" validate:"required,uuid"`
 }
 
 // DeleteUserAccountRequest defines the information needed to delete an existing account
 // for a user. This will hard delete the existing database entry.
 type DeleteUserAccountRequest struct {
-	UserID    string `validate:"required,uuid"`
-	AccountID string `validate:"required,uuid"`
+	UserID    string `json:"user_id" validate:"required,uuid"`
+	AccountID string `json:"account_id" validate:"required,uuid"`
 }
 
 // UserAccountFindRequest defines the possible options to search for users accounts.
 // By default archived user accounts will be excluded from response.
 type UserAccountFindRequest struct {
-	Where            *string       `schema:"where"`
-	Args             []interface{} `schema:"args"`
-	Order            []string      `schema:"order"`
-	Limit            *uint         `schema:"limit"`
-	Offset           *uint         `schema:"offset"`
-	IncludedArchived bool          `schema:"included-archived"`
+	Where            *string       `json:"where"`
+	Args             []interface{} `json:"args" swaggertype:"array,string"`
+	Order            []string      `json:"order"`
+	Limit            *uint         `json:"limit"`
+	Offset           *uint         `json:"offset"`
+	IncludedArchived bool          `json:"included-archived"`
 }
 
 // UserAccountStatus represents the status of a user for an account.

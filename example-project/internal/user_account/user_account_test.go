@@ -352,7 +352,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		if err != nil || arcRes == nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
-		} else if findRes.ArchivedAt.Valid && !findRes.ArchivedAt.Time.IsZero() {
+		} else if findRes.ArchivedAt != nil && findRes.ArchivedAt.Valid && !findRes.ArchivedAt.Time.IsZero() {
 			t.Fatalf("\t%s\tExpected user account to have archived_at empty", tests.Failed)
 		}
 
@@ -657,7 +657,7 @@ func TestCrud(t *testing.T) {
 							Status:     ua.Status,
 							CreatedAt:  ua.CreatedAt,
 							UpdatedAt:  now,
-							ArchivedAt: pq.NullTime{Time: now, Valid: true},
+							ArchivedAt: &pq.NullTime{Time: now, Valid: true},
 						},
 					}
 					if diff := cmp.Diff(findRes, expected); diff != "" {

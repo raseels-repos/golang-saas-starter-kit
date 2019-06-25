@@ -38,7 +38,7 @@ func TestAuthenticatorFile(t *testing.T) {
 		error         error
 	}{
 		{"NoKeyExpiration", time.Now(), time.Duration(0), nil},
-		{"KeyExpirationOk",  time.Now(), time.Duration(time.Second * 3600), nil},
+		{"KeyExpirationOk", time.Now(), time.Duration(time.Second * 3600), nil},
 		{"KeyExpirationDisabled", time.Now().Add(time.Second * 3600 * 3), time.Duration(time.Second * 3600), nil},
 	}
 

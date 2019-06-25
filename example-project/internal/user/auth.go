@@ -227,7 +227,6 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	return Token{Token: tkn, claims: claims}, nil
 }
 
-
 // mockTokenGenerator is used for testing that Authenticate calls its provided
 // token generator in a specific way.
 type MockTokenGenerator struct {

@@ -649,7 +649,7 @@ func MockAccount(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*Account,
 		Region:   "AK",
 		Country:  "USA",
 		Zipcode:  "99686",
-		Status: &s,
+		Status:   &s,
 	}
 	return Create(ctx, auth.Claims{}, dbConn, req, now)
 }

@@ -47,13 +47,12 @@ func New() *Test {
 
 	awsSession := session.Must(session.NewSession())
 
-
 	// ============================================================
 	// Startup Postgres container
 
 	var (
-		masterDB   *sqlx.DB
-		container  *docker.Container
+		masterDB  *sqlx.DB
+		container *docker.Container
 	)
 	if !DisableDb {
 		var err error

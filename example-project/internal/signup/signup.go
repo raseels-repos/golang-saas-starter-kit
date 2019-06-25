@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/go-playground/validator.v9"
@@ -45,7 +45,7 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 		}
 
 		var uniq bool
-		switch (fl.FieldName()) {
+		switch fl.FieldName() {
 		case "Name":
 			uniq = uniqName
 		case "Email":
@@ -83,9 +83,9 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 	// Associate the created user with the new account. The first user for the account will
 	// always have the role of admin.
 	ua := user_account.CreateUserAccountRequest{
-		UserID: resp.User.ID,
+		UserID:    resp.User.ID,
 		AccountID: resp.Account.ID,
-		Roles: []user_account.UserAccountRole{user_account.UserAccountRole_Admin},
+		Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_Admin},
 		//Status:  Use default value
 	}
 

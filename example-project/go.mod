@@ -19,7 +19,7 @@ require (
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kelseyhightower/envconfig v1.3.0
-	github.com/leodido/go-urn v1.1.0
+	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.1.1
 	github.com/mailru/easyjson v0.0.0-20190620125010-da37f6c1e481 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646

@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lib/pq"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )

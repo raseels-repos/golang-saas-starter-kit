@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
@@ -27,7 +27,6 @@ func testMain(m *testing.M) int {
 	return m.Run()
 }
 
-
 // TestSignupValidation ensures all the validation tags work on Signup
 func TestSignupValidation(t *testing.T) {
 
@@ -43,14 +42,14 @@ func TestSignupValidation(t *testing.T) {
 				return nil
 			},
 			errors.New("Key: 'SignupRequest.Account.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.Account.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.Account.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.Account.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.Account.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.Account.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.User.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.User.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
-			"Key: 'SignupRequest.User.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
+				"Key: 'SignupRequest.Account.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.Account.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.Account.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.Account.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.Account.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.User.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.User.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.User.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
 		},
 	}
 
@@ -159,7 +158,6 @@ func TestSignupFull(t *testing.T) {
 		}
 
 		t.Logf("\t%s\tSignup ok.", tests.Success)
-
 
 		// Verify that the user can be authenticated with the updated password.
 		_, err = user.Authenticate(ctx, test.MasterDB, tknGen, res.User.Email, req.User.Password, time.Hour, now)

@@ -82,5 +82,7 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 // @Param data body web.TimeResponse false "Time Response"
 // @Param data body web.EnumResponse false "Enum Response"
 // @Param data body web.EnumOption false "Enum Option"
+// @Param data body signup.SignupAccount false "SignupAccount"
+// @Param data body signup.SignupUser false "SignupUser"
 // To support nested types not parsed by swag.
 func Types() {}

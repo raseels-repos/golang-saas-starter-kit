@@ -295,6 +295,11 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	return tkn, nil
 }
 
+// AuthorizationHeader returns the header authorization value.
+func (t Token) AuthorizationHeader() string {
+	return "Bearer " + t.AccessToken
+}
+
 // mockTokenGenerator is used for testing that Authenticate calls its provided
 // token generator in a specific way.
 type MockTokenGenerator struct {

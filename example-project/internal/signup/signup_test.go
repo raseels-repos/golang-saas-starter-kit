@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
@@ -102,7 +101,7 @@ func TestSignupValidation(t *testing.T) {
 func TestSignupFull(t *testing.T) {
 
 	req := SignupRequest{
-		Account: account.AccountCreateRequest{
+		Account: SignupAccount{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -111,7 +110,7 @@ func TestSignupFull(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		},
-		User: user.UserCreateRequest{
+		User: SignupUser{
 			Name:            "Lee Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",

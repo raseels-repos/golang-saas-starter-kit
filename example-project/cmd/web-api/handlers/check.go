@@ -28,10 +28,10 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	// check redis
-	err = c.Redis.Ping().Err()
-	if err != nil {
-		return errors.Wrap(err, "Redis failed")
-	}
+	//err = c.Redis.Ping().Err()
+	//if err != nil {
+	//	return errors.Wrap(err, "Redis failed")
+	//}
 
 	status := struct {
 		Status string `json:"status"`

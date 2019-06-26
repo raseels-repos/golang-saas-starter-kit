@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
+	"github.com/pborman/uuid"
 	"net/http"
 	"os"
 	"testing"
@@ -18,10 +19,20 @@ var a http.Handler
 var test *tests.Test
 
 // Information about the users we have created for testing.
-var adminAuthorization string
-var adminID string
-var userAuthorization string
-var userID string
+type roleTest struct {
+	Token          user.Token
+	Claims         auth.Claims
+	SignupRequest  *signup.SignupRequest
+	SignupResponse *signup.SignupResponse
+	User           *user.User
+	Account        *account.Account
+}
+
+var roleTests map[string]roleTest
+
+func init() {
+	roleTests = make(map[string]roleTest)
+}
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -32,66 +43,90 @@ func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
 
-	// Create RSA keys to enable authentication in our service.
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(err)
-	}
+	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	kid := "4754d86b-7a6d-4df5-9c65-224741361492"
-	kf := auth.NewSingleKeyFunc(kid, key.Public().(*rsa.PublicKey))
-	authenticator, err := auth.NewAuthenticator(key, kid, "RS256", kf)
+	authenticator, err := auth.NewAuthenticatorMemory(now)
 	if err != nil {
 		panic(err)
 	}
 
 	shutdown := make(chan os.Signal, 1)
-	a = handlers.API(shutdown, test.Log, test.MasterDB, authenticator)
+	a = handlers.API(shutdown, test.Log, test.MasterDB, nil, authenticator)
 
-	// Create an admin user directly with our business logic. This creates an
-	// initial user that we will use for admin validated endpoints.
-	nu := user.NewUser{
-		Email:           "admin@ardanlabs.com",
-		Name:            "Admin User",
-		Roles:           []string{auth.RoleAdmin, auth.RoleUser},
-		Password:        "gophers",
-		PasswordConfirm: "gophers",
+	// Create a new account directly business logic. This creates an
+	// initial account and user that we will use for admin validated endpoints.
+	signupReq := signup.SignupRequest{
+		Account: signup.SignupAccount{
+			Name:     uuid.NewRandom().String(),
+			Address1: "103 East Main St",
+			Address2: "Unit 546",
+			City:     "Valdez",
+			Region:   "AK",
+			Country:  "USA",
+			Zipcode:  "99686",
+		},
+		User: signup.SignupUser{
+			Name:            "Lee Brown",
+			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
+			Password:        "akTechFr0n!ier",
+			PasswordConfirm: "akTechFr0n!ier",
+		},
 	}
-
-	admin, err := user.Create(tests.Context(), test.MasterDB, &nu, time.Now())
+	signup, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq, now)
 	if err != nil {
 		panic(err)
 	}
-	adminID = admin.ID.Hex()
 
-	tkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, time.Now(), nu.Email, nu.Password)
+	expires := time.Now().UTC().Sub(signup.User.CreatedAt) + time.Hour
+	adminTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq.User.Email, signupReq.User.Password, expires, now)
 	if err != nil {
 		panic(err)
 	}
 
-	adminAuthorization = "Bearer " + tkn.Token
+	adminClaims, err := authenticator.ParseClaims(adminTkn.AccessToken)
+	if err != nil {
+		panic(err)
+	}
+
+	roleTests[auth.RoleAdmin] = roleTest{
+		Token:          adminTkn,
+		Claims:         adminClaims,
+		SignupRequest:  &signupReq,
+		SignupResponse: signup,
+		User:           signup.User,
+		Account:        signup.Account,
+	}
 
 	// Create a regular user to use when calling regular validated endpoints.
-	nu = user.NewUser{
-		Email:           "user@ardanlabs.com",
-		Name:            "Regular User",
-		Roles:           []string{auth.RoleUser},
-		Password:        "concurrency",
-		PasswordConfirm: "concurrency",
+	userReq := user.UserCreateRequest{
+		Name:            "Lucas Brown",
+		Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
+		Password:        "akTechFr0n!ier",
+		PasswordConfirm: "akTechFr0n!ier",
 	}
-
-	usr, err := user.Create(tests.Context(), test.MasterDB, &nu, time.Now())
-	if err != nil {
-		panic(err)
-	}
-	userID = usr.ID.Hex()
-
-	tkn, err = user.Authenticate(tests.Context(), test.MasterDB, authenticator, time.Now(), nu.Email, nu.Password)
+	usr, err := user.Create(tests.Context(), adminClaims, test.MasterDB, userReq, now)
 	if err != nil {
 		panic(err)
 	}
 
-	userAuthorization = "Bearer " + tkn.Token
+	userTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, usr.Email, userReq.Password, expires, now)
+	if err != nil {
+		panic(err)
+	}
+
+	userClaims, err := authenticator.ParseClaims(userTkn.AccessToken)
+	if err != nil {
+		panic(err)
+	}
+
+	roleTests[auth.RoleUser] = roleTest{
+		Token:          userTkn,
+		Claims:         userClaims,
+		SignupRequest:  &signupReq,
+		SignupResponse: signup,
+		Account:        signup.Account,
+		User:           usr,
+	}
 
 	return m.Run()
 }

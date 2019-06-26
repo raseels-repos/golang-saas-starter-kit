@@ -201,7 +201,7 @@ func FindByUserID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, user
 }
 
 // Create a user account for a given user with specified roles.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req CreateUserAccountRequest, now time.Time) (*UserAccount, error) {
+func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountCreateRequest, now time.Time) (*UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Create")
 	defer span.Finish()
 
@@ -243,7 +243,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Create
 	// If there is an existing entry, then update instead of insert.
 	var ua UserAccount
 	if len(existing) > 0 {
-		upReq := UpdateUserAccountRequest{
+		upReq := UserAccountUpdateRequest{
 			UserID:    req.UserID,
 			AccountID: req.AccountID,
 			Roles:     &req.Roles,
@@ -315,7 +315,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 }
 
 // Update replaces a user account in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UpdateUserAccountRequest, now time.Time) error {
+func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Update")
 	defer span.Finish()
 
@@ -387,7 +387,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Update
 }
 
 // Archive soft deleted the user account from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ArchiveUserAccountRequest, now time.Time) error {
+func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Archive")
 	defer span.Finish()
 
@@ -438,7 +438,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Archi
 }
 
 // Delete removes a user account from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req DeleteUserAccountRequest) error {
+func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Delete")
 	defer span.Finish()
 

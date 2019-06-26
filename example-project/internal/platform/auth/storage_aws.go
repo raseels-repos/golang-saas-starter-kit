@@ -44,7 +44,7 @@ func NewAuthenticatorAws(awsSession *session.Session, awsSecretID string, now ti
 		return nil, err
 	}
 
-	return NewAuthenticator(storage, time.Now().UTC())
+	return NewAuthenticator(storage, now)
 }
 
 // NewStorageAws implements the interface Storage to support persisting private keys

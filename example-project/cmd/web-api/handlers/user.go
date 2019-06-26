@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
 	"net/http"
 	"strconv"
 	"strings"
@@ -225,6 +226,29 @@ func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			}
 
 			return errors.Wrapf(err, "User: %+v", &req)
+		}
+	}
+
+	if claims.Audience != "" {
+		uaReq := user_account.UserAccountCreateRequest{
+			UserID:    resp.User.ID,
+			AccountID: resp.Account.ID,
+			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_Admin},
+			//Status:  Use default value
+		}
+		_, err = user_account.Create(ctx, claims, u.MasterDB, uaReq, v.Now)
+		if err != nil {
+			switch err {
+			case user.ErrForbidden:
+				return web.NewRequestError(err, http.StatusForbidden)
+			default:
+				_, ok := err.(validator.ValidationErrors)
+				if ok {
+					return web.NewRequestError(err, http.StatusBadRequest)
+				}
+
+				return errors.Wrapf(err, "User account: %+v", &req)
+			}
 		}
 	}
 

@@ -1,5 +1,6 @@
 package tests
 
+/*
 import (
 	"bytes"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gopkg.in/mgo.v2/bson"
 )
+
 
 // TestProjects is the entry point for the projects
 func TestProjects(t *testing.T) {
@@ -447,3 +449,4 @@ func putProject204(t *testing.T, id string) {
 		}
 	}
 }
+*/

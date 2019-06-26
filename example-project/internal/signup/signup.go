@@ -96,7 +96,7 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 
 	// Associate the created user with the new account. The first user for the account will
 	// always have the role of admin.
-	ua := user_account.CreateUserAccountRequest{
+	ua := user_account.UserAccountCreateRequest{
 		UserID:    resp.User.ID,
 		AccountID: resp.Account.ID,
 		Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_Admin},

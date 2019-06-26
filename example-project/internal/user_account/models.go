@@ -66,20 +66,20 @@ func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
 	return r
 }
 
-// CreateUserAccountRequest defines the information is needed to associate a user to an
+// UserAccountCreateRequest defines the information is needed to associate a user to an
 // account. Users are global to the application and each users access can be managed
 // on an account level. If a current entry exists in the database but is archived,
 // it will be un-archived.
-type CreateUserAccountRequest struct {
+type UserAccountCreateRequest struct {
 	UserID    string             `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles     UserAccountRoles   `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
 }
 
-// UpdateUserAccountRequest defines the information needed to update the roles or the
+// UserAccountUpdateRequest defines the information needed to update the roles or the
 // status for an existing user account.
-type UpdateUserAccountRequest struct {
+type UserAccountUpdateRequest struct {
 	UserID    string             `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles     *UserAccountRoles  `json:"roles,omitempty" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"user"`
@@ -87,16 +87,16 @@ type UpdateUserAccountRequest struct {
 	unArchive bool               `json:"-"` // Internal use only.
 }
 
-// ArchiveUserAccountRequest defines the information needed to remove an existing account
+// UserAccountArchiveRequest defines the information needed to remove an existing account
 // for a user. This will archive (soft-delete) the existing database entry.
-type ArchiveUserAccountRequest struct {
+type UserAccountArchiveRequest struct {
 	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
-// DeleteUserAccountRequest defines the information needed to delete an existing account
+// UserAccountDeleteRequest defines the information needed to delete an existing account
 // for a user. This will hard delete the existing database entry.
-type DeleteUserAccountRequest struct {
+type UserAccountDeleteRequest struct {
 	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }

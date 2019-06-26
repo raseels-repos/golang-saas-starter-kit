@@ -143,49 +143,49 @@ func TestCreateValidation(t *testing.T) {
 
 	var accountTests = []struct {
 		name     string
-		req      CreateUserAccountRequest
-		expected func(req CreateUserAccountRequest, res *UserAccount) *UserAccount
+		req      UserAccountCreateRequest
+		expected func(req UserAccountCreateRequest, res *UserAccount) *UserAccount
 		error    error
 	}{
 		{"Required Fields",
-			CreateUserAccountRequest{},
-			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
+			UserAccountCreateRequest{},
+			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'CreateUserAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'CreateUserAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'CreateUserAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
+				"Key: 'UserAccountCreateRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'UserAccountCreateRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
-			CreateUserAccountRequest{
+			UserAccountCreateRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{invalidRole},
 			},
-			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
+			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'CreateUserAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
 		},
 		{"Valid Status",
-			CreateUserAccountRequest{
+			UserAccountCreateRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{UserAccountRole_User},
 				Status:    &invalidStatus,
 			},
-			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
+			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'CreateUserAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 		{"Default Status",
-			CreateUserAccountRequest{
+			UserAccountCreateRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     []UserAccountRole{UserAccountRole_User},
 			},
-			func(req CreateUserAccountRequest, res *UserAccount) *UserAccount {
+			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return &UserAccount{
 					UserID:    req.UserID,
 					AccountID: req.AccountID,
@@ -288,7 +288,7 @@ func TestCreateExistingEntry(t *testing.T) {
 			t.Fatalf("\t%s\tMock account failed.", tests.Failed)
 		}
 
-		req1 := CreateUserAccountRequest{
+		req1 := UserAccountCreateRequest{
 			UserID:    userID,
 			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
@@ -301,7 +301,7 @@ func TestCreateExistingEntry(t *testing.T) {
 			t.Fatalf("\t%s\tCreate user account roles should match request. Diff:\n%s", tests.Failed, diff)
 		}
 
-		req2 := CreateUserAccountRequest{
+		req2 := UserAccountCreateRequest{
 			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
 			Roles:     []UserAccountRole{UserAccountRole_Admin},
@@ -315,7 +315,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Now archive the user account to test trying to create a new entry for an archived entry
-		err = Archive(tests.Context(), auth.Claims{}, test.MasterDB, ArchiveUserAccountRequest{
+		err = Archive(tests.Context(), auth.Claims{}, test.MasterDB, UserAccountArchiveRequest{
 			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
 		}, now)
@@ -334,7 +334,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Attempt to create the duplicate user account which should set archived_at back to nil
-		req3 := CreateUserAccountRequest{
+		req3 := UserAccountCreateRequest{
 			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
@@ -368,32 +368,32 @@ func TestUpdateValidation(t *testing.T) {
 
 	var accountTests = []struct {
 		name  string
-		req   UpdateUserAccountRequest
+		req   UserAccountUpdateRequest
 		error error
 	}{
 		{"Required Fields",
-			UpdateUserAccountRequest{},
-			errors.New("Key: 'UpdateUserAccountRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'UpdateUserAccountRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'UpdateUserAccountRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			UserAccountUpdateRequest{},
+			errors.New("Key: 'UserAccountUpdateRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
+				"Key: 'UserAccountUpdateRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
+				"Key: 'UserAccountUpdateRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
-			UpdateUserAccountRequest{
+			UserAccountUpdateRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     &UserAccountRoles{invalidRole},
 			},
-			errors.New("Key: 'UpdateUserAccountRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountUpdateRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
 		},
 
 		{"Valid Status",
-			UpdateUserAccountRequest{
+			UserAccountUpdateRequest{
 				UserID:    uuid.NewRandom().String(),
 				AccountID: uuid.NewRandom().String(),
 				Roles:     &UserAccountRoles{UserAccountRole_User},
 				Status:    &invalidStatus,
 			},
-			errors.New("Key: 'UpdateUserAccountRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountUpdateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
 		},
 	}
 
@@ -550,7 +550,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Associate that with the user.
-				createReq := CreateUserAccountRequest{
+				createReq := UserAccountCreateRequest{
 					UserID:    userID,
 					AccountID: accountID,
 					Roles:     []UserAccountRole{UserAccountRole_User},
@@ -576,7 +576,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Update the account.
-				updateReq := UpdateUserAccountRequest{
+				updateReq := UserAccountUpdateRequest{
 					UserID:    userID,
 					AccountID: accountID,
 					Roles:     &UserAccountRoles{UserAccountRole_Admin},
@@ -624,7 +624,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user account.
-				err = Archive(tests.Context(), tt.claims(userID, accountID), test.MasterDB, ArchiveUserAccountRequest{
+				err = Archive(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountArchiveRequest{
 					UserID:    userID,
 					AccountID: accountID,
 				}, now)
@@ -667,7 +667,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive user account ok.", tests.Success)
 
 				// Delete (hard-delete) the user account.
-				err = Delete(tests.Context(), tt.claims(userID, accountID), test.MasterDB, DeleteUserAccountRequest{
+				err = Delete(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountDeleteRequest{
 					UserID:    userID,
 					AccountID: accountID,
 				})
@@ -717,7 +717,7 @@ func TestFind(t *testing.T) {
 		}
 
 		// Execute Create that will associate the user with the account.
-		ua, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, CreateUserAccountRequest{
+		ua, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, UserAccountCreateRequest{
 			UserID:    userID,
 			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},

@@ -36,9 +36,9 @@ require (
 	github.com/swaggo/swag v1.5.1
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/urfave/cli v1.20.0
+	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/crypto v0.0.0-20190621222207-cc06ce4a13d4
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0 // indirect
 	golang.org/x/tools v0.0.0-20190624222133-a101b041ded4 // indirect
 	google.golang.org/appengine v1.6.0 // indirect

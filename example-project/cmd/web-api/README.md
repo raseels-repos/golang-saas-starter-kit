@@ -6,7 +6,11 @@ accelerator@geeksinthewoods.com.com
 
 ## Description
 
-Service exposes a JSON api.
+Web API is a client facing API. Standard response format is JSON. 
+
+**Not all CRUD methods are exposed as endpoints.** Only endpoints that clients may need should be exposed. Internal 
+services should communicate directly with the business logic packages or a new API should be created to support. This 
+separation should help decouple client integrations from internal application development. 
 
 
 ## Local Installation

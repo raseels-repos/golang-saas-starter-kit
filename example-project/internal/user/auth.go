@@ -3,7 +3,9 @@ package user
 import (
 	"context"
 	"crypto/rsa"
+	"database/sql"
 	"github.com/dgrijalva/jwt-go"
+	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -26,7 +28,7 @@ type TokenGenerator interface {
 // Authenticate finds a user by their email and verifies their password. On success
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
-func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, email, password string, expires time.Duration, now time.Time) (Token, error) {
+func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, email, password string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Authenticate")
 	defer span.Finish()
 
@@ -58,13 +60,13 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, e
 	}
 
 	// The user is successfully authenticated with the supplied email and password.
-	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, "", expires, now)
+	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, "", expires, now, scopes...)
 }
 
 // Authenticate finds a user by their email and verifies their password. On success
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
-func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, accountID string, expires time.Duration, now time.Time) (Token, error) {
+func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.SwitchAccount")
 	defer span.Finish()
 
@@ -86,12 +88,12 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	// Generate a token for the user ID in supplied in claims as the Subject. Pass
 	// in the supplied claims as well to enforce ACLs when finding the current
 	// list of accounts for the user.
-	return generateToken(ctx, dbConn, tknGen, claims, req.UserID, req.AccountID, expires, now)
+	return generateToken(ctx, dbConn, tknGen, claims, req.UserID, req.AccountID, expires, now, scopes...)
 }
 
 // generateToken generates claims for the supplied user ID and account ID and then
 // returns the token for the generated claims used for authentication.
-func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, userID, accountID string, expires time.Duration, now time.Time) (Token, error) {
+func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, userID, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 
 	type userAccount struct {
 		AccountID       string
@@ -100,13 +102,16 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		UserArchived    pq.NullTime
 		AccountStatus   string
 		AccountArchived pq.NullTime
+		AccountTimezone sql.NullString
+		UserTimezone    sql.NullString
 	}
 
 	// Build select statement for users_accounts table to find all the user accounts for the user
 	f := func() ([]userAccount, error) {
-		query := sqlbuilder.NewSelectBuilder().Select("ua.account_id, ua.roles, ua.status as userStatus, ua.archived_at userArchived, a.status as accountStatus, a.archived_at as accountArchived").
+		query := sqlbuilder.NewSelectBuilder().Select("ua.account_id, ua.roles, ua.status as userStatus, ua.archived_at userArchived, a.status as accountStatus, a.archived_at, a.timezone, u.timezone as accountArchived").
 			From(userAccountTableName+" ua").
-			Join(accountTableName+" a", "a.id = ua.account_id")
+			Join(accountTableName+" a", "a.id = ua.account_id").
+			Join(userTableName+" u", "u.id = ua.user_id")
 		query.Where(query.And(
 			query.Equal("ua.user_id", userID),
 		))
@@ -125,7 +130,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		var resp []userAccount
 		for rows.Next() {
 			var ua userAccount
-			err = rows.Scan(&ua.AccountID, &ua.Roles, &ua.UserStatus, &ua.UserArchived, &ua.AccountStatus, &ua.AccountArchived)
+			err = rows.Scan(&ua.AccountID, &ua.Roles, &ua.UserStatus, &ua.UserArchived, &ua.AccountStatus, &ua.AccountArchived, &ua.AccountTimezone, &ua.UserTimezone)
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
@@ -212,11 +217,64 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		accountIds = append(accountIds, a.AccountID)
 	}
 
+	// Allow the scope to be defined for the claims. This enables testing via the API when a user has the role of admin
+	// and would like to limit their role to user.
+	var roles []string
+	if len(scopes) > 0 && scopes[0] != "" {
+		// Parse scopes, handle when one value has a list of scopes
+		// separated by a space.
+		var scopeList []string
+		for _, vs := range scopes {
+			for _, v := range strings.Split(vs, " ") {
+				v = strings.TrimSpace(v)
+				if v == "" {
+					continue
+				}
+				scopeList = append(scopeList, v)
+			}
+		}
+
+		for _, s := range scopeList {
+			var scopeValid bool
+			for _, r := range account.Roles {
+				if r == s || (s == auth.RoleUser && r == auth.RoleAdmin) {
+					scopeValid = true
+					break
+				}
+			}
+
+			if scopeValid {
+				roles = append(roles, s)
+			} else {
+				err := errors.Errorf("invalid scope '%s'", s)
+				return Token{}, err
+			}
+		}
+	} else {
+		roles = account.Roles
+	}
+
+	if len(roles) == 0 {
+		err := errors.New("no roles defined for user")
+		return Token{}, err
+	}
+
+	// Set the timezone if one is specifically set on the user.
+	var tz *time.Location
+	if account.UserTimezone.Valid && account.UserTimezone.String != "" {
+		tz, _ = time.LoadLocation(account.UserTimezone.String)
+	}
+
+	// If user timezone failed to parse or none is set, check the timezone set on the account.
+	if tz == nil && account.AccountTimezone.Valid && account.AccountTimezone.String != "" {
+		tz, _ = time.LoadLocation(account.AccountTimezone.String)
+	}
+
 	// JWT claims requires both an audience and a subject. For this application:
 	// 	Subject: The ID of the user authenticated.
 	// 	Audience: The ID of the account the user is accessing. A list of account IDs
 	// 			  will also be included to support the user switching between them.
-	claims = auth.NewClaims(userID, accountID, accountIds, account.Roles, now, expires)
+	claims = auth.NewClaims(userID, accountID, accountIds, roles, tz, now, expires)
 
 	// Generate a token for the user with the defined claims.
 	tknStr, err := tknGen.GenerateToken(claims)

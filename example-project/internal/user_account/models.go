@@ -1,7 +1,9 @@
 package user_account
 
 import (
+	"context"
 	"database/sql/driver"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -17,14 +19,51 @@ import (
 // application. The status will allow users to be managed on by account with users
 // being global to the application.
 type UserAccount struct {
-	ID         string            `json:"id" example:"72938896-a998-4258-a17b-6418dcdb80e3"`
-	UserID     string            `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	AccountID  string            `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
-	Roles      UserAccountRoles  `json:"roles" swaggertype:"array,string" enums:"admin,user" example:"admin"`
-	Status     UserAccountStatus `json:"status" swaggertype:"string" enums:"active,invited,disabled" example:"active"`
+	ID         string            `json:"id" validate:"required,uuid" example:"72938896-a998-4258-a17b-6418dcdb80e3"`
+	UserID     string            `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID  string            `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+	Status     UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	ArchivedAt *pq.NullTime      `json:"archived_at,omitempty"`
+}
+
+// UserAccountResponse defines the one to many relationship of an user to an account that is returned for display.
+type UserAccountResponse struct {
+	ID         string            `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	UserID     string            `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID  string            `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+	Status     web.EnumResponse  `json:"status"`                // Status is enum with values [active, invited, disabled].
+	CreatedAt  web.TimeResponse  `json:"created_at"`            // CreatedAt contains multiple format options for display.
+	UpdatedAt  web.TimeResponse  `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
+	ArchivedAt *web.TimeResponse `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
+}
+
+// Response transforms UserAccount and UserAccountResponse that is used for display.
+// Additional filtering by context values or translations could be applied.
+func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
+	if m == nil {
+		return nil
+	}
+
+	r := &UserAccountResponse{
+		ID:        m.ID,
+		UserID:    m.UserID,
+		AccountID: m.AccountID,
+		Roles:     m.Roles,
+		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountRole_Values),
+		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
+		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
+	}
+
+	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {
+		at := web.NewTimeResponse(ctx, m.ArchivedAt.Time)
+		r.ArchivedAt = &at
+	}
+
+	return r
 }
 
 // CreateUserAccountRequest defines the information is needed to associate a user to an
@@ -41,8 +80,8 @@ type CreateUserAccountRequest struct {
 // UpdateUserAccountRequest defines the information needed to update the roles or the
 // status for an existing user account.
 type UpdateUserAccountRequest struct {
-	UserID    string             `json:"user_id" validate:"required,uuid"`
-	AccountID string             `json:"account_id" validate:"required,uuid"`
+	UserID    string             `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles     *UserAccountRoles  `json:"roles,omitempty" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"user"`
 	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"disabled"`
 	unArchive bool               `json:"-"` // Internal use only.
@@ -51,26 +90,26 @@ type UpdateUserAccountRequest struct {
 // ArchiveUserAccountRequest defines the information needed to remove an existing account
 // for a user. This will archive (soft-delete) the existing database entry.
 type ArchiveUserAccountRequest struct {
-	UserID    string `json:"user_id" validate:"required,uuid"`
-	AccountID string `json:"account_id" validate:"required,uuid"`
+	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
 // DeleteUserAccountRequest defines the information needed to delete an existing account
 // for a user. This will hard delete the existing database entry.
 type DeleteUserAccountRequest struct {
-	UserID    string `json:"user_id" validate:"required,uuid"`
-	AccountID string `json:"account_id" validate:"required,uuid"`
+	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
 // UserAccountFindRequest defines the possible options to search for users accounts.
 // By default archived user accounts will be excluded from response.
 type UserAccountFindRequest struct {
-	Where            *string       `json:"where"`
-	Args             []interface{} `json:"args" swaggertype:"array,string"`
-	Order            []string      `json:"order"`
-	Limit            *uint         `json:"limit"`
-	Offset           *uint         `json:"offset"`
-	IncludedArchived bool          `json:"included-archived"`
+	Where            *string       `json:"where" example:"user_id = ? and account_id = ?"`
+	Args             []interface{} `json:"args" swaggertype:"array,string" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2,c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Order            []string      `json:"order" example:"created_at desc"`
+	Limit            *uint         `json:"limit" example:"10"`
+	Offset           *uint         `json:"offset" example:"20"`
+	IncludedArchived bool          `json:"included-archived" example:"false"`
 }
 
 // UserAccountStatus represents the status of a user for an account.

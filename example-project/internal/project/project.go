@@ -358,14 +358,19 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	return nil
 }
 
+// Archive soft deleted the project by ID from the database.
+func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, now time.Time) error {
+	req := ProjectArchiveRequest{
+		ID: id,
+	}
+	return Archive(ctx, claims, dbConn, req, now)
+}
+
 // Archive soft deleted the project from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, now time.Time) error {
+func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Archive")
 	defer span.Finish()
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `validate:"required,uuid"`
-	}{}
+
 	// Validate the request.
 	err := validator.New().Struct(req)
 	if err != nil {

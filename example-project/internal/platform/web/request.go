@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"reflect"
 	"strings"
@@ -10,6 +9,9 @@ import (
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/gorilla/schema"
+	"github.com/pkg/errors"
+	"github.com/xwb1989/sqlparser"
+	"github.com/xwb1989/sqlparser/dependency/querypb"
 	"gopkg.in/go-playground/validator.v9"
 	en_translations "gopkg.in/go-playground/validator.v9/translations/en"
 )
@@ -96,4 +98,44 @@ func Decode(r *http.Request, val interface{}) error {
 	}
 
 	return nil
+}
+
+// ExtractWhereArgs extracts the sql args from where. This allows requests to accept sql queries for filters and
+// then replaces the raw values with placeholders. The resulting query will then be executed with bind vars.
+func ExtractWhereArgs(where string) (string, []interface{}, error) {
+	// Create a full select sql query.
+	query := "select `t` from test where " + where
+
+	// Parse the query.
+	stmt, err := sqlparser.Parse(query)
+	if err != nil {
+		return "", nil, errors.WithMessagef(err, "Failed to parse query - %s", where)
+	}
+
+	// Normalize changes the query statement to use bind values, and updates the bind vars to those values. The
+	// supplied prefix is used to generate the bind var names.
+	bindVars := make(map[string]*querypb.BindVariable)
+	sqlparser.Normalize(stmt, bindVars, "redacted")
+
+	// Loop through all the bind vars and append to the response args list.
+	var vals []interface{}
+	for _, bv := range bindVars {
+		if bv.Values != nil {
+			var l []interface{}
+			for _, v := range bv.Values {
+				l = append(l, string(v.Value))
+			}
+			vals = append(vals, l)
+		} else {
+			vals = append(vals, string(bv.Value))
+		}
+	}
+
+	// Update the original query to include the redacted values.
+	query = sqlparser.String(stmt)
+
+	// Parse out the updated where.
+	where = strings.Split(query, " where ")[1]
+
+	return where, vals, nil
 }

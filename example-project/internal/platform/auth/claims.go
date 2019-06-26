@@ -24,13 +24,15 @@ const Key ctxKey = 1
 type Claims struct {
 	AccountIds []string `json:"accounts"`
 	Roles      []string `json:"roles"`
+	Timezone   string   `json:"timezone"`
+	tz         *time.Location
 	jwt.StandardClaims
 }
 
 // NewClaims constructs a Claims value for the identified user. The Claims
 // expire within a specified duration of the provided time. Additional fields
 // of the Claims can be set after calling NewClaims is desired.
-func NewClaims(userId, accountId string, accountIds []string, roles []string, now time.Time, expires time.Duration) Claims {
+func NewClaims(userId, accountId string, accountIds []string, roles []string, userTimezone *time.Location, now time.Time, expires time.Duration) Claims {
 	c := Claims{
 		AccountIds: accountIds,
 		Roles:      roles,
@@ -40,6 +42,10 @@ func NewClaims(userId, accountId string, accountIds []string, roles []string, no
 			IssuedAt:  now.Unix(),
 			ExpiresAt: now.Add(expires).Unix(),
 		},
+	}
+
+	if userTimezone != nil {
+		c.Timezone = userTimezone.String()
 	}
 
 	return c
@@ -70,4 +76,11 @@ func (c Claims) HasRole(roles ...string) bool {
 		}
 	}
 	return false
+}
+
+func (c Claims) TimeLocation() *time.Location {
+	if c.tz == nil && c.Timezone != "" {
+		c.tz, _ = time.LoadLocation(c.Timezone)
+	}
+	return c.tz
 }

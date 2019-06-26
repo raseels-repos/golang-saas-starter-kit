@@ -1,7 +1,9 @@
 package project
 
 import (
+	"context"
 	"database/sql/driver"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -12,18 +14,53 @@ import (
 type Project struct {
 	ID         string        `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
 	AccountID  string        `json:"account_id" validate:"required,uuid" truss:"api-create"`
-	Name       string        `json:"name"  validate:"required"`
-	Status     ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
+	Name       string        `json:"name"  validate:"required" example:"Rocket Launch"`
+	Status     ProjectStatus `json:"status" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string" example:"active"`
 	CreatedAt  time.Time     `json:"created_at" truss:"api-read"`
 	UpdatedAt  time.Time     `json:"updated_at" truss:"api-read"`
 	ArchivedAt *pq.NullTime  `json:"archived_at,omitempty" truss:"api-hide"`
 }
 
+// ProjectResponse represents a workflow that is returned for display.
+type ProjectResponse struct {
+	ID         string            `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
+	AccountID  string            `json:"account_id" validate:"required,uuid" truss:"api-create" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Name       string            `json:"name"  validate:"required" example:"Rocket Launch"`
+	Status     web.EnumResponse  `json:"status"`                // Status is enum with values [active, disabled].
+	CreatedAt  web.TimeResponse  `json:"created_at"`            // CreatedAt contains multiple format options for display.
+	UpdatedAt  web.TimeResponse  `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
+	ArchivedAt *web.TimeResponse `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
+}
+
+// Response transforms Project and ProjectResponse that is used for display.
+// Additional filtering by context values or translations could be applied.
+func (m *Project) Response(ctx context.Context) *ProjectResponse {
+	if m == nil {
+		return nil
+	}
+
+	r := &ProjectResponse{
+		ID:        m.ID,
+		AccountID: m.AccountID,
+		Name:      m.Name,
+		Status:    web.NewEnumResponse(ctx, m.Status, ProjectStatus_Values),
+		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
+		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
+	}
+
+	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {
+		at := web.NewTimeResponse(ctx, m.ArchivedAt.Time)
+		r.ArchivedAt = &at
+	}
+
+	return r
+}
+
 // ProjectCreateRequest contains information needed to create a new Project.
 type ProjectCreateRequest struct {
-	AccountID string         `json:"account_id" validate:"required,uuid"`
-	Name      string         `json:"name" validate:"required"`
-	Status    *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
+	AccountID string         `json:"account_id" validate:"required,uuid"  example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Name      string         `json:"name" validate:"required"  example:"Rocket Launch"`
+	Status    *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string" example:"active"`
 }
 
 // ProjectUpdateRequest defines what information may be provided to modify an existing
@@ -31,20 +68,26 @@ type ProjectCreateRequest struct {
 // changed. It uses pointer fields so we can differentiate between a field that
 // was not provided and a field that was provided as explicitly blank.
 type ProjectUpdateRequest struct {
-	ID     string         `json:"id" validate:"required,uuid"`
-	Name   *string        `json:"name,omitempty" validate:"omitempty"`
-	Status *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string"`
+	ID     string         `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
+	Name   *string        `json:"name,omitempty" validate:"omitempty" example:"Rocket Launch to Moon"`
+	Status *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string" example:"disabled"`
+}
+
+// ProjectArchiveRequest defines the information needed to archive a project. This will archive (soft-delete) the
+// existing database entry.
+type ProjectArchiveRequest struct {
+	ID string `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
 }
 
 // ProjectFindRequest defines the possible options to search for projects. By default
 // archived project will be excluded from response.
 type ProjectFindRequest struct {
-	Where            *string       `json:"where"`
-	Args             []interface{} `json:"args" swaggertype:"array,string"`
-	Order            []string      `json:"order"`
-	Limit            *uint         `json:"limit"`
-	Offset           *uint         `json:"offset"`
-	IncludedArchived bool          `json:"included-archived"`
+	Where            *string       `json:"where" example:"name = ? and status = ?"`
+	Args             []interface{} `json:"args" swaggertype:"array,string" example:"Moon Launch,active"`
+	Order            []string      `json:"order" example:"created_at desc"`
+	Limit            *uint         `json:"limit" example:"10"`
+	Offset           *uint         `json:"offset" example:"20"`
+	IncludedArchived bool          `json:"included-archived" example:"false"`
 }
 
 // ProjectStatus represents the status of project.

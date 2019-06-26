@@ -481,17 +481,18 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	return nil
 }
 
-// Archive soft deleted the account from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Archive")
-	defer span.Finish()
-
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `validate:"required,uuid"`
-	}{
+// Archive soft deleted the account by ID from the database.
+func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string, now time.Time) error {
+	req := AccountArchiveRequest{
 		ID: accountID,
 	}
+	return Archive(ctx, claims, dbConn, req, now)
+}
+
+// Archive soft deleted the account from the database.
+func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountArchiveRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Archive")
+	defer span.Finish()
 
 	// Validate the request.
 	err := validator.New().Struct(req)

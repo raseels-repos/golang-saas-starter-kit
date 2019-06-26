@@ -827,7 +827,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user.
-				err = Archive(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, now)
+				err = ArchiveById(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)

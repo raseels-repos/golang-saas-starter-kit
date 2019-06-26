@@ -30,14 +30,15 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 		MasterDB:       masterDB,
 		TokenGenerator: authenticator,
 	}
+
 	app.Handle("GET", "/v1/users", u.Find, mid.Authenticate(authenticator))
 	app.Handle("POST", "/v1/users", u.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/v1/users/:id", u.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users/:id", u.Update, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users/:id/password", u.UpdatePassword, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/users/:id/archive", u.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users", u.Update, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/users/switch-account/:accountId", u.SwitchAccount, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.Authenticate(authenticator))
 
 	// This route is not authenticated
 	app.Handle("POST", "/v1/oauth/token", u.Token)
@@ -46,12 +47,8 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	a := Account{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/accounts", a.Find, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/accounts", a.Create, mid.Authenticate(authenticator))
 	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/accounts/:id", a.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/accounts/:id/archive", a.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/accounts/:id", a.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/accounts", a.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register signup endpoints.
 	s := Signup{
@@ -66,8 +63,8 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	app.Handle("GET", "/v1/projects", p.Find, mid.Authenticate(authenticator))
 	app.Handle("POST", "/v1/projects", p.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/v1/projects/:id", p.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/projects/:id", p.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/projects/:id/archive", p.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/projects", p.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register swagger documentation.
@@ -78,3 +75,12 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 
 	return app
 }
+
+// Types godoc
+// @Summary List of types.
+// @Param data body web.FieldError false "Field Error"
+// @Param data body web.TimeResponse false "Time Response"
+// @Param data body web.EnumResponse false "Enum Response"
+// @Param data body web.EnumOption false "Enum Option"
+// To support nested types not parsed by swag.
+func Types() {}

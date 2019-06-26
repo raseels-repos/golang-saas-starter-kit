@@ -512,17 +512,18 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 	return nil
 }
 
+// Archive soft deleted the user by ID from the database.
+func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, now time.Time) error {
+	req := UserArchiveRequest{
+		ID: id,
+	}
+	return Archive(ctx, claims, dbConn, req, now)
+}
+
 // Archive soft deleted the user from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string, now time.Time) error {
+func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Archive")
 	defer span.Finish()
-
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `validate:"required,uuid"`
-	}{
-		ID: userID,
-	}
 
 	// Validate the request.
 	err := validator.New().Struct(req)

@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -109,12 +110,13 @@ func TestAuthenticate(t *testing.T) {
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
-			} else if diff := cmp.Diff(claims1, tkn1.claims); diff != "" {
+			}
+
+			// Hack for Unhandled Exception in go-cmp@v0.3.0/cmp/options.go:229
+			resClaims, _ := json.Marshal(claims1)
+			expectClaims, _ := json.Marshal(tkn1.claims)
+			if diff := cmp.Diff(string(resClaims), string(expectClaims)); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims to match from token. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims1.Roles, []string{account1Role}); diff != "" {
-				t.Fatalf("\t%s\tExpected parsed claims roles to match user account. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims1.AccountIds, []string{account1Id, account2Id}); diff != "" {
-				t.Fatalf("\t%s\tExpected parsed claims account IDs to match the single user account. Diff:\n%s", tests.Failed, diff)
 			}
 			t.Logf("\t%s\tAuthenticate parse claims from token ok.", tests.Success)
 
@@ -131,12 +133,13 @@ func TestAuthenticate(t *testing.T) {
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
-			} else if diff := cmp.Diff(claims2, tkn2.claims); diff != "" {
+			}
+
+			// Hack for Unhandled Exception in go-cmp@v0.3.0/cmp/options.go:229
+			resClaims, _ = json.Marshal(claims2)
+			expectClaims, _ = json.Marshal(tkn2.claims)
+			if diff := cmp.Diff(string(resClaims), string(expectClaims)); diff != "" {
 				t.Fatalf("\t%s\tExpected parsed claims to match from token. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims2.Roles, []string{account2Role}); diff != "" {
-				t.Fatalf("\t%s\tExpected parsed claims roles to match user account. Diff:\n%s", tests.Failed, diff)
-			} else if diff := cmp.Diff(claims2.AccountIds, []string{account1Id, account2Id}); diff != "" {
-				t.Fatalf("\t%s\tExpected parsed claims account IDs to match the single user account. Diff:\n%s", tests.Failed, diff)
 			}
 			t.Logf("\t%s\tSwitchAccount parse claims from token ok.", tests.Success)
 		}

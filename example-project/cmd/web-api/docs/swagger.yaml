@@ -1,6 +1,6 @@
 basePath: '{{.BasePath}}'
 definitions:
-  account.Account:
+  account.AccountResponse:
     properties:
       address1:
         example: 221 Tatitlek Ave
@@ -9,8 +9,10 @@ definitions:
         example: 'Box #1832'
         type: string
       archived_at:
-        type: string
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
       billing_user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
       city:
         example: Valdez
@@ -19,6 +21,49 @@ definitions:
         example: USA
         type: string
       created_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      name:
+        example: Company Name
+        type: string
+      region:
+        example: AK
+        type: string
+      signup_user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      status:
+        $ref: '#/definitions/web.EnumResponse'
+        type: object
+      timezone:
+        example: America/Anchorage
+        type: string
+      updated_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      zipcode:
+        example: "99686"
+        type: string
+    type: object
+  account.AccountUpdateRequest:
+    properties:
+      address1:
+        example: 221 Tatitlek Ave
+        type: string
+      address2:
+        example: 'Box #1832'
+        type: string
+      billing_user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      city:
+        example: Valdez
+        type: string
+      country:
+        example: USA
         type: string
       id:
         example: c4653bf9-5978-48b7-89c5-95704aebb7e2
@@ -30,18 +75,94 @@ definitions:
         example: AK
         type: string
       signup_user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
       status:
-        example: active
+        enum:
+        - active
+        - pending
+        - disabled
+        example: disabled
         type: string
       timezone:
         example: America/Anchorage
         type: string
-      updated_at:
-        type: string
       zipcode:
         example: "99686"
         type: string
+    required:
+    - id
+    type: object
+  project.ProjectArchiveRequest:
+    properties:
+      id:
+        example: 985f1746-1d9f-459f-a2d9-fc53ece5ae86
+        type: string
+    required:
+    - id
+    type: object
+  project.ProjectCreateRequest:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      name:
+        example: Rocket Launch
+        type: string
+      status:
+        enum:
+        - active
+        - disabled
+        example: active
+        type: string
+    required:
+    - account_id
+    - name
+    type: object
+  project.ProjectResponse:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      archived_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      created_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      id:
+        example: 985f1746-1d9f-459f-a2d9-fc53ece5ae86
+        type: string
+      name:
+        example: Rocket Launch
+        type: string
+      status:
+        $ref: '#/definitions/web.EnumResponse'
+        type: object
+      updated_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+    required:
+    - account_id
+    - id
+    - name
+    type: object
+  project.ProjectUpdateRequest:
+    properties:
+      id:
+        example: 985f1746-1d9f-459f-a2d9-fc53ece5ae86
+        type: string
+      name:
+        example: Rocket Launch to Moon
+        type: string
+      status:
+        enum:
+        - active
+        - disabled
+        example: disabled
+        type: string
+    required:
+    - id
     type: object
   signup.SignupRequest:
     properties:
@@ -102,11 +223,9 @@ definitions:
   signup.SignupResponse:
     properties:
       account:
-        $ref: '#/definitions/account.Account'
-        type: object
+        type: string
       user:
-        $ref: '#/definitions/user.User'
-        type: object
+        type: string
     type: object
   user.Token:
     properties:
@@ -117,12 +236,44 @@ definitions:
       token_type:
         type: string
     type: object
-  user.User:
+  user.UserArchiveRequest:
+    properties:
+      id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+    required:
+    - id
+    type: object
+  user.UserCreateRequest:
+    properties:
+      email:
+        example: gabi@geeksinthewoods.com
+        type: string
+      name:
+        example: Gabi May
+        type: string
+      password:
+        example: SecretString
+        type: string
+      password_confirm:
+        example: SecretString
+        type: string
+      timezone:
+        example: America/Anchorage
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  user.UserResponse:
     properties:
       archived_at:
-        type: string
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
       created_at:
-        type: string
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
       email:
         example: gabi@geeksinthewoods.com
         type: string
@@ -136,9 +287,65 @@ definitions:
         example: America/Anchorage
         type: string
       updated_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+    type: object
+  user.UserUpdatePasswordRequest:
+    properties:
+      id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      password:
+        example: NeverTellSecret
+        type: string
+      password_confirm:
+        example: NeverTellSecret
         type: string
     required:
-    - name
+    - id
+    - password
+    type: object
+  user.UserUpdateRequest:
+    properties:
+      email:
+        example: gabi.may@geeksinthewoods.com
+        type: string
+      id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      name:
+        example: Gabi May Not
+        type: string
+      timezone:
+        example: America/Anchorage
+        type: string
+    required:
+    - id
+    type: object
+  web.EnumOption:
+    properties:
+      selected:
+        example: true
+        type: boolean
+      title:
+        example: Active Etc
+        type: string
+      value:
+        example: active_etc
+        type: string
+    type: object
+  web.EnumResponse:
+    properties:
+      options:
+        items:
+          $ref: '#/definitions/web.EnumOption'
+        type: array
+      title:
+        example: Active Etc
+        type: string
+      value:
+        example: active_etc
+        type: string
     type: object
   web.Error:
     properties:
@@ -146,10 +353,62 @@ definitions:
         type: error
       fields:
         items:
-          type: FieldError
+          $ref: '#/definitions/web.FieldError'
         type: array
       status:
         type: integer
+    type: object
+  web.ErrorResponse:
+    properties:
+      error:
+        type: string
+      fields:
+        items:
+          $ref: '#/definitions/web.FieldError'
+        type: array
+    type: object
+  web.FieldError:
+    properties:
+      error:
+        type: string
+      field:
+        type: string
+    type: object
+  web.TimeResponse:
+    properties:
+      date:
+        example: "2019-06-25"
+        type: string
+      kitchen:
+        example: 3:00AM
+        type: string
+      local:
+        example: Tue Jun 25 3:00AM
+        type: string
+      local_date:
+        example: Tue Jun 25
+        type: string
+      now_rel_time:
+        example: 15 hours from now
+        type: string
+      now_time:
+        example: 5 hours ago
+        type: string
+      rfc1123:
+        example: Tue, 25 Jun 2019 03:00:53 AKDT
+        type: string
+      time:
+        example: "03:00:53"
+        type: string
+      timezone:
+        example: America/Anchorage
+        type: string
+      value:
+        example: "2019-06-25T03:00:53.284-08:00"
+        type: string
+      value_utc:
+        example: "2019-06-25T11:00:53.284Z"
+        type: string
     type: object
 host: '{{.Host}}'
 info:
@@ -165,11 +424,53 @@ info:
   title: SaaS Example API
   version: '{{.Version}}'
 paths:
+  /accounts:
+    patch:
+      consumes:
+      - application/json
+      description: Update updates the specified account in the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/account.AccountUpdateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Update account by ID
+      tags:
+      - account
   /accounts/{id}:
     get:
       consumes:
       - application/json
-      description: get string by ID
+      description: Read returns the specified account from the system.
       parameters:
       - description: Account ID
         in: path
@@ -181,31 +482,32 @@ paths:
       responses:
         "200":
           description: OK
-          headers:
-            Token:
-              description: qwerty
-              type: string
           schema:
-            $ref: '#/definitions/account.Account'
+            $ref: '#/definitions/account.AccountResponse'
             type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
-      summary: Read returns the specified account from the system.
+      summary: Get account by ID
       tags:
       - account
   /oauth/token:
@@ -214,6 +516,14 @@ paths:
       - application/json
       description: Token generates an oauth2 accessToken using Basic Auth with a user's
         email and password.
+      parameters:
+      - description: Scope
+        enum:
+        - user
+        - admin
+        in: query
+        name: scope
+        type: string
       produces:
       - application/json
       responses:
@@ -246,6 +556,273 @@ paths:
       summary: Token handles a request to authenticate a user.
       tags:
       - user
+  /project:
+    get:
+      consumes:
+      - application/json
+      description: Find returns the existing projects in the system.
+      parameters:
+      - description: 'Filter string, example: name = ''Moon Launch'''
+        in: query
+        name: where
+        type: string
+      - description: 'Order columns separated by comma, example: created_at desc'
+        in: query
+        name: order
+        type: string
+      - description: 'Limit, example: 10'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset, example: 20'
+        in: query
+        name: offset
+        type: integer
+      - description: 'Included Archived, example: false'
+        in: query
+        name: included-archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/project.ProjectResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: List projects
+      tags:
+      - project
+  /projects:
+    patch:
+      consumes:
+      - application/json
+      description: Update updates the specified project in the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/project.ProjectUpdateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Update project by ID
+      tags:
+      - project
+    post:
+      consumes:
+      - application/json
+      description: Create inserts a new project into the system.
+      parameters:
+      - description: Project details
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/project.ProjectCreateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/project.ProjectResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Create new project.
+      tags:
+      - project
+  /projects/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete removes the specified project from the system.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Delete project by ID
+      tags:
+      - project
+    get:
+      consumes:
+      - application/json
+      description: Read returns the specified project from the system.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/project.ProjectResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Get project by ID.
+      tags:
+      - project
+  /projects/archive:
+    patch:
+      consumes:
+      - application/json
+      description: Archive soft-deletes the specified project from the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/project.ProjectArchiveRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Archive project by ID
+      tags:
+      - project
   /signup:
     post:
       consumes:
@@ -264,40 +841,217 @@ paths:
       responses:
         "200":
           description: OK
-          headers:
-            Token:
-              description: qwerty
-              type: string
           schema:
             $ref: '#/definitions/signup.SignupResponse'
             type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
       summary: Signup handles new account creation.
       tags:
       - signup
-  /users/{id}:
+  /users:
     get:
       consumes:
       - application/json
-      description: get string by ID
+      description: Find returns the existing users in the system.
+      parameters:
+      - description: 'Filter string, example: name = ''Company Name'' and email =
+          ''gabi.may@geeksinthewoods.com'''
+        in: query
+        name: where
+        type: string
+      - description: 'Order columns separated by comma, example: created_at desc'
+        in: query
+        name: order
+        type: string
+      - description: 'Limit, example: 10'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset, example: 20'
+        in: query
+        name: offset
+        type: integer
+      - description: 'Included Archived, example: false'
+        in: query
+        name: included-archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.UserResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: List users
+      tags:
+      - user
+    patch:
+      consumes:
+      - application/json
+      description: Update updates the specified user in the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user.UserUpdateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Update user by ID
+      tags:
+      - user
+    post:
+      consumes:
+      - application/json
+      description: Create inserts a new user into the system.
+      parameters:
+      - description: User details
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user.UserCreateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Create new user.
+      tags:
+      - user
+  /users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete removes the specified user from the system.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: string
-      - description: Authentication header
-        in: header
-        name: Authorization
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Delete user by ID
+      tags:
+      - user
+    get:
+      consumes:
+      - application/json
+      description: Read returns the specified user from the system.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
         required: true
         type: string
       produces:
@@ -305,31 +1059,156 @@ paths:
       responses:
         "200":
           description: OK
-          headers:
-            Token:
-              description: qwerty
-              type: string
           schema:
-            $ref: '#/definitions/user.User'
+            $ref: '#/definitions/user.UserResponse'
             type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
-      summary: Read returns the specified user from the system.
+      summary: Get user by ID
+      tags:
+      - user
+  /users/archive:
+    patch:
+      consumes:
+      - application/json
+      description: Archive soft-deletes the specified user from the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user.UserArchiveRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Archive user by ID
+      tags:
+      - user
+  /users/password:
+    patch:
+      consumes:
+      - application/json
+      description: Update updates the password for a specified user in the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user.UserUpdatePasswordRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Update user password by ID
+      tags:
+      - user
+  /users/switch-account/{account_id}:
+    patch:
+      consumes:
+      - application/json
+      description: SwitchAccount updates the auth claims to a new account.
+      parameters:
+      - description: Account ID
+        in: path
+        name: account_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Switch account.
       tags:
       - user
 securityDefinitions:
@@ -338,9 +1217,8 @@ securityDefinitions:
   OAuth2Password:
     flow: password
     scopes:
-      admin: ' Grants read and write access to administrative information'
-      read: ' Grants read access'
-      write: ' Grants write access'
+      admin: ' Grants administrative privileges with role of admin.'
+      user: ' Grants basic privileges with role of user.'
     tokenUrl: /v1/oauth/token
     type: oauth2
 swagger: "2.0"

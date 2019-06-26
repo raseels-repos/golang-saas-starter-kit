@@ -55,9 +55,8 @@ var service = "WEB_API"
 
 // @securitydefinitions.oauth2.password OAuth2Password
 // @tokenUrl /v1/oauth/token
-// @scope.read Grants read access
-// @scope.write Grants write access
-// @scope.admin Grants read and write access to administrative information
+// @scope.user Grants basic privileges with role of user.
+// @scope.admin Grants administrative privileges with role of admin.
 
 func main() {
 

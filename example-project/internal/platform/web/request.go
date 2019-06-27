@@ -36,7 +36,21 @@ func init() {
 	en_translations.RegisterDefaultTranslations(validate, lang)
 
 	// Use JSON tag names for errors instead of Go struct names.
-	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+	validate = NewValidator()
+
+	// Empty method that can be overwritten in business logic packages to prevent web.Decode from failing.
+	f := func(fl validator.FieldLevel) bool {
+		return true
+	}
+	validate.RegisterValidation("unique", f)
+}
+
+// NewValidator inits a new validator with custom settings.
+func NewValidator() *validator.Validate {
+	var v = validator.New()
+
+	// Use JSON tag names for errors instead of Go struct names.
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 		if name == "-" {
 			return ""
@@ -44,10 +58,7 @@ func init() {
 		return name
 	})
 
-	f := func(fl validator.FieldLevel) bool {
-		return true
-	}
-	validate.RegisterValidation("unique", f)
+	return v
 }
 
 // Decode reads the body of an HTTP request looking for a JSON document. The
@@ -56,45 +67,24 @@ func init() {
 // If the provided value is a struct then it is checked for validation tags.
 func Decode(r *http.Request, val interface{}) error {
 
-	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete {
+	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch || r.Method == http.MethodDelete {
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(val); err != nil {
+			err = errors.Wrap(err, "decode request body failed")
 			return NewRequestError(err, http.StatusBadRequest)
 		}
 	} else {
 		decoder := schema.NewDecoder()
 		if err := decoder.Decode(val, r.URL.Query()); err != nil {
+			err = errors.Wrap(err, "decode request query failed")
 			return NewRequestError(err, http.StatusBadRequest)
 		}
 	}
 
 	if err := validate.Struct(val); err != nil {
-
-		// Use a type assertion to get the real error value.
-		verrors, ok := err.(validator.ValidationErrors)
-		if !ok {
-			return err
-		}
-
-		// lang controls the language of the error messages. You could look at the
-		// Accept-Language header if you intend to support multiple languages.
-		lang, _ := translator.GetTranslator("en")
-
-		var fields []FieldError
-		for _, verror := range verrors {
-			field := FieldError{
-				Field: verror.Field(),
-				Error: verror.Translate(lang),
-			}
-			fields = append(fields, field)
-		}
-
-		return &Error{
-			Err:    errors.New("field validation error"),
-			Status: http.StatusBadRequest,
-			Fields: fields,
-		}
+		verr, _ :=  NewValidationError(err)
+		return verr
 	}
 
 	return nil
@@ -139,3 +129,30 @@ func ExtractWhereArgs(where string) (string, []interface{}, error) {
 
 	return where, vals, nil
 }
+
+
+func RequestIsJson(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if v := r.Header.Get("Content-type"); v != "" {
+		for _, hv := range strings.Split(v, ";") {
+			if strings.ToLower(hv) == "application/json" {
+				return true
+			}
+		}
+	}
+
+	if v := r.URL.Query().Get("ResponseFormat"); v != "" {
+		if strings.ToLower(v) == "json" {
+			return true
+		}
+	}
+
+	if strings.HasSuffix(r.URL.Path, ".json") {
+		return true
+	}
+
+	return false
+}
+

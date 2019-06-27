@@ -50,7 +50,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if v := r.URL.Query().Get("where"); v != "" {
 		where, args, err := web.ExtractWhereArgs(v)
 		if err != nil {
-			return web.NewRequestError(err, http.StatusBadRequest)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
 		req.Where = &where
 		req.Args = args
@@ -71,7 +71,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for limit param", v)
-			return web.NewRequestError(err, http.StatusBadRequest)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
@@ -82,21 +82,28 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for offset param", v)
-			return web.NewRequestError(err, http.StatusBadRequest)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
 	}
 
-	// Handle order query value if set.
+	// Handle include-archive query value if set.
 	if v := r.URL.Query().Get("included-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
-			return web.NewRequestError(err, http.StatusBadRequest)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
 		req.IncludedArchived = b
 	}
+
+	//if err := web.Decode(r, &req); err != nil {
+	//	if _, ok := errors.Cause(err).(*web.Error); !ok {
+	//		err = web.NewRequestError(err, http.StatusBadRequest)
+	//	}
+	//	return  web.RespondJsonError(ctx, w, err)
+	//}
 
 	res, err := project.Find(ctx, claims, p.MasterDB, req)
 	if err != nil {
@@ -121,7 +128,6 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Param id path string true "Project ID"
 // @Success 200 {object} project.ProjectResponse
 // @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects/{id} [get]
@@ -131,24 +137,23 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return errors.New("claims missing from context")
 	}
 
+	// Handle included-archived query value if set.
 	var includeArchived bool
-	if qv := r.URL.Query().Get("include-archived"); qv != "" {
-		var err error
-		includeArchived, err = strconv.ParseBool(qv)
+	if v := r.URL.Query().Get("included-archived"); v != "" {
+		b, err := strconv.ParseBool(v)
 		if err != nil {
-			return errors.Wrapf(err, "Invalid value for include-archived : %s", qv)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
+		includeArchived = b
 	}
 
 	res, err := project.Read(ctx, claims, p.MasterDB, params["id"], includeArchived)
 	if err != nil {
-		switch err {
-		case project.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
+		cause := errors.Cause(err)
+		switch cause {
 		case project.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
-		case project.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
 		}
@@ -165,7 +170,7 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Produce  json
 // @Security OAuth2Password
 // @Param data body project.ProjectCreateRequest true "Project details"
-// @Success 200 {object} project.ProjectResponse
+// @Success 201 {object} project.ProjectResponse
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
@@ -184,24 +189,22 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	var req project.ProjectCreateRequest
 	if err := web.Decode(r, &req); err != nil {
-		err = errors.WithStack(err)
-
-		_, ok := err.(validator.ValidationErrors)
-		if ok {
-			return web.NewRequestError(err, http.StatusBadRequest)
+		if _, ok := errors.Cause(err).(*web.Error); !ok {
+			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return err
+		return  web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := project.Create(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
-		switch err {
+		cause := errors.Cause(err)
+		switch cause {
 		case project.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
-			_, ok := err.(validator.ValidationErrors)
+			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.NewRequestError(err, http.StatusBadRequest)
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
 			return errors.Wrapf(err, "Project: %+v", &req)
 		}
@@ -218,10 +221,9 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Produce  json
 // @Security OAuth2Password
 // @Param data body project.ProjectUpdateRequest true "Update fields"
-// @Success 201
+// @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects [patch]
 func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -237,29 +239,24 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	var req project.ProjectUpdateRequest
 	if err := web.Decode(r, &req); err != nil {
-		err = errors.WithStack(err)
-
-		_, ok := err.(validator.ValidationErrors)
-		if ok {
-			return web.NewRequestError(err, http.StatusBadRequest)
+		if _, ok := errors.Cause(err).(*web.Error); !ok {
+			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return err
+		return  web.RespondJsonError(ctx, w, err)
 	}
 
 	err := project.Update(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
-		switch err {
-		case project.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
-		case project.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
+		cause := errors.Cause(err)
+		switch cause {
 		case project.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
-			_, ok := err.(validator.ValidationErrors)
+			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.NewRequestError(err, http.StatusBadRequest)
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
+
 			return errors.Wrapf(err, "ID: %s Update: %+v", req.ID, req)
 		}
 	}
@@ -275,7 +272,7 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Produce  json
 // @Security OAuth2Password
 // @Param data body project.ProjectArchiveRequest true "Update fields"
-// @Success 201
+// @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
@@ -294,28 +291,24 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	var req project.ProjectArchiveRequest
 	if err := web.Decode(r, &req); err != nil {
-		err = errors.WithStack(err)
-
-		_, ok := err.(validator.ValidationErrors)
-		if ok {
-			return web.NewRequestError(err, http.StatusBadRequest)
+		if _, ok := errors.Cause(err).(*web.Error); !ok {
+			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return err
+		return  web.RespondJsonError(ctx, w, err)
 	}
 
 	err := project.Archive(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
-		switch err {
-		case project.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
+		cause := errors.Cause(err)
+		switch cause {
 		case project.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case project.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
-			_, ok := err.(validator.ValidationErrors)
+			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.NewRequestError(err, http.StatusBadRequest)
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "Id: %s", req.ID)
@@ -333,7 +326,7 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Produce  json
 // @Security OAuth2Password
 // @Param id path string true "Project ID"
-// @Success 201
+// @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
@@ -347,13 +340,12 @@ func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	err := project.Delete(ctx, claims, p.MasterDB, params["id"])
 	if err != nil {
-		switch err {
-		case project.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
+		cause := errors.Cause(err)
+		switch cause {
 		case project.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case project.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
 			return errors.Wrapf(err, "Id: %s", params["id"])
 		}

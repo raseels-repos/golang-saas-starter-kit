@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -12,15 +13,11 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 var (
 	// ErrNotFound abstracts the mgo not found error.
 	ErrNotFound = errors.New("Entity not found")
-
-	// ErrInvalidID occurs when an ID is not in a valid form.
-	ErrInvalidID = errors.New("ID is not in its proper form")
 
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
@@ -64,8 +61,6 @@ func mapAccountError(err error) error {
 	switch errors.Cause(err) {
 	case account.ErrNotFound:
 		err = ErrNotFound
-	case account.ErrInvalidID:
-		err = ErrInvalidID
 	case account.ErrForbidden:
 		err = ErrForbidden
 	}
@@ -206,7 +201,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return nil, err
 	}
@@ -303,10 +299,10 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 	query.Where(query.Equal("id", id))
 
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if err != nil {
+	if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "account %s not found", id)
 		return nil, err
-	} else if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "user account %s not found", id)
+	} else if err != nil {
 		return nil, err
 	}
 	u := res[0]
@@ -320,7 +316,8 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}
@@ -392,7 +389,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}
@@ -443,7 +441,8 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}

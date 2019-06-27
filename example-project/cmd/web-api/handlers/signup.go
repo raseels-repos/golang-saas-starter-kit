@@ -27,9 +27,8 @@ type Signup struct {
 // @Accept  json
 // @Produce  json
 // @Param data body signup.SignupRequest true "Signup details"
-// @Success 200 {object} signup.SignupResponse
+// @Success 201 {object} signup.SignupResponse
 // @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /signup [post]
 func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -43,29 +42,26 @@ func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 	var req signup.SignupRequest
 	if err := web.Decode(r, &req); err != nil {
-		err = errors.WithStack(err)
-
-		_, ok := err.(validator.ValidationErrors)
-		if ok {
-			return web.NewRequestError(err, http.StatusBadRequest)
+		if _, ok := errors.Cause(err).(*web.Error); !ok {
+			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return err
+		return  web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := signup.Signup(ctx, claims, c.MasterDB, req, v.Now)
 	if err != nil {
-		switch err {
+		switch errors.Cause(err) {
 		case account.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
 			_, ok := err.(validator.ValidationErrors)
 			if ok {
-				return web.NewRequestError(err, http.StatusBadRequest)
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "Signup: %+v", &req)
 		}
 	}
 
-	return web.RespondJson(ctx, w, res, http.StatusCreated)
+	return web.RespondJson(ctx, w, res.Response(ctx), http.StatusCreated)
 }

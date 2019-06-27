@@ -1,6 +1,7 @@
 package signup
 
 import (
+	"context"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
 )
@@ -31,8 +32,33 @@ type SignupUser struct {
 	PasswordConfirm string `json:"password_confirm" validate:"eqfield=Password" example:"SecretString"`
 }
 
-// SignupResponse response signup with created account and user.
-type SignupResponse struct {
+// SignupResult response signup with created account and user.
+type SignupResult struct {
 	Account *account.Account `json:"account"`
 	User    *user.User       `json:"user"`
 }
+
+// SignupResponse represents the user and account created for signup that is returned for display.
+type SignupResponse struct {
+	Account *account.AccountResponse `json:"account"`
+	User    *user.UserResponse       `json:"user"`
+}
+
+// Response transforms SignupResult to SignupResponse that is used for display.
+// Additional filtering by context values or translations could be applied.
+func (m *SignupResult) Response(ctx context.Context) *SignupResponse {
+	if m == nil {
+		return nil
+	}
+
+	r := &SignupResponse{}
+	if m.Account != nil {
+		r.Account = m.Account.Response(ctx)
+	}
+	if m.User != nil {
+		r.User = m.User.Response(ctx)
+	}
+
+	return r
+}
+

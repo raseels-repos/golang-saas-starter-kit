@@ -32,12 +32,12 @@ func TestSignupValidation(t *testing.T) {
 	var userTests = []struct {
 		name     string
 		req      SignupRequest
-		expected func(req SignupRequest, res *SignupResponse) *SignupResponse
+		expected func(req SignupRequest, res *SignupResult) *SignupResult
 		error    error
 	}{
 		{"Required Fields",
 			SignupRequest{},
-			func(req SignupRequest, res *SignupResponse) *SignupResponse {
+			func(req SignupRequest, res *SignupResult) *SignupResult {
 				return nil
 			},
 			errors.New("Key: 'SignupRequest.Account.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +

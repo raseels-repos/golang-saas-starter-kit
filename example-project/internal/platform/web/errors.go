@@ -2,6 +2,8 @@ package web
 
 import (
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
+	"net/http"
 )
 
 // FieldError is used to indicate an error with a specific request field.
@@ -27,6 +29,12 @@ type Error struct {
 // NewRequestError wraps a provided error with an HTTP status code. This
 // function should be used when handlers encounter expected errors.
 func NewRequestError(err error, status int) error {
+
+	// if its a validation error then
+	if verr, ok :=  NewValidationError(err); ok {
+		return verr
+	}
+
 	return &Error{err, status, nil}
 }
 
@@ -50,6 +58,35 @@ func (s *shutdown) Error() string {
 // a graceful shutdown.
 func NewShutdownError(message string) error {
 	return &shutdown{message}
+}
+
+// NewValidationError checks the error for validation errors and formats the correct response.
+func NewValidationError(err error) (error, bool) {
+
+	// Use a type assertion to get the real error value.
+	verrors, ok := errors.Cause(err).(validator.ValidationErrors)
+	if !ok {
+		return err, false
+	}
+
+	// lang controls the language of the error messages. You could look at the
+	// Accept-Language header if you intend to support multiple languages.
+	lang, _ := translator.GetTranslator("en")
+
+	var fields []FieldError
+	for _, verror := range verrors {
+		field := FieldError{
+			Field: verror.Field(),
+			Error: verror.Translate(lang),
+		}
+		fields = append(fields, field)
+	}
+
+	return &Error{
+		Err:    errors.New("field validation error"),
+		Status: http.StatusBadRequest,
+		Fields: fields,
+	}, true
 }
 
 // IsShutdown checks to see if the shutdown error is contained

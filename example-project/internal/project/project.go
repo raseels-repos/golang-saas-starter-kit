@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/go-playground/validator.v9"
 	"time"
 )
 
@@ -21,10 +21,9 @@ const (
 var (
 	// ErrNotFound abstracts the postgres not found error.
 	ErrNotFound = errors.New("Entity not found")
+
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
-	// ErrInvalidID occurs when an ID is not in a valid form.
-	ErrInvalidID = errors.New("ID is not in its proper form")
 )
 
 // projectMapColumns is the list of columns needed for mapRowsToProject
@@ -193,14 +192,16 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*Project, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Read")
 	defer span.Finish()
+
 	// Filter base select query by id
 	query := selectQuery()
 	query.Where(query.Equal("id", id))
+
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if err != nil {
+	if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "account %s not found", id)
 		return nil, err
-	} else if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "project %s not found", id)
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -231,8 +232,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 
 	}
 
-	v := validator.New()
 	// Validate the request.
+	v := web.NewValidator()
 	err := v.Struct(req)
 	if err != nil {
 		return nil, err
@@ -301,8 +302,9 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Update")
 	defer span.Finish()
-	v := validator.New()
+
 	// Validate the request.
+	v := web.NewValidator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -372,7 +374,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}
@@ -418,12 +421,15 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
 	defer span.Finish()
+
 	// Defines the struct to apply validation
 	req := struct {
 		ID string `validate:"required,uuid"`
 	}{}
+
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,12 @@ func RespondJsonError(ctx context.Context, w http.ResponseWriter, err error) err
 
 	// If the error was of the type *Error, the handler has
 	// a specific status code and error to return.
-	if webErr, ok := errors.Cause(err).(*Error); ok {
+	webErr, ok := errors.Cause(err).(*Error)
+	if !ok {
+		webErr, ok = err.(*Error)
+	}
+
+	if ok {
 		er := ErrorResponse{
 			Error:  webErr.Err.Error(),
 			Fields: webErr.Fields,

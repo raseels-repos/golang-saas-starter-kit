@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"database/sql"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -24,9 +25,6 @@ const (
 var (
 	// ErrNotFound abstracts the mgo not found error.
 	ErrNotFound = errors.New("Entity not found")
-
-	// ErrInvalidID occurs when an ID is not in a valid form.
-	ErrInvalidID = errors.New("ID is not in its proper form")
 
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
@@ -243,6 +241,7 @@ func UniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (b
 
 	var existingId string
 	err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
+
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		return false, err
@@ -261,8 +260,6 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Create")
 	defer span.Finish()
 
-	v := validator.New()
-
 	// Validation email address is unique in the database.
 	uniq, err := UniqueName(ctx, dbConn, req.Name, "")
 	if err != nil {
@@ -274,6 +271,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 		}
 		return uniq
 	}
+
+	v := web.NewValidator()
 	v.RegisterValidation("unique", f)
 
 	// Validate the request.
@@ -352,10 +351,10 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 	query.Where(query.Equal("id", id))
 
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if err != nil {
-		return nil, err
-	} else if res == nil || len(res) == 0 {
+	if res == nil || len(res) == 0 {
 		err = errors.WithMessagef(ErrNotFound, "account %s not found", id)
+		return nil, err
+	} else if err != nil {
 		return nil, err
 	}
 	u := res[0]
@@ -368,7 +367,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Update")
 	defer span.Finish()
 
-	v := validator.New()
+	v := web.NewValidator()
 
 	// Validation name is unique in the database.
 	if req.Name != nil {
@@ -380,6 +379,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 			if fl.Field().String() == "invalid" {
 				return false
 			}
+
 			return uniq
 		}
 		v.RegisterValidation("unique", f)
@@ -495,7 +495,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 	defer span.Finish()
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}
@@ -573,7 +574,8 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 	}
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return err
 	}

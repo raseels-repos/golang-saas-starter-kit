@@ -2,6 +2,7 @@ package signup
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
@@ -15,11 +16,9 @@ import (
 
 // Signup performs the steps needed to create a new account, new user and then associate
 // both records with a new user_account entry.
-func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req SignupRequest, now time.Time) (*SignupResponse, error) {
+func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req SignupRequest, now time.Time) (*SignupResult, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.signup.Signup")
 	defer span.Finish()
-
-	v := validator.New()
 
 	// Validate the user email address is unique in the database.
 	uniqEmail, err := user.UniqueEmail(ctx, dbConn, req.User.Email, "")
@@ -33,6 +32,7 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 		return nil, err
 	}
 
+
 	f := func(fl validator.FieldLevel) bool {
 		if fl.Field().String() == "invalid" {
 			return false
@@ -40,14 +40,16 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 
 		var uniq bool
 		switch fl.FieldName() {
-		case "Name":
+		case "Name", "name":
 			uniq = uniqName
-		case "Email":
+		case "Email", "email":
 			uniq = uniqEmail
 		}
 
 		return uniq
 	}
+
+	v := web.NewValidator()
 	v.RegisterValidation("unique", f)
 
 	// Validate the request.
@@ -56,7 +58,7 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 		return nil, err
 	}
 
-	var resp SignupResponse
+	var resp SignupResult
 
 	// UserCreateRequest contains information needed to create a new User.
 	userReq := user.UserCreateRequest{

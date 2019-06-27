@@ -29,24 +29,35 @@ func Authenticate(authenticator *auth.Authenticator) web.Middleware {
 			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Authenticate")
 			defer span.Finish()
 
-			authHdr := r.Header.Get("Authorization")
-			if authHdr == "" {
-				err := errors.New("missing Authorization header")
-				return web.NewRequestError(err, http.StatusUnauthorized)
+			m := func() error {
+				authHdr := r.Header.Get("Authorization")
+				if authHdr == "" {
+					err := errors.New("missing Authorization header")
+					return web.NewRequestError(err, http.StatusUnauthorized)
+				}
+
+				tknStr, err := parseAuthHeader(authHdr)
+				if err != nil {
+					return web.NewRequestError(err, http.StatusUnauthorized)
+				}
+
+				claims, err := authenticator.ParseClaims(tknStr)
+				if err != nil {
+					return web.NewRequestError(err, http.StatusUnauthorized)
+				}
+
+				// Add claims to the context so they can be retrieved later.
+				ctx = context.WithValue(ctx, auth.Key, claims)
+
+				return nil
 			}
 
-			tknStr, err := parseAuthHeader(authHdr)
-			if err != nil {
-				return web.NewRequestError(err, http.StatusUnauthorized)
+			if err := m(); err != nil {
+				if web.RequestIsJson(r) {
+					return web.RespondJsonError(ctx, w, err)
+				}
+				return err
 			}
-
-			claims, err := authenticator.ParseClaims(tknStr)
-			if err != nil {
-				return web.NewRequestError(err, http.StatusUnauthorized)
-			}
-
-			// Add claims to the context so they can be retrieved later.
-			ctx = context.WithValue(ctx, auth.Key, claims)
 
 			return after(ctx, w, r, params)
 		}
@@ -68,14 +79,25 @@ func HasRole(roles ...string) web.Middleware {
 			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.HasRole")
 			defer span.Finish()
 
-			claims, ok := ctx.Value(auth.Key).(auth.Claims)
-			if !ok {
-				// TODO(jlw) should this be a web.Shutdown?
-				return errors.New("claims missing from context: HasRole called without/before Authenticate")
+			m := func() error {
+				claims, ok := ctx.Value(auth.Key).(auth.Claims)
+				if !ok {
+					// TODO(jlw) should this be a web.Shutdown?
+					return errors.New("claims missing from context: HasRole called without/before Authenticate")
+				}
+
+				if !claims.HasRole(roles...) {
+					return ErrForbidden
+				}
+
+				return nil
 			}
 
-			if !claims.HasRole(roles...) {
-				return ErrForbidden
+			if err := m(); err != nil {
+				if web.RequestIsJson(r) {
+					return web.RespondJsonError(ctx, w, err)
+				}
+				return err
 			}
 
 			return after(ctx, w, r, params)
@@ -97,3 +119,6 @@ func parseAuthHeader(bearerStr string) (string, error) {
 
 	return split[1], nil
 }
+
+
+

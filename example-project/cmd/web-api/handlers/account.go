@@ -30,7 +30,6 @@ type Account struct {
 // @Param id path string true "Account ID"
 // @Success 200 {object} account.AccountResponse
 // @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /accounts/{id} [get]
@@ -40,24 +39,23 @@ func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return errors.New("claims missing from context")
 	}
 
+	// Handle included-archived query value if set.
 	var includeArchived bool
-	if qv := r.URL.Query().Get("include-archived"); qv != "" {
-		var err error
-		includeArchived, err = strconv.ParseBool(qv)
+	if v := r.URL.Query().Get("included-archived"); v != "" {
+		b, err := strconv.ParseBool(v)
 		if err != nil {
-			return errors.Wrapf(err, "Invalid value for include-archived : %s", qv)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 		}
+		includeArchived = b
 	}
 
 	res, err := account.Read(ctx, claims, a.MasterDB, params["id"], includeArchived)
 	if err != nil {
-		switch err {
-		case account.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
+		cause := errors.Cause(err)
+		switch cause {
 		case account.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
-		case account.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
 		}
@@ -74,10 +72,9 @@ func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Produce  json
 // @Security OAuth2Password
 // @Param data body account.AccountUpdateRequest true "Update fields"
-// @Success 201
+// @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /accounts [patch]
 func (a *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -93,31 +90,25 @@ func (a *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	var req account.AccountUpdateRequest
 	if err := web.Decode(r, &req); err != nil {
-		err = errors.WithStack(err)
-
-		_, ok := err.(validator.ValidationErrors)
-		if ok {
-			return web.NewRequestError(err, http.StatusBadRequest)
+		if _, ok := errors.Cause(err).(*web.Error); !ok {
+			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return err
+		return  web.RespondJsonError(ctx, w, err)
 	}
 
 	err := account.Update(ctx, claims, a.MasterDB, req, v.Now)
 	if err != nil {
-		switch err {
-		case account.ErrInvalidID:
-			return web.NewRequestError(err, http.StatusBadRequest)
-		case account.ErrNotFound:
-			return web.NewRequestError(err, http.StatusNotFound)
+		cause := errors.Cause(err)
+		switch cause {
 		case account.ErrForbidden:
-			return web.NewRequestError(err, http.StatusForbidden)
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
-			_, ok := err.(validator.ValidationErrors)
+			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.NewRequestError(err, http.StatusBadRequest)
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
 
-			return errors.Wrapf(err, "Id: %s Account: %+v", params["id"], &req)
+			return errors.Wrapf(err, "Id: %s Account: %+v", req.ID, &req)
 		}
 	}
 

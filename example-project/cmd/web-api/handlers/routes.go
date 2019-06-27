@@ -30,18 +30,29 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 		MasterDB:       masterDB,
 		TokenGenerator: authenticator,
 	}
-
 	app.Handle("GET", "/v1/users", u.Find, mid.Authenticate(authenticator))
 	app.Handle("POST", "/v1/users", u.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/v1/users/:id", u.Read, mid.Authenticate(authenticator))
 	app.Handle("PATCH", "/v1/users", u.Update, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.Authenticate(authenticator))
 	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.Authenticate(authenticator))
 
 	// This route is not authenticated
 	app.Handle("POST", "/v1/oauth/token", u.Token)
+
+
+	// Register user account management endpoints.
+	ua := UserAccount{
+		MasterDB:       masterDB,
+	}
+	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.Authenticate(authenticator))
+	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/user_accounts/:id", ua.Read, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.Authenticate(authenticator))
+	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register account endpoints.
 	a := Account{

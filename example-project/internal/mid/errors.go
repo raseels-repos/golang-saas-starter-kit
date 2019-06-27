@@ -28,8 +28,14 @@ func Errors(log *log.Logger) web.Middleware {
 				log.Printf("%d : ERROR : %+v", span.Context().TraceID(), err)
 
 				// Respond to the error.
-				if err := web.RespondError(ctx, w, err); err != nil {
-					return err
+				if web.RequestIsJson(r) {
+					if err := web.RespondJsonError(ctx, w, err); err != nil {
+						return err
+					}
+				} else {
+					if err := web.RespondError(ctx, w, err); err != nil {
+						return err
+					}
 				}
 
 				// If we receive the shutdown err we need to return it

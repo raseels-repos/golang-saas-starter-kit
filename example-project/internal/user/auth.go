@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"database/sql"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/dgrijalva/jwt-go"
 	"strings"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 // TokenGenerator is the behavior we need in our Authenticate to generate tokens for
@@ -80,7 +80,8 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	}
 
 	// Validate the request.
-	err := validator.New().Struct(req)
+	v := web.NewValidator()
+	err := v.Struct(req)
 	if err != nil {
 		return Token{}, err
 	}

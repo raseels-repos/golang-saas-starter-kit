@@ -568,7 +568,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 
 	// Defines the struct to apply validation
 	req := struct {
-		ID string `validate:"required,uuid"`
+		ID string `json:"id" validate:"required,uuid"`
 	}{
 		ID: accountID,
 	}

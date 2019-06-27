@@ -61,4 +61,3 @@ func (m *SignupResult) Response(ctx context.Context) *SignupResponse {
 
 	return r
 }
-

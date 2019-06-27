@@ -53,7 +53,7 @@ func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
 		UserID:    m.UserID,
 		AccountID: m.AccountID,
 		Roles:     m.Roles,
-		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountRole_Values),
+		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountStatus_Values),
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 	}
@@ -82,7 +82,7 @@ type UserAccountCreateRequest struct {
 type UserAccountUpdateRequest struct {
 	UserID    string             `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
-	Roles     *UserAccountRoles  `json:"roles,omitempty" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"user"`
+	Roles     *UserAccountRoles  `json:"roles,omitempty" validate:"omitempty,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"user"`
 	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"disabled"`
 	unArchive bool               `json:"-"` // Internal use only.
 }

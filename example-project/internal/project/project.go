@@ -199,7 +199,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
 	if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "account %s not found", id)
+		err = errors.WithMessagef(ErrNotFound, "project %s not found", id)
 		return nil, err
 	} else if err != nil {
 		return nil, err
@@ -424,8 +424,10 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string)
 
 	// Defines the struct to apply validation
 	req := struct {
-		ID string `validate:"required,uuid"`
-	}{}
+		ID string `json:"id" validate:"required,uuid"`
+	}{
+		ID: id,
+	}
 
 	// Validate the request.
 	v := web.NewValidator()

@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"github.com/google/go-cmp/cmp"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,40 +14,44 @@ import (
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
-	"github.com/iancoleman/strcase"
-	"github.com/pborman/uuid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
+	"github.com/google/go-cmp/cmp"
+	"github.com/iancoleman/strcase"
+	"github.com/pborman/uuid"
+	"github.com/pkg/errors"
 )
 
 var a http.Handler
 var test *tests.Test
+var authenticator *auth.Authenticator
 
 // Information about the users we have created for testing.
 type roleTest struct {
-	Token          user.Token
-	Claims         auth.Claims
-	SignupRequest  *signup.SignupRequest
-	SignupResult *signup.SignupResult
-	User           *user.User
-	Account        *account.Account
+	Role             string
+	Token            user.Token
+	Claims           auth.Claims
+	User             mockUser
+	Account          *account.Account
+	ForbiddenUser    mockUser
+	ForbiddenAccount *account.Account
 }
 
 type requestTest struct {
-	name string
-	method string
-	url string
-	request           interface{}
-	token          user.Token
-	claims         auth.Claims
-	statusCode     int
-	error          interface{}
-	expected       func(req requestTest, result []byte) bool
+	name       string
+	method     string
+	url        string
+	request    interface{}
+	token      user.Token
+	claims     auth.Claims
+	statusCode int
+	error      interface{}
 }
 
 var roleTests map[string]roleTest
@@ -68,40 +71,28 @@ func testMain(m *testing.M) int {
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	authenticator, err := auth.NewAuthenticatorMemory(now)
+	var err error
+	authenticator, err = auth.NewAuthenticatorMemory(now)
 	if err != nil {
 		panic(err)
 	}
 
 	shutdown := make(chan os.Signal, 1)
-	a = handlers.API(shutdown, test.Log, test.MasterDB, nil, authenticator)
+
+	log := test.Log
+	log.SetOutput(ioutil.Discard)
+	a = handlers.API(shutdown, log, test.MasterDB, nil, authenticator)
 
 	// Create a new account directly business logic. This creates an
 	// initial account and user that we will use for admin validated endpoints.
-	signupReq := signup.SignupRequest{
-		Account: signup.SignupAccount{
-			Name:     uuid.NewRandom().String(),
-			Address1: "103 East Main St",
-			Address2: "Unit 546",
-			City:     "Valdez",
-			Region:   "AK",
-			Country:  "USA",
-			Zipcode:  "99686",
-		},
-		User: signup.SignupUser{
-			Name:            "Lee Brown",
-			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
-			Password:        "akTechFr0n!ier",
-			PasswordConfirm: "akTechFr0n!ier",
-		},
-	}
-	signup, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq, now)
+	signupReq1 := mockSignupRequest()
+	signup1, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq1, now)
 	if err != nil {
 		panic(err)
 	}
 
-	expires := time.Now().UTC().Sub(signup.User.CreatedAt) + time.Hour
-	adminTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq.User.Email, signupReq.User.Password, expires, now)
+	expires := time.Now().UTC().Sub(signup1.User.CreatedAt) + time.Hour
+	adminTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq1.User.Email, signupReq1.User.Password, expires, now)
 	if err != nil {
 		panic(err)
 	}
@@ -111,13 +102,22 @@ func testMain(m *testing.M) int {
 		panic(err)
 	}
 
+	// Create a second account that the first account user should not have access to.
+	signupReq2 := mockSignupRequest()
+	signup2, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq2, now)
+	if err != nil {
+		panic(err)
+	}
+
+	// First test will be for role Admin
 	roleTests[auth.RoleAdmin] = roleTest{
-		Token:          adminTkn,
-		Claims:         adminClaims,
-		SignupRequest:  &signupReq,
-		SignupResult: signup,
-		User:           signup.User,
-		Account:        signup.Account,
+		Role:             auth.RoleAdmin,
+		Token:            adminTkn,
+		Claims:           adminClaims,
+		User:             mockUser{signup1.User, signupReq1.User.Password},
+		Account:          signup1.Account,
+		ForbiddenUser:    mockUser{signup2.User, signupReq2.User.Password},
+		ForbiddenAccount: signup2.Account,
 	}
 
 	// Create a regular user to use when calling regular validated endpoints.
@@ -133,9 +133,9 @@ func testMain(m *testing.M) int {
 	}
 
 	_, err = user_account.Create(tests.Context(), adminClaims, test.MasterDB, user_account.UserAccountCreateRequest{
-		UserID:            usr.ID,
-		AccountID:         signup.Account.ID,
-		Roles:       []user_account.UserAccountRole{user_account.UserAccountRole_User},
+		UserID:    usr.ID,
+		AccountID: signup1.Account.ID,
+		Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
 		// Status: use default value
 	}, now)
 	if err != nil {
@@ -152,83 +152,114 @@ func testMain(m *testing.M) int {
 		panic(err)
 	}
 
+	// Second test will be for role User
 	roleTests[auth.RoleUser] = roleTest{
-		Token:          userTkn,
-		Claims:         userClaims,
-		SignupRequest:  &signupReq,
-		SignupResult: signup,
-		Account:        signup.Account,
-		User:           usr,
+		Role:             auth.RoleUser,
+		Token:            userTkn,
+		Claims:           userClaims,
+		Account:          signup1.Account,
+		User:             mockUser{usr, userReq.Password},
+		ForbiddenUser:    mockUser{signup2.User, signupReq2.User.Password},
+		ForbiddenAccount: signup2.Account,
 	}
 
 	return m.Run()
 }
 
-
-// runRequestTests helper function for testing endpoints.
-func runRequestTests(t *testing.T, rtests []requestTest ) {
-
-	for i, tt := range rtests {
-		t.Logf("\tTest: %d\tWhen running test: %s", i, tt.name)
-		{
-			var req []byte
-			var rr io.Reader
-			if  tt.request != nil {
-				var ok bool
-				req, ok = tt.request.([]byte)
-				if !ok {
-					var err error
-					req, err = json.Marshal(tt.request)
-					if err != nil {
-						t.Logf("\t\tGot err : %+v", err)
-						t.Fatalf("\t%s\tEncode request failed.", tests.Failed)
-					}
-				}
-				rr = bytes.NewReader(req)
+// executeRequestTest provides request execution and basic response validation
+func executeRequestTest(t *testing.T, tt requestTest, ctx context.Context) (*httptest.ResponseRecorder, bool) {
+	var req []byte
+	var rr io.Reader
+	if tt.request != nil {
+		var ok bool
+		req, ok = tt.request.([]byte)
+		if !ok {
+			var err error
+			req, err = json.Marshal(tt.request)
+			if err != nil {
+				t.Logf("\t\tGot err : %+v", err)
+				t.Logf("\t\tEncode request failed.")
+				return nil, false
 			}
+		}
+		rr = bytes.NewReader(req)
+	}
 
-			r := httptest.NewRequest(tt.method, tt.url , rr)
-			w := httptest.NewRecorder()
+	r := httptest.NewRequest(tt.method, tt.url, rr).WithContext(ctx)
 
-			r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
-			if tt.token.AccessToken != "" {
-				r.Header.Set("Authorization", tt.token.AuthorizationHeader())
-			}
+	w := httptest.NewRecorder()
 
-			a.ServeHTTP(w, r)
+	r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
+	if tt.token.AccessToken != "" {
+		r.Header.Set("Authorization", tt.token.AuthorizationHeader())
+	}
 
-			if w.Code != tt.statusCode {
-				t.Logf("\t\tRequest : %s\n", string(req))
-				t.Logf("\t\tBody : %s\n", w.Body.String())
-				t.Fatalf("\t%s\tShould receive a status code of %d for the response : %v", tests.Failed, tt.statusCode, w.Code)
-			}
-			t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+	a.ServeHTTP(w, r)
 
-			if tt.error != nil {
+	if w.Code != tt.statusCode {
+		t.Logf("\t\tRequest : %s\n", string(req))
+		t.Logf("\t\tBody : %s\n", w.Body.String())
+		t.Logf("\t\tShould receive a status code of %d for the response : %v", tt.statusCode, w.Code)
+		return w, false
+	}
 
+	if tt.error != nil {
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tBody : %s\n", w.Body.String())
+			t.Logf("\t\tGot error : %+v", err)
+			t.Logf("\t\tShould get the expected error.")
+			return w, false
+		}
 
-
-				var actual web.ErrorResponse
-				if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
-					t.Logf("\t\tBody : %s\n", w.Body.String())
-					t.Logf("\t\tGot error : %+v", err)
-					t.Fatalf("\t%s\tShould get the expected error.", tests.Failed)
-				}
-
-				if diff := cmp.Diff(actual, tt.error); diff != "" {
-					t.Logf("\t\tDiff : %s\n", diff)
-					t.Fatalf("\t%s\tShould get the expected error.", tests.Failed)
-				}
-			}
-
-			if ok := tt.expected(tt, w.Body.Bytes()); !ok {
-				t.Fatalf("\t%s\tShould get the expected result.", tests.Failed)
-			}
-			t.Logf("\t%s\tReceived expected result.", tests.Success)
+		if diff := cmp.Diff(actual, tt.error); diff != "" {
+			t.Logf("\t\tDiff : %s\n", diff)
+			t.Logf("\t\tShould get the expected error.")
+			return w, false
 		}
 	}
+
+	return w, true
 }
 
+// decodeMapToStruct used to covert map to json struct so don't have a bunch of raw json strings running around test files.
+func decodeMapToStruct(expectedMap map[string]interface{}, expected interface{}) error {
+	expectedJson, err := json.Marshal(expectedMap)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if err := json.Unmarshal([]byte(expectedJson), &expected); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+// cmpDiff prints out the raw json to help with debugging.
+func cmpDiff(t *testing.T, actual, expected interface{}) bool {
+	if actual == nil && expected == nil {
+		return false
+	}
+	if diff := cmp.Diff(actual, expected); diff != "" {
+		actualJSON, err := json.MarshalIndent(actual, "", "    ")
+		if err != nil {
+			t.Fatalf("\t%s\tGot error : %+v", tests.Failed, err)
+		}
+		t.Logf("\t\tGot : %s\n", actualJSON)
+
+		expectedJSON, err := json.MarshalIndent(expected, "", "    ")
+		if err != nil {
+			t.Fatalf("\t%s\tGot error : %+v", tests.Failed, err)
+		}
+		t.Logf("\t\tExpected : %s\n", expectedJSON)
+
+		t.Logf("\t\tDiff : %s\n", diff)
+
+		return true
+	}
+	return false
+}
 
 func printResultMap(ctx context.Context, result []byte) {
 	var m map[string]interface{}
@@ -261,13 +292,13 @@ func printResultMapKeys(ctx context.Context, m map[string]interface{}, depth int
 			fmt.Printf("%s\"%s\": []map[string]interface{}{\n", strings.Repeat("\t", depth), k)
 
 			for _, smv := range sm {
-				printResultMapKeys(ctx, smv, depth +1)
+				printResultMapKeys(ctx, smv, depth+1)
 			}
 
 			fmt.Printf("%s},\n", strings.Repeat("\t", depth))
 		} else if sm, ok := kv.(map[string]interface{}); ok {
 			fmt.Printf("%s\"%s\": map[string]interface{}{\n", strings.Repeat("\t", depth), k)
-			printResultMapKeys(ctx, sm, depth +1)
+			printResultMapKeys(ctx, sm, depth+1)
 			fmt.Printf("%s},\n", strings.Repeat("\t", depth))
 		} else {
 			var pv string
@@ -282,4 +313,3 @@ func printResultMapKeys(ctx context.Context, m map[string]interface{}, depth int
 		}
 	}
 }
-

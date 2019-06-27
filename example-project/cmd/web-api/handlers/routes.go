@@ -42,10 +42,9 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	// This route is not authenticated
 	app.Handle("POST", "/v1/oauth/token", u.Token)
 
-
 	// Register user account management endpoints.
 	ua := UserAccount{
-		MasterDB:       masterDB,
+		MasterDB: masterDB,
 	}
 	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.Authenticate(authenticator))
 	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))

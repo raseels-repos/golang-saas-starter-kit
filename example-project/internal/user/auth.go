@@ -72,8 +72,8 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 
 	// Defines struct to apply validation for the supplied claims and account ID.
 	req := struct {
-		UserID    string `validate:"required,uuid"`
-		AccountID string `validate:"required,uuid"`
+		UserID    string `json:"user_id"  validate:"required,uuid"`
+		AccountID string `json:"account_id" validate:"required,uuid"`
 	}{
 		UserID:    claims.Subject,
 		AccountID: accountID,

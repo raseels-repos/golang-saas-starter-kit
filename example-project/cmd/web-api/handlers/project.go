@@ -22,6 +22,7 @@ type Project struct {
 }
 
 // Find godoc
+// TODO: Need to implement unittests on projects/find endpoint. There are none.
 // @Summary List projects
 // @Description Find returns the existing projects in the system.
 // @Tags project
@@ -192,7 +193,7 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := project.Create(ctx, claims, p.MasterDB, req, v.Now)
@@ -242,7 +243,7 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := project.Update(ctx, claims, p.MasterDB, req, v.Now)
@@ -275,7 +276,6 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects/archive [patch]
 func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -294,15 +294,13 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := project.Archive(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case project.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
@@ -329,7 +327,6 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects/{id} [delete]
 func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -342,11 +339,14 @@ func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Req
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case project.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
+			_, ok := cause.(validator.ValidationErrors)
+			if ok {
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			}
+
 			return errors.Wrapf(err, "Id: %s", params["id"])
 		}
 	}

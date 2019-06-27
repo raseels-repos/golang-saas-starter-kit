@@ -90,34 +90,51 @@ func CanReadUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userI
 
 // CanModifyUser determines if claims has the authority to modify the specified user ID.
 func CanModifyUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
-	// If the request has claims from a specific account, ensure that the user
-	// has the correct access to the account.
+	// If the request has claims from a specific user, ensure that the user
+	// has the correct role for creating a new user.
 	if claims.Subject != "" && claims.Subject != userID {
-		// When the claims Audience - AccountID - does not match the requested account, the
-		// claims Audience - AccountID - should have a record with an admin role.
-		// select id from users_accounts where  account_id = [claims.Audience] and user_id = [userID] and any (roles) = 'admin'
-		query := sqlbuilder.NewSelectBuilder().Select("id").From(userAccountTableName)
-		query.Where(query.And(
-			query.Equal("account_id", claims.Audience),
-			query.Equal("user_id", userID),
-			"'"+auth.RoleAdmin+"' = ANY (roles)",
-		))
-		queryStr, args := query.Build()
-		queryStr = dbConn.Rebind(queryStr)
-
-		var userAccountId string
-		err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
-		if err != nil && err != sql.ErrNoRows {
-			err = errors.Wrapf(err, "query - %s", query.String())
+		// Users with the role of admin are ony allows to create users.
+		if !claims.HasRole(auth.RoleAdmin) {
+			err := errors.WithStack(ErrForbidden)
 			return err
 		}
-
-		// When there is no userAccount ID returned, then the current user does not have access
-		// to the specified account.
-		if userAccountId == "" {
-			return errors.WithStack(ErrForbidden)
-		}
 	}
+
+	if err := CanReadUser(ctx, claims, dbConn, userID); err != nil {
+		return err
+	}
+
+	// TODO: Review, this doesn't seem correct, replaced with above.
+	/*
+		// If the request has claims from a specific account, ensure that the user
+		// has the correct access to the account.
+		if claims.Subject != "" && claims.Subject != userID {
+			// When the claims Audience - AccountID - does not match the requested account, the
+			// claims Audience - AccountID - should have a record with an admin role.
+			// select id from users_accounts where  account_id = [claims.Audience] and user_id = [userID] and any (roles) = 'admin'
+			query := sqlbuilder.NewSelectBuilder().Select("id").From(userAccountTableName)
+			query.Where(query.And(
+				query.Equal("account_id", claims.Audience),
+				query.Equal("user_id", userID),
+				"'"+auth.RoleAdmin+"' = ANY (roles)",
+			))
+			queryStr, args := query.Build()
+			queryStr = dbConn.Rebind(queryStr)
+
+			var userAccountId string
+			err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
+			if err != nil && err != sql.ErrNoRows {
+				err = errors.Wrapf(err, "query - %s", query.String())
+				return err
+			}
+
+			// When there is no userAccount ID returned, then the current user does not have access
+			// to the specified account.
+			if userAccountId == "" {
+				return errors.WithStack(ErrForbidden)
+			}
+		}
+	*/
 
 	return nil
 }
@@ -598,7 +615,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID str
 
 	// Defines the struct to apply validation
 	req := struct {
-		ID string `validate:"required,uuid"`
+		ID string `json:"id" validate:"required,uuid"`
 	}{
 		ID: userID,
 	}

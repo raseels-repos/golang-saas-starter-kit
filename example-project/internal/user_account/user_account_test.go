@@ -152,9 +152,9 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'UserAccountCreateRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'UserAccountCreateRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'UserAccountCreateRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.user_id' Error:Field validation for 'user_id' failed on the 'required' tag\n" +
+				"Key: 'UserAccountCreateRequest.account_id' Error:Field validation for 'account_id' failed on the 'required' tag\n" +
+				"Key: 'UserAccountCreateRequest.roles' Error:Field validation for 'roles' failed on the 'required' tag"),
 		},
 		{"Valid Role",
 			UserAccountCreateRequest{
@@ -165,7 +165,7 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'UserAccountCreateRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.roles[0]' Error:Field validation for 'roles[0]' failed on the 'oneof' tag"),
 		},
 		{"Valid Status",
 			UserAccountCreateRequest{
@@ -177,7 +177,7 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserAccountCreateRequest, res *UserAccount) *UserAccount {
 				return nil
 			},
-			errors.New("Key: 'UserAccountCreateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"),
 		},
 		{"Default Status",
 			UserAccountCreateRequest{
@@ -373,9 +373,8 @@ func TestUpdateValidation(t *testing.T) {
 	}{
 		{"Required Fields",
 			UserAccountUpdateRequest{},
-			errors.New("Key: 'UserAccountUpdateRequest.UserID' Error:Field validation for 'UserID' failed on the 'required' tag\n" +
-				"Key: 'UserAccountUpdateRequest.AccountID' Error:Field validation for 'AccountID' failed on the 'required' tag\n" +
-				"Key: 'UserAccountUpdateRequest.Roles' Error:Field validation for 'Roles' failed on the 'required' tag"),
+			errors.New("Key: 'UserAccountUpdateRequest.user_id' Error:Field validation for 'user_id' failed on the 'required' tag\n" +
+				"Key: 'UserAccountUpdateRequest.account_id' Error:Field validation for 'account_id' failed on the 'required' tag"),
 		},
 		{"Valid Role",
 			UserAccountUpdateRequest{
@@ -383,7 +382,7 @@ func TestUpdateValidation(t *testing.T) {
 				AccountID: uuid.NewRandom().String(),
 				Roles:     &UserAccountRoles{invalidRole},
 			},
-			errors.New("Key: 'UserAccountUpdateRequest.Roles[0]' Error:Field validation for 'Roles[0]' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountUpdateRequest.roles[0]' Error:Field validation for 'roles[0]' failed on the 'oneof' tag"),
 		},
 
 		{"Valid Status",
@@ -393,7 +392,7 @@ func TestUpdateValidation(t *testing.T) {
 				Roles:     &UserAccountRoles{UserAccountRole_User},
 				Status:    &invalidStatus,
 			},
-			errors.New("Key: 'UserAccountUpdateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'UserAccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"),
 		},
 	}
 

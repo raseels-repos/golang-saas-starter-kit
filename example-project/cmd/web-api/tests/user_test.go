@@ -4,559 +4,1458 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"net/http"
-	"strconv"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"github.com/google/go-cmp/cmp"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
 	"github.com/pborman/uuid"
 )
 
-func mockUser() *user.User {
-	req := user.UserCreateRequest{
+type mockUser struct {
+	*user.User
+	password string
+}
+
+func mockUserCreateRequest() user.UserCreateRequest {
+	return user.UserCreateRequest{
 		Name:            "Lee Brown",
 		Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 		Password:        "akTechFr0n!ier",
 		PasswordConfirm: "akTechFr0n!ier",
 	}
+}
 
-	a, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
+// mockUser creates a new user for testing and associates it with the supplied account ID.
+func newMockUser(accountID string, role user_account.UserAccountRole) mockUser {
+	req := mockUserCreateRequest()
+	u, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}
-	return a
+
+	_, err = user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		UserID:    u.ID,
+		AccountID: accountID,
+		Roles:     []user_account.UserAccountRole{role},
+	}, time.Now().UTC().AddDate(-1, -1, -1))
+	if err != nil {
+		panic(err)
+	}
+
+	return mockUser{
+		User:     u,
+		password: req.Password,
+	}
 }
 
-// TestUser is the entry point for the user endpoints.
-func TestUser(t *testing.T) {
+// TestUserCRUDAdmin tests all the user CRUD endpoints using an user with role admin.
+func TestUserCRUDAdmin(t *testing.T) {
 	defer tests.Recover(t)
 
-	t.Run("getUser", getUser)
-	t.Run("createUser", createUser)
-	t.Run("patchUser", patchUser)
-	t.Run("patchUserPassword", patchUserPassword)
-}
+	tr := roleTests[auth.RoleAdmin]
 
-// getUser validates get user by ID endpoint.
-func getUser(t *testing.T) {
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
-	var rtests []requestTest
+	// Test create.
+	var created user.UserResponse
+	{
+		expectedStatus := http.StatusCreated
 
-	forbiddenUser := mockUser()
-
-	// Both roles should be able to read the user.
-	for rn, tr := range roleTests {
-		usr := tr.SignupResult.User
-
-		// Test 200.
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s 200", rn),
-			http.MethodGet,
-			fmt.Sprintf("/v1/users/%s", usr.ID),
-			nil,
-			tr.Token,
-			tr.Claims,
-			http.StatusOK,
-			nil,
-			func(treq requestTest, body []byte) bool {
-				var actual user.UserResponse
-				if err := json.Unmarshal(body, &actual); err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
-
-				// Add claims to the context so they can be retrieved later.
-				ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
-
-				expectedMap := map[string]interface{}{
-					"updated_at":      web.NewTimeResponse(ctx, usr.UpdatedAt),
-					"id":              usr.ID,
-					"email":        usr.Email,
-					"timezone":        usr.Timezone,
-					"created_at":      web.NewTimeResponse(ctx, usr.CreatedAt),
-					"name":            usr.Name,
-				}
-				expectedJson, err := json.Marshal(expectedMap)
-				if err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
-
-				var expected user.UserResponse
-				if err := json.Unmarshal([]byte(expectedJson), &expected); err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					printResultMap(ctx, body)
-					return false
-				}
-
-				if diff := cmp.Diff(actual, expected); diff != "" {
-					actualJSON, err := json.MarshalIndent(actual, "", "    ")
-					if err != nil {
-						t.Logf("\t\tGot error : %+v", err)
-						return false
-					}
-					t.Logf("\t\tGot : %s\n", actualJSON)
-
-					expectedJSON, err := json.MarshalIndent(expected, "", "    ")
-					if err != nil {
-						t.Logf("\t\tGot error : %+v", err)
-						return false
-					}
-					t.Logf("\t\tExpected : %s\n", expectedJSON)
-
-					t.Logf("\t\tDiff : %s\n", diff)
-
-					if len(expectedMap) == 0 {
-						printResultMap(ctx, body)
-					}
-
-					return false
-				}
-
-				return true
-			},
-		})
-
-		// Test 404.
-		invalidID := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s 404 w/invalid ID", rn),
-			http.MethodGet,
-			fmt.Sprintf("/v1/users/%s", invalidID),
-			nil,
-			tr.Token,
-			tr.Claims,
-			http.StatusNotFound,
-			web.ErrorResponse{
-				Error: fmt.Sprintf("user %s not found: Entity not found", invalidID),
-			},
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-
-		// Test 404 - User exists but not allowed.
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s 404 w/random user ID", rn),
-			http.MethodGet,
-			fmt.Sprintf("/v1/users/%s", forbiddenUser.ID),
-			nil,
-			tr.Token,
-			tr.Claims,
-			http.StatusNotFound,
-			web.ErrorResponse{
-				Error: fmt.Sprintf("user %s not found: Entity not found", forbiddenUser.ID),
-			},
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
-
-	runRequestTests(t, rtests)
-}
-
-// createUser validates create user endpoint.
-func createUser(t *testing.T) {
-
-	var rtests []requestTest
-
-	// Test create user.
-	// 	Admin role: 201
-	//  User role 403
-	for rn, tr := range roleTests {
-		var expectedStatus int
-		var expectedErr interface{}
-
-		// Test 201.
-		if rn == auth.RoleAdmin {
-			expectedStatus = http.StatusCreated
-		} else {
-			expectedStatus = http.StatusForbidden
-			expectedErr = web.ErrorResponse{
-				Error: mid.ErrForbidden.Error(),
-			}
-		}
-
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d", rn, expectedStatus),
+		req := mockUserCreateRequest()
+		rt := requestTest{
+			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPost,
 			"/v1/users",
-			user.UserCreateRequest{
-				Name:            "Lee Brown",
-				Email:           uuid.NewRandom().String() + rn + strconv.Itoa(len(rtests))+ "@geeksinthewoods.com",
-				Password:        "akTechFr0n!ier",
-				PasswordConfirm: "akTechFr0n!ier",
-			},
+			req,
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				if treq.error != nil {
-					return true
-				}
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-				var actual user.UserResponse
-				if err := json.Unmarshal(body, &actual); err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-				// Add claims to the context so they can be retrieved later.
-				ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+		var actual user.UserResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+		created = actual
 
-				req := treq.request.(user.UserCreateRequest)
-
-				expectedMap := map[string]interface{}{
-					"updated_at":      web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
-					"id":              actual.ID,
-					"email":        	req.Email,
-					"timezone":        actual.Timezone,
-					"created_at":      web.NewTimeResponse(ctx, actual.CreatedAt.Value),
-					"name":            req.Name,
-				}
-				expectedJson, err := json.Marshal(expectedMap)
-				if err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
-
-				var expected user.UserResponse
-				if err := json.Unmarshal([]byte(expectedJson), &expected); err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					printResultMap(ctx, body)
-					return false
-				}
-
-				if diff := cmp.Diff(actual, expected); diff != "" {
-					actualJSON, err := json.MarshalIndent(actual, "", "    ")
-					if err != nil {
-						t.Logf("\t\tGot error : %+v", err)
-						return false
-					}
-					t.Logf("\t\tGot : %s\n", actualJSON)
-
-					expectedJSON, err := json.MarshalIndent(expected, "", "    ")
-					if err != nil {
-						t.Logf("\t\tGot error : %+v", err)
-						return false
-					}
-					t.Logf("\t\tExpected : %s\n", expectedJSON)
-
-					t.Logf("\t\tDiff : %s\n", diff)
-
-					if len(expectedMap) == 0 {
-						printResultMap(ctx, body)
-					}
-
-					return false
-				}
-
-				return true
-			},
-		})
-	}
-
-	// Test update a user with invalid data.
-	// 	Admin role: 400
-	//  User role 403
-	for rn, tr := range roleTests {
-		var expectedStatus int
-		var expectedErr interface{}
-
-		// Test 201.
-		if rn == auth.RoleAdmin {
-			expectedStatus = http.StatusBadRequest
-			expectedErr = web.ErrorResponse{
-				Error: "field validation error",
-				Fields: []web.FieldError{
-					{Field: "email", Error: "Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
-				},
-			}
-		} else {
-			expectedStatus = http.StatusForbidden
-			expectedErr = web.ErrorResponse{
-				Error: mid.ErrForbidden.Error(),
-			}
+		expectedMap := map[string]interface{}{
+			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
+			"id":         actual.ID,
+			"email":      req.Email,
+			"timezone":   actual.Timezone,
+			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
+			"name":       req.Name,
 		}
 
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/invalid data", rn, expectedStatus),
-			http.MethodPost,
-			"/v1/users",
-			user.UserCreateRequest{
-				Name:            "Lee Brown",
-				Email:           "invalid email address",
-				Password:        "akTechFr0n!ier",
-				PasswordConfirm: "akTechFr0n!ier",
-			},
+		var expected user.UserResponse
+		if err := decodeMapToStruct(expectedMap, &expected); err != nil {
+			t.Logf("\t\tGot error : %+v\nActual results to format expected : \n", err)
+			printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
+			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			if len(expectedMap) == 0 {
+				printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
+			}
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
+
+		// Only for user creation do we need to do this.
+		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			UserID:    actual.ID,
+			AccountID: tr.Account.ID,
+			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+		}, time.Now().UTC().AddDate(-1, -1, -1))
+		if err != nil {
+			t.Fatalf("\t%s\tLink user to account.", tests.Failed)
+		}
+	}
+
+	// Test read.
+	{
+		expectedStatus := http.StatusOK
+
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", created.ID),
+			nil,
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual user.UserResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		if diff := cmpDiff(t, actual, created); diff {
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
 	}
 
-	runRequestTests(t, rtests)
-}
+	// Test Read with random ID.
+	{
+		expectedStatus := http.StatusNotFound
 
-// patchUser validates update user by ID endpoint.
-func patchUser(t *testing.T) {
+		randID := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", randID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-	var rtests []requestTest
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-	// Test update a user
-	// 	Admin role: 204
-	//  User role 204 - user ID matches claims so OK
-	for rn, tr := range roleTests {
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test Read with forbidden ID.
+	{
+		expectedStatus := http.StatusNotFound
+
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", tr.ForbiddenUser.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test update.
+	{
 		expectedStatus := http.StatusNoContent
-		newName := rn + uuid.NewRandom().String() + strconv.Itoa(len(rtests))
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d", rn, expectedStatus),
+
+		newName := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
 			"/v1/users",
 			user.UserUpdateRequest{
-				ID:   tr.SignupResult.User.ID,
+				ID:   created.ID,
 				Name: &newName,
 			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
 			nil,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		if len(w.Body.String()) != 0 {
+			if diff := cmpDiff(t, w.Body.Bytes(), nil); diff {
+				t.Fatalf("\t%s\tReceived expected empty.", tests.Failed)
+			}
+		}
+		t.Logf("\t%s\tReceived expected empty.", tests.Success)
 	}
 
-	// Test update a user with invalid data.
-	// 	Admin role: 400
-	//  User role 400
-	for rn, tr := range roleTests {
+	// Test update password.
+	{
+		expectedStatus := http.StatusNoContent
+
+		newPass := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Update password %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/password",
+			user.UserUpdatePasswordRequest{
+				ID:              created.ID,
+				Password:        newPass,
+				PasswordConfirm: newPass,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		if len(w.Body.String()) != 0 {
+			if diff := cmpDiff(t, w.Body.Bytes(), nil); diff {
+				t.Fatalf("\t%s\tReceived expected empty.", tests.Failed)
+			}
+		}
+		t.Logf("\t%s\tReceived expected empty.", tests.Success)
+	}
+
+	// Test archive.
+	{
+		expectedStatus := http.StatusNoContent
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/archive",
+			user.UserArchiveRequest{
+				ID: created.ID,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		if len(w.Body.String()) != 0 {
+			if diff := cmpDiff(t, w.Body.Bytes(), nil); diff {
+				t.Fatalf("\t%s\tReceived expected empty.", tests.Failed)
+			}
+		}
+		t.Logf("\t%s\tReceived expected empty.", tests.Success)
+	}
+
+	// Test delete.
+	{
+		expectedStatus := http.StatusNoContent
+
+		rt := requestTest{
+			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
+			http.MethodDelete,
+			fmt.Sprintf("/v1/users/%s", created.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		if len(w.Body.String()) != 0 {
+			if diff := cmpDiff(t, w.Body.Bytes(), nil); diff {
+				t.Fatalf("\t%s\tReceived expected empty.", tests.Failed)
+			}
+		}
+		t.Logf("\t%s\tReceived expected empty.", tests.Success)
+	}
+
+	// Test switch account.
+	{
+		expectedStatus := http.StatusOK
+
+		newAccount := newMockSignup().account
+		rt := requestTest{
+			fmt.Sprintf("Switch account %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			fmt.Sprintf("/v1/users/switch-account/%s", newAccount.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			UserID:    tr.User.ID,
+			AccountID: newAccount.ID,
+			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+		}, time.Now().UTC().AddDate(-1, -1, -1))
+		if err != nil {
+			t.Fatalf("\t%s\tAdd user to account failed.", tests.Failed)
+		}
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		// This is just for response format validation, will verify account from claims.
+		expected := map[string]interface{}{
+			"access_token": actual["access_token"],
+			"token_type":   actual["token_type"],
+			"expiry":       actual["expiry"],
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
+
+		newClaims, err := authenticator.ParseClaims(actual["access_token"].(string))
+		if err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tParse claims failed.", tests.Failed)
+		} else if newClaims.Audience != newAccount.ID {
+			t.Logf("\t\tGot : %+v", newClaims.Audience)
+			t.Logf("\t\tExpected : %+v", newAccount.ID)
+			t.Fatalf("\t%s\tParse claims expected audience to match new account.", tests.Failed)
+		} else if newClaims.Subject != tr.User.ID {
+			t.Logf("\t\tGot : %+v", newClaims.Subject)
+			t.Logf("\t\tExpected : %+v", tr.User.ID)
+			t.Fatalf("\t%s\tParse claims expected Subject to match user.", tests.Failed)
+		}
+		t.Logf("\t%s\tParse claims valid.", tests.Success)
+	}
+}
+
+// TestUserCRUDUser tests all the user CRUD endpoints using an user with role user.
+func TestUserCRUDUser(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleUser]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test create.
+	{
+		expectedStatus := http.StatusForbidden
+
+		req := mockUserCreateRequest()
+		rt := requestTest{
+			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPost,
+			"/v1/users",
+			req,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: mid.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Since role doesn't support create, bypass auth to test other endpoints.
+	created := newMockUser(tr.Account.ID, user_account.UserAccountRole_User).Response(ctx)
+
+	// Test read.
+	{
+		expectedStatus := http.StatusOK
+
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", created.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual *user.UserResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		if diff := cmpDiff(t, actual, created); diff {
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
+	}
+
+	// Test Read with random ID.
+	{
+		expectedStatus := http.StatusNotFound
+
+		randID := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", randID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test Read with forbidden ID.
+	{
+		expectedStatus := http.StatusNotFound
+
+		rt := requestTest{
+			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			http.MethodGet,
+			fmt.Sprintf("/v1/users/%s", tr.ForbiddenUser.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test update.
+	{
+		expectedStatus := http.StatusForbidden
+
+		newName := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users",
+			user.UserUpdateRequest{
+				ID:   created.ID,
+				Name: &newName,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test update password.
+	{
+		expectedStatus := http.StatusForbidden
+
+		newPass := uuid.NewRandom().String()
+		rt := requestTest{
+			fmt.Sprintf("Update password %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/password",
+			user.UserUpdatePasswordRequest{
+				ID:              created.ID,
+				Password:        newPass,
+				PasswordConfirm: newPass,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test archive.
+	{
+		expectedStatus := http.StatusForbidden
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/archive",
+			user.UserArchiveRequest{
+				ID: created.ID,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: mid.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test delete.
+	{
+		expectedStatus := http.StatusForbidden
+
+		rt := requestTest{
+			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
+			http.MethodDelete,
+			fmt.Sprintf("/v1/users/%s", created.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: mid.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test switch account.
+	{
+		expectedStatus := http.StatusOK
+
+		newAccount := newMockSignup().account
+		rt := requestTest{
+			fmt.Sprintf("Switch account %d w/role %s", expectedStatus, tr.Role),
+			http.MethodPatch,
+			fmt.Sprintf("/v1/users/switch-account/%s", newAccount.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			UserID:    tr.User.ID,
+			AccountID: newAccount.ID,
+			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+		}, time.Now().UTC().AddDate(-1, -1, -1))
+		if err != nil {
+			t.Fatalf("\t%s\tAdd user to account failed.", tests.Failed)
+		}
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		// This is just for response format validation, will verify account from claims.
+		expected := map[string]interface{}{
+			"access_token": actual["access_token"],
+			"token_type":   actual["token_type"],
+			"expiry":       actual["expiry"],
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
+
+		newClaims, err := authenticator.ParseClaims(actual["access_token"].(string))
+		if err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tParse claims failed.", tests.Failed)
+		} else if newClaims.Audience != newAccount.ID {
+			t.Logf("\t\tGot : %+v", newClaims.Audience)
+			t.Logf("\t\tExpected : %+v", newAccount.ID)
+			t.Fatalf("\t%s\tParse claims expected audience to match new account.", tests.Failed)
+		} else if newClaims.Subject != tr.User.ID {
+			t.Logf("\t\tGot : %+v", newClaims.Subject)
+			t.Logf("\t\tExpected : %+v", tr.User.ID)
+			t.Fatalf("\t%s\tParse claims expected Subject to match user.", tests.Failed)
+		}
+		t.Logf("\t%s\tParse claims valid.", tests.Success)
+	}
+}
+
+// TestUserCreate validates create user endpoint.
+func TestUserCreate(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test create with invalid data.
+	{
 		expectedStatus := http.StatusBadRequest
-		expectedErr := web.ErrorResponse{
+
+		req := mockUserCreateRequest()
+		req.Email = "invalid email address.com"
+		rt := requestTest{
+			fmt.Sprintf("Create %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPost,
+			"/v1/users",
+			req,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "email", Error: "Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserUpdate validates update user endpoint.
+func TestUserUpdate(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test update with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		invalidEmail := "invalid email address"
+		rt := requestTest{
+			fmt.Sprintf("Update %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users",
+			user.UserUpdateRequest{
+				ID:    tr.User.ID,
+				Email: &invalidEmail,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
 			Error: "field validation error",
 			Fields: []web.FieldError{
 				{Field: "email", Error: "Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
 			},
 		}
 
-		invalidEmail :=  "invalid email address"
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/invalid data", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users",
-			user.UserUpdateRequest{
-				ID:   tr.SignupResult.User.ID,
-				Email:          &invalidEmail,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
-
-	// Test update a user for with an invalid ID.
-	// 	Admin role: 403
-	//  User role 403
-	for rn, tr := range roleTests {
-
-		expectedStatus := http.StatusForbidden
-		expectedErr := web.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
-
-		newName := rn + uuid.NewRandom().String() + strconv.Itoa(len(rtests))
-		invalidID := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/invalid ID", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users",
-			user.UserUpdateRequest{
-				ID:   invalidID,
-				Name: &newName,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
 	}
-
-	// Test update a user for with random user ID.
-	// 	Admin role: 403
-	//  User role 403
-	forbiddenUser := mockUser()
-	for rn, tr := range roleTests {
-
-		expectedStatus := http.StatusForbidden
-		expectedErr := web.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
-		}
-
-		newName := rn+uuid.NewRandom().String()+strconv.Itoa(len(rtests))
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/random user ID", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users",
-			user.UserUpdateRequest{
-				ID: forbiddenUser.ID,
-				Name: &newName,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
-
-	runRequestTests(t, rtests)
 }
 
-// patchUserPassword validates update user password by ID endpoint.
-func patchUserPassword(t *testing.T) {
+// TestUserUpdatePassword validates update user password endpoint.
+func TestUserUpdatePassword(t *testing.T) {
+	defer tests.Recover(t)
 
-	var rtests []requestTest
+	tr := roleTests[auth.RoleAdmin]
 
-	// Test update a user
-	// 	Admin role: 204
-	//  User role 204 - user ID matches claims so OK
-	for rn, tr := range roleTests {
-		expectedStatus := http.StatusNoContent
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Since role doesn't support create, bypass auth to test other endpoints.
+	created := newMockUser(tr.Account.ID, user_account.UserAccountRole_User).Response(ctx)
+
+	// Test update user password with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
 		newPass := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d", rn, expectedStatus),
+		rt := requestTest{
+			fmt.Sprintf("Update password %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
 			"/v1/users/password",
 			user.UserUpdatePasswordRequest{
-				ID:   tr.SignupResult.User.ID,
-				Password: newPass,
-				PasswordConfirm: newPass,
+				ID:              created.ID,
+				Password:        newPass,
+				PasswordConfirm: "different",
 			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
 			nil,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-	// Test update a user password with invalid data.
-	// 	Admin role: 400
-	//  User role 400
-	for rn, tr := range roleTests {
-		expectedStatus := http.StatusBadRequest
-		expectedErr := web.ErrorResponse{
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
 			Error: "field validation error",
 			Fields: []web.FieldError{
 				{Field: "password_confirm", Error: "Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'eqfield' tag"},
 			},
 		}
 
-		newPass := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/invalid data", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users/password",
-			user.UserUpdatePasswordRequest{
-				ID:   tr.SignupResult.User.ID,
-				Password: newPass,
-				PasswordConfirm: "different",
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
-
-	// Test update a user password for with an invalid ID.
-	// 	Admin role: 403
-	//  User role 403
-	for rn, tr := range roleTests {
-
-		expectedStatus := http.StatusForbidden
-		expectedErr := web.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
-
-		newPass := uuid.NewRandom().String()
-		invalidID := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/invalid ID", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users/password",
-			user.UserUpdatePasswordRequest{
-				ID:   invalidID,
-				Password: newPass,
-				PasswordConfirm: newPass,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
 	}
-
-	// Test update a user password for with random user ID.
-	// 	Admin role: 403
-	//  User role 403
-	forbiddenUser := mockUser()
-	for rn, tr := range roleTests {
-
-		expectedStatus := http.StatusForbidden
-		expectedErr := web.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
-		}
-
-		newPass := uuid.NewRandom().String()
-		rtests = append(rtests, requestTest{
-			fmt.Sprintf("Role %s %d w/random user ID", rn, expectedStatus),
-			http.MethodPatch,
-			"/v1/users/password",
-			user.UserUpdatePasswordRequest{
-				ID: forbiddenUser.ID,
-				Password: newPass,
-				PasswordConfirm: newPass,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			expectedErr,
-			func(treq requestTest, body []byte) bool {
-				return true
-			},
-		})
-	}
-
-	runRequestTests(t, rtests)
 }
 
+// TestUserArchive validates archive user endpoint.
+func TestUserArchive(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test archive user with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/archive",
+			user.UserArchiveRequest{
+				ID: "a",
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "id", Error: "Key: 'UserArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test archive user with forbidden ID.
+	{
+		expectedStatus := http.StatusForbidden
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/archive",
+			user.UserArchiveRequest{
+				ID: tr.ForbiddenUser.ID,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserDelete validates delete user endpoint.
+func TestUserDelete(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test delete user with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		rt := requestTest{
+			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodDelete,
+			"/v1/users/345345",
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test delete user with forbidden ID.
+	{
+		expectedStatus := http.StatusForbidden
+
+		rt := requestTest{
+			fmt.Sprintf("Delete %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			http.MethodDelete,
+			fmt.Sprintf("/v1/users/%s", tr.ForbiddenUser.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserSwitchAccount validates user switch account endpoint.
+func TestUserSwitchAccount(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test user switch account with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		rt := requestTest{
+			fmt.Sprintf("Switch account %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/users/switch-account/sf",
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "account_id", Error: "Key: 'account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test user switch account with forbidden ID.
+	{
+		expectedStatus := http.StatusUnauthorized
+
+		rt := requestTest{
+			fmt.Sprintf("Switch account %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			http.MethodPatch,
+			fmt.Sprintf("/v1/users/switch-account/%s", tr.ForbiddenAccount.ID),
+			nil,
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrAuthenticationFailure.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserToken validates user token endpoint.
+func TestUserToken(t *testing.T) {
+	defer tests.Recover(t)
+
+	// Test user token with empty credentials.
+	{
+		expectedStatus := http.StatusUnauthorized
+
+		rt := requestTest{
+			fmt.Sprintf("Token %d using empty request", expectedStatus),
+			http.MethodPost,
+			"/v1/oauth/token",
+			nil,
+			user.Token{},
+			auth.Claims{},
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, tests.Context())
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "must provide email and password in Basic auth",
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test user token with invalid email.
+	{
+		expectedStatus := http.StatusUnauthorized
+
+		rt := requestTest{
+			fmt.Sprintf("Token %d using invalid email", expectedStatus),
+			http.MethodPost,
+			"/v1/oauth/token",
+			nil,
+			user.Token{},
+			auth.Claims{},
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		r := httptest.NewRequest(rt.method, rt.url, nil)
+		r.SetBasicAuth("invalid email.com", "some random password")
+
+		w := httptest.NewRecorder()
+		r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
+
+		a.ServeHTTP(w, r)
+
+		if w.Code != expectedStatus {
+			t.Logf("\t\tBody : %s\n", w.Body.String())
+			t.Logf("\t\tShould receive a status code of %d for the response : %v", rt.statusCode, w.Code)
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user.ErrAuthenticationFailure.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test user token with invalid password.
+	{
+		for _, tr := range roleTests {
+			expectedStatus := http.StatusUnauthorized
+
+			rt := requestTest{
+				fmt.Sprintf("Token %d w/role %s using invalid password", expectedStatus, tr.Role),
+				http.MethodPost,
+				"/v1/oauth/token",
+				nil,
+				user.Token{},
+				auth.Claims{},
+				expectedStatus,
+				nil,
+			}
+			t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+			r := httptest.NewRequest(rt.method, rt.url, nil)
+			r.SetBasicAuth(tr.User.Email, "invalid password")
+
+			w := httptest.NewRecorder()
+			r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
+
+			a.ServeHTTP(w, r)
+
+			if w.Code != expectedStatus {
+				t.Logf("\t\tBody : %s\n", w.Body.String())
+				t.Logf("\t\tShould receive a status code of %d for the response : %v", rt.statusCode, w.Code)
+				t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+			var actual web.ErrorResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+				t.Logf("\t\tGot error : %+v", err)
+				t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+			}
+
+			expected := web.ErrorResponse{
+				Error: user.ErrAuthenticationFailure.Error(),
+			}
+
+			if diff := cmpDiff(t, actual, expected); diff {
+				t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+			}
+			t.Logf("\t%s\tReceived expected error.", tests.Success)
+		}
+	}
+
+	// Test user token with valid email and password.
+	{
+		for _, tr := range roleTests {
+			expectedStatus := http.StatusOK
+
+			rt := requestTest{
+				fmt.Sprintf("Token %d w/role %s using valid credentials", expectedStatus, tr.Role),
+				http.MethodPost,
+				"/v1/oauth/token",
+				nil,
+				user.Token{},
+				auth.Claims{},
+				expectedStatus,
+				nil,
+			}
+			t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+			r := httptest.NewRequest(rt.method, rt.url, nil)
+			r.SetBasicAuth(tr.User.Email, tr.User.password)
+
+			w := httptest.NewRecorder()
+			r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
+
+			a.ServeHTTP(w, r)
+
+			if w.Code != expectedStatus {
+				t.Logf("\t\tBody : %s\n", w.Body.String())
+				t.Logf("\t\tShould receive a status code of %d for the response : %v", rt.statusCode, w.Code)
+				t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+			var actual map[string]interface{}
+			if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+				t.Logf("\t\tGot error : %+v", err)
+				t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+			}
+
+			// This is just for response format validation, will verify account from claims.
+			expected := map[string]interface{}{
+				"access_token": actual["access_token"],
+				"token_type":   actual["token_type"],
+				"expiry":       actual["expiry"],
+			}
+
+			if diff := cmpDiff(t, actual, expected); diff {
+				t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+			}
+			t.Logf("\t%s\tReceived expected result.", tests.Success)
+		}
+	}
+}

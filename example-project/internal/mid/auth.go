@@ -119,6 +119,3 @@ func parseAuthHeader(bearerStr string) (string, error) {
 
 	return split[1], nil
 }
-
-
-

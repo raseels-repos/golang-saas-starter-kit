@@ -32,7 +32,6 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 		return nil, err
 	}
 
-
 	f := func(fl validator.FieldLevel) bool {
 		if fl.Field().String() == "invalid" {
 			return false

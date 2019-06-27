@@ -1,7 +1,6 @@
 package user
 
 import (
-	"github.com/lib/pq"
 	"math/rand"
 	"os"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
@@ -149,9 +149,9 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'UserCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
-				"Key: 'UserCreateRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
+			errors.New("Key: 'UserCreateRequest.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.password' Error:Field validation for 'password' failed on the 'required' tag"),
 		},
 		{"Valid Email",
 			UserCreateRequest{
@@ -163,7 +163,7 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
+			errors.New("Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"),
 		},
 		{"Passwords Match",
 			UserCreateRequest{
@@ -175,7 +175,7 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'UserCreateRequest.PasswordConfirm' Error:Field validation for 'PasswordConfirm' failed on the 'eqfield' tag"),
+			errors.New("Key: 'UserCreateRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'eqfield' tag"),
 		},
 		{"Default Timezone",
 			UserCreateRequest{
@@ -276,7 +276,7 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 			Password:        "W0rkL1fe#",
 			PasswordConfirm: "W0rkL1fe#",
 		}
-		expectedErr := errors.New("Key: 'UserCreateRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'unique' tag")
 		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -384,7 +384,7 @@ func TestUpdateValidation(t *testing.T) {
 	var userTests = []userTest{
 		{"Required Fields",
 			UserUpdateRequest{},
-			errors.New("Key: 'UserUpdateRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
+			errors.New("Key: 'UserUpdateRequest.id' Error:Field validation for 'id' failed on the 'required' tag"),
 		},
 	}
 
@@ -394,7 +394,7 @@ func TestUpdateValidation(t *testing.T) {
 			ID:    uuid.NewRandom().String(),
 			Email: &invalidEmail,
 		},
-		errors.New("Key: 'UserUpdateRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"),
+		errors.New("Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"),
 	})
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
@@ -469,7 +469,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			ID:    user2.ID,
 			Email: &user1.Email,
 		}
-		expectedErr := errors.New("Key: 'UserUpdateRequest.Email' Error:Field validation for 'Email' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'unique' tag")
 		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -533,8 +533,8 @@ func TestUpdatePassword(t *testing.T) {
 		}
 
 		// Ensure validation is working by trying UpdatePassword with an empty request.
-		expectedErr := errors.New("Key: 'UserUpdatePasswordRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag\n" +
-			"Key: 'UserUpdatePasswordRequest.Password' Error:Field validation for 'Password' failed on the 'required' tag")
+		expectedErr := errors.New("Key: 'UserUpdatePasswordRequest.id' Error:Field validation for 'id' failed on the 'required' tag\n" +
+			"Key: 'UserUpdatePasswordRequest.password' Error:Field validation for 'password' failed on the 'required' tag")
 		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{}, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)

@@ -93,7 +93,7 @@ func (a *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := account.Update(ctx, claims, a.MasterDB, req, v.Now)

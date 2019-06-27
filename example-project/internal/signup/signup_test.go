@@ -40,15 +40,15 @@ func TestSignupValidation(t *testing.T) {
 			func(req SignupRequest, res *SignupResult) *SignupResult {
 				return nil
 			},
-			errors.New("Key: 'SignupRequest.Account.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.Account.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.Account.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.Account.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.Account.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.Account.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.User.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.User.Email' Error:Field validation for 'Email' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.User.Password' Error:Field validation for 'Password' failed on the 'required' tag"),
+			errors.New("Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.account.address1' Error:Field validation for 'address1' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.account.city' Error:Field validation for 'city' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.account.region' Error:Field validation for 'region' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.account.country' Error:Field validation for 'country' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.account.zipcode' Error:Field validation for 'zipcode' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.user.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.user.password' Error:Field validation for 'password' failed on the 'required' tag"),
 		},
 	}
 

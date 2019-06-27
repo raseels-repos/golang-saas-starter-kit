@@ -31,7 +31,7 @@ type Error struct {
 func NewRequestError(err error, status int) error {
 
 	// if its a validation error then
-	if verr, ok :=  NewValidationError(err); ok {
+	if verr, ok := NewValidationError(err); ok {
 		return verr
 	}
 

@@ -27,6 +27,7 @@ type User struct {
 }
 
 // Find godoc
+// TODO: Need to implement unittests on users/find endpoint. There are none.
 // @Summary List users
 // @Description Find returns the existing users in the system.
 // @Tags user
@@ -40,7 +41,6 @@ type User struct {
 // @Param included-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} user.UserResponse
 // @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /users [get]
 func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -196,7 +196,7 @@ func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := user.Create(ctx, claims, u.MasterDB, req, v.Now)
@@ -247,7 +247,7 @@ func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user.Update(ctx, claims, u.MasterDB, req, v.Now)
@@ -298,7 +298,7 @@ func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user.UpdatePassword(ctx, claims, u.MasterDB, req, v.Now)
@@ -308,7 +308,7 @@ func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 		case user.ErrNotFound:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case user.ErrForbidden:
-			return web.RespondJsonError(ctx, w,  web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
@@ -333,7 +333,6 @@ func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /users/archive [patch]
 func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -352,15 +351,13 @@ func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user.Archive(ctx, claims, u.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case user.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
@@ -387,7 +384,6 @@ func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /users/{id} [delete]
 func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -400,12 +396,15 @@ func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case user.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
-			return errors.Wrapf(cause, "Id: %s", params["id"])
+			_, ok := cause.(validator.ValidationErrors)
+			if ok {
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			}
+
+			return errors.Wrapf(err, "Id: %s", params["id"])
 		}
 	}
 
@@ -420,10 +419,9 @@ func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Produce  json
 // @Security OAuth2Password
 // @Param account_id path int true "Account ID"
-// @Success 201
+// @Success 200
 // @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
+// @Failure 401 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /users/switch-account/{account_id} [patch]
 func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -453,7 +451,7 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		}
 	}
 
-	return web.RespondJson(ctx, w, tkn, http.StatusNoContent)
+	return web.RespondJson(ctx, w, tkn, http.StatusOK)
 }
 
 // Token godoc
@@ -464,10 +462,10 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 // @Produce  json
 // @Security BasicAuth
 // @Param scope query string false "Scope" Enums(user, admin)
-// @Success 200 {object} user.Token
-// @Header 200 {string} Token "qwerty"
-// @Failure 400 {object} web.Error
-// @Failure 403 {object} web.Error
+// @Success 200
+// @Failure 400 {object} web.ErrorResponse
+// @Failure 401 {object} web.ErrorResponse
+// @Failure 500 {object} web.ErrorResponse
 // @Router /oauth/token [post]
 func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, ok := ctx.Value(web.KeyValues).(*web.Values)
@@ -491,6 +489,11 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		case user.ErrAuthenticationFailure:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusUnauthorized))
 		default:
+			_, ok := cause.(validator.ValidationErrors)
+			if ok {
+				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			}
+
 			return errors.Wrap(err, "authenticating")
 		}
 	}

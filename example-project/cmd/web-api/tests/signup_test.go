@@ -1,18 +1,29 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pborman/uuid"
 )
+
+type mockSignup struct {
+	account *account.Account
+	user    mockUser
+	token   user.Token
+	claims  auth.Claims
+	context context.Context
+}
 
 func mockSignupRequest() signup.SignupRequest {
 	return signup.SignupRequest{
@@ -34,152 +45,199 @@ func mockSignupRequest() signup.SignupRequest {
 	}
 }
 
-// TestSignup is the entry point for the signup
+func newMockSignup() mockSignup {
+	req := mockSignupRequest()
+	now := time.Now().UTC().AddDate(-1, -1, -1)
+	s, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, req, now)
+	if err != nil {
+		panic(err)
+	}
+
+	expires := time.Now().UTC().Sub(s.User.CreatedAt) + time.Hour
+	tkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, req.User.Email, req.User.Password, expires, now)
+	if err != nil {
+		panic(err)
+	}
+
+	claims, err := authenticator.ParseClaims(tkn.AccessToken)
+	if err != nil {
+		panic(err)
+	}
+
+	// Add claims to the context for the user.
+	ctx := context.WithValue(tests.Context(), auth.Key, claims)
+
+	return mockSignup{
+		account: s.Account,
+		user:    mockUser{s.User, req.User.Password},
+		claims:  claims,
+		token:   tkn,
+		context: ctx,
+	}
+}
+
+// TestSignup validates the signup endpoint.
 func TestSignup(t *testing.T) {
 	defer tests.Recover(t)
 
-	t.Run("postSigup", postSigup)
-}
+	ctx := tests.Context()
 
-// postSigup validates the signup endpoint.
-func postSigup(t *testing.T) {
+	// Test signup.
+	{
+		expectedStatus := http.StatusCreated
 
-	var rtests []requestTest
+		req := mockSignupRequest()
+		rt := requestTest{
+			fmt.Sprintf("Signup %d w/no authorization", expectedStatus),
+			http.MethodPost,
+			"/v1/signup",
+			req,
+			user.Token{},
+			auth.Claims{},
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-	// Test 201.
-	// Signup does not require auth, so empty token and claims should result in success.
-	req1 := mockSignupRequest()
-	rtests = append(rtests, requestTest{
-		"No Authorization Valid",
-		http.MethodPost,
-		"/v1/signup",
-		req1,
-		user.Token{},
-		auth.Claims{},
-		http.StatusCreated,
-		nil,
-		func(treq requestTest, body []byte) bool {
-			var actual signup.SignupResponse
-			if err := json.Unmarshal(body, &actual); err != nil {
-				t.Logf("\t\tGot error : %+v", err)
-				return false
-			}
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-			ctx := tests.Context()
+		var actual signup.SignupResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
 
-			req := treq.request.(signup.SignupRequest )
-
-			expectedMap := map[string]interface{}{
-				"user": map[string]interface{}{
-					"id": actual.User.ID,
-					"name": req.User.Name,
-					"email": req.User.Email,
-					"timezone": actual.User.Timezone,
-					"created_at": web.NewTimeResponse(ctx, actual.User.CreatedAt.Value),
-					"updated_at": web.NewTimeResponse(ctx, actual.User.UpdatedAt.Value),
+		expectedMap := map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":         actual.User.ID,
+				"name":       req.User.Name,
+				"email":      req.User.Email,
+				"timezone":   actual.User.Timezone,
+				"created_at": web.NewTimeResponse(ctx, actual.User.CreatedAt.Value),
+				"updated_at": web.NewTimeResponse(ctx, actual.User.UpdatedAt.Value),
+			},
+			"account": map[string]interface{}{
+				"updated_at":      web.NewTimeResponse(ctx, actual.Account.UpdatedAt.Value),
+				"id":              actual.Account.ID,
+				"address2":        req.Account.Address2,
+				"region":          req.Account.Region,
+				"zipcode":         req.Account.Zipcode,
+				"timezone":        actual.Account.Timezone,
+				"created_at":      web.NewTimeResponse(ctx, actual.Account.CreatedAt.Value),
+				"country":         req.Account.Country,
+				"billing_user_id": &actual.Account.BillingUserID,
+				"name":            req.Account.Name,
+				"address1":        req.Account.Address1,
+				"city":            req.Account.City,
+				"status": map[string]interface{}{
+					"value":   "active",
+					"title":   "Active",
+					"options": []map[string]interface{}{{"selected": false, "title": "[Active Pending Disabled]", "value": "[active pending disabled]"}},
 				},
-				"account":  map[string]interface{}{
-					"updated_at": web.NewTimeResponse(ctx, actual.Account.UpdatedAt.Value),
-					"id": actual.Account.ID,
-					"address2": req.Account.Address2,
-					"region": req.Account.Region,
-					"zipcode": req.Account.Zipcode,
-					"timezone": actual.Account.Timezone,
-					"created_at": web.NewTimeResponse(ctx, actual.Account.CreatedAt.Value),
-					"country": req.Account.Country,
-					"billing_user_id": &actual.Account.BillingUserID,
-					"name": req.Account.Name,
-					"address1": req.Account.Address1,
-					"city": req.Account.City,
-					"status": map[string]interface{}{
-						"value": "active",
-						"title": "Active",
-						"options": []map[string]interface{}{{"selected":false,"title":"[Active Pending Disabled]","value":"[active pending disabled]"}},
-					},
-					"signup_user_id": &actual.Account.SignupUserID,
-				},
+				"signup_user_id": &actual.Account.SignupUserID,
+			},
+		}
+
+		var expected signup.SignupResponse
+		if err := decodeMapToStruct(expectedMap, &expected); err != nil {
+			t.Logf("\t\tGot error : %+v\nActual results to format expected : \n", err)
+			printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
+			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			if len(expectedMap) == 0 {
+				printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
 			}
-			expectedJson, err := json.Marshal(expectedMap)
-			if err != nil {
-				t.Logf("\t\tGot error : %+v", err)
-				return false
-			}
+			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected result.", tests.Success)
+	}
 
-			var expected signup.SignupResponse
-			if err := json.Unmarshal([]byte(expectedJson), &expected); err != nil {
-				t.Logf("\t\tGot error : %+v", err)
-				printResultMap(ctx, body)
-				return false
-			}
+	// Test signup w/empty request.
+	{
+		expectedStatus := http.StatusBadRequest
 
-			if diff := cmp.Diff(actual, expected); diff != "" {
-				actualJSON, err := json.MarshalIndent(actual, "", "    ")
-				if err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
-				t.Logf("\t\tGot : %s\n", actualJSON)
+		rt := requestTest{
+			fmt.Sprintf("Signup %d w/empty request", expectedStatus),
+			http.MethodPost,
+			"/v1/signup",
+			nil,
+			user.Token{},
+			auth.Claims{},
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-				expectedJSON, err := json.MarshalIndent(expected, "", "    ")
-				if err != nil {
-					t.Logf("\t\tGot error : %+v", err)
-					return false
-				}
-				t.Logf("\t\tExpected : %s\n", expectedJSON)
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-				t.Logf("\t\tDiff : %s\n", diff)
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
 
-				if len(expectedMap) == 0 {
-					printResultMap(ctx, body)
-				}
-
-				return false
-			}
-
-			return true
-		},
-	})
-
-	// Test 404 w/empty request.
-	rtests = append(rtests, requestTest{
-		"Empty request",
-		http.MethodPost,
-		"/v1/signup",
-		nil,
-		user.Token{},
-		auth.Claims{},
-		http.StatusBadRequest,
-		web.ErrorResponse{
+		expected := web.ErrorResponse{
 			Error: "decode request body failed: EOF",
-		},
-		func(req requestTest, body []byte) bool {
-			return true
-		},
-	})
+		}
 
-	// Test 404 w/validation errors.
-	invalidReq := mockSignupRequest()
-	invalidReq.User.Email = ""
-	invalidReq.Account.Name = ""
-	rtests = append(rtests, requestTest{
-		"Invalid request",
-		http.MethodPost,
-		"/v1/signup",
-		invalidReq,
-		user.Token{},
-		auth.Claims{},
-		http.StatusBadRequest,
-		web.ErrorResponse{
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test signup w/validation errors.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		req := mockSignupRequest()
+		req.User.Email = ""
+		req.Account.Name = ""
+		rt := requestTest{
+			fmt.Sprintf("Signup %d w/validation errors", expectedStatus),
+			http.MethodPost,
+			"/v1/signup",
+			req,
+			user.Token{},
+			auth.Claims{},
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
 			Error: "field validation error",
 			Fields: []web.FieldError{
 				{Field: "name", Error: "Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag"},
 				{Field: "email", Error: "Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag"},
 			},
-		},
-		func(req requestTest, body []byte) bool {
-			return true
-		},
-	})
+		}
 
-	runRequestTests(t, rtests)
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
 }

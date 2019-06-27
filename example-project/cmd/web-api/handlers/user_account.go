@@ -15,12 +15,13 @@ import (
 
 // UserAccount represents the UserAccount API method handler set.
 type UserAccount struct {
-	MasterDB       *sqlx.DB
+	MasterDB *sqlx.DB
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
 
 // Find godoc
+// TODO: Need to implement unittests on user_accounts/find endpoint. There are none.
 // @Summary List user accounts
 // @Description Find returns the existing user accounts in the system.
 // @Tags user_account
@@ -191,7 +192,7 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := user_account.Create(ctx, claims, u.MasterDB, req, v.Now)
@@ -242,7 +243,7 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user_account.Update(ctx, claims, u.MasterDB, req, v.Now)
@@ -275,7 +276,6 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts/archive [patch]
 func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -294,15 +294,13 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user_account.Archive(ctx, claims, u.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user_account.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case user_account.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
@@ -329,7 +327,6 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 // @Success 204
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts [delete]
 func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
@@ -343,15 +340,13 @@ func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	err := user_account.Delete(ctx, claims, u.MasterDB, req)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user_account.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
 		case user_account.ErrForbidden:
 			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
 		default:
@@ -360,7 +355,7 @@ func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http
 				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
 			}
 
-			return errors.Wrapf(err, "UserID: %s AccountID: %s  User Account: %+v", req.UserID, req.AccountID, &req)
+			return errors.Wrapf(err, "UserID: %s, AccountID: %s", req.UserID, req.AccountID)
 		}
 	}
 

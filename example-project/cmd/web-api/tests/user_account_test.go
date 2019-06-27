@@ -8,52 +8,55 @@ import (
 	"testing"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
 	"github.com/pborman/uuid"
 )
 
-func mockProjectCreateRequest(accountID string) project.ProjectCreateRequest {
-	return project.ProjectCreateRequest{
-		Name:      fmt.Sprintf("Moon Launch %s", uuid.NewRandom().String()),
-		AccountID: accountID,
-	}
-}
-
-// mockProject creates a new project for testing and associates it with the supplied account ID.
-func newMockProject(accountID string) *project.Project {
-	req := mockProjectCreateRequest(accountID)
-	p, err := project.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
+// newMockUserAccount creates a new user user for testing and associates it with the supplied account ID.
+func newMockUserAccount(accountID string, role user_account.UserAccountRole) *user_account.UserAccount {
+	req := mockUserCreateRequest()
+	u, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}
 
-	return p
+	ua, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		UserID:    u.ID,
+		AccountID: accountID,
+		Roles:     []user_account.UserAccountRole{role},
+	}, time.Now().UTC().AddDate(-1, -1, -1))
+	if err != nil {
+		panic(err)
+	}
+
+	return ua
 }
 
-// TestProjectCRUDAdmin tests all the project CRUD endpoints using an user with role admin.
-func TestProjectCRUDAdmin(t *testing.T) {
+// TestUserAccountCRUDAdmin tests all the user account CRUD endpoints using an user with role admin.
+func TestUserAccountCRUDAdmin(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the user_account.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create.
-	var created project.ProjectResponse
+	var created user_account.UserAccountResponse
 	{
 		expectedStatus := http.StatusCreated
 
-		req := mockProjectCreateRequest(tr.Account.ID)
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
-			req,
+			"/v1/user_accounts",
+			nil,
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
@@ -61,13 +64,24 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
+		newUser, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, mockUserCreateRequest(), time.Now().UTC().AddDate(-1, -1, -1))
+		if err != nil {
+			t.Fatalf("\t%s\tCreate new user failed.", tests.Failed)
+		}
+		req := user_account.UserAccountCreateRequest{
+			UserID:    newUser.ID,
+			AccountID: tr.Account.ID,
+			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+		}
+		rt.request = req
+
 		w, ok := executeRequestTest(t, rt, ctx)
 		if !ok {
 			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual project.ProjectResponse
+		var actual user_account.UserAccountResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -78,12 +92,13 @@ func TestProjectCRUDAdmin(t *testing.T) {
 			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
 			"id":         actual.ID,
 			"account_id": req.AccountID,
-			"status":     web.NewEnumResponse(ctx, "active", project.ProjectStatus_Values),
+			"user_id":    req.UserID,
+			"status":     web.NewEnumResponse(ctx, "active", user_account.UserAccountStatus_Values),
+			"roles":      req.Roles,
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
-			"name":       req.Name,
 		}
 
-		var expected project.ProjectResponse
+		var expected user_account.UserAccountResponse
 		if err := decodeMapToStruct(expectedMap, &expected); err != nil {
 			t.Logf("\t\tGot error : %+v\nActual results to format expected : \n", err)
 			printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
@@ -106,7 +121,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/user_accounts/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -121,7 +136,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual project.ProjectResponse
+		var actual user_account.UserAccountResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -141,7 +156,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", randID),
+			fmt.Sprintf("/v1/user_accounts/%s", randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -163,7 +178,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
+			Error: fmt.Sprintf("user account %s not found: Entity not found", randID),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -173,14 +188,14 @@ func TestProjectCRUDAdmin(t *testing.T) {
 	}
 
 	// Test Read with forbidden ID.
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenUserAccount := newMockUserAccount(newMockSignup().account.ID, user_account.UserAccountRole_Admin)
 	{
 		expectedStatus := http.StatusNotFound
 
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
+			fmt.Sprintf("/v1/user_accounts/%s", forbiddenUserAccount.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -202,7 +217,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			Error: fmt.Sprintf("user account %s not found: Entity not found", forbiddenUserAccount.ID),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -215,14 +230,15 @@ func TestProjectCRUDAdmin(t *testing.T) {
 	{
 		expectedStatus := http.StatusNoContent
 
-		newName := uuid.NewRandom().String()
+		newStatus := user_account.UserAccountStatus_Invited
 		rt := requestTest{
 			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
-				ID:   created.ID,
-				Name: &newName,
+			"/v1/user_accounts",
+			user_account.UserAccountUpdateRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
+				Status:    &newStatus,
 			},
 			tr.Token,
 			tr.Claims,
@@ -252,9 +268,10 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
-				ID: created.ID,
+			"/v1/user_accounts/archive",
+			user_account.UserAccountArchiveRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
 			},
 			tr.Token,
 			tr.Claims,
@@ -284,8 +301,11 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
-			nil,
+			"/v1/user_accounts",
+			user_account.UserAccountDeleteRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
+			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
@@ -308,25 +328,28 @@ func TestProjectCRUDAdmin(t *testing.T) {
 	}
 }
 
-// TestProjectCRUDUser tests all the project CRUD endpoints using an user with role project.
-func TestProjectCRUDUser(t *testing.T) {
+// TestUserAccountCRUDUser tests all the user account CRUD endpoints using an user with role user_account.
+func TestUserAccountCRUDUser(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleUser]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the user_account.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create.
 	{
 		expectedStatus := http.StatusForbidden
 
-		req := mockProjectCreateRequest(tr.Account.ID)
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
-			req,
+			"/v1/user_accounts",
+			user_account.UserAccountCreateRequest{
+				UserID:    uuid.NewRandom().String(),
+				AccountID: tr.Account.ID,
+				Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
@@ -357,7 +380,7 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 
 	// Since role doesn't support create, bypass auth to test other endpoints.
-	created := newMockProject(tr.Account.ID).Response(ctx)
+	created := newMockUserAccount(tr.Account.ID, user_account.UserAccountRole_User).Response(ctx)
 
 	// Test read.
 	{
@@ -366,7 +389,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/user_accounts/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -381,7 +404,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual *project.ProjectResponse
+		var actual *user_account.UserAccountResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -401,7 +424,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", randID),
+			fmt.Sprintf("/v1/user_accounts/%s", randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -423,7 +446,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
+			Error: fmt.Sprintf("user account %s not found: Entity not found", randID),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -433,14 +456,14 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 
 	// Test Read with forbidden ID.
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenUserAccount := newMockUserAccount(newMockSignup().account.ID, user_account.UserAccountRole_Admin)
 	{
 		expectedStatus := http.StatusNotFound
 
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
+			fmt.Sprintf("/v1/user_accounts/%s", forbiddenUserAccount.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -462,7 +485,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			Error: fmt.Sprintf("user account %s not found: Entity not found", forbiddenUserAccount.ID),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -475,14 +498,15 @@ func TestProjectCRUDUser(t *testing.T) {
 	{
 		expectedStatus := http.StatusForbidden
 
-		newName := uuid.NewRandom().String()
+		newStatus := user_account.UserAccountStatus_Invited
 		rt := requestTest{
 			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
-				ID:   created.ID,
-				Name: &newName,
+			"/v1/user_accounts",
+			user_account.UserAccountUpdateRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
+				Status:    &newStatus,
 			},
 			tr.Token,
 			tr.Claims,
@@ -504,7 +528,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
+			Error: account.ErrForbidden.Error(),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -520,9 +544,10 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
-				ID: created.ID,
+			"/v1/user_accounts/archive",
+			user_account.UserAccountArchiveRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
 			},
 			tr.Token,
 			tr.Claims,
@@ -560,8 +585,11 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
-			nil,
+			"/v1/user_accounts",
+			user_account.UserAccountArchiveRequest{
+				UserID:    created.UserID,
+				AccountID: created.AccountID,
+			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
@@ -592,26 +620,238 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 }
 
-// TestProjectCreate validates create project endpoint.
-func TestProjectCreate(t *testing.T) {
+// TestUserAccountCreate validates create user account endpoint.
+func TestUserAccountCreate(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the user_account.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create with invalid data.
 	{
 		expectedStatus := http.StatusBadRequest
 
-		req := mockProjectCreateRequest(tr.Account.ID)
-		invalidStatus := project.ProjectStatus("invalid status")
-		req.Status = &invalidStatus
+		invalidStatus := user_account.UserAccountStatus("invalid status")
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
+			"/v1/user_accounts",
+			user_account.UserAccountCreateRequest{
+				UserID:    uuid.NewRandom().String(),
+				AccountID: tr.Account.ID,
+				Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
+				Status:    &invalidStatus,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "status", Error: "Key: 'UserAccountCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserAccountUpdate validates update user account endpoint.
+func TestUserAccountUpdate(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user_account.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test update with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		invalidStatus := user_account.UserAccountStatus("invalid status")
+		rt := requestTest{
+			fmt.Sprintf("Update %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/user_accounts",
+			user_account.UserAccountUpdateRequest{
+				UserID:    uuid.NewRandom().String(),
+				AccountID: uuid.NewRandom().String(),
+				Status:    &invalidStatus,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "status", Error: "Key: 'UserAccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserAccountArchive validates archive user account endpoint.
+func TestUserAccountArchive(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user_account.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test archive with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/user_accounts/archive",
+			user_account.UserAccountArchiveRequest{
+				UserID:    "foo",
+				AccountID: "bar",
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: "field validation error",
+			Fields: []web.FieldError{
+				{Field: "user_id", Error: "Key: 'UserAccountArchiveRequest.user_id' Error:Field validation for 'user_id' failed on the 'uuid' tag"},
+				{Field: "account_id", Error: "Key: 'UserAccountArchiveRequest.account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
+			},
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+
+	// Test archive with forbidden ID.
+	forbiddenUserAccount := newMockUserAccount(newMockSignup().account.ID, user_account.UserAccountRole_Admin)
+	{
+		expectedStatus := http.StatusForbidden
+
+		rt := requestTest{
+			fmt.Sprintf("Archive %d w/role %s using forbidden IDs", expectedStatus, tr.Role),
+			http.MethodPatch,
+			"/v1/user_accounts/archive",
+			user_account.UserAccountArchiveRequest{
+				UserID:    forbiddenUserAccount.UserID,
+				AccountID: forbiddenUserAccount.AccountID,
+			},
+			tr.Token,
+			tr.Claims,
+			expectedStatus,
+			nil,
+		}
+		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
+
+		w, ok := executeRequestTest(t, rt, ctx)
+		if !ok {
+			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
+
+		var actual web.ErrorResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
+			t.Logf("\t\tGot error : %+v", err)
+			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
+		}
+
+		expected := web.ErrorResponse{
+			Error: user_account.ErrForbidden.Error(),
+		}
+
+		if diff := cmpDiff(t, actual, expected); diff {
+			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
+		}
+		t.Logf("\t%s\tReceived expected error.", tests.Success)
+	}
+}
+
+// TestUserAccountDelete validates delete user account endpoint.
+func TestUserAccountDelete(t *testing.T) {
+	defer tests.Recover(t)
+
+	tr := roleTests[auth.RoleAdmin]
+
+	// Add claims to the context for the user_account.
+	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
+
+	// Test delete with invalid data.
+	{
+		expectedStatus := http.StatusBadRequest
+
+		req := user_account.UserAccountDeleteRequest{
+			UserID:    "foo",
+			AccountID: "bar",
+		}
+
+		rt := requestTest{
+			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
+			http.MethodDelete,
+			"/v1/user_accounts",
 			req,
 			tr.Token,
 			tr.Claims,
@@ -635,210 +875,8 @@ func TestProjectCreate(t *testing.T) {
 		expected := web.ErrorResponse{
 			Error: "field validation error",
 			Fields: []web.FieldError{
-				{Field: "status", Error: "Key: 'ProjectCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
-			},
-		}
-
-		if diff := cmpDiff(t, actual, expected); diff {
-			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived expected error.", tests.Success)
-	}
-}
-
-// TestProjectUpdate validates update project endpoint.
-func TestProjectUpdate(t *testing.T) {
-	defer tests.Recover(t)
-
-	tr := roleTests[auth.RoleAdmin]
-
-	// Add claims to the context for the project.
-	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
-
-	// Test update with invalid data.
-	{
-		expectedStatus := http.StatusBadRequest
-
-		invalidStatus := project.ProjectStatus("invalid status")
-		rt := requestTest{
-			fmt.Sprintf("Update %d w/role %s using invalid data", expectedStatus, tr.Role),
-			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
-				ID:     uuid.NewRandom().String(),
-				Status: &invalidStatus,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			nil,
-		}
-		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
-
-		w, ok := executeRequestTest(t, rt, ctx)
-		if !ok {
-			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
-
-		var actual web.ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
-			t.Logf("\t\tGot error : %+v", err)
-			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
-		}
-
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "status", Error: "Key: 'ProjectUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
-			},
-		}
-
-		if diff := cmpDiff(t, actual, expected); diff {
-			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived expected error.", tests.Success)
-	}
-}
-
-// TestProjectArchive validates archive project endpoint.
-func TestProjectArchive(t *testing.T) {
-	defer tests.Recover(t)
-
-	tr := roleTests[auth.RoleAdmin]
-
-	// Add claims to the context for the project.
-	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
-
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
-
-	// Test archive with invalid data.
-	{
-		expectedStatus := http.StatusBadRequest
-
-		rt := requestTest{
-			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
-			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
-				ID: "a",
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			nil,
-		}
-		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
-
-		w, ok := executeRequestTest(t, rt, ctx)
-		if !ok {
-			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
-
-		var actual web.ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
-			t.Logf("\t\tGot error : %+v", err)
-			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
-		}
-
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'ProjectArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
-			},
-		}
-
-		if diff := cmpDiff(t, actual, expected); diff {
-			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived expected error.", tests.Success)
-	}
-
-	// Test archive with forbidden ID.
-	{
-		expectedStatus := http.StatusForbidden
-
-		rt := requestTest{
-			fmt.Sprintf("Archive %d w/role %s using forbidden ID", expectedStatus, tr.Role),
-			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
-				ID: forbiddenProject.ID,
-			},
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			nil,
-		}
-		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
-
-		w, ok := executeRequestTest(t, rt, ctx)
-		if !ok {
-			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
-
-		var actual web.ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
-			t.Logf("\t\tGot error : %+v", err)
-			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
-		}
-
-		expected := web.ErrorResponse{
-			Error: project.ErrForbidden.Error(),
-		}
-
-		if diff := cmpDiff(t, actual, expected); diff {
-			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived expected error.", tests.Success)
-	}
-}
-
-// TestProjectDelete validates delete project endpoint.
-func TestProjectDelete(t *testing.T) {
-	defer tests.Recover(t)
-
-	tr := roleTests[auth.RoleAdmin]
-
-	// Add claims to the context for the project.
-	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
-
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
-
-	// Test delete with invalid data.
-	{
-		expectedStatus := http.StatusBadRequest
-
-		rt := requestTest{
-			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
-			http.MethodDelete,
-			"/v1/projects/a",
-			nil,
-			tr.Token,
-			tr.Claims,
-			expectedStatus,
-			nil,
-		}
-		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
-
-		w, ok := executeRequestTest(t, rt, ctx)
-		if !ok {
-			t.Fatalf("\t%s\tExecute request failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
-
-		var actual web.ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
-			t.Logf("\t\tGot error : %+v", err)
-			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
-		}
-
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				{Field: "user_id", Error: "Key: 'UserAccountDeleteRequest.user_id' Error:Field validation for 'user_id' failed on the 'uuid' tag"},
+				{Field: "account_id", Error: "Key: 'UserAccountDeleteRequest.account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
 			},
 		}
 
@@ -849,14 +887,18 @@ func TestProjectDelete(t *testing.T) {
 	}
 
 	// Test delete with forbidden ID.
+	forbiddenUserAccount := newMockUserAccount(newMockSignup().account.ID, user_account.UserAccountRole_Admin)
 	{
 		expectedStatus := http.StatusForbidden
 
 		rt := requestTest{
-			fmt.Sprintf("Delete %d w/role %s using forbidden ID", expectedStatus, tr.Role),
+			fmt.Sprintf("Delete %d w/role %s using forbidden IDs", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
-			nil,
+			fmt.Sprintf("/v1/user_accounts"),
+			user_account.UserAccountDeleteRequest{
+				UserID:    forbiddenUserAccount.UserID,
+				AccountID: forbiddenUserAccount.AccountID,
+			},
 			tr.Token,
 			tr.Claims,
 			expectedStatus,
@@ -877,7 +919,7 @@ func TestProjectDelete(t *testing.T) {
 		}
 
 		expected := web.ErrorResponse{
-			Error: project.ErrForbidden.Error(),
+			Error: user_account.ErrForbidden.Error(),
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {

@@ -83,7 +83,7 @@ func Decode(r *http.Request, val interface{}) error {
 	}
 
 	if err := validate.Struct(val); err != nil {
-		verr, _ :=  NewValidationError(err)
+		verr, _ := NewValidationError(err)
 		return verr
 	}
 
@@ -130,7 +130,6 @@ func ExtractWhereArgs(where string) (string, []interface{}, error) {
 	return where, vals, nil
 }
 
-
 func RequestIsJson(r *http.Request) bool {
 	if r == nil {
 		return false
@@ -155,4 +154,3 @@ func RequestIsJson(r *http.Request) bool {
 
 	return false
 }
-

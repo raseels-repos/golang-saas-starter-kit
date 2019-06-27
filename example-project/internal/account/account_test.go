@@ -151,12 +151,12 @@ func TestCreateValidation(t *testing.T) {
 			func(req AccountCreateRequest, res *Account) *Account {
 				return nil
 			},
-			errors.New("Key: 'AccountCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag\n" +
-				"Key: 'AccountCreateRequest.Address1' Error:Field validation for 'Address1' failed on the 'required' tag\n" +
-				"Key: 'AccountCreateRequest.City' Error:Field validation for 'City' failed on the 'required' tag\n" +
-				"Key: 'AccountCreateRequest.Region' Error:Field validation for 'Region' failed on the 'required' tag\n" +
-				"Key: 'AccountCreateRequest.Country' Error:Field validation for 'Country' failed on the 'required' tag\n" +
-				"Key: 'AccountCreateRequest.Zipcode' Error:Field validation for 'Zipcode' failed on the 'required' tag"),
+			errors.New("Key: 'AccountCreateRequest.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.address1' Error:Field validation for 'address1' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.city' Error:Field validation for 'city' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.region' Error:Field validation for 'region' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.country' Error:Field validation for 'country' failed on the 'required' tag\n" +
+				"Key: 'AccountCreateRequest.zipcode' Error:Field validation for 'zipcode' failed on the 'required' tag"),
 		},
 
 		{"Default Timezone & Status",
@@ -204,7 +204,7 @@ func TestCreateValidation(t *testing.T) {
 			func(req AccountCreateRequest, res *Account) *Account {
 				return nil
 			},
-			errors.New("Key: 'AccountCreateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+			errors.New("Key: 'AccountCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"),
 		},
 	}
 
@@ -286,7 +286,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		}
-		expectedErr := errors.New("Key: 'AccountCreateRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'AccountCreateRequest.name' Error:Field validation for 'name' failed on the 'unique' tag")
 		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
@@ -403,7 +403,7 @@ func TestUpdateValidation(t *testing.T) {
 	var accountTests = []accountTest{
 		{"Required Fields",
 			AccountUpdateRequest{},
-			errors.New("Key: 'AccountUpdateRequest.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
+			errors.New("Key: 'AccountUpdateRequest.id' Error:Field validation for 'id' failed on the 'required' tag"),
 		},
 	}
 
@@ -413,7 +413,7 @@ func TestUpdateValidation(t *testing.T) {
 			ID:     uuid.NewRandom().String(),
 			Status: &invalidStatus,
 		},
-		errors.New("Key: 'AccountUpdateRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"),
+		errors.New("Key: 'AccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"),
 	})
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
@@ -494,7 +494,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			ID:   account2.ID,
 			Name: &account1.Name,
 		}
-		expectedErr := errors.New("Key: 'AccountUpdateRequest.Name' Error:Field validation for 'Name' failed on the 'unique' tag")
+		expectedErr := errors.New("Key: 'AccountUpdateRequest.name' Error:Field validation for 'name' failed on the 'unique' tag")
 		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)

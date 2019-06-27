@@ -45,7 +45,7 @@ func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		if _, ok := errors.Cause(err).(*web.Error); !ok {
 			err = web.NewRequestError(err, http.StatusBadRequest)
 		}
-		return  web.RespondJsonError(ctx, w, err)
+		return web.RespondJsonError(ctx, w, err)
 	}
 
 	res, err := signup.Signup(ctx, claims, c.MasterDB, req, v.Now)

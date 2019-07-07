@@ -11,6 +11,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
+	_ "geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
 )
 
 // API returns a handler for a set of routes.

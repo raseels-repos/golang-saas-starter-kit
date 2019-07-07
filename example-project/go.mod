@@ -2,7 +2,7 @@ module geeks-accelerator/oss/saas-starter-kit/example-project
 
 require (
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
-	github.com/aws/aws-sdk-go v1.19.33
+	github.com/aws/aws-sdk-go v1.20.15
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/dustin/go-humanize v1.0.0

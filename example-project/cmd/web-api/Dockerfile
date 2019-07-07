@@ -12,7 +12,8 @@ RUN GO111MODULE=off go get gopkg.in/go-playground/validator.v9 && \
     GO111MODULE=off go get github.com/lib/pq/oid && \
     GO111MODULE=off go get github.com/lib/pq/scram && \
     GO111MODULE=off go get github.com/tinylib/msgp/msgp && \
-    GO111MODULE=off go get gopkg.in/DataDog/dd-trace-go.v1/ddtrace
+    GO111MODULE=off go get gopkg.in/DataDog/dd-trace-go.v1/ddtrace && \
+    GO111MODULE=off go get github.com/xwb1989/sqlparser
 
 # Install swag with go modules enabled.
 RUN GO111MODULE=on go get -u github.com/swaggo/swag/cmd/swag
@@ -51,6 +52,12 @@ RUN apk --update --no-cache add \
 COPY --from=builder /gosrv /
 #COPY --from=builder /static /static
 COPY --from=builder /templates /templates
+
+ARG service
+ENV SERVICE_NAME $service
+
+ARG env="dev"
+ENV ENV $env
 
 ARG gogc="20"
 ENV GOGC $gogc

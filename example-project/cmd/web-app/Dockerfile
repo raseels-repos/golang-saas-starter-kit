@@ -37,6 +37,12 @@ COPY --from=builder /gosrv /
 COPY --from=builder /static /static
 COPY --from=builder /templates /templates
 
+ARG service
+ENV SERVICE_NAME $service
+
+ARG env="dev"
+ENV ENV $env
+
 ARG gogc="20"
 ENV GOGC $gogc
 

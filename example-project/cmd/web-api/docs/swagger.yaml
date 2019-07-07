@@ -164,77 +164,76 @@ definitions:
     required:
     - id
     type: object
+  signup.SignupAccount:
+    properties:
+      address1:
+        example: 221 Tatitlek Ave
+        type: string
+      address2:
+        example: 'Box #1832'
+        type: string
+      city:
+        example: Valdez
+        type: string
+      country:
+        example: USA
+        type: string
+      name:
+        example: Company {RANDOM_UUID}
+        type: string
+      region:
+        example: AK
+        type: string
+      timezone:
+        example: America/Anchorage
+        type: string
+      zipcode:
+        example: "99686"
+        type: string
+    required:
+    - address1
+    - city
+    - country
+    - name
+    - region
+    - zipcode
+    type: object
   signup.SignupRequest:
     properties:
       account:
-        properties:
-          address1:
-            example: 221 Tatitlek Ave
-            type: string
-          address2:
-            example: 'Box #1832'
-            type: string
-          city:
-            example: Valdez
-            type: string
-          country:
-            example: USA
-            type: string
-          name:
-            example: Company {RANDOM_UUID}
-            type: string
-          region:
-            example: AK
-            type: string
-          timezone:
-            example: America/Anchorage
-            type: string
-          zipcode:
-            example: "99686"
-            type: string
-        required:
-        - name
-        - address1
-        - city
-        - region
-        - country
-        - zipcode
+        $ref: '#/definitions/signup.SignupAccount'
         type: object
       user:
-        properties:
-          email:
-            example: '{RANDOM_EMAIL}'
-            type: string
-          name:
-            example: Gabi May
-            type: string
-          password:
-            example: SecretString
-            type: string
-          password_confirm:
-            example: SecretString
-            type: string
-        required:
-        - name
-        - email
-        - password
+        $ref: '#/definitions/signup.SignupUser'
         type: object
     type: object
   signup.SignupResponse:
     properties:
       account:
-        type: string
+        $ref: '#/definitions/account.AccountResponse'
+        type: object
       user:
-        type: string
+        $ref: '#/definitions/user.UserResponse'
+        type: object
     type: object
-  user.Token:
+  signup.SignupUser:
     properties:
-      access_token:
+      email:
+        example: '{RANDOM_EMAIL}'
         type: string
-      expiry:
+      name:
+        example: Gabi May
         type: string
-      token_type:
+      password:
+        example: SecretString
         type: string
+      password_confirm:
+        example: SecretString
+        type: string
+    required:
+    - email
+    - name
+    - password
     type: object
   user.UserArchiveRequest:
     properties:
@@ -322,6 +321,110 @@ definitions:
     required:
     - id
     type: object
+  user_account.UserAccountArchiveRequest:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+    required:
+    - account_id
+    - user_id
+    type: object
+  user_account.UserAccountCreateRequest:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      roles:
+        example:
+        - admin
+        items:
+          enum:
+          - admin
+          - user
+          type: string
+        type: array
+      status:
+        enum:
+        - active
+        - invited
+        - disabled
+        example: active
+        type: string
+      user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+    required:
+    - account_id
+    - roles
+    - user_id
+    type: object
+  user_account.UserAccountResponse:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      archived_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      created_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+      roles:
+        example:
+        - admin
+        items:
+          enum:
+          - admin
+          - user
+          type: string
+        type: array
+      status:
+        $ref: '#/definitions/web.EnumResponse'
+        type: object
+      updated_at:
+        $ref: '#/definitions/web.TimeResponse'
+        type: object
+      user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+    required:
+    - roles
+    type: object
+  user_account.UserAccountUpdateRequest:
+    properties:
+      account_id:
+        example: c4653bf9-5978-48b7-89c5-95704aebb7e2
+        type: string
+      roles:
+        example:
+        - user
+        items:
+          enum:
+          - admin
+          - user
+          type: string
+        type: array
+      status:
+        enum:
+        - active
+        - invited
+        - disabled
+        example: disabled
+        type: string
+      user_id:
+        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
+        type: string
+    required:
+    - account_id
+    - user_id
+    type: object
   web.EnumOption:
     properties:
       selected:
@@ -346,17 +449,6 @@ definitions:
       value:
         example: active_etc
         type: string
-    type: object
-  web.Error:
-    properties:
-      err:
-        type: error
-      fields:
-        items:
-          $ref: '#/definitions/web.FieldError'
-        type: array
-      status:
-        type: integer
     type: object
   web.ErrorResponse:
     properties:
@@ -440,7 +532,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -448,11 +540,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -490,11 +577,6 @@ paths:
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
@@ -527,29 +609,21 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
-          headers:
-            Token:
-              description: qwerty
-              type: string
-          schema:
-            $ref: '#/definitions/user.Token'
-            type: object
+        "200": {}
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
+        "401":
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "404":
-          description: Not Found
+        "500":
+          description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.Error'
+            $ref: '#/definitions/web.ErrorResponse'
             type: object
       security:
       - BasicAuth: []
@@ -627,7 +701,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -635,11 +709,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -668,8 +737,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/project.ProjectResponse'
             type: object
@@ -712,7 +781,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -720,11 +789,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -761,11 +825,6 @@ paths:
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
@@ -797,7 +856,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -805,11 +864,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -839,11 +893,39 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/signup.SignupResponse'
             type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      summary: Signup handles new account creation.
+      tags:
+      - signup
+  /user_accounts:
+    delete:
+      consumes:
+      - application/json
+      description: Delete removes the specified user account from the system.
+      parameters:
+      - description: UserAccount ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -859,9 +941,222 @@ paths:
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-      summary: Signup handles new account creation.
+      security:
+      - OAuth2Password: []
+      summary: Delete user account by user ID and account ID
       tags:
-      - signup
+      - user
+    get:
+      consumes:
+      - application/json
+      description: Find returns the existing user accounts in the system.
+      parameters:
+      - description: 'Filter string, example: account_id = ''c4653bf9-5978-48b7-89c5-95704aebb7e2'''
+        in: query
+        name: where
+        type: string
+      - description: 'Order columns separated by comma, example: created_at desc'
+        in: query
+        name: order
+        type: string
+      - description: 'Limit, example: 10'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset, example: 20'
+        in: query
+        name: offset
+        type: integer
+      - description: 'Included Archived, example: false'
+        in: query
+        name: included-archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user_account.UserAccountResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: List user accounts
+      tags:
+      - user_account
+    patch:
+      consumes:
+      - application/json
+      description: Update updates the specified user account in the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user_account.UserAccountUpdateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Update user account by user ID and account ID
+      tags:
+      - user
+    post:
+      consumes:
+      - application/json
+      description: Create inserts a new user account into the system.
+      parameters:
+      - description: User Account details
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user_account.UserAccountCreateRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user_account.UserAccountResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Create new user account.
+      tags:
+      - user_account
+  /user_accounts/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Read returns the specified user account from the system.
+      parameters:
+      - description: UserAccount ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user_account.UserAccountResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Get user account by ID
+      tags:
+      - user_account
+  /user_accounts/archive:
+    patch:
+      consumes:
+      - application/json
+      description: Archive soft-deletes the specified user account from the system.
+      parameters:
+      - description: Update fields
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/user_account.UserAccountArchiveRequest'
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+            type: object
+      security:
+      - OAuth2Password: []
+      summary: Archive user account by user ID and account ID
+      tags:
+      - user
   /users:
     get:
       consumes:
@@ -903,11 +1198,6 @@ paths:
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
@@ -933,7 +1223,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -941,11 +1231,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -974,8 +1259,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/user.UserResponse'
             type: object
@@ -986,11 +1271,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -1018,7 +1298,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -1026,11 +1306,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -1067,11 +1342,6 @@ paths:
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
@@ -1103,7 +1373,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -1111,11 +1381,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -1145,7 +1410,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "204": {}
         "400":
           description: Bad Request
           schema:
@@ -1153,11 +1418,6 @@ paths:
             type: object
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
@@ -1185,19 +1445,14 @@ paths:
       produces:
       - application/json
       responses:
-        "201": {}
+        "200": {}
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/web.ErrorResponse'
-            type: object
-        "404":
-          description: Not Found
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/web.ErrorResponse'
             type: object

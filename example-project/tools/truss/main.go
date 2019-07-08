@@ -121,6 +121,8 @@ func main() {
 	// =========================================================================
 	// Start Truss
 
+	var deployFlags devops.ServiceDeployFlags
+
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		{
@@ -207,60 +209,24 @@ func main() {
 			},
 		},
 		{
-			Name:    "build",
-			Aliases: []string{"serviceBuild"},
-			Usage:   "-service=web-api -env=dev [-image=gitlab.com/example-project:latest] [-root=.]",
-			Flags: []cli.Flag{
-				cli.StringFlag{Name: "service", Usage: "name of cmd"},
-				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod"},
-				cli.StringFlag{Name: "image", Usage: "release image used to tag docker build"},
-				cli.StringFlag{Name: "root", Usage: "project root directory"},
-				cli.BoolFlag{Name: "no_push", Usage: "skip docker push after build"},
-				cli.BoolFlag{Name: "no_cache", Usage: "skip docker cache"},
-			},
-			Action: func(c *cli.Context) error {
-				service := strings.TrimSpace(c.String("service"))
-				env := strings.TrimSpace(c.String("env"))
-				image := strings.TrimSpace(c.String("image"))
-				projectRoot := strings.TrimSpace(c.String("root"))
-				noPush := c.Bool("no_push")
-				noCache := c.Bool("no_cache")
-
-				if image == "-" {
-					image = ""
-				}
-
-				return devops.ServiceBuild(log, projectRoot, service, env, image, noPush, noCache)
-			},
-		},
-		{
 			Name:    "deploy",
 			Aliases: []string{"serviceDeploy"},
 			Usage:   "-service=web-api -env=dev [-image=gitlab.com/example-project:latest] [-root=.]",
 			Flags: []cli.Flag{
-				cli.StringFlag{Name: "service", Usage: "name of cmd"},
-				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod"},
-				cli.StringFlag{Name: "image", Usage: "release image used to tag docker build"},
-				cli.StringFlag{Name: "root", Usage: "project root directory"},
-				cli.StringFlag{Name: "cluster, ecs_cluster", Usage: "name of the AWS EC2 cluster."},
-				cli.BoolFlag{Name: "vpc, enable_vpc", Usage: "skip docker push after build"},
-				cli.BoolFlag{Name: "no_build", Usage: "skip docker push after build"},
-				cli.BoolFlag{Name: "no_deploy", Usage: "skip docker push after build"},
-				cli.BoolFlag{Name: "no_cache", Usage: "skip docker cache"},
+				cli.StringFlag{Name: "service", Usage: "name of cmd", Destination: &deployFlags.ServiceName},
+				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod", Destination: &deployFlags.Env},
+				cli.StringFlag{Name: "root", Usage: "project root directory", Destination: &deployFlags.ProjectRoot},
+				cli.BoolTFlag{Name: "vpc, enable_vpc", Usage: "deploy contain behind VPC", Destination: &deployFlags.VPC},
+				cli.BoolFlag{Name: "elb, enable_elb", Usage: "enable deployed to use Elastic Load Balancer", Destination: &deployFlags.ELB},
+				cli.BoolFlag{Name: "sd, enable_sd", Usage: "register tasks with service discovery", Destination: &deployFlags.SD},
+				cli.BoolFlag{Name: "no_build", Usage: "skip build and continue directly to deploy", Destination: &deployFlags.NoBuild},
+				cli.BoolFlag{Name: "no_deploy", Usage: "skip deploy after build", Destination: &deployFlags.NoDeploy},
+				cli.BoolFlag{Name: "no_cache", Usage: "skip docker cache", Destination: &deployFlags.NoCache},
+				cli.BoolFlag{Name: "no_push", Usage: "skip docker push after build", Destination: &deployFlags.NoPush},
+				cli.BoolFlag{Name: "debug", Usage: "print additional information", Destination: &deployFlags.Debug},
 			},
 			Action: func(c *cli.Context) error {
-				service := strings.TrimSpace(c.String("service"))
-				env := strings.TrimSpace(c.String("env"))
-				image := strings.TrimSpace(c.String("image"))
-				projectRoot := strings.TrimSpace(c.String("root"))
-				ecsCluster := strings.TrimSpace(c.String("cluster"))
-				enableVpc := c.Bool("vpc")
-
-				if image == "-" {
-					image = ""
-				}
-
-				return devops.ServiceDeploy(log, projectRoot, service, env, image, ecsCluster, enableVpc)
+				return devops.ServiceDeploy(log, &deployFlags)
 			},
 		},
 	}

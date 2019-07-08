@@ -1,0 +1,126 @@
+{
+  "family": "{SERVICE}",
+  "executionRoleArn": "",
+  "taskRoleArn": "",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "{ECS_SERVICE}",
+      "image": "421734222910.dkr.ecr.us-west-2.amazonaws.com/procedures:{ECS_SERVICE}",
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "{AWSLOGS_GROUP}",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "portMappings": [
+        {
+          "hostPort": 80,
+          "protocol": "tcp",
+          "containerPort": 80
+        }
+      ],
+      "cpu": 768,
+      "memoryReservation": 2560,
+      "volumesFrom": [],
+      "environment": [
+        {"name": "AWSLOGS_GROUP", "value": "{AWSLOGS_GROUP}"},
+        {"name": "ECS_CLUSTER", "value": "{ECS_CLUSTER}"},
+        {"name": "ECS_SERVICE", "value": "{ECS_SERVICE}"},
+        {"name": "HAS_LB", "value": "{HAS_LB}"},
+        {"name": "DATADOG_ADDR", "value": "127.0.0.1:8125"},
+        {"name": "DD_TRACE_AGENT_HOSTNAME", "value": "127.0.0.1"},
+        {"name": "DD_TRACE_AGENT_PORT", "value": "8126"},
+        {"name": "DD_SERVICE_NAME", "value": "{ECS_SERVICE}"},
+        {"name": "DD_ENV", "value": "{ENV}"}
+      ],
+      "healthCheck": {
+        "retries": 3,
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost/ping || exit 1"
+        ],
+        "timeout": 5,
+        "interval": 60,
+        "startPeriod": 60
+      },
+      "dockerLabels": {
+        "com.datadoghq.ad.check_names": "[\"{ECS_SERVICE}\"]",
+        "com.datadoghq.ad.logs": "[{\"source\": \"docker\", \"service\": \"{ECS_SERVICE}\", \"service_name\": \"{SERVICE}\", \"cluster\": \"{ECS_CLUSTER}\", \"env\": \"{ENV}\"}]",
+        "com.datadoghq.ad.init_configs": "[{}]",
+        "com.datadoghq.ad.instances": "[{\"host\": \"%%host%%\", \"port\": 80}]"
+      },
+      "ulimits": [
+        {
+          "name": "nofile",
+          "softLimit": 987654,
+          "hardLimit": 999999
+        }
+      ]
+    },
+    {
+      "name": "datadog-agent",
+      "image": "421734222910.dkr.ecr.us-west-2.amazonaws.com/procedures:datadog-agent",
+      "essential": true,
+      "cpu": 256,
+      "memoryReservation": 512,
+      "portMappings": [
+        {
+          "containerPort": 8125
+        },
+        {
+          "containerPort": 8126
+        }
+      ],
+      "environment": [
+        {
+          "name": "DD_API_KEY",
+          "value": "{DATADOG_APIKEY}"
+        },
+        {
+          "name": "DD_LOGS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_RECEIVER_PORT",
+          "value": "8126"
+        },
+        {
+          "name": "DD_APM_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        },
+        {
+          "name": "DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL",
+          "value": "true"
+        },
+        {
+          "name": "DD_TAGS",
+          "value": "source:docker service:{ECS_SERVICE} service_name:{SERVICE} cluster:{ECS_CLUSTER} env:{ENV}"
+        },
+        {
+          "name": "DD_DOGSTATSD_ORIGIN_DETECTION",
+          "value": "true"
+        },
+        {
+          "name": "DD_DOGSTATSD_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        },
+        {
+          "name": "ECS_FARGATE",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "volumes": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ]
+}

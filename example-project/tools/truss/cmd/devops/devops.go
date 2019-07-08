@@ -56,8 +56,6 @@ func findServiceDockerFile(projectRoot, targetService string) (string, error) {
 		// Check to see if directory contains Dockerfile.
 		tf := filepath.Join(cd, "Dockerfile")
 
-		fmt.Println(tf)
-
 		ok, _ := exists(tf)
 		if ok {
 			dockerFile = tf

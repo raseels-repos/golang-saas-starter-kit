@@ -6,13 +6,13 @@
   "containerDefinitions": [
     {
       "name": "{ECS_SERVICE}",
-      "image": "421734222910.dkr.ecr.us-west-2.amazonaws.com/procedures:{ECS_SERVICE}",
+      "image": "{RELEASE_IMAGE}",
       "essential": true,
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "{AWSLOGS_GROUP}",
-          "awslogs-region": "us-west-2",
+          "awslogs-region": "{AWS_REGION}",
           "awslogs-stream-prefix": "ecs"
         }
       },

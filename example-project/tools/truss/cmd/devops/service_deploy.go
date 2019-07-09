@@ -1,12 +1,15 @@
 package devops
 
 import (
+	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/go-playground/validator.v9"
+	"io"
 	"log"
+	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -15,6 +18,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecr"
@@ -22,33 +26,81 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	dockerTypes "github.com/docker/docker/api/types"
+	dockerClient "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
 )
 
-
-var requiredDeployIamPermissions = []string{
-	"secretsmanager:GetSecretValue",
-	"ecr:GetAuthorizationToken",
-	"ecr:ListImages",
-	"ecr:DescribeRepositories",
-	"ecr:CreateRepository",
-	"ecs:CreateCluster",
-	"ecs:DescribeClusters",
-	"esc:RegisterTaskDefinition",
-	"cloudwatchlogs:DescribeLogGroups",
-	"cloudwatchlogs:CreateLogGroup",
-	"iam:CreateServiceLinkedRole",
-	"iam:PutRolePolicy",
+// baseServicePolicyDocument defines the default permissions required to access AWS services for all deployed services.
+var baseServicePolicyDocument = IamPolicyDocument{
+	Version: "2012-10-17",
+	Statement: []IamStatementEntry{
+		IamStatementEntry{
+			Sid:    "DefaultServiceAccess",
+			Effect: "Allow",
+			Action: []string{
+				"s3:HeadBucket",
+				"ec2:DescribeNetworkInterfaces",
+				"ec2:DeleteNetworkInterface",
+				"ecs:ListTasks",
+				"ecs:DescribeTasks",
+				"ec2:DescribeNetworkInterfaces",
+				"route53:ListHostedZones",
+				"route53:ListResourceRecordSets",
+				"route53:ChangeResourceRecordSets",
+				"ecs:UpdateService",
+				"ses:SendEmail",
+			},
+			Resource: "*",
+		},
+		IamStatementEntry{
+			Sid:    "ServiceInvokeLambda",
+			Effect: "Allow",
+			Action: []string{
+				"iam:GetRole",
+				"lambda:InvokeFunction",
+				"lambda:ListVersionsByFunction",
+				"lambda:GetFunction",
+				"lambda:InvokeAsync",
+				"lambda:GetFunctionConfiguration",
+				"iam:PassRole",
+				"lambda:GetAlias",
+				"lambda:GetPolicy",
+			},
+			Resource: []string{
+				"arn:aws:iam:::role/*",
+				"arn:aws:lambda:::function:*",
+			},
+		},
+		IamStatementEntry{
+			Sid:    "datadoglambda",
+			Effect: "Allow",
+			Action: []string{
+				"cloudwatch:Get*",
+				"cloudwatch:List*",
+				"ec2:Describe*",
+				"support:*",
+				"tag:GetResources",
+				"tag:GetTagKeys",
+				"tag:GetTagValues",
+			},
+			Resource: "*",
+		},
+	},
 }
 
+/*
 // requiredCmdsBuild proves a list of required executables for completing build.
 var requiredCmdsDeploy = [][]string{
 	[]string{"docker", "version", "-f", "{{.Client.Version}}"},
 }
+*/
 
 // NewServiceDeployRequest generated a new request for executing deploy for a given set of flags.
-func NewServiceDeployRequest(log *log.Logger, flags *ServiceDeployFlags) (*serviceDeployRequest, error) {
+func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*serviceDeployRequest, error) {
 
 	log.Println("Validate flags.")
 	{
@@ -60,37 +112,40 @@ func NewServiceDeployRequest(log *log.Logger, flags *ServiceDeployFlags) (*servi
 	}
 
 	log.Println("\tVerify AWS credentials.")
-	var awsCreds *AwsCredentials
+	var awsCreds awsCredentials
 	{
 		var err error
 		awsCreds, err = GetAwsCredentials(flags.Env)
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("\t\t\tAccessKeyID: %s", awsCreds.AccessKeyID)
-		log.Printf("\t\t\tRegion: %s", awsCreds.Region)
+		log.Printf("\t\t\tAccessKeyID: '%s'", awsCreds.AccessKeyID)
+		log.Printf("\t\t\tRegion: '%s'", awsCreds.Region)
 		log.Printf("\t%s\tAWS credentials valid.", tests.Success)
 	}
 
 	log.Println("Generate deploy request.")
-	var req *serviceDeployRequest
+	var req serviceDeployRequest
 	{
-		req = &serviceDeployRequest{
+		req = serviceDeployRequest{
 			// Required flags.
-			serviceName: flags.ServiceName,
-			env: flags.Env,
-			awsCreds: awsCreds,
+			ServiceName: flags.ServiceName,
+			Env:         flags.Env,
+			AwsCreds:    awsCreds,
 
 			// Optional flags.
-			projectRoot: flags.ProjectRoot,
-			projectName : flags.ProjectName,
-			dockerFile: flags.DockerFile,
-			enableLambdaVPC: flags.EnableLambdaVPC,
-			enableEcsElb : flags.EnableEcsElb,
-			noBuild: flags.NoBuild,
-			noDeploy: flags.NoDeploy,
-			noCache: flags.NoCache,
-			noPush: flags.NoPush,
+			ProjectRoot:     flags.ProjectRoot,
+			ProjectName:     flags.ProjectName,
+			DockerFile:      flags.DockerFile,
+			EnableLambdaVPC: flags.EnableLambdaVPC,
+			EnableEcsElb:    flags.EnableEcsElb,
+			NoBuild:         flags.NoBuild,
+			NoDeploy:        flags.NoDeploy,
+			NoCache:         flags.NoCache,
+			NoPush:          flags.NoPush,
+			RecreateService: flags.RecreateService,
+
+			flags: flags,
 		}
 
 		// When project root directory is empty or set to current working path, then search for the project root by locating
@@ -101,107 +156,127 @@ func NewServiceDeployRequest(log *log.Logger, flags *ServiceDeployFlags) (*servi
 				log.Println("\tAttempting to location project root directory from current working directory.")
 
 				var err error
-				req.goModFile, err = findProjectGoModFile()
+				req.GoModFile, err = findProjectGoModFile()
 				if err != nil {
 					return nil, err
 				}
-				req.projectRoot = filepath.Dir(req.goModFile)
+				req.ProjectRoot = filepath.Dir(req.GoModFile)
 			} else {
 				log.Println("\t\tUsing supplied project root directory.")
-				req.goModFile = filepath.Join(flags.ProjectRoot, "go.mod")
+				req.GoModFile = filepath.Join(flags.ProjectRoot, "go.mod")
 			}
-			log.Printf("\t\t\tproject root: %s", req.projectRoot)
-			log.Printf("\t\t\tgo.mod: %s", req.goModFile )
+			log.Printf("\t\t\tproject root: %s", req.ProjectRoot)
+			log.Printf("\t\t\tgo.mod: %s", req.GoModFile)
 		}
 
 		log.Println("\tExtracting go module name from go.mod.")
 		{
 			var err error
-			req.goModName, err = loadGoModName(req.goModFile)
+			req.GoModName, err = loadGoModName(req.GoModFile)
 			if err != nil {
 				return nil, err
 			}
-			log.Printf("\t\t\tmodule name: %s", req.goModName)
+			log.Printf("\t\t\tmodule name: %s", req.GoModName)
 		}
 
 		log.Println("\tDetermining the project name.")
 		{
 			if flags.ProjectName != "" {
-				req.projectName = flags.ProjectName
+				req.ProjectName = flags.ProjectName
 				log.Printf("\t\tUse provided value.")
 			} else {
-				req.projectName = filepath.Base(req.goModName)
+				req.ProjectName = filepath.Base(req.GoModName)
 				log.Printf("\t\tSet from go module.")
 			}
-			log.Printf("\t\t\tproject name: %s", req.projectName)
+			log.Printf("\t\t\tproject name: %s", req.ProjectName)
 		}
 
 		log.Println("\tAttempting to locate service directory from project root directory.")
 		{
 			if flags.DockerFile != "" {
-				req.dockerFile = flags.DockerFile
+				req.DockerFile = flags.DockerFile
 				log.Printf("\t\tUse provided value.")
 
 			} else {
 				log.Printf("\t\tFind from project root looking for Dockerfile.")
 				var err error
-				req.dockerFile, err = findServiceDockerFile(req.projectRoot, req.serviceName)
+				req.DockerFile, err = findServiceDockerFile(req.ProjectRoot, req.ServiceName)
 				if err != nil {
 					return nil, err
 				}
 			}
 
-			req.serviceDir = filepath.Dir(flags.DockerFile)
+			req.ServiceDir = filepath.Dir(req.DockerFile)
 
-			log.Printf("\t\t\tservice directory: %s", req.serviceDir)
-			log.Printf("\t\t\tdockerfile: %s", req.dockerFile)
+			log.Printf("\t\t\tservice directory: %s", req.ServiceDir)
+			log.Printf("\t\t\tdockerfile: %s", req.DockerFile)
 		}
-
 
 		log.Println("\tSet defaults not defined in env vars.")
 		{
 			// Set default AWS ECR Repository Name.
-			req.ecrRepositoryName  = req.projectName
-			log.Printf("\t\t\tSet ECR Repository Name to '%s'.", req.ecrRepositoryName)
+			req.EcrRepositoryName = req.ProjectName
+			log.Printf("\t\t\tSet ECR Repository Name to '%s'.", req.EcrRepositoryName)
 
 			// Set default AWS ECR Regsistry Max Images.
-			req.ecrRepositoryMaxImages = defaultAwsRegistryMaxImages
-			log.Printf("\t\t\tSet ECR Regsistry Max Images to '%d'.", req.ecrRepositoryMaxImages)
-
+			req.EcrRepositoryMaxImages = defaultAwsRegistryMaxImages
+			log.Printf("\t\t\tSet ECR Regsistry Max Images to '%d'.", req.EcrRepositoryMaxImages)
 
 			// Set default AWS ECS Cluster Name.
-			req.ecsClusterName = req.projectName + "-" + req.env
-			log.Printf("\t\t\tSet ECS Cluster Name to '%s'.", req.ecsClusterName)
-
+			req.EcsClusterName = req.ProjectName + "-" + req.Env
+			log.Printf("\t\t\tSet ECS Cluster Name to '%s'.", req.EcsClusterName)
 
 			// Set default AWS ECS Service Name.
-			req.ecsServiceName = req.serviceName + "-" + req.env
-			log.Printf("\t\t\tSet ECS Service Name to '%s'.", req.ecsServiceName)
+			req.EcsServiceName = req.ServiceName + "-" + req.Env
+			log.Printf("\t\t\tSet ECS Service Name to '%s'.", req.EcsServiceName)
 
+			// Set default AWS ECS Execution Role Name.
+			req.EcsExecutionRoleName = fmt.Sprintf("ecsExecutionRole%s%s", req.ProjectNameCamel(), strcase.ToCamel(req.Env))
+			log.Printf("\t\t\tSet ECS Execution Role Name to '%s'.", req.EcsExecutionRoleName)
+
+			// Set default AWS ECS Task Role Name.
+			req.EcsTaskRoleName = fmt.Sprintf("ecsTaskRole%s%s", req.ProjectNameCamel(), strcase.ToCamel(req.Env))
+			log.Printf("\t\t\tSet ECS Task Role Name to '%s'.", req.EcsTaskRoleName)
+
+			// Set default AWS ECS Task Policy Name.
+			req.EcsTaskPolicyName = fmt.Sprintf("%s%sServices", req.ProjectNameCamel(), strcase.ToCamel(req.Env))
+			log.Printf("\t\t\tSet ECS Task Policy Name to '%s'.", req.EcsTaskPolicyName)
 
 			// Set default Cloudwatch Log Group Name.
-			req.cloudWatchLogGroupName = fmt.Sprintf("logs/env_%s/aws/ecs/cluster_%s/service_%s", req.env, req.ecsClusterName, req.serviceName)
-			log.Printf("\t\t\tSet CloudWatch Log Group Name to '%s'.", req.cloudWatchLogGroupName)
+			req.CloudWatchLogGroupName = fmt.Sprintf("logs/env_%s/aws/ecs/cluster_%s/service_%s", req.Env, req.EcsClusterName, req.ServiceName)
+			log.Printf("\t\t\tSet CloudWatch Log Group Name to '%s'.", req.CloudWatchLogGroupName)
 
 			// Set default EC2 Security Group Name.
-			req.ec2SecurityGroupName = req.ecsClusterName
-			log.Printf("\t\t\tSet ECS Security Group Name to '%s'.", req.ec2SecurityGroupName)
+			req.Ec2SecurityGroupName = req.EcsClusterName
+			log.Printf("\t\t\tSet ECS Security Group Name to '%s'.", req.Ec2SecurityGroupName)
+
+			// Set default ELB Load Balancer Name when ELB is enabled.
+			if req.EnableEcsElb {
+				if !strings.Contains(req.EcsClusterName, req.Env) && !strings.Contains(req.ServiceName, req.Env) {
+					// When a custom cluster name is provided and/or service name, ensure the ELB contains the current env.
+					req.ElbLoadBalancerName = fmt.Sprintf("%s-%s-%s", req.EcsClusterName, req.ServiceName, req.Env)
+				} else {
+					// Default value when when custom cluster/service name is supplied.
+					req.ElbLoadBalancerName = fmt.Sprintf("%s-%s", req.EcsClusterName, req.ServiceName)
+				}
+				log.Printf("\t\t\tSet ELB Name to '%s'.", req.ElbLoadBalancerName)
+			}
 
 			// Set ECS configs based on specified env.
 			if flags.Env == "prod" {
-				req.ecsServiceMinimumHealthyPercent  = aws.Int64(100)
-				req.ecsServiceMaximumPercent = aws.Int64(200)
+				req.EcsServiceMinimumHealthyPercent = aws.Int64(100)
+				req.EcsServiceMaximumPercent = aws.Int64(200)
 
-				req.elbDeregistrationDelay =aws.Int( 300)
+				req.ElbDeregistrationDelay = aws.Int(300)
 			} else {
-				req.ecsServiceMinimumHealthyPercent  = aws.Int64(100)
-				req.ecsServiceMaximumPercent = aws.Int64(200)
+				req.EcsServiceMinimumHealthyPercent = aws.Int64(100)
+				req.EcsServiceMaximumPercent = aws.Int64(200)
 
 				// force staging to deploy immediately without waiting for connections to drain
-				req.elbDeregistrationDelay = aws.Int(0)
+				req.ElbDeregistrationDelay = aws.Int(0)
 			}
-			req.ecsServiceDesiredCount = 1
-			req.escServiceHealthCheckGracePeriodSeconds = aws.Int64(60)
+			req.EcsServiceDesiredCount = 1
+			req.EscServiceHealthCheckGracePeriodSeconds = aws.Int64(60)
 
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
@@ -215,41 +290,44 @@ func NewServiceDeployRequest(log *log.Logger, flags *ServiceDeployFlags) (*servi
 		log.Printf("\t%s\tNew request generated.", tests.Success)
 	}
 
-	return req, nil
+	return &req, nil
 }
 
 // Run is the main entrypoint for deploying a service for a given target env.
 func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
-	//
-	log.Println("Verify required commands are installed.")
-	for _, cmdVals := range requiredCmdsDeploy {
-		cmd := exec.Command(cmdVals[0], cmdVals[1:]...)
-		cmd.Env = os.Environ()
+	/*
+		log.Println("Verify required commands are installed.")
+		for _, cmdVals := range requiredCmdsDeploy {
+			cmd := exec.Command(cmdVals[0], cmdVals[1:]...)
+			cmd.Env = os.Environ()
 
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return errors.WithMessagef(err, "failed to execute %s - %s\n%s", strings.Join(cmdVals, " "), string(out))
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				return errors.WithMessagef(err, "failed to execute %s - %s\n%s", strings.Join(cmdVals, " "), string(out))
+			}
+
+			log.Printf("\t%s\t%s - %s", tests.Success, cmdVals[0], string(out))
 		}
 
-		log.Printf("\t%s\t%s - %s", tests.Success, cmdVals[0], string(out))
-	}
+		// Pull the current env variables to be passed in for command execution.
+		envVars := EnvVars(os.Environ())
 
-	// Pull the current env variables to be passed in for command execution.
-	envVars := EnvVars(os.Environ())
+	*/
 
 	// Load the ECR repository.
 	log.Println("ECR - Get or create repository.")
-	var awsRepo *ecr.Repository
+	var docker *dockerClient.Client
 	{
-		svc := ecr.New(awsCreds.Session())
+		svc := ecr.New(req.awsSession())
 
+		var awsRepo *ecr.Repository
 		descRes, err := svc.DescribeRepositories(&ecr.DescribeRepositoriesInput{
-			RepositoryNames: []*string{aws.String(awsCreds.EcrRepositoryName)},
+			RepositoryNames: []*string{aws.String(req.EcrRepositoryName)},
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != ecr.ErrCodeRepositoryNotFoundException {
-				return errors.Wrapf(err, "failed to describe repository '%s'", awsCreds.EcrRepositoryName)
+				return errors.Wrapf(err, "failed to describe repository '%s'", req.EcrRepositoryName)
 			}
 		} else if len(descRes.Repositories) > 0 {
 			awsRepo = descRes.Repositories[0]
@@ -258,14 +336,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		if awsRepo == nil {
 			// If no repository was found, create one.
 			createRes, err := svc.CreateRepository(&ecr.CreateRepositoryInput{
-				RepositoryName: aws.String(awsCreds.EcrRepositoryName),
+				RepositoryName: aws.String(req.EcrRepositoryName),
 				Tags: []*ecr.Tag{
-					&ecr.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-					&ecr.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
+					&ecr.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+					&ecr.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to create repository '%s'", awsCreds.EcrRepositoryName)
+				return errors.Wrapf(err, "failed to create repository '%s'", req.EcrRepositoryName)
 			}
 			awsRepo = createRes.Repository
 			log.Printf("\t\tCreated: %s.", *awsRepo.RepositoryArn)
@@ -273,117 +351,146 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			log.Printf("\t\tFound: %s.", *awsRepo.RepositoryArn)
 
 			log.Println("\t\tChecking old ECR images.")
-			delIds, err := EcrPurgeImages(awsCreds)
+			delIds, err := EcrPurgeImages(req)
 			if err != nil {
 				return err
 			}
 
 			// If there are image IDs to delete, delete them.
 			if len(delIds) > 0 {
-				log.Printf("\t\tDeleted %d images that exceeded limit of %d", len(delIds), awsCreds.EcrRepositoryMaxImages)
+				log.Printf("\t\tDeleted %d images that exceeded limit of %d", len(delIds), req.EcrRepositoryMaxImages)
 				for _, imgId := range delIds {
 					log.Printf("\t\t\t%s", *imgId.ImageTag)
 				}
 			}
 		}
 
-		if len(flags.BuildTags) > 0 {
-			if flags.ReleaseImage == "" {
-				flags.ReleaseImage = *awsRepo.RepositoryUri + ":" + flags.BuildTags[0]
-			}
-		} else if flags.ReleaseImage == "" {
-			tag1 := flags.Env + "-" + flags.ServiceName
-			flags.BuildTags = append(flags.BuildTags, tag1)
+		tag1 := req.Env + "-" + req.ServiceName
+		req.BuildTags = append(req.BuildTags, tag1)
 
-			if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
-				tag2 := tag1 + "-" + v
-				flags.BuildTags = append(flags.BuildTags, tag2)
-				flags.ReleaseImage = *awsRepo.RepositoryUri+":"+tag2
-			} else {
-				flags.ReleaseImage = *awsRepo.RepositoryUri+":"+tag1
-			}
+		if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
+			tag2 := tag1 + "-" + v
+			req.BuildTags = append(req.BuildTags, tag2)
+			req.ReleaseImage = *awsRepo.RepositoryUri + ":" + tag2
+		} else {
+			req.ReleaseImage = *awsRepo.RepositoryUri + ":" + tag1
 		}
-		log.Printf("\t\trelease image: %s", flags.ReleaseImage)
 
-		log.Printf("\t\ttags: %s", strings.Join(flags.BuildTags, " "))
+		log.Printf("\t\trelease image: %s", req.ReleaseImage)
+
+		log.Printf("\t\ttags: %s", strings.Join(req.BuildTags, " "))
 		log.Printf("\t%s\tRelease image valid.", tests.Success)
 
 		log.Println("ECR - Retrieve authorization token used for docker login.")
-		dockerLogin, err := GetEcrLogin(awsCreds)
+
+		// Get the credentials necessary for logging into the AWS Elastic Container Registry
+		// made available with the AWS access key and AWS secret access keys.
+		res, err := svc.GetAuthorizationToken(&ecr.GetAuthorizationTokenInput{})
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to get ecr authorization token")
 		}
 
-		log.Println("\t\texecute docker login")
-		_, err = execCmds(flags.ProjectRoot, &envVars, dockerLogin)
+		authToken, err := base64.StdEncoding.DecodeString(*res.AuthorizationData[0].AuthorizationToken)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to base64 decode ecr authorization token")
 		}
-		log.Printf("\t%s\tDocker login complete.", tests.Success)
+		pts := strings.Split(string(authToken), ":")
+		user := pts[0]
+		pass := pts[1]
+
+		docker, err = dockerClient.NewEnvClient()
+		if err != nil {
+			return errors.WithMessage(err, "failed to init new docker client from env")
+		}
+
+		_, err = docker.RegistryLogin(context.Background(), dockerTypes.AuthConfig{
+			Username:      user,
+			Password:      pass,
+			ServerAddress: *res.AuthorizationData[0].ProxyEndpoint,
+		})
+		if err != nil {
+			return errors.WithMessage(err, "failed docker registry login")
+		}
+		log.Printf("\t%s\tdocker login ok.", tests.Success)
 	}
 
 	// Do the docker build.
-	if flags.NoBuild == false {
-		cmdVals := []string{
-			"docker",
-			"build",
-			"--file=" + flags.DockerFile,
-			"--build-arg", "service=" + flags.ServiceName,
-			"--build-arg", "env=" + flags.Env,
-			"-t", flags.ReleaseImage,
+	if req.NoBuild == false {
+		dockerFile, err := filepath.Rel(req.ProjectRoot, req.DockerFile)
+		if err != nil {
+			return errors.Wrapf(err, "failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+		}
+
+		buildOpts := dockerTypes.ImageBuildOptions{
+			Tags: []string{req.ReleaseImage},
+			BuildArgs: map[string]*string{
+				"service": &req.ServiceName,
+				"env":     &req.Env,
+			},
+			Dockerfile: dockerFile,
+			NoCache:    req.NoCache,
 		}
 
 		// Append the build tags.
 		var builtImageTags []string
-		for _, t := range flags.BuildTags {
-			imageTag := flags.ReleaseImage+":"+t
-			if imageTag == flags.ReleaseImage {
+		for _, t := range req.BuildTags {
+			if strings.HasSuffix(req.ReleaseImage, ":"+t) {
 				// skip duplicate image tags
 				continue
 			}
 
-			cmdVals = append(cmdVals, "-t")
-			cmdVals = append(cmdVals, imageTag)
+			imageTag := req.ReleaseImage + ":" + t
+			buildOpts.Tags = append(buildOpts.Tags, imageTag)
 			builtImageTags = append(builtImageTags, imageTag)
 		}
 
-		if flags.NoCache == true {
-			cmdVals = append(cmdVals, "--no-cache")
-		}
-		cmdVals = append(cmdVals, ".")
+		log.Println("starting docker build")
 
-		log.Printf("starting docker build: \n\t\t%s", strings.Join(cmdVals, " "))
-		out, err := execCmds(flags.ProjectRoot, &envVars, cmdVals)
+		buildCtx, err := archive.TarWithOptions(req.ProjectRoot, &archive.TarOptions{})
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to create docker build context")
+		}
+
+		_, err = docker.ImageBuild(context.Background(), buildCtx, buildOpts)
+		if err != nil {
+			return errors.Wrap(err, "failed to build docker image")
 		}
 
 		// Push the newly built docker container to the registry.
-		if flags.NoPush == false {
-			log.Printf("\t\tpush release image %s", flags.ReleaseImage)
-			_, err = execCmds(flags.ProjectRoot, &envVars, []string{"docker", "push", flags.ReleaseImage})
-			if err != nil {
-				return err
+		if req.NoPush == false {
+			log.Printf("\t\tpush release image %s", req.ReleaseImage)
+
+			pushOpts := dockerTypes.ImagePushOptions{
+				All: true,
+				// Push returns EOF if no 'X-Registry-Auth' header is specified
+				// https://github.com/moby/moby/issues/10983
+				RegistryAuth: "123",
 			}
+
+			closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
+			if err != nil {
+				return errors.WithMessagef(err, "failed to push image %s", req.ReleaseImage)
+			}
+			io.Copy(os.Stdout, closer)
+			closer.Close()
 
 			// Push all the build tags.
 			for _, t := range builtImageTags {
 				log.Printf("\t\tpush tag %s", t)
-				_, err = execCmds(flags.ProjectRoot, &envVars, []string{"docker", "push", t})
+				closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
 				if err != nil {
-					return err
+					return errors.WithMessagef(err, "failed to push image %s", t)
 				}
+				io.Copy(os.Stdout, closer)
+				closer.Close()
 			}
 		}
 
 		log.Printf("\t%s\tbuild complete.\n", tests.Success)
-		if flags.Debug {
-			log.Println(string(out[0]))
-		}
 	}
 
 	// Exit and don't continue if skip deploy.
-	if flags.NoDeploy == true {
+	if req.NoDeploy == true {
 		return nil
 	}
 
@@ -392,16 +499,16 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	{
 		// Load Datadog API Key which can be either stored in an env var or in AWS Secrets Manager.
 		// 1. Check env vars for [DEV|STAGE|PROD]_DD_API_KEY and DD_API_KEY
-		datadogApiKey = getTargetEnv(flags.Env, "DD_API_KEY")
+		datadogApiKey = getTargetEnv(req.Env, "DD_API_KEY")
 
 		// 2. Check AWS Secrets Manager for datadog entry prefixed with target env.
 		if datadogApiKey == "" {
-			prefixedSecretId := strings.ToUpper(flags.Env) + "/DATADOG"
+			prefixedSecretId := strings.ToUpper(req.Env) + "/DATADOG"
 			var err error
-			datadogApiKey, err = GetAwsSecretValue(awsCreds, prefixedSecretId)
+			datadogApiKey, err = GetAwsSecretValue(req.AwsCreds, prefixedSecretId)
 			if err != nil {
 				if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
-					return  err
+					return err
 				}
 			}
 		}
@@ -409,7 +516,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// 3. Check AWS Secrets Manager for datadog entry.
 		if datadogApiKey == "" {
 			secretId := "DATADOG"
-			datadogApiKey, err = GetAwsSecretValue(awsCreds, secretId)
+			var err error
+			datadogApiKey, err = GetAwsSecretValue(req.AwsCreds, secretId)
 			if err != nil {
 				if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
 					return err
@@ -422,80 +530,61 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		} else {
 			log.Printf("\t%s\tAPI Key NOT set.\n", tests.Failed)
 		}
-
 	}
 
 	log.Println("CloudWatch Logs - Get or Create Log Group")
 	{
-		svc := cloudwatchlogs.New(awsCreds.Session())
-
-		/*var logGroup *cloudwatchlogs.LogGroup
-		err := svc.DescribeLogGroupsPages(&cloudwatchlogs.DescribeLogGroupsInput{
-			LogGroupNamePrefix: aws.String(awsCreds.CloudWatchLogGroupName),
-		}, func(res *cloudwatchlogs.DescribeLogGroupsOutput, lastPage bool) bool{
-			for _, lg := range res.LogGroups {
-				if *lg.LogGroupName == awsCreds.CloudWatchLogGroupName {
-					logGroup = lg
-					return false
-				}
-
-			}
-
-			return !lastPage
-		})
-		if err != nil {
-			return errors.Wrapf(err, "failed to describe log groups for prefix '%s'", awsCreds.CloudWatchLogGroupName)
-		}*/
+		svc := cloudwatchlogs.New(req.awsSession())
 
 		// If no log group was found, create one.
+		var err error
 		_, err = svc.CreateLogGroup(&cloudwatchlogs.CreateLogGroupInput{
-			LogGroupName: aws.String(awsCreds.CloudWatchLogGroupName),
+			LogGroupName: aws.String(req.CloudWatchLogGroupName),
 			Tags: map[string]*string{
-				awsTagNameProject: aws.String(flags.ProjectName),
-				awsTagNameEnv: aws.String(flags.Env),
+				awsTagNameProject: aws.String(req.ProjectName),
+				awsTagNameEnv:     aws.String(req.Env),
 			},
 		})
 		if err != nil {
-
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != cloudwatchlogs.ErrCodeResourceAlreadyExistsException {
-				return  errors.Wrapf(err, "failed to create log group '%s'", awsCreds.CloudWatchLogGroupName)
+				return errors.Wrapf(err, "failed to create log group '%s'", req.CloudWatchLogGroupName)
 			}
 
-			log.Printf("\t\tFound: %s.", awsCreds.CloudWatchLogGroupName)
+			log.Printf("\t\tFound: %s.", req.CloudWatchLogGroupName)
 		} else {
-			log.Printf("\t\tCreated: %s.", awsCreds.CloudWatchLogGroupName)
+			log.Printf("\t\tCreated: %s.", req.CloudWatchLogGroupName)
 		}
 
-		log.Printf("\t%s\tUsing Log Group '%s'.\n", tests.Success, awsCreds.CloudWatchLogGroupName)
+		log.Printf("\t%s\tUsing Log Group '%s'.\n", tests.Success, req.CloudWatchLogGroupName)
 	}
 
 	log.Println("ECS - Get or Create Cluster")
 	var ecsCluster *ecs.Cluster
 	{
-		svc := ecs.New(awsCreds.Session())
+		svc := ecs.New(req.awsSession())
 
 		descRes, err := svc.DescribeClusters(&ecs.DescribeClustersInput{
-			Clusters: []*string{aws.String(awsCreds.EcsClusterName)},
+			Clusters: []*string{aws.String(req.EcsClusterName)},
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != ecs.ErrCodeClusterNotFoundException {
-				return errors.Wrapf(err, "failed to describe cluster '%s'", awsCreds.EcsClusterName)
+				return errors.Wrapf(err, "failed to describe cluster '%s'", req.EcsClusterName)
 			}
-		} else if len( descRes.Clusters) > 0 {
+		} else if len(descRes.Clusters) > 0 {
 			ecsCluster = descRes.Clusters[0]
 		}
 
-		if ecsCluster == nil  {
+		if ecsCluster == nil {
 			// If no repository was found, create one.
 			createRes, err := svc.CreateCluster(&ecs.CreateClusterInput{
-				ClusterName: aws.String(awsCreds.EcsClusterName),
+				ClusterName: aws.String(req.EcsClusterName),
 				Tags: []*ecs.Tag{
-					&ecs.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-					&ecs.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
+					&ecs.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+					&ecs.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to create cluster '%s'", awsCreds.EcsClusterName)
+				return errors.Wrapf(err, "failed to create cluster '%s'", req.EcsClusterName)
 			}
 			ecsCluster = createRes.Cluster
 
@@ -528,13 +617,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	{
 		// List of placeholders that can be used in task definition and replaced on deployment.
 		placeholders := map[string]string{
-			"{SERVICE}": flags.ServiceName,
-			"{RELEASE_IMAGE}": flags.ReleaseImage,
-			"{ECS_CLUSTER}": awsCreds.EcsClusterName,
-			"{ECS_SERVICE}": awsCreds.EcsServiceName,
-			"{AWS_REGION}": awsCreds.Region,
-			"{AWSLOGS_GROUP}": awsCreds.CloudWatchLogGroupName,
-			"{ENV}": flags.Env,
+			"{SERVICE}":        req.ServiceName,
+			"{RELEASE_IMAGE}":  req.ReleaseImage,
+			"{ECS_CLUSTER}":    req.EcsClusterName,
+			"{ECS_SERVICE}":    req.EcsServiceName,
+			"{AWS_REGION}":     req.AwsCreds.Region,
+			"{AWSLOGS_GROUP}":  req.CloudWatchLogGroupName,
+			"{ENV}":            req.Env,
 			"{DATADOG_APIKEY}": datadogApiKey,
 		}
 
@@ -552,7 +641,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		// Read the defined json task definition.
-		dat, err := EcsReadTaskDefinition(flags.ServiceDir, flags.Env)
+		dat, err := EcsReadTaskDefinition(req.ServiceDir, req.Env)
 		if err != nil {
 			return err
 		}
@@ -594,14 +683,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// If a task definition value is empty, populate it with the default value.
 		if taskDefInput.Family == nil || *taskDefInput.Family == "" {
-			taskDefInput.Family = &flags.ServiceName
+			taskDefInput.Family = &req.ServiceName
 		}
 		if len(taskDefInput.ContainerDefinitions) > 0 {
 			if taskDefInput.ContainerDefinitions[0].Name == nil || *taskDefInput.ContainerDefinitions[0].Name == "" {
-				taskDefInput.ContainerDefinitions[0].Name = &awsCreds.EcsServiceName
+				taskDefInput.ContainerDefinitions[0].Name = &req.EcsServiceName
 			}
 			if taskDefInput.ContainerDefinitions[0].Image == nil || *taskDefInput.ContainerDefinitions[0].Image == "" {
-				taskDefInput.ContainerDefinitions[0].Image = &flags.ReleaseImage
+				taskDefInput.ContainerDefinitions[0].Image = &req.ReleaseImage
 			}
 		}
 
@@ -627,7 +716,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			var (
 				totalMemory int64
-				totalCpu int64
+				totalCpu    int64
 			)
 			for _, c := range taskDefInput.ContainerDefinitions {
 				if c.Memory != nil {
@@ -648,41 +737,41 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			var (
 				selectedMemory int64
-				selectedCpu int64
+				selectedCpu    int64
 			)
 			if totalMemory < 8192 {
 				if totalMemory > 7168 {
 					selectedMemory = 8192
 
 					if totalCpu >= 2048 {
-						selectedCpu=4096
+						selectedCpu = 4096
 					} else if totalCpu >= 1024 {
 						selectedCpu = 2048
 					} else {
 						selectedCpu = 1024
 					}
 				} else if totalMemory > 6144 {
-					selectedMemory=7168
+					selectedMemory = 7168
 
 					if totalCpu >= 2048 {
-						selectedCpu=4096
-					} else if totalCpu >=  1024 {
+						selectedCpu = 4096
+					} else if totalCpu >= 1024 {
 						selectedCpu = 2048
 					} else {
 						selectedCpu = 1024
 					}
-				} else if totalMemory > 5120 || totalCpu >=  1024 {
-					selectedMemory=6144
+				} else if totalMemory > 5120 || totalCpu >= 1024 {
+					selectedMemory = 6144
 
 					if totalCpu >= 2048 {
-						selectedCpu=4096
-					} else if totalCpu >=  1024 {
+						selectedCpu = 4096
+					} else if totalCpu >= 1024 {
 						selectedCpu = 2048
 					} else {
 						selectedCpu = 1024
 					}
 				} else if totalMemory > 4096 {
-					selectedMemory=5120
+					selectedMemory = 5120
 
 					if totalCpu >= 512 {
 						selectedCpu = 1024
@@ -690,23 +779,23 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						selectedCpu = 512
 					}
 				} else if totalMemory > 3072 {
-					selectedMemory=4096
+					selectedMemory = 4096
 
 					if totalCpu >= 512 {
 						selectedCpu = 1024
 					} else {
 						selectedCpu = 512
 					}
-				} else if totalMemory >  2048 || totalCpu >= 512 {
-					selectedMemory=3072
+				} else if totalMemory > 2048 || totalCpu >= 512 {
+					selectedMemory = 3072
 
 					if totalCpu >= 512 {
 						selectedCpu = 1024
 					} else {
 						selectedCpu = 512
 					}
-				} else if totalMemory >  1024 || totalCpu >= 256 {
-					selectedMemory=2048
+				} else if totalMemory > 1024 || totalCpu >= 256 {
+					selectedMemory = 2048
 
 					if totalCpu >= 256 {
 						if totalCpu >= 512 {
@@ -717,8 +806,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					} else {
 						selectedCpu = 256
 					}
-				} else if totalMemory >  512 {
-					selectedMemory=1024
+				} else if totalMemory > 512 {
+					selectedMemory = 1024
 
 					if totalCpu >= 256 {
 						selectedCpu = 512
@@ -726,8 +815,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						selectedCpu = 256
 					}
 				} else {
-					selectedMemory=512
-					selectedCpu=256
+					selectedMemory = 512
+					selectedCpu = 256
 				}
 			}
 			log.Printf("\t\t\tSelected memory %d and cpu %d", selectedMemory, selectedCpu)
@@ -740,270 +829,261 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// The execution role is the IAM role that executes ECS actions such as pulling the image and storing the
 		// application logs in cloudwatch.
 		if taskDefInput.ExecutionRoleArn == nil || *taskDefInput.ExecutionRoleArn == "" {
-			if flags.EcsExecutionRoleArn != "" {
-				taskDefInput.ExecutionRoleArn = &flags.EcsExecutionRoleArn
-				log.Printf("\t%s\tExecutionRoleArn updated.\n", tests.Success)
-			} else {
-				svc := iam.New(awsCreds.Session())
 
-				/*
-					res, err := svc.CreateServiceLinkedRole(&iam.CreateServiceLinkedRoleInput{
-						AWSServiceName: aws.String("ecs.amazonaws.com"),
-						Description:  aws.String(""),
+			svc := iam.New(req.awsSession())
 
+			/*
+				res, err := svc.CreateServiceLinkedRole(&iam.CreateServiceLinkedRoleInput{
+					AWSServiceName: aws.String("ecs.amazonaws.com"),
+					Description:  aws.String(""),
+
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to register task definition '%s'", *taskDef.Family)
+				}
+				taskDefInput.ExecutionRoleArn = res.Role.Arn
+			*/
+
+			// Find or create role for ExecutionRoleArn.
+			{
+				log.Printf("\tAppend ExecutionRoleArn to task definition input for role %s.", req.EcsExecutionRoleName)
+
+				res, err := svc.GetRole(&iam.GetRoleInput{
+					RoleName: aws.String(req.EcsExecutionRoleName),
+				})
+				if err != nil {
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
+						return errors.Wrapf(err, "failed to find task role '%s'", req.EcsExecutionRoleName)
+					}
+				}
+
+				if res.Role != nil {
+					taskDefInput.ExecutionRoleArn = res.Role.Arn
+					log.Printf("\t\t\tFound role '%s'", *taskDefInput.ExecutionRoleArn)
+				} else {
+					// If no repository was found, create one.
+					res, err := svc.CreateRole(&iam.CreateRoleInput{
+						RoleName:                 aws.String(req.EcsExecutionRoleName),
+						Description:              aws.String(fmt.Sprintf("Provides access to other AWS service resources that are required to run Amazon ECS tasks for %s. ", req.ProjectName)),
+						AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
+						Tags: []*iam.Tag{
+							&iam.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+							&iam.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
+						},
 					})
 					if err != nil {
-						return errors.Wrapf(err, "failed to register task definition '%s'", *taskDef.Family)
+						return errors.Wrapf(err, "failed to create task role '%s'", req.EcsExecutionRoleName)
 					}
 					taskDefInput.ExecutionRoleArn = res.Role.Arn
-				*/
+					log.Printf("\t\t\tCreated role '%s'", *taskDefInput.ExecutionRoleArn)
+				}
 
-				// Find or create role for ExecutionRoleArn.
-				{
-					roleName := fmt.Sprintf("ecsExecutionRole%s%s", flags.ProjectNameCamel(), strcase.ToCamel(flags.Env))
-					log.Printf("\tAppend ExecutionRoleArn to task definition input for role %s.", roleName)
+				policyArns := []string{
+					"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+				}
 
-					res, err := svc.GetRole(&iam.GetRoleInput{
-						RoleName: aws.String(roleName),
+				for _, policyArn := range policyArns {
+					_, err = svc.AttachRolePolicy(&iam.AttachRolePolicyInput{
+						PolicyArn: aws.String(policyArn),
+						RoleName:  aws.String(req.EcsExecutionRoleName),
 					})
 					if err != nil {
-						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-							return errors.Wrapf(err, "failed to find task role '%s'", roleName)
-						}
+						return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, req.EcsExecutionRoleName)
 					}
-
-					if res.Role != nil {
-						taskDefInput.ExecutionRoleArn = res.Role.Arn
-						log.Printf("\t\t\tFound role '%s'", *taskDefInput.ExecutionRoleArn)
-					} else {
-						// If no repository was found, create one.
-						res, err := svc.CreateRole(&iam.CreateRoleInput{
-							RoleName:                 aws.String(roleName),
-							Description:              aws.String(fmt.Sprintf("Provides access to other AWS service resources that are required to run Amazon ECS tasks for %s. ", flags.ProjectName)),
-							AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
-							Tags: []*iam.Tag{
-								&iam.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-								&iam.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
-							},
-
-						})
-						if err != nil {
-							return errors.Wrapf(err, "failed to create task role '%s'", roleName)
-						}
-						taskDefInput.ExecutionRoleArn = res.Role.Arn
-						log.Printf("\t\t\tCreated role '%s'", *taskDefInput.ExecutionRoleArn)
-					}
-
-					policyArns := []string{
-						"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
-					}
-
-					for _, policyArn := range policyArns {
-						_, err = svc.AttachRolePolicy(&iam.AttachRolePolicyInput{
-							PolicyArn: aws.String(policyArn),
-							RoleName:  aws.String(roleName),
-						})
-						if err != nil {
-							return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, roleName)
-						}
-						log.Printf("\t\t\t\tAttached Policy '%s'", policyArn)
-					}
-
-					log.Printf("\t%s\tExecutionRoleArn updated.\n", tests.Success)
+					log.Printf("\t\t\t\tAttached Policy '%s'", policyArn)
 				}
+
+				log.Printf("\t%s\tExecutionRoleArn updated.\n", tests.Success)
 			}
 		}
 
 		// The task role is the IAM role used by the task itself to access other AWS Services. To access services
 		// like S3, SQS, etc then those permissions would need to be covered by the TaskRole.
 		if taskDefInput.TaskRoleArn == nil || *taskDefInput.TaskRoleArn == "" {
+			svc := iam.New(req.awsSession())
 
-			if flags.EcsTaskRoleArn != "" {
-				taskDefInput.TaskRoleArn = &flags.EcsTaskRoleArn
-				log.Printf("\t%s\tTaskRoleArn updated.\n", tests.Success)
-			} else {
-				svc := iam.New(awsCreds.Session())
+			// Find or create the default service policy.
+			var policyArn string
+			{
+				log.Printf("\tFind default service policy %s.", req.EcsTaskPolicyName)
 
-				// Find or create the default service policy.
-				var policyArn string
-				{
-					policyName := fmt.Sprintf("%s%sServices", flags.ProjectNameCamel(), strcase.ToCamel(flags.Env))
-					log.Printf("\tFind default service policy %s.", policyName)
-
-					var policyVersionId string
-					err = svc.ListPoliciesPages(&iam.ListPoliciesInput{}, func(res *iam.ListPoliciesOutput, lastPage bool) bool{
-						for _, p := range res.Policies {
-							if *p.PolicyName == policyName {
-								policyArn = *p.Arn
-								policyVersionId = *p.DefaultVersionId
-								return false
-							}
+				var policyVersionId string
+				err = svc.ListPoliciesPages(&iam.ListPoliciesInput{}, func(res *iam.ListPoliciesOutput, lastPage bool) bool {
+					for _, p := range res.Policies {
+						if *p.PolicyName == req.EcsTaskPolicyName {
+							policyArn = *p.Arn
+							policyVersionId = *p.DefaultVersionId
+							return false
 						}
-
-						return !lastPage
-					})
-					if err != nil {
-						return errors.Wrap(err, "failed to list IAM policies")
 					}
 
+					return !lastPage
+				})
+				if err != nil {
+					return errors.Wrap(err, "failed to list IAM policies")
+				}
 
+				if policyArn != "" {
+					log.Printf("\t\t\tFound policy '%s' versionId '%s'", policyArn, policyVersionId)
 
-					if policyArn != "" {
-						log.Printf("\t\t\tFound policy '%s' versionId '%s'", policyArn, policyVersionId)
+					res, err := svc.GetPolicyVersion(&iam.GetPolicyVersionInput{
+						PolicyArn: aws.String(policyArn),
+						VersionId: aws.String(policyVersionId),
+					})
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
+							return errors.Wrapf(err, "failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
+						}
+					}
 
-						res, err := svc.GetPolicyVersion(&iam.GetPolicyVersionInput{
-							PolicyArn: aws.String(policyArn),
-							VersionId: aws.String(policyVersionId),
-						})
-						if err != nil {
-							if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-								return errors.Wrapf(err, "failed to read policy '%s' version '%s'", policyName, policyVersionId)
+					// The policy document returned in this structure is URL-encoded compliant with
+					// RFC 3986 (https://tools.ietf.org/html/rfc3986). You can use a URL decoding
+					// method to convert the policy back to plain JSON text.
+					curJson, err := url.QueryUnescape(*res.PolicyVersion.Document)
+					if err != nil {
+						return errors.Wrapf(err, "failed to url unescape policy document - %s", string(*res.PolicyVersion.Document))
+					}
+
+					// Compare policy documents and add any missing actions for each statement by matching Sid.
+					var curDoc IamPolicyDocument
+					err = json.Unmarshal([]byte(curJson), &curDoc)
+					if err != nil {
+						return errors.Wrapf(err, "failed to json decode policy document - %s", string(curJson))
+					}
+
+					var updateDoc bool
+					for _, baseStmt := range baseServicePolicyDocument.Statement {
+						var found bool
+						for curIdx, curStmt := range curDoc.Statement {
+							if baseStmt.Sid != curStmt.Sid {
+								continue
 							}
-						}
 
-						// Compare policy documents and add any missing actions for each statement by matching Sid.
-						var curDoc IamPolicyDocument
-						err = json.Unmarshal([]byte(*res.PolicyVersion.Document), &curDoc)
-						if err != nil {
-							return errors.Wrap(err, "failed to json decode policy document")
-						}
+							found = true
 
-						var updateDoc bool
-						for _, baseStmt := range baseServicePolicyDocument.Statement {
-							var found bool
-							for curIdx, curStmt := range curDoc.Statement {
-								if baseStmt.Sid != curStmt.Sid {
-									continue
-								}
-
-								for _, baseAction := range baseStmt.Action {
-									var hasAction bool
-									for _, curAction := range curStmt.Action {
-										if baseAction == curAction {
-											hasAction = true
-											break
-										}
-
+							for _, baseAction := range baseStmt.Action {
+								var hasAction bool
+								for _, curAction := range curStmt.Action {
+									if baseAction == curAction {
+										hasAction = true
+										break
 									}
-
-									if !hasAction {
-										log.Printf("\t\t\t\tAdded new action %s for '%s'", curStmt.Sid)
-										curStmt.Action = append(curStmt.Action, baseAction)
-										curDoc.Statement[curIdx] = curStmt
-										updateDoc = true
-									}
 								}
-							}
 
-							if !found {
-								log.Printf("\t\t\t\tAdded new statement '%s'", baseStmt.Sid)
-								curDoc.Statement = append(curDoc.Statement, baseStmt)
-								updateDoc = true
-							}
-						}
-
-						if updateDoc {
-							dat, err := json.Marshal(curDoc)
-							if err != nil {
-								return errors.Wrap(err, "failed to json encode policy document")
-							}
-
-							_, err = svc.CreatePolicyVersion(&iam.CreatePolicyVersionInput{
-								PolicyArn: aws.String(policyArn),
-								PolicyDocument: aws.String(string(dat)),
-								SetAsDefault: aws.Bool(true),
-							})
-							if err != nil {
-								if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-									return errors.Wrapf(err, "failed to read policy '%s' version '%s'", policyName, policyVersionId)
+								if !hasAction {
+									log.Printf("\t\t\t\tAdded new action %s for '%s'", curStmt.Sid)
+									curStmt.Action = append(curStmt.Action, baseAction)
+									curDoc.Statement[curIdx] = curStmt
+									updateDoc = true
 								}
 							}
 						}
-					} else {
-						dat, err := json.Marshal(baseServicePolicyDocument)
+
+						if !found {
+							log.Printf("\t\t\t\tAdded new statement '%s'", baseStmt.Sid)
+							curDoc.Statement = append(curDoc.Statement, baseStmt)
+							updateDoc = true
+						}
+					}
+
+					if updateDoc {
+						dat, err := json.Marshal(curDoc)
 						if err != nil {
 							return errors.Wrap(err, "failed to json encode policy document")
 						}
 
-						// If no repository was found, create one.
-						res, err := svc.CreatePolicy(&iam.CreatePolicyInput{
-							PolicyName:                 aws.String(policyName),
-							Description:              aws.String(fmt.Sprintf("Defines access for %s services. ", flags.ProjectName)),
+						_, err = svc.CreatePolicyVersion(&iam.CreatePolicyVersionInput{
+							PolicyArn:      aws.String(policyArn),
 							PolicyDocument: aws.String(string(dat)),
-
+							SetAsDefault:   aws.Bool(true),
 						})
 						if err != nil {
-							return errors.Wrapf(err, "failed to create task policy '%s'", policyName)
+							if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
+								return errors.Wrapf(err, "failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
+							}
 						}
-
-						policyArn = *res.Policy.Arn
-
-						log.Printf("\t\t\tCreated policy '%s'", policyArn)
+					}
+				} else {
+					dat, err := json.Marshal(baseServicePolicyDocument)
+					if err != nil {
+						return errors.Wrap(err, "failed to json encode policy document")
 					}
 
-					log.Printf("\t%s\tConfigured default service policy.\n", tests.Success)
-				}
-
-				// Find or create role for TaskRoleArn.
-				{
-					roleName := fmt.Sprintf("ecsTaskRole%s%s", flags.ProjectNameCamel(), strcase.ToCamel(flags.Env))
-					log.Printf("\tAppend TaskRoleArn to task definition input for role %s.", roleName)
-
-					res, err := svc.GetRole(&iam.GetRoleInput{
-						RoleName: aws.String(roleName),
+					// If no repository was found, create one.
+					res, err := svc.CreatePolicy(&iam.CreatePolicyInput{
+						PolicyName:     aws.String(req.EcsTaskPolicyName),
+						Description:    aws.String(fmt.Sprintf("Defines access for %s services. ", req.ProjectName)),
+						PolicyDocument: aws.String(string(dat)),
 					})
 					if err != nil {
-						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-							return errors.Wrapf(err, "failed to find task role '%s'", roleName)
-						}
+						return errors.Wrapf(err, "failed to create task policy '%s'", req.EcsTaskPolicyName)
 					}
 
-					if res.Role != nil {
-						taskDefInput.TaskRoleArn = res.Role.Arn
-						log.Printf("\t\t\tFound role '%s'", *taskDefInput.TaskRoleArn)
-					} else {
-						// If no repository was found, create one.
-						res, err := svc.CreateRole(&iam.CreateRoleInput{
-							RoleName:                 aws.String(roleName),
-							Description:              aws.String(fmt.Sprintf("Allows ECS tasks for %s to call AWS services on your behalf. ", flags.ProjectName)),
-							AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs-tasks.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
-							Tags: []*iam.Tag{
-								&iam.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-								&iam.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
-							},
+					policyArn = *res.Policy.Arn
 
-						})
-						if err != nil {
-							return errors.Wrapf(err, "failed to create task role '%s'", roleName)
-						}
-						taskDefInput.TaskRoleArn = res.Role.Arn
-						log.Printf("\t\t\tCreated role '%s'", *taskDefInput.TaskRoleArn)
+					log.Printf("\t\t\tCreated policy '%s'", policyArn)
+				}
 
-						//_, err = svc.UpdateAssumeRolePolicy(&iam.UpdateAssumeRolePolicyInput{
-						//	PolicyDocument: ,
-						//	RoleName:       aws.String(roleName),
-						//})
-						//if err != nil {
-						//	return errors.Wrapf(err, "failed to create task role '%s'", roleName)
-						//}
+				log.Printf("\t%s\tConfigured default service policy.\n", tests.Success)
+			}
+
+			// Find or create role for TaskRoleArn.
+			{
+				log.Printf("\tAppend TaskRoleArn to task definition input for role %s.", req.EcsTaskRoleName)
+
+				res, err := svc.GetRole(&iam.GetRoleInput{
+					RoleName: aws.String(req.EcsTaskRoleName),
+				})
+				if err != nil {
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
+						return errors.Wrapf(err, "failed to find task role '%s'", req.EcsTaskRoleName)
 					}
+				}
 
-					_, err = svc.AttachRolePolicy( &iam.AttachRolePolicyInput{
-						PolicyArn: aws.String(policyArn),
-						RoleName:  aws.String(roleName),
+				if res.Role != nil {
+					taskDefInput.TaskRoleArn = res.Role.Arn
+					log.Printf("\t\t\tFound role '%s'", *taskDefInput.TaskRoleArn)
+				} else {
+					// If no repository was found, create one.
+					res, err := svc.CreateRole(&iam.CreateRoleInput{
+						RoleName:                 aws.String(req.EcsTaskRoleName),
+						Description:              aws.String(fmt.Sprintf("Allows ECS tasks for %s to call AWS services on your behalf.", req.ProjectName)),
+						AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs-tasks.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
+						Tags: []*iam.Tag{
+							&iam.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+							&iam.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
+						},
 					})
 					if err != nil {
-						return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, roleName)
+						return errors.Wrapf(err, "failed to create task role '%s'", req.EcsTaskRoleName)
 					}
+					taskDefInput.TaskRoleArn = res.Role.Arn
+					log.Printf("\t\t\tCreated role '%s'", *taskDefInput.TaskRoleArn)
 
-					log.Printf("\t%s\tTaskRoleArn updated.\n", tests.Success)
+					//_, err = svc.UpdateAssumeRolePolicy(&iam.UpdateAssumeRolePolicyInput{
+					//	PolicyDocument: ,
+					//	RoleName:       aws.String(roleName),
+					//})
+					//if err != nil {
+					//	return errors.Wrapf(err, "failed to create task role '%s'", roleName)
+					//}
 				}
+
+				_, err = svc.AttachRolePolicy(&iam.AttachRolePolicyInput{
+					PolicyArn: aws.String(policyArn),
+					RoleName:  aws.String(req.EcsTaskRoleName),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, req.EcsTaskRoleName)
+				}
+
+				log.Printf("\t%s\tTaskRoleArn updated.\n", tests.Success)
 			}
 		}
 
 		log.Println("\tRegister new task definition.")
 		{
-			svc := ecs.New(awsCreds.Session())
+			svc := ecs.New(req.awsSession())
 
 			// Registers a new task.
 			res, err := svc.RegisterTaskDefinition(taskDefInput)
@@ -1011,7 +1091,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return errors.Wrapf(err, "failed to register task definition '%s'", *taskDefInput.Family)
 			}
 			taskDef = res.TaskDefinition
-
 
 			log.Printf("\t\tRegistered: %s.", *taskDef.TaskDefinitionArn)
 			log.Printf("\t\t\tRevision: %d.", *taskDef.Revision)
@@ -1024,16 +1103,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	log.Println("ECS - Find Service")
 	var ecsService *ecs.Service
 	{
-		svc := ecs.New(awsCreds.Session())
+		svc := ecs.New(req.awsSession())
 
 		res, err := svc.DescribeServices(&ecs.DescribeServicesInput{
-			Services: []*string{aws.String(awsCreds.EcsServiceName)},
+			Cluster:  ecsCluster.ClusterArn,
+			Services: []*string{aws.String(req.EcsServiceName)},
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != ecs.ErrCodeServiceNotFoundException {
-				return errors.Wrapf(err, "failed to describe service '%s'", awsCreds.EcsServiceName)
+				return errors.Wrapf(err, "failed to describe service '%s'", req.EcsServiceName)
 			}
-		} else if len( res.Services) > 0 {
+		} else if len(res.Services) > 0 {
 			ecsService = res.Services[0]
 
 			log.Printf("\t\tFound: %s.", *ecsService.ServiceArn)
@@ -1056,11 +1136,52 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
+	// Check to see if the service should be re-created instead of updated.
+	if ecsService != nil {
+		var (
+			recreateService bool
+			forceDelete     bool
+		)
+
+		if req.RecreateService {
+			// Flag was included to force recreate.
+			recreateService = true
+			forceDelete = true
+		} else if req.EnableEcsElb && (ecsService.LoadBalancers == nil || len(ecsService.LoadBalancers) == 0) {
+			// Service was created with no ELB and now ELB is enabled.
+			recreateService = true
+		} else if !req.EnableEcsElb && (ecsService.LoadBalancers != nil && len(ecsService.LoadBalancers) > 0) {
+			// Service was created with ELB and now ELB is disabled.
+			recreateService = true
+		}
+
+		if recreateService {
+			log.Println("ECS - Delete Service")
+
+			svc := ecs.New(req.awsSession())
+
+			_, err := svc.DeleteService(&ecs.DeleteServiceInput{
+				Cluster: ecsService.ClusterArn,
+				Service: ecsService.ServiceArn,
+
+				// If true, allows you to delete a service even if it has not been scaled down
+				// to zero tasks. It is only necessary to use this if the service is using the
+				// REPLICA scheduling strategy.
+				Force: aws.Bool(forceDelete),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
+			}
+
+			log.Printf("\t%s\tDelete Service.\n", tests.Success)
+		}
+	}
+
 	// If the service exists update the service, else create a new service.
 	if ecsService != nil && *ecsService.Status != "INACTIVE" {
 		log.Println("ECS - Update Service")
 
-		svc := ecs.New(awsCreds.Session())
+		svc := ecs.New(req.awsSession())
 
 		// If the desired count is zero because it was spun down for termination of staging env, update to launch
 		// with at least once task running for the service.
@@ -1069,18 +1190,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			desiredCount = 1
 		}
 
-		_, err = svc.UpdateService(&ecs.UpdateServiceInput{
-			// The short name or full Amazon Resource Name (ARN) of the cluster that your
-			// service is running on. If you do not specify a cluster, the default cluster
-			// is assumed.
-			Cluster: ecsCluster.ClusterName,
-
-			// The name of the service to update.
-			Service: ecsService.ServiceName,
-
-			// The number of instantiations of the task to place and keep running in your
-			// service.
-			DesiredCount: aws.Int64(desiredCount),
+		_, err := svc.UpdateService(&ecs.UpdateServiceInput{
+			Cluster:                       ecsCluster.ClusterName,
+			Service:                       ecsService.ServiceName,
+			DesiredCount:                  aws.Int64(desiredCount),
+			HealthCheckGracePeriodSeconds: ecsService.HealthCheckGracePeriodSeconds,
+			TaskDefinition:                taskDef.TaskDefinitionArn,
 
 			// Whether to force a new deployment of the service. Deployments are not forced
 			// by default. You can use this option to trigger a new deployment with no service
@@ -1088,40 +1203,22 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// a newer Docker image with the same image/tag combination (my_image:latest)
 			// or to roll Fargate tasks onto a newer platform version.
 			ForceNewDeployment: aws.Bool(false),
-
-			// The period of time, in seconds, that the Amazon ECS service scheduler should
-			// ignore unhealthy Elastic Load Balancing target health checks after a task
-			// has first started. This is only valid if your service is configured to use
-			// a load balancer. If your service's tasks take a while to start and respond
-			// to Elastic Load Balancing health checks, you can specify a health check grace
-			// period of up to 1,800 seconds. During that time, the ECS service scheduler
-			// ignores the Elastic Load Balancing health check status. This grace period
-			// can prevent the ECS service scheduler from marking tasks as unhealthy and
-			// stopping them before they have time to come up.
-			HealthCheckGracePeriodSeconds:  ecsService.HealthCheckGracePeriodSeconds,
-
-			// The family and revision (family:revision) or full ARN of the task definition
-			// to run in your service. If a revision is not specified, the latest ACTIVE
-			// revision is used. If you modify the task definition with UpdateService, Amazon
-			// ECS spawns a task with the new version of the task definition and then stops
-			// an old task after the new version is running.
-			TaskDefinition: taskDef.TaskDefinitionArn,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "failed to update service '%s'",  *ecsService.ServiceName)
+			return errors.Wrapf(err, "failed to update service '%s'", *ecsService.ServiceName)
 		}
 
-		log.Printf("\t%s\tUpdated ECS Service '%s'.\n", tests.Success,  *ecsService.ServiceName)
+		log.Printf("\t%s\tUpdated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 	} else {
 
 		log.Println("EC2 - Find Subnets")
 		var subnetsIDs []string
 		var vpcId string
 		{
-			svc := ec2.New(awsCreds.Session())
+			svc := ec2.New(req.awsSession())
 
 			var subnets []*ec2.Subnet
-			if len(flags.Ec2SubnetIds) == 0 {
+			if true { // len(req.ec2SubnetIds) == 0 {
 				log.Println("\t\tFind all subnets are that default for each available AZ.")
 
 				err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
@@ -1135,7 +1232,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				if err != nil {
 					return errors.Wrap(err, "failed to find default subnets")
 				}
-			} else {
+				/*} else {
 				log.Println("\t\tFind all subnets for the IDs provided.")
 
 				err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
@@ -1150,7 +1247,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					return errors.Wrapf(err, "failed to find subnets: %s", strings.Join(flags.Ec2SubnetIds, ", "))
 				} else if len(flags.Ec2SubnetIds) != len(subnets)  {
 					return errors.Errorf("failed to find all subnets, expected %d, got %d", len(flags.Ec2SubnetIds) != len(subnets))
-				}
+				}*/
 			}
 
 			if len(subnets) == 0 {
@@ -1171,21 +1268,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				log.Printf("\t\t\t%s", *s.SubnetId)
 			}
 
-			log.Printf("\t%s\tFound %d subnets.\n", len(subnets))
+			log.Printf("\t\tFound %d subnets.\n", len(subnets))
 		}
 
 		log.Println("EC2 - Find Security Group")
+		var securityGroupId string
 		{
-			svc := ec2.New(awsCreds.Session())
+			svc := ec2.New(req.awsSession())
 
-			log.Printf("\t\tFind security group '%s'.\n", flags.Ec2SecurityGroupName)
+			log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
 
-			var securityGroupId string
 			err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
-				GroupNames: aws.StringSlice([]string{flags.Ec2SecurityGroupName}),
+				GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
 			}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
 				for _, s := range res.SecurityGroups {
-					if *s.GroupName == flags.Ec2SecurityGroupName {
+					if *s.GroupName == req.Ec2SecurityGroupName {
 						securityGroupId = *s.GroupId
 						break
 					}
@@ -1194,69 +1291,65 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return !lastPage
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to find security group '%s'", flags.Ec2SecurityGroupName)
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
+					return errors.Wrapf(err, "failed to find security group '%s'", req.Ec2SecurityGroupName)
+				}
 			}
 
-			if securityGroupId == ""  {
+			if securityGroupId == "" {
 				// If no security group was found, create one.
-				_, err = svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+				createRes, err := svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
 					// The name of the security group.
 					// Constraints: Up to 255 characters in length. Cannot start with sg-.
 					// Constraints for EC2-Classic: ASCII characters
 					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
 					// GroupName is a required field
-					GroupName : aws.String(flags.Ec2SecurityGroupName),
+					GroupName: aws.String(req.Ec2SecurityGroupName),
 					// A description for the security group. This is informational only.
 					// Constraints: Up to 255 characters in length
 					// Constraints for EC2-Classic: ASCII characters
 					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
 					// Description is a required field
-					Description:              aws.String(fmt.Sprintf("Security group for %s running on ECS cluster %s", flags.ProjectName, awsCreds.EcsClusterName)),
+					Description: aws.String(fmt.Sprintf("Security group for %s running on ECS cluster %s", req.ProjectName, req.EcsClusterName)),
 					// [EC2-VPC] The ID of the VPC. Required for EC2-VPC.
-					VpcId : aws.String(vpcId),
+					VpcId: aws.String(vpcId),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to create cluster '%s'", awsCreds.EcsClusterName)
+					return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
 				}
+				securityGroupId = *createRes.GroupId
 
-				log.Printf("\t\tCreated: %s.", flags.Ec2SecurityGroupName)
+				log.Printf("\t\tCreated: %s.", req.Ec2SecurityGroupName)
 			} else {
-				log.Printf("\t\tFound: %s.", flags.Ec2SecurityGroupName)
+				log.Printf("\t\tFound: %s.", req.Ec2SecurityGroupName)
 			}
 
 			ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
 				// Enable services to be publicly available via HTTP port 80
 				&ec2.AuthorizeSecurityGroupIngressInput{
 					IpProtocol: aws.String("tcp"),
-					CidrIp: aws.String("0.0.0.0/0"),
-					FromPort: aws.Int64(80),
-					ToPort: aws.Int64(80),
+					CidrIp:     aws.String("0.0.0.0/0"),
+					FromPort:   aws.Int64(80),
+					ToPort:     aws.Int64(80),
+					GroupId:    aws.String(securityGroupId),
 				},
-				// Allow all services in the security group to access other services via HTTP port 80.
+				// Allow all services in the security group to access other services.
 				&ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					SourceSecurityGroupName: aws.String( flags.Ec2SecurityGroupName),
-					FromPort: aws.Int64(80),
-					ToPort: aws.Int64(80),
+					SourceSecurityGroupName: aws.String(req.Ec2SecurityGroupName),
+					GroupId:                 aws.String(securityGroupId),
 				},
 			}
 
 			// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
 			// HTTPS is terminated via the web server and not on the Load Balancer.
-			if !flags.EnableElb {
+			if !req.EnableEcsElb {
 				// Enable services to be publicly available via HTTPS port 443
 				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
 					IpProtocol: aws.String("tcp"),
-					CidrIp: aws.String("0.0.0.0/0"),
-					FromPort: aws.Int64(443),
-					ToPort: aws.Int64(443),
-				})
-				// Allow all services in the security group to access other services via HTTPS port 443.
-				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					SourceSecurityGroupName: aws.String( flags.Ec2SecurityGroupName),
-					FromPort: aws.Int64(443),
-					ToPort: aws.Int64(443),
+					CidrIp:     aws.String("0.0.0.0/0"),
+					FromPort:   aws.Int64(443),
+					ToPort:     aws.Int64(443),
+					GroupId:    aws.String(securityGroupId),
 				})
 			}
 
@@ -1264,111 +1357,193 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			for _, ingressInput := range ingressInputs {
 				_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
 				if err != nil {
-					return errors.Wrapf(err, "failed to add ingress for securuty group '%s'", flags.Ec2SecurityGroupName)
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
+						return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.Ec2SecurityGroupName)
+					}
 				}
 			}
 
-
-			log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, flags.Ec2SecurityGroupName)
+			log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
 		}
 
 		// If an Elastic Load Balancer is enabled, then ensure one exists else create one.
 		var ecsELBs []*ecs.LoadBalancer
-		if flags.EnableElb {
-			log.Println("EC2 - Find Elastic Load Balance")
+		if req.EnableEcsElb {
 
-			svc := elbv2.New(awsCreds.Session())
+			var certificateArn string
+			if req.EnableHTTPS {
+				log.Println("ACM - Find Elastic Load Balance")
 
-			// Set default EBL if needed.
-			var maintainELB bool
-			if flags.EnableElb && flags.ElbName == "" {
-				if !strings.Contains(awsCreds.EcsClusterName, flags.Env) && !strings.Contains(flags.ServiceName, flags.Env) {
-					// When a custom cluster name is provided and/or service name, ensure the ELB contains the current env.
-					flags.ElbName = fmt.Sprintf("%s-%s-%s", awsCreds.EcsClusterName, flags.ServiceName, flags.Env)
-				} else {
-					// Default value when when custom cluster/service name is supplied.
-					flags.ElbName = fmt.Sprintf("%s-%s", awsCreds.EcsClusterName, flags.ServiceName)
+				svc := acm.New(req.awsSession())
+
+				err := svc.ListCertificatesPages(&acm.ListCertificatesInput{},
+					func(res *acm.ListCertificatesOutput, lastPage bool) bool {
+						for _, cert := range res.CertificateSummaryList {
+							if *cert.DomainName == req.ServiceDomainName {
+								certificateArn = *cert.CertificateArn
+								return false
+							}
+						}
+						return !lastPage
+					})
+				if err != nil {
+					return errors.Wrapf(err, "failed to list certificates for '%s'", req.ServiceDomainName)
 				}
 
-				log.Printf("\t\t\tSet ELB Name to '%s'.", flags.ElbName)
+				if certificateArn == "" {
+					// Create hash of all the domain names to be used to mark unique requests.
+					idempotencyToken := req.ServiceDomainName + "|" + strings.Join(req.ServiceDomainNameAliases, "|")
+					idempotencyToken = fmt.Sprintf("%x", md5.Sum([]byte(idempotencyToken)))
 
-				// When not ELB name is provided and is assigned by us, we should manage the associated target groups
-				// and other properties.
-				maintainELB = true
-			}
+					// If no certicate was found, create one.
+					createRes, err := svc.RequestCertificate(&acm.RequestCertificateInput{
+						// Fully qualified domain name (FQDN), such as www.example.com, that you want
+						// to secure with an ACM certificate. Use an asterisk (*) to create a wildcard
+						// certificate that protects several sites in the same domain. For example,
+						// *.example.com protects www.example.com, site.example.com, and images.example.com.
+						//
+						// The first domain name you enter cannot exceed 63 octets, including periods.
+						// Each subsequent Subject Alternative Name (SAN), however, can be up to 253
+						// octets in length.
+						//
+						// DomainName is a required field
+						DomainName: aws.String(req.ServiceDomainName),
 
-			var elb *elbv2.LoadBalancer
-			err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{
-				Names: []*string{aws.String(flags.ElbName)},
-			}, func(res *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool{
-				for _, lb := range res.LoadBalancers {
-					if *lb.LoadBalancerName == flags.ElbName {
-						elb = lb
-						return false
+						// Customer chosen string that can be used to distinguish between calls to RequestCertificate.
+						// Idempotency tokens time out after one hour. Therefore, if you call RequestCertificate
+						// multiple times with the same idempotency token within one hour, ACM recognizes
+						// that you are requesting only one certificate and will issue only one. If
+						// you change the idempotency token for each call, ACM recognizes that you are
+						// requesting multiple certificates.
+						IdempotencyToken: aws.String(idempotencyToken),
+
+						// Currently, you can use this parameter to specify whether to add the certificate
+						// to a certificate transparency log. Certificate transparency makes it possible
+						// to detect SSL/TLS certificates that have been mistakenly or maliciously issued.
+						// Certificates that have not been logged typically produce an error message
+						// in a browser. For more information, see Opting Out of Certificate Transparency
+						// Logging (https://docs.aws.amazon.com/acm/latest/userguide/acm-bestpractices.html#best-practices-transparency).
+						Options: &acm.CertificateOptions{
+							CertificateTransparencyLoggingPreference: aws.String("DISABLED"),
+						},
+
+						// Additional FQDNs to be included in the Subject Alternative Name extension
+						// of the ACM certificate. For example, add the name www.example.net to a certificate
+						// for which the DomainName field is www.example.com if users can reach your
+						// site by using either name. The maximum number of domain names that you can
+						// add to an ACM certificate is 100. However, the initial limit is 10 domain
+						// names. If you need more than 10 names, you must request a limit increase.
+						// For more information, see Limits (https://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html).
+						SubjectAlternativeNames: aws.StringSlice(req.ServiceDomainNameAliases),
+
+						// The method you want to use if you are requesting a public certificate to
+						// validate that you own or control domain. You can validate with DNS (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-dns.html)
+						// or validate with email (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-email.html).
+						// We recommend that you use DNS validation.
+						ValidationMethod: aws.String("DNS"),
+					})
+					if err != nil {
+						return errors.Wrapf(err, "failed to create certiciate '%s'", req.ServiceDomainName)
 					}
+					certificateArn = *createRes.CertificateArn
+
+					log.Printf("\t\tCreated certiciate '%s'", req.ServiceDomainName)
+				} else {
+					log.Printf("\t\tFound certiciate '%s'", req.ServiceDomainName)
 				}
-				return !lastPage
-			})
-			if err != nil {
-				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeLoadBalancerNotFoundException {
-					return errors.Wrapf(err, "failed to describe load balance '%s'", flags.ElbName)
-				}
+
+				log.Printf("\t%s\tUsing ACM Certicate '%s'.\n", tests.Success, certificateArn)
 			}
 
-			if elb == nil  {
-				// If no repository was found, create one.
-				createRes, err := svc.CreateLoadBalancer(&elbv2.CreateLoadBalancerInput{
-					// The name of the load balancer.
-					// This name must be unique per region per account, can have a maximum of 32
-					// characters, must contain only alphanumeric characters or hyphens, must not
-					// begin or end with a hyphen, and must not begin with "internal-".
-					// Name is a required field
-					Name: aws.String(flags.ElbName),
-					// [Application Load Balancers] The type of IP addresses used by the subnets
-					// for your load balancer. The possible values are ipv4 (for IPv4 addresses)
-					// and dualstack (for IPv4 and IPv6 addresses).
-					IpAddressType: aws.String("dualstack"),
-					// The nodes of an Internet-facing load balancer have public IP addresses. The
-					// DNS name of an Internet-facing load balancer is publicly resolvable to the
-					// public IP addresses of the nodes. Therefore, Internet-facing load balancers
-					// can route requests from clients over the internet.
-					// The nodes of an internal load balancer have only private IP addresses. The
-					// DNS name of an internal load balancer is publicly resolvable to the private
-					// IP addresses of the nodes. Therefore, internal load balancers can only route
-					// requests from clients with access to the VPC for the load balancer.
-					Scheme: aws.String("Internet-facing"),
-					// [Application Load Balancers] The IDs of the security groups for the load
-					// balancer.
-					SecurityGroups: aws.StringSlice([]string{flags.Ec2SecurityGroupName}),
-					// The IDs of the public subnets. You can specify only one subnet per Availability
-					// Zone. You must specify either subnets or subnet mappings.
-					// [Application Load Balancers] You must specify subnets from at least two Availability
-					// Zones.
-					Subnets: aws.StringSlice(subnetsIDs),
-					// The type of load balancer.
-					Type: aws.String("application"),
-					// One or more tags to assign to the load balancer.
-					Tags: []*elbv2.Tag{
-						&elbv2.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-						&elbv2.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
-					},
+			log.Println("EC2 - Find Elastic Load Balance")
+			{
+				svc := elbv2.New(req.awsSession())
+
+				var elb *elbv2.LoadBalancer
+				err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{
+					Names: []*string{aws.String(req.ElbLoadBalancerName)},
+				}, func(res *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
+					for _, lb := range res.LoadBalancers {
+						if *lb.LoadBalancerName == req.ElbLoadBalancerName {
+							elb = lb
+							return false
+						}
+					}
+					return !lastPage
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to create cluster '%s'", awsCreds.EcsClusterName)
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeLoadBalancerNotFoundException {
+						return errors.Wrapf(err, "failed to describe load balancer '%s'", req.ElbLoadBalancerName)
+					}
 				}
-				elb = createRes.LoadBalancers[0]
 
-				log.Printf("\t\tCreated: %s.", *elb.LoadBalancerArn)
-			} else {
-				log.Printf("\t\tFound: %s.", *elb.LoadBalancerArn)
-			}
+				var curListeners []*elbv2.Listener
+				if elb == nil {
+					// If no repository was found, create one.
+					createRes, err := svc.CreateLoadBalancer(&elbv2.CreateLoadBalancerInput{
+						// The name of the load balancer.
+						// This name must be unique per region per account, can have a maximum of 32
+						// characters, must contain only alphanumeric characters or hyphens, must not
+						// begin or end with a hyphen, and must not begin with "internal-".
+						// Name is a required field
+						Name: aws.String(req.ElbLoadBalancerName),
+						// [Application Load Balancers] The type of IP addresses used by the subnets
+						// for your load balancer. The possible values are ipv4 (for IPv4 addresses)
+						// and dualstack (for IPv4 and IPv6 addresses).
+						IpAddressType: aws.String("dualstack"),
+						// The nodes of an Internet-facing load balancer have public IP addresses. The
+						// DNS name of an Internet-facing load balancer is publicly resolvable to the
+						// public IP addresses of the nodes. Therefore, Internet-facing load balancers
+						// can route requests from clients over the internet.
+						// The nodes of an internal load balancer have only private IP addresses. The
+						// DNS name of an internal load balancer is publicly resolvable to the private
+						// IP addresses of the nodes. Therefore, internal load balancers can only route
+						// requests from clients with access to the VPC for the load balancer.
+						Scheme: aws.String("Internet-facing"),
+						// [Application Load Balancers] The IDs of the security groups for the load
+						// balancer.
+						SecurityGroups: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
+						// The IDs of the public subnets. You can specify only one subnet per Availability
+						// Zone. You must specify either subnets or subnet mappings.
+						// [Application Load Balancers] You must specify subnets from at least two Availability
+						// Zones.
+						Subnets: aws.StringSlice(subnetsIDs),
+						// The type of load balancer.
+						Type: aws.String("application"),
+						// One or more tags to assign to the load balancer.
+						Tags: []*elbv2.Tag{
+							&elbv2.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+							&elbv2.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
+						},
+					})
+					if err != nil {
+						return errors.Wrapf(err, "failed to create load balancer '%s'", req.ElbLoadBalancerName)
+					}
+					elb = createRes.LoadBalancers[0]
 
-			// The state code. The initial state of the load balancer is provisioning. After
-			// the load balancer is fully set up and ready to route traffic, its state is
-			// active. If the load balancer could not be set up, its state is failed.
-			log.Printf("\t\t\tState: %s.", *elb.State.Code)
+					log.Printf("\t\tCreated: %s.", *elb.LoadBalancerArn)
+				} else {
+					log.Printf("\t\tFound: %s.", *elb.LoadBalancerArn)
 
-			if maintainELB {
+					// Search for existing listeners associated with the load balancer.
+					res, err := svc.DescribeListeners(&elbv2.DescribeListenersInput{
+						// The Amazon Resource Name (ARN) of the load balancer.
+						LoadBalancerArn: elb.LoadBalancerArn,
+						// There are two target groups, return both associated listeners if they exist.
+						PageSize: aws.Int64(2),
+					})
+					if err != nil {
+						return errors.Wrapf(err, "failed to find listeners for load balancer '%s'", req.ElbLoadBalancerName)
+					}
+					curListeners = res.Listeners
+				}
+
+				// The state code. The initial state of the load balancer is provisioning. After
+				// the load balancer is fully set up and ready to route traffic, its state is
+				// active. If the load balancer could not be set up, its state is failed.
+				log.Printf("\t\t\tState: %s.", *elb.State.Code)
+
+				// Default target groups.
 				targetGroupInputs := []*elbv2.CreateTargetGroupInput{
 					// Default target group for HTTP via port 80.
 					&elbv2.CreateTargetGroupInput{
@@ -1405,7 +1580,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 						// [HTTP/HTTPS health checks] The ping path that is the destination on the targets
 						// for health checks. The default is /.
-						HealthCheckPath: aws.String( "/ping"),
+						HealthCheckPath: aws.String("/ping"),
 
 						// The protocol the load balancer uses when performing health checks on targets.
 						// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
@@ -1462,32 +1637,36 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						// function, this parameter does not apply.
 						VpcId: aws.String(vpcId),
 					},
+				}
+
+				// If HTTPS is enabled, then add the associated target group.
+				if req.EnableHTTPS {
 					// Default target group for HTTPS via port 443.
-					&elbv2.CreateTargetGroupInput{
-						Name: aws.String(fmt.Sprintf("%s-https", *elb.LoadBalancerName)),
-						Port: aws.Int64(443),
-						Protocol: aws.String("HTTPS"),
-						HealthCheckEnabled: aws.Bool(true),
+					targetGroupInputs = append(targetGroupInputs, &elbv2.CreateTargetGroupInput{
+						Name:                       aws.String(fmt.Sprintf("%s-https", *elb.LoadBalancerName)),
+						Port:                       aws.Int64(443),
+						Protocol:                   aws.String("HTTPS"),
+						HealthCheckEnabled:         aws.Bool(true),
 						HealthCheckIntervalSeconds: aws.Int64(30),
-						HealthCheckPath: aws.String( "/ping"),
-						HealthCheckProtocol: aws.String("HTTPS"),
-						HealthCheckTimeoutSeconds: aws.Int64(5),
-						HealthyThresholdCount: aws.Int64(3),
-						UnhealthyThresholdCount: aws.Int64(3),
+						HealthCheckPath:            aws.String("/ping"),
+						HealthCheckProtocol:        aws.String("HTTPS"),
+						HealthCheckTimeoutSeconds:  aws.Int64(5),
+						HealthyThresholdCount:      aws.Int64(3),
+						UnhealthyThresholdCount:    aws.Int64(3),
 						Matcher: &elbv2.Matcher{
 							HttpCode: aws.String("200"),
 						},
 						TargetType: aws.String("ip"),
-						VpcId: aws.String(vpcId),
-					},
+						VpcId:      aws.String(vpcId),
+					})
 				}
 
 				for _, targetGroupInput := range targetGroupInputs {
 					var targetGroup *elbv2.TargetGroup
 					err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
 						LoadBalancerArn: elb.LoadBalancerArn,
-						Names: []*string{aws.String(flags.ElbName)},
-					}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool{
+						Names:           []*string{aws.String(req.ElbLoadBalancerName)},
+					}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
 						for _, tg := range res.TargetGroups {
 							if *tg.TargetGroupName == *targetGroupInput.Name {
 								targetGroup = tg
@@ -1502,7 +1681,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						}
 					}
 
-					if targetGroup == nil  {
+					if targetGroup == nil {
 						// If no target group was found, create one.
 						createRes, err := svc.CreateTargetGroup(targetGroupInput)
 						if err != nil {
@@ -1518,7 +1697,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
 						// The name of the container (as it appears in a container definition) to associate
 						// with the load balancer.
-						ContainerName: aws.String(awsCreds.EcsServiceName),
+						ContainerName: aws.String(req.EcsServiceName),
 						// The port on the container to associate with the load balancer. This port
 						// must correspond to a containerPort in the service's task definition. Your
 						// container instances must allow ingress traffic on the hostPort of the port
@@ -1529,8 +1708,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						TargetGroupArn: targetGroup.TargetGroupArn,
 					})
 
-
-					if flags.elbDeregistrationDelay != -1 {
+					if req.ElbDeregistrationDelay != nil {
 						// If no target group was found, create one.
 						_, err = svc.ModifyTargetGroupAttributes(&elbv2.ModifyTargetGroupAttributesInput{
 							TargetGroupArn: targetGroup.TargetGroupArn,
@@ -1540,7 +1718,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 									Key: aws.String("deregistration_delay.timeout_seconds"),
 
 									// The value of the attribute.
-									Value: aws.String(strconv.Itoa(flags.elbDeregistrationDelay)),
+									Value: aws.String(strconv.Itoa(*req.ElbDeregistrationDelay)),
 								},
 							},
 						})
@@ -1550,26 +1728,94 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 						log.Printf("\t\t\tSet sttributes.")
 					}
-				}
-			}
 
-			log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
+					var foundListener bool
+					for _, cl := range curListeners {
+						if cl.Port == targetGroupInput.Port {
+							foundListener = true
+							break
+						}
+					}
+
+					if !foundListener {
+						listenerInput := &elbv2.CreateListenerInput{
+							// The actions for the default rule. The rule must include one forward action
+							// or one or more fixed-response actions.
+							//
+							// If the action type is forward, you specify a target group. The protocol of
+							// the target group must be HTTP or HTTPS for an Application Load Balancer.
+							// The protocol of the target group must be TCP, TLS, UDP, or TCP_UDP for a
+							// Network Load Balancer.
+							//
+							// DefaultActions is a required field
+							DefaultActions: []*elbv2.Action{
+								&elbv2.Action{
+									// The type of action. Each rule must include exactly one of the following types
+									// of actions: forward, fixed-response, or redirect.
+									//
+									// Type is a required field
+									Type: aws.String("forward"),
+
+									// The Amazon Resource Name (ARN) of the target group. Specify only when Type
+									// is forward.
+									TargetGroupArn: targetGroup.TargetGroupArn,
+								},
+							},
+
+							// The Amazon Resource Name (ARN) of the load balancer.
+							//
+							// LoadBalancerArn is a required field
+							LoadBalancerArn: elb.LoadBalancerArn,
+
+							// The port on which the load balancer is listening.
+							//
+							// Port is a required field
+							Port: targetGroup.Port,
+
+							// The protocol for connections from clients to the load balancer. For Application
+							// Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load
+							// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP.
+							//
+							// Protocol is a required field
+							Protocol: targetGroup.Protocol,
+						}
+
+						if *listenerInput.Protocol == "HTTPS" {
+							listenerInput.Certificates = append(listenerInput.Certificates, &elbv2.Certificate{
+								CertificateArn: aws.String(certificateArn),
+								IsDefault:      aws.Bool(true),
+							})
+						}
+
+						// If no repository was found, create one.
+						createRes, err := svc.CreateListener(listenerInput)
+						if err != nil {
+							return errors.Wrapf(err, "failed to create listener '%s'", req.ElbLoadBalancerName)
+						}
+
+						log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
+					}
+				}
+
+				log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
+			}
 		}
 
 		log.Println("ECS - Create Service")
 		{
 
-			svc := ecs.New(awsCreds.Session())
+			svc := ecs.New(req.awsSession())
 
 			var assignPublicIp *string
+			var healthCheckGracePeriodSeconds *int64
 			if len(ecsELBs) == 0 {
 				assignPublicIp = aws.String("ENABLED")
 			} else {
 				assignPublicIp = aws.String("DISABLED")
+				healthCheckGracePeriodSeconds = req.EscServiceHealthCheckGracePeriodSeconds
 			}
 
-
-			createRes, err := svc.CreateService(&ecs.CreateServiceInput{
+			serviceInput := &ecs.CreateServiceInput{
 				// The short name or full Amazon Resource Name (ARN) of the cluster that your
 				// service is running on. If you do not specify a cluster, the default cluster
 				// is assumed.
@@ -1581,19 +1827,19 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// or across multiple Regions.
 				//
 				// ServiceName is a required field
-				ServiceName: aws.String(awsCreds.EcsServiceName),
+				ServiceName: aws.String(req.EcsServiceName),
 
 				// Optional deployment parameters that control how many tasks run during the
 				// deployment and the ordering of stopping and starting tasks.
-				DeploymentConfiguration:  &ecs.DeploymentConfiguration{
+				DeploymentConfiguration: &ecs.DeploymentConfiguration{
 					// Refer to documentation for flags.ecsServiceMaximumPercent
-					MaximumPercent: aws.Int64(int64(flags.ecsServiceMaximumPercent)),
+					MaximumPercent: req.EcsServiceMaximumPercent,
 					// Refer to documentation for flags.ecsServiceMinimumHealthyPercent
-					MinimumHealthyPercent: aws.Int64(int64(flags.ecsServiceMinimumHealthyPercent)),
+					MinimumHealthyPercent: req.EcsServiceMinimumHealthyPercent,
 				},
 
 				// Refer to documentation for flags.ecsServiceDesiredCount.
-				DesiredCount: aws.Int64(int64(flags.ecsServiceDesiredCount)),
+				DesiredCount: aws.Int64(req.EcsServiceDesiredCount),
 
 				// Specifies whether to enable Amazon ECS managed tags for the tasks within
 				// the service. For more information, see Tagging Your Amazon ECS Resources
@@ -1610,7 +1856,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// scheduler ignores health check status. This grace period can prevent the
 				// ECS service scheduler from marking tasks as unhealthy and stopping them before
 				// they have time to come up.
-				HealthCheckGracePeriodSeconds: aws.Int64(int64(flags.escServiceHealthCheckGracePeriodSeconds)),
+				HealthCheckGracePeriodSeconds: healthCheckGracePeriodSeconds,
 
 				// The launch type on which to run your service. For more information, see Amazon
 				// ECS Launch Types (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/launch_types.html)
@@ -1635,13 +1881,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						// a security group, the default security group for the VPC is used. There is
 						// a limit of 5 security groups that can be specified per AwsVpcConfiguration.
 						// All specified security groups must be from the same VPC.
-						SecurityGroups: aws.StringSlice([]string{flags.Ec2SecurityGroupName}),
+						SecurityGroups: aws.StringSlice([]string{securityGroupId}),
 
 						// The subnets associated with the task or service. There is a limit of 16 subnets
 						// that can be specified per AwsVpcConfiguration.
 						// All specified subnets must be from the same VPC.
 						// Subnets is a required field
-						Subnets : aws.StringSlice(subnetsIDs),
+						Subnets: aws.StringSlice(subnetsIDs),
 					},
 				},
 
@@ -1658,27 +1904,30 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// can have a maximum character length of 128 characters, and tag values can
 				// have a maximum length of 256 characters.
 				Tags: []*ecs.Tag{
-					&ecs.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(flags.ProjectName)},
-					&ecs.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(flags.Env)},
+					&ecs.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+					&ecs.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
 				},
-			})
+			}
+
+			createRes, err := svc.CreateService(serviceInput)
+
+			// If tags aren't enabled for the account, try the request again without them.
+			// https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2/
+			if err != nil && strings.Contains(err.Error(), "new ARN and resource ID format must be enabled") {
+				serviceInput.Tags = nil
+				createRes, err = svc.CreateService(serviceInput)
+			}
+
 			if err != nil {
-				return errors.Wrapf(err, "failed to create service '%s'", awsCreds.EcsServiceName)
+				return errors.Wrapf(err, "failed to create service '%s'", req.EcsServiceName)
 			}
 			ecsService = createRes.Service
 
-			log.Printf("\t%s\tCreated ECS Service '%s'.\n", tests.Success,  *ecsService.ServiceName)
+			log.Printf("\t%s\tCreated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 		}
-
 	}
-
-
 
 	// If Elastic cache is enabled, need to add ingress to security group
 
-
-
-
 	return nil
 }
-

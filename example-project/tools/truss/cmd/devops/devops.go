@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
+// findProjectGoModFile finds the project root directory from the current working directory.
 func findProjectGoModFile() (string, error) {
 	var err error
 	projectRoot, err := os.Getwd()
@@ -76,7 +76,7 @@ func getTargetEnv(targetEnv, envName string) string {
 
 	if v := os.Getenv(k); v != "" {
 		// Set the non prefixed env var with the prefixed value.
-		os.Setenv(envName, v )
+		os.Setenv(envName, v)
 		return v
 	}
 
@@ -84,7 +84,7 @@ func getTargetEnv(targetEnv, envName string) string {
 }
 
 // loadGoModName parses out the module name from go.mod.
-func loadGoModName(goModFile string ) (string, error) {
+func loadGoModName(goModFile string) (string, error) {
 	ok, err := exists(goModFile)
 	if err != nil {
 		return "", errors.WithMessage(err, "Failed to load go.mod for project")
@@ -94,7 +94,7 @@ func loadGoModName(goModFile string ) (string, error) {
 
 	b, err := ioutil.ReadFile(goModFile)
 	if err != nil {
-		return"",  errors.WithMessagef(err, "Failed to read go.mod at %s", goModFile)
+		return "", errors.WithMessagef(err, "Failed to read go.mod at %s", goModFile)
 	}
 
 	var name string
@@ -121,6 +121,7 @@ func exists(path string) (bool, error) {
 	return true, err
 }
 
+/*
 type EnvVars []string
 
 // execCmds executes a set of commands.
@@ -136,8 +137,11 @@ func execCmds(workDir string, envVars *EnvVars, cmds ...[]string) ([]string, err
 		cmd.Dir = workDir
 		cmd.Env = *envVars
 		out, err := cmd.CombinedOutput()
+
+		fmt.Println(string(out ))
+
 		if err != nil {
-			return results, errors.WithMessagef(err, "failed to execute %s - %s\n%s",  strings.Join(cmdVals, " "), string(out))
+			return results, errors.WithMessagef(err, "failed to execute %s\n%s",  strings.Join(cmdVals, " "), string(out))
 		}
 		results = append(results, string(out))
 
@@ -148,3 +152,4 @@ func execCmds(workDir string, envVars *EnvVars, cmds ...[]string) ([]string, err
 
 	return results, nil
 }
+*/

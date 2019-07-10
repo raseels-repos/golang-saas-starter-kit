@@ -381,11 +381,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	startTime := time.Now()
 
-	// Load the ECR repository.
-	log.Println("ECR - Get or create repository.")
+	// Load the AWS ECR repository. Try to find by name else create new one.
 	var docker *dockerClient.Client
 	var registryAuth string
 	{
+		log.Println("ECR - Get or create repository.")
+
 		svc := ecr.New(req.awsSession())
 
 		var awsRepo *ecr.Repository
@@ -575,9 +576,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		return nil
 	}
 
-	log.Println("Datadog - Get API Key")
+	// Try to find the datadog API Key, this value is optional.
 	var datadogApiKey string
 	{
+		log.Println("Datadog - Get API Key")
+
 		// Load Datadog API Key which can be either stored in an env var or in AWS Secrets Manager.
 		// 1. Check env vars for [DEV|STAGE|PROD]_DD_API_KEY and DD_API_KEY
 		datadogApiKey = getTargetEnv(req.Env, "DD_API_KEY")
@@ -613,8 +616,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
-	log.Println("CloudWatch Logs - Get or Create Log Group")
+	// Try to find the AWS Cloudwatch Log Group by name or create new one.
 	{
+		log.Println("CloudWatch Logs - Get or Create Log Group")
+
 		svc := cloudwatchlogs.New(req.awsSession())
 
 		// If no log group was found, create one.
@@ -639,8 +644,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Log Group '%s'.\n", tests.Success, req.CloudWatchLogGroupName)
 	}
 
-	log.Println("S3 - Setup Buckets")
+	// Try to find the AWS S3 Buckets by names or create new ones.
 	{
+		log.Println("S3 - Setup Buckets")
+
 		svc := s3.New(req.awsSession())
 
 		var bucketNames []string
@@ -840,10 +847,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tBuckets setup.\n", tests.Success)
 	}
 
-	log.Println("EC2 - Find Subnets")
+	// Find the default VPC and associated subnets. Custom subnets outside of the default VPC are not currently supported.
 	var subnetsIDs []string
 	var vpcId string
 	{
+		log.Println("EC2 - Find Subnets")
+
 		svc := ec2.New(req.awsSession())
 
 		var subnets []*ec2.Subnet
@@ -900,9 +909,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t\tFound %d subnets.\n", len(subnets))
 	}
 
-	log.Println("EC2 - Find Security Group")
+	// Try to find the AWS Security Group by name or create a new one.
 	var securityGroupId string
 	{
+		log.Println("EC2 - Find Security Group")
+
 		svc := ec2.New(req.awsSession())
 
 		log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
@@ -995,6 +1006,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
 	}
 
+	// If a database cluster is defined, ensure it exists else create a new one.
 	var dbCluster *rds.DBCluster
 	if req.DBCluster != nil {
 		log.Println("RDS - Get or Create Database Cluster")
@@ -1031,6 +1043,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing DB Cluster '%s'.\n", tests.Success, *dbCluster.DatabaseName)
 	}
 
+	// If a database instance is defined, ensure it exists else create a new one.
 	var db *DB
 	if req.DBInstance != nil {
 		log.Println("RDS - Get or Create Database Instance")
@@ -1041,7 +1054,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// Retrieve the current secret value if something is stored.
 		{
 			sm := secretsmanager.New(req.awsSession())
-
 			res, err := sm.GetSecretValue(&secretsmanager.GetSecretValueInput{
 				SecretId: aws.String(dbSecretId),
 			})
@@ -1057,16 +1069,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
+		// Init a new RDS client.
 		svc := rds.New(req.awsSession())
 
+		// Always set the VPC Security Group ID dynamically with the one created/found previously.
 		req.DBInstance.VpcSecurityGroupIds = aws.StringSlice([]string{securityGroupId})
 
+		// When a DB cluster exists, add the identifier to the instance input. This is for creating databases with
+		// the storage engine of AWS Aurora.
 		if dbCluster != nil {
 			req.DBInstance.DBClusterIdentifier = dbCluster.DBClusterIdentifier
 		} else {
 			req.DBInstance.DBClusterIdentifier = nil
 		}
 
+		// Try to find an existing DB instance with the same identifier.
 		var dbInstance *rds.DBInstance
 		descRes, err := svc.DescribeDBInstances(&rds.DescribeDBInstancesInput{
 			DBInstanceIdentifier: req.DBInstance.DBInstanceIdentifier,
@@ -1079,31 +1096,39 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			dbInstance = descRes.DBInstances[0]
 		}
 
+		// No DB instance was found, so create a new one.
 		if dbInstance == nil {
 			if db == nil {
+				// If master password is not set, pull from cluster or generate random.
+				if req.DBInstance.MasterUserPassword == nil {
+					if req.DBCluster.MasterUserPassword != nil && *req.DBCluster.MasterUserPassword != "" {
+						req.DBInstance.MasterUserPassword = req.DBCluster.MasterUserPassword
+					} else {
+						req.DBInstance.MasterUserPassword = aws.String(uuid.NewRandom().String())
+					}
+				}
+
+				// Only set the password right now, all other details will be set after the database instance is created.
 				db = &DB{
-					Host: fmt.Sprintf("%s:%d", *dbInstance.Endpoint.Address, *dbInstance.Endpoint.Port),
-					User: *dbInstance.MasterUsername,
 					Pass: *req.DBInstance.MasterUserPassword,
-					Database : *dbInstance.DBName,
-					Driver: *dbInstance.Engine,
-					DisableTLS: false,
 				}
 
 				// Store the secret first in the event that create fails.
 				{
-					sm := secretsmanager.New(req.awsSession())
-
+					// Json encode the db details to be stored as secret text.
 					dat, err := json.Marshal(db)
 					if err != nil {
 						return errors.Wrap(err, "failed to marshal db credentials")
 					}
 
+					// Create the new entry in AWS Secret Manager with the database password.
+					sm := secretsmanager.New(req.awsSession())
 					_, err = sm.CreateSecret(&secretsmanager.CreateSecretInput{
 						Name:         aws.String(dbSecretId),
 						SecretString: aws.String(string(dat)),
 					})
 					if err != nil {
+						/*
 						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceExistsException {
 							return errors.Wrap(err, "failed to create new secret with db credentials")
 						}
@@ -1113,19 +1138,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						})
 						if err != nil {
 							return errors.Wrap(err, "failed to update secret with db credentials")
-						}
+						}*/
+						return errors.Wrap(err, "failed to create new secret with db credentials")
 					}
 					log.Printf("\t\tStored Secret\n")
 				}
-			}
-
-			// If master password is not set, pull from cluster or generate random.
-			if req.DBInstance.MasterUserPassword == nil {
-				if req.DBCluster.MasterUserPassword != nil && *req.DBCluster.MasterUserPassword != "" {
-					req.DBInstance.MasterUserPassword = req.DBCluster.MasterUserPassword
-				} else {
-					req.DBInstance.MasterUserPassword = aws.String(uuid.NewRandom().String())
-				}
+			} else {
+				req.DBInstance.MasterUserPassword = aws.String(db.Pass)
 			}
 
 			// If no cluster was found, create one.
@@ -1154,15 +1173,37 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
+		// Update the secret with the db instance details. This happens after DB create to help address when the
+		// db instance was successfully created, but the secret failed to save. The db details host should be empty or
+		// match the current instance endpoint.
+		curHost := fmt.Sprintf("%s:%d", *dbInstance.Endpoint.Address, *dbInstance.Endpoint.Port)
+		if curHost != db.Host {
 
+			// Copy the instance details to the db struct.
+			db.Host = curHost
+			db.User = *dbInstance.MasterUsername
+			db.Database = *dbInstance.DBName
+			db.Driver = *dbInstance.Engine
+			db.DisableTLS = false
 
+			// Json encode the db details to be stored as text via AWS Secrets Manager.
+			dat, err := json.Marshal(db)
+			if err != nil {
+				return errors.Wrap(err, "failed to marshal db credentials")
+			}
 
+			// Update the current AWS Secret.
+			sm := secretsmanager.New(req.awsSession())
+			_, err = sm.UpdateSecret(&secretsmanager.UpdateSecretInput{
+				SecretId:         aws.String(dbSecretId),
+				SecretString: aws.String(string(dat)),
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to update secret with db credentials")
+			}
 
-
-
-		return nil
-
-
+			log.Printf("\t\tUpdate Secret\n")
+		}
 
 		log.Printf("\t%s\tUsing DB Instance '%s'.\n", tests.Success, *dbInstance.DBInstanceIdentifier)
 	}
@@ -1289,9 +1330,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Cache Cluster '%s'.\n", tests.Success, *cacheCluster.CacheClusterId)
 	}
 
-	log.Println("ECS - Get or Create Cluster")
+	// Try to find AWS ECS Cluster by name or create new one.
 	var ecsCluster *ecs.Cluster
 	{
+		log.Println("ECS - Get or Create Cluster")
+
 		svc := ecs.New(req.awsSession())
 
 		descRes, err := svc.DescribeClusters(&ecs.DescribeClustersInput{
@@ -1343,9 +1386,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing ECS Cluster '%s'.\n", tests.Success, *ecsCluster.ClusterName)
 	}
 
-	log.Println("ECS - Register task definition")
+	// Register a new ECS task.
 	var taskDef *ecs.TaskDefinition
 	{
+		log.Println("ECS - Register task definition")
+
 		// List of placeholders that can be used in task definition and replaced on deployment.
 		placeholders := map[string]string{
 			"{SERVICE}":        req.ServiceName,
@@ -1908,9 +1953,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
-	log.Println("ECS - Find Service")
+	// Try to find AWS ECS Service by name. This does not error on not found, but results are used to determine if
+	// the full creation process of a service needs to be executed.
 	var ecsService *ecs.Service
 	{
+		log.Println("ECS - Find Service")
+
 		svc := ecs.New(req.awsSession())
 
 		res, err := svc.DescribeServices(&ecs.DescribeServicesInput{
@@ -2581,8 +2629,9 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
-	log.Println("\tWaiting for service to enter stable state.")
+	// Wait for the updated or created service to enter a stable state.
 	{
+		log.Println("\tWaiting for service to enter stable state.")
 
 		// Helper method to get the logs from cloudwatch for a specific task ID.
 		getTaskLogs := func(taskId string) ([]string, error) {
@@ -3110,9 +3159,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			log.Printf("\t%s\tDNS entries updated.\n", tests.Success)
 		}
 	}
-
-
-	// If Elastic cache is enabled, need to add ingress to security group
 
 	return nil
 }

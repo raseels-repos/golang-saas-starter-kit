@@ -53,6 +53,8 @@ COPY --from=builder /gosrv /
 #COPY --from=builder /static /static
 COPY --from=builder /templates /templates
 
+ENV TEMPLATE_DIR=/templates
+
 ARG service
 ENV SERVICE_NAME $service
 

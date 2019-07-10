@@ -146,6 +146,12 @@ func main() {
 	// =========================================================================
 	// Config Validation & Defaults
 
+	// AWS access keys are required, if roles are enabled, remove any placeholders.
+	if cfg.Aws.UseRole {
+		cfg.Aws.AccessKeyID = ""
+		cfg.Aws.SecretAccessKey = ""
+	}
+
 	// If base URL is empty, set the default value from the HTTP Host
 	if cfg.App.BaseUrl == "" {
 		baseUrl := cfg.HTTP.Host
@@ -216,16 +222,14 @@ func main() {
 	// default not set and will based on the redis config values defined on the server
 	if cfg.Redis.MaxmemoryPolicy != "" {
 		err := redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "unknown command") {
 			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %v", err)
 		}
 	} else {
 		evictPolicy, err := redisClient.ConfigGet(evictPolicyConfigKey).Result()
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "unknown command") {
 			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %v", err)
-		}
-
-		if evictPolicy[1] != "allkeys-lru" {
+		} else if evictPolicy != nil && len(evictPolicy) > 0 && evictPolicy[1] != "allkeys-lru" {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
 	}

@@ -218,6 +218,8 @@ func main() {
 				cli.BoolFlag{Name: "enable_https", Usage: "enable HTTPS", Destination: &deployFlags.EnableHTTPS},
 				cli.StringFlag{Name: "domain_name", Usage: "dev, stage, or prod", Destination: &deployFlags.ServiceDomainName},
 				cli.StringSliceFlag{Name: "domain_name_aliases", Usage: "dev, stage, or prod", Value: &deployFlags.ServiceDomainNameAliases},
+				cli.StringFlag{Name: "private_bucket", Usage: "dev, stage, or prod", Destination: &deployFlags.S3BucketPrivateName},
+				cli.StringFlag{Name: "public_bucket", Usage: "dev, stage, or prod", Destination: &deployFlags.S3BucketPublicName},
 				cli.StringFlag{Name: "dockerfile", Usage: "DockerFile for service", Destination: &deployFlags.DockerFile},
 				cli.StringFlag{Name: "root", Usage: "project root directory", Destination: &deployFlags.ProjectRoot},
 				cli.StringFlag{Name: "project", Usage: "name of project", Destination: &deployFlags.ProjectName},

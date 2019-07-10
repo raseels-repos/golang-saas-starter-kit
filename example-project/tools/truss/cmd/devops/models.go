@@ -1,6 +1,7 @@
 package devops
 
 import (
+	"github.com/aws/aws-sdk-go/service/elasticache"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -20,6 +21,9 @@ type ServiceDeployFlags struct {
 	EnableHTTPS              bool            `validate:"omitempty" example:"false"`
 	ServiceDomainName        string          `validate:"omitempty" example:"example-project.com"`
 	ServiceDomainNameAliases cli.StringSlice `validate:"omitempty" example:"subdomain.example-project.com"`
+	S3BucketPrivateName      string          `validate:"omitempty" example:"saas-example-project-private"`
+	S3BucketPublicName       string          `validate:"omitempty" example:"saas-example-project-public"`
+
 	ProjectRoot              string          `validate:"omitempty" example:"."`
 	ProjectName              string          ` validate:"omitempty" example:"example-project"`
 	DockerFile               string          `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
@@ -52,12 +56,15 @@ type serviceDeployRequest struct {
 	EcsServiceDesiredCount int64          `validate:"required"`
 	Ec2SecurityGroupName   string         `validate:"required"`
 	CloudWatchLogGroupName string         `validate:"required"`
+	S3BucketTempPrefix     string          `validate:"required"`
 	AwsCreds               awsCredentials `validate:"required,dive,required"`
 
 	// Optional flags.
 	EnableHTTPS                             bool     `validate:"omitempty"`
 	ServiceDomainName                       string   `validate:"omitempty,required_with=EnableHTTPS,fqdn"`
 	ServiceDomainNameAliases                []string `validate:"omitempty,dive,fqdn"`
+	S3BucketPrivateName      string          `validate:"omitempty"`
+	S3BucketPublicName       string          `validate:"omitempty"`
 	EcrRepositoryMaxImages                  int      `validate:"omitempty"`
 	EcsServiceMinimumHealthyPercent         *int64   `validate:"omitempty"`
 	EcsServiceMaximumPercent                *int64   `validate:"omitempty"`
@@ -72,6 +79,7 @@ type serviceDeployRequest struct {
 	NoPush                                  bool     `validate:"omitempty"`
 	RecreateService                         bool     `validate:"omitempty"`
 
+	CacheCluster *elasticache.CreateCacheClusterInput
 	ReleaseImage string
 	BuildTags    []string
 	flags        ServiceDeployFlags

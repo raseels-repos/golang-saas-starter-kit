@@ -1,12 +1,16 @@
 package devops
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/elasticache"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -14,10 +18,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
+	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -137,6 +145,11 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			ProjectRoot:     flags.ProjectRoot,
 			ProjectName:     flags.ProjectName,
 			DockerFile:      flags.DockerFile,
+			EnableHTTPS:      flags.EnableHTTPS,
+			ServiceDomainName:      flags.ServiceDomainName,
+			ServiceDomainNameAliases:      flags.ServiceDomainNameAliases,
+			S3BucketPrivateName :      flags.S3BucketPrivateName,
+			S3BucketPublicName:      flags.S3BucketPublicName,
 			EnableLambdaVPC: flags.EnableLambdaVPC,
 			EnableEcsElb:    flags.EnableEcsElb,
 			NoBuild:         flags.NoBuild,
@@ -278,6 +291,22 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			req.EcsServiceDesiredCount = 1
 			req.EscServiceHealthCheckGracePeriodSeconds = aws.Int64(60)
 
+			// S3 temp prefix, a life cycle policy will be applied to this.
+			req.S3BucketTempPrefix = "tmp/"
+
+			// Elastic Cache settings for a Redis cache cluster. Could defined different settings by env.
+			req.CacheCluster = &elasticache.CreateCacheClusterInput{
+				AutoMinorVersionUpgrade:   aws.Bool(true),
+				CacheClusterId:            aws.String(req.ProjectName+"-"+req.Env),
+				CacheNodeType:             aws.String("cache.t2.micro"),
+				CacheSubnetGroupName:      aws.String("default"),
+				Engine:                    aws.String("redis"),
+				EngineVersion:             aws.String("5.0.4"),
+				NumCacheNodes:             aws.Int64(1),
+				Port:                      aws.Int64(6379),
+				SnapshotRetentionLimit:    aws.Int64(7),
+			}
+
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
 
@@ -315,9 +344,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	*/
 
+	startTime := time.Now()
+
 	// Load the ECR repository.
 	log.Println("ECR - Get or create repository.")
 	var docker *dockerClient.Client
+	var registryAuth string
 	{
 		svc := ecr.New(req.awsSession())
 
@@ -403,7 +435,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.WithMessage(err, "failed to init new docker client from env")
 		}
 
-		_, err = docker.RegistryLogin(context.Background(), dockerTypes.AuthConfig{
+		loginRes, err := docker.RegistryLogin(context.Background(), dockerTypes.AuthConfig{
+
 			Username:      user,
 			Password:      pass,
 			ServerAddress: *res.AuthorizationData[0].ProxyEndpoint,
@@ -411,6 +444,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		if err != nil {
 			return errors.WithMessage(err, "failed docker registry login")
 		}
+		log.Printf("\t\tStatus: %s", loginRes.Status )
+
+
+		registryAuth = fmt.Sprintf(`{"Username": "%s", "Password": "%s"}`, user, pass)
+		registryAuth = base64.StdEncoding.EncodeToString([]byte(registryAuth))
+
 		log.Printf("\t%s\tdocker login ok.", tests.Success)
 	}
 
@@ -460,11 +499,18 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		if req.NoPush == false {
 			log.Printf("\t\tpush release image %s", req.ReleaseImage)
 
+			// Common Errors:
+			// 1. Image push failed Error parsing HTTP response: unexpected end of JSON input: ""
+			// 		If you are trying to push to an ECR repository, you need to make sure that the
+			// 		ecr:BatchCheckLayerAvailability permission is also checked. It is not selected by
+			// 		default when using the default push permissions that ECR sets.
+			// 		https://github.com/moby/moby/issues/19010
+
 			pushOpts := dockerTypes.ImagePushOptions{
 				All: true,
 				// Push returns EOF if no 'X-Registry-Auth' header is specified
 				// https://github.com/moby/moby/issues/10983
-				RegistryAuth: "123",
+				RegistryAuth: registryAuth,
 			}
 
 			closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
@@ -558,6 +604,494 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Log Group '%s'.\n", tests.Success, req.CloudWatchLogGroupName)
 	}
 
+
+	log.Println("S3 - Setup Buckets")
+	{
+		svc := s3.New(req.awsSession())
+
+		var bucketNames []string
+
+		if req.S3BucketPrivateName != "" {
+			bucketNames = append(bucketNames, req.S3BucketPrivateName)
+		}
+		if req.S3BucketPublicName != "" {
+			bucketNames = append(bucketNames, req.S3BucketPublicName)
+		}
+
+		log.Println("\tGet or Create S3 Buckets")
+		for _, bucketName := range bucketNames {
+			_, err := svc.CreateBucket(&s3.CreateBucketInput{
+				Bucket: aws.String(bucketName),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || (aerr.Code() != s3.ErrCodeBucketAlreadyExists && aerr.Code() != s3.ErrCodeBucketAlreadyOwnedByYou) {
+					return errors.Wrapf(err, "failed to create s3 bucket '%s'", bucketName)
+				}
+
+				log.Printf("\t\tFound: %s.", bucketName)
+			} else {
+				log.Printf("\t\tCreated: %s.", bucketName)
+			}
+		}
+
+		log.Println("\tWait for S3 Buckets to exist")
+		for _, bucketName := range bucketNames {
+			log.Printf("\t\t%s", bucketName)
+
+			err := svc.WaitUntilBucketExists(&s3.HeadBucketInput{
+				Bucket: aws.String(bucketName),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to wait for s3 bucket '%s' to exist", bucketName)
+			}
+			log.Printf("\t\t\tExists")
+		}
+
+		log.Println("\tConfigure S3 Buckets to exist")
+		for _, bucketName := range bucketNames {
+			log.Printf("\t\t%s", bucketName)
+
+			// Add a life cycle policy to expire keys for the temp directory.
+			_, err := svc.PutBucketLifecycleConfiguration(&s3.PutBucketLifecycleConfigurationInput{
+				Bucket: aws.String(bucketName),
+				LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
+					Rules: []*s3.LifecycleRule{
+						{
+							ID:     aws.String("Rule for : "+req.S3BucketTempPrefix),
+							Status: aws.String("Enabled"),
+							Filter: &s3.LifecycleRuleFilter{
+								Prefix: aws.String(req.S3BucketTempPrefix),
+							},
+							Expiration: &s3.LifecycleExpiration{
+								// Indicates the lifetime, in days, of the objects that are subject to the rule.
+								// The value must be a non-zero positive integer.
+								Days: aws.Int64(1),
+							},
+							// Specifies the days since the initiation of an incomplete multipart upload
+							// that Amazon S3 will wait before permanently removing all parts of the upload.
+							// For more information, see Aborting Incomplete Multipart Uploads Using a Bucket
+							// Lifecycle Policy (https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html#mpu-abort-incomplete-mpu-lifecycle-config)
+							// in the Amazon Simple Storage Service Developer Guide.
+							AbortIncompleteMultipartUpload: &s3.AbortIncompleteMultipartUpload{
+								DaysAfterInitiation: aws.Int64(1),
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to configure lifecycle rule for s3 bucket '%s'", bucketName)
+			}
+			log.Printf("\t\t\tAdded lifecycle expiration for prefix '%s'", req.S3BucketTempPrefix)
+
+			if bucketName == req.S3BucketPublicName {
+				// Enable CORS for public bucket.
+				_, err = svc.PutBucketCors(&s3.PutBucketCorsInput{
+					Bucket: aws.String(bucketName),
+					CORSConfiguration: &s3.CORSConfiguration{
+						CORSRules: []*s3.CORSRule{
+							&s3.CORSRule{
+								// Headers that are specified in the Access-Control-Request-Headers header.
+								// These headers are allowed in a preflight OPTIONS request. In response to
+								// any preflight OPTIONS request, Amazon S3 returns any requested headers that
+								// are allowed.
+								// AllowedHeaders: aws.StringSlice([]string{}),
+
+								// An HTTP method that you allow the origin to execute. Valid values are GET,
+								// PUT, HEAD, POST, and DELETE.
+								//
+								// AllowedMethods is a required field
+								AllowedMethods: aws.StringSlice([]string{"GET", "POST"}),
+
+								// One or more origins you want customers to be able to access the bucket from.
+								//
+								// AllowedOrigins is a required field
+								AllowedOrigins: aws.StringSlice([]string{"*"}),
+
+								// One or more headers in the response that you want customers to be able to
+								// access from their applications (for example, from a JavaScript XMLHttpRequest
+								// object).
+								// ExposeHeaders: aws.StringSlice([]string{}),
+
+								// The time in seconds that your browser is to cache the preflight response
+								// for the specified resource.
+								// MaxAgeSeconds: aws.Int64(),
+							},
+						},
+					},
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to put CORS on s3 bucket '%s'", bucketName)
+				}
+				log.Printf("\t\t\tUpdated CORS")
+
+			} else {
+				// Block public access for all non-public buckets.
+				_, err = svc.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
+					Bucket: aws.String(bucketName),
+					PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
+						// Specifies whether Amazon S3 should block public access control lists (ACLs)
+						// for this bucket and objects in this bucket. Setting this element to TRUE
+						// causes the following behavior:
+						//
+						//    * PUT Bucket acl and PUT Object acl calls fail if the specified ACL is
+						//    public.
+						//
+						//    * PUT Object calls fail if the request includes a public ACL.
+						//
+						// Enabling this setting doesn't affect existing policies or ACLs.
+						BlockPublicAcls: aws.Bool(true),
+
+						// Specifies whether Amazon S3 should block public bucket policies for this
+						// bucket. Setting this element to TRUE causes Amazon S3 to reject calls to
+						// PUT Bucket policy if the specified bucket policy allows public access.
+						//
+						// Enabling this setting doesn't affect existing bucket policies.
+						BlockPublicPolicy: aws.Bool(true),
+
+						// Specifies whether Amazon S3 should restrict public bucket policies for this
+						// bucket. Setting this element to TRUE restricts access to this bucket to only
+						// AWS services and authorized users within this account if the bucket has a
+						// public policy.
+						//
+						// Enabling this setting doesn't affect previously stored bucket policies, except
+						// that public and cross-account access within any public bucket policy, including
+						// non-public delegation to specific accounts, is blocked.
+						RestrictPublicBuckets: aws.Bool(true),
+
+						// Specifies whether Amazon S3 should ignore public ACLs for this bucket and
+						// objects in this bucket. Setting this element to TRUE causes Amazon S3 to
+						// ignore all public ACLs on this bucket and objects in this bucket.
+						//
+						// Enabling this setting doesn't affect the persistence of any existing ACLs
+						// and doesn't prevent new public ACLs from being set.
+						IgnorePublicAcls: aws.Bool(true),
+					},
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to block public access for s3 bucket '%s'", bucketName)
+				}
+				log.Printf("\t\t\tBlocked public access")
+
+				// Add a bucket policy to enable exports from Cloudwatch Logs.
+				tmpPolicyResource := strings.Trim(filepath.Join(bucketName, req.S3BucketTempPrefix), "/")
+				_, err = svc.PutBucketPolicy(&s3.PutBucketPolicyInput{
+					Bucket: aws.String(bucketName),
+					Policy: aws.String(fmt.Sprintf(`{
+							"Version": "2012-10-17",
+							"Statement": [
+							  {
+								  "Action": "s3:GetBucketAcl",
+								  "Effect": "Allow",
+								  "Resource": "arn:aws:s3:::%s",
+								  "Principal": { "Service": "logs.%s.amazonaws.com" }
+							  },
+							  {
+								  "Action": "s3:PutObject" ,
+								  "Effect": "Allow",
+								  "Resource": "arn:aws:s3:::%s/*",
+								  "Condition": { "StringEquals": { "s3:x-amz-acl": "bucket-owner-full-control" } },
+								  "Principal": { "Service": "logs.%s.amazonaws.com" }
+							  }
+							]
+						}`, bucketName, req.AwsCreds.Region, tmpPolicyResource, req.AwsCreds.Region )),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to put bucket policy for s3 bucket '%s'", bucketName)
+				}
+				log.Printf("\t\t\tUpdated bucket policy")
+			}
+		}
+
+		log.Printf("\t%s\tBuckets setup.\n", tests.Success)
+	}
+
+	log.Println("EC2 - Find Subnets")
+	var subnetsIDs []string
+	var vpcId string
+	{
+		svc := ec2.New(req.awsSession())
+
+		var subnets []*ec2.Subnet
+		if true { // len(req.ec2SubnetIds) == 0 {
+			log.Println("\t\tFind all subnets are that default for each available AZ.")
+
+			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
+				for _, s := range res.Subnets {
+					if *s.DefaultForAz {
+						subnets = append(subnets, s)
+					}
+				}
+				return !lastPage
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to find default subnets")
+			}
+			/*} else {
+			log.Println("\t\tFind all subnets for the IDs provided.")
+
+			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
+				SubnetIds: aws.StringSlice(flags.Ec2SubnetIds),
+			}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
+				for _, s := range res.Subnets {
+					subnets = append(subnets, s)
+				}
+				return !lastPage
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to find subnets: %s", strings.Join(flags.Ec2SubnetIds, ", "))
+			} else if len(flags.Ec2SubnetIds) != len(subnets)  {
+				return errors.Errorf("failed to find all subnets, expected %d, got %d", len(flags.Ec2SubnetIds) != len(subnets))
+			}*/
+		}
+
+		if len(subnets) == 0 {
+			return errors.New("failed to find any subnets, expected at least 1")
+		}
+
+		for _, s := range subnets {
+			if s.VpcId == nil {
+				continue
+			}
+			if vpcId == "" {
+				vpcId = *s.VpcId
+			} else if vpcId != *s.VpcId {
+				return errors.Errorf("invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, vpcId, *s.VpcId)
+			}
+
+			subnetsIDs = append(subnetsIDs, *s.SubnetId)
+			log.Printf("\t\t\t%s", *s.SubnetId)
+		}
+
+		log.Printf("\t\tFound %d subnets.\n", len(subnets))
+	}
+
+	log.Println("EC2 - Find Security Group")
+	var securityGroupId string
+	{
+		svc := ec2.New(req.awsSession())
+
+		log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
+
+		err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
+			GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
+		}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
+			for _, s := range res.SecurityGroups {
+				if *s.GroupName == req.Ec2SecurityGroupName {
+					securityGroupId = *s.GroupId
+					break
+				}
+
+			}
+			return !lastPage
+		})
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
+				return errors.Wrapf(err, "failed to find security group '%s'", req.Ec2SecurityGroupName)
+			}
+		}
+
+		if securityGroupId == "" {
+			// If no security group was found, create one.
+			createRes, err := svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+				// The name of the security group.
+				// Constraints: Up to 255 characters in length. Cannot start with sg-.
+				// Constraints for EC2-Classic: ASCII characters
+				// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+				// GroupName is a required field
+				GroupName: aws.String(req.Ec2SecurityGroupName),
+				// A description for the security group. This is informational only.
+				// Constraints: Up to 255 characters in length
+				// Constraints for EC2-Classic: ASCII characters
+				// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+				// Description is a required field
+				Description: aws.String(fmt.Sprintf("Security group for %s running on ECS cluster %s", req.ProjectName, req.EcsClusterName)),
+				// [EC2-VPC] The ID of the VPC. Required for EC2-VPC.
+				VpcId: aws.String(vpcId),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
+			}
+			securityGroupId = *createRes.GroupId
+
+			log.Printf("\t\tCreated: %s.", req.Ec2SecurityGroupName)
+		} else {
+			log.Printf("\t\tFound: %s.", req.Ec2SecurityGroupName)
+		}
+
+		ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
+			// Enable services to be publicly available via HTTP port 80
+			&ec2.AuthorizeSecurityGroupIngressInput{
+				IpProtocol: aws.String("tcp"),
+				CidrIp:     aws.String("0.0.0.0/0"),
+				FromPort:   aws.Int64(80),
+				ToPort:     aws.Int64(80),
+				GroupId:    aws.String(securityGroupId),
+			},
+			// Allow all services in the security group to access other services.
+			&ec2.AuthorizeSecurityGroupIngressInput{
+				SourceSecurityGroupName: aws.String(req.Ec2SecurityGroupName),
+				GroupId:                 aws.String(securityGroupId),
+			},
+		}
+
+		// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
+		// HTTPS is terminated via the web server and not on the Load Balancer.
+		if !req.EnableEcsElb {
+			// Enable services to be publicly available via HTTPS port 443
+			ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+				IpProtocol: aws.String("tcp"),
+				CidrIp:     aws.String("0.0.0.0/0"),
+				FromPort:   aws.Int64(443),
+				ToPort:     aws.Int64(443),
+				GroupId:    aws.String(securityGroupId),
+			})
+		}
+
+		// Add all the default ingress to the security group.
+		for _, ingressInput := range ingressInputs {
+			_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
+					return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.Ec2SecurityGroupName)
+				}
+			}
+		}
+
+		log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
+	}
+
+	var cacheCluster *elasticache.CacheCluster
+	if req.CacheCluster != nil {
+		log.Println("Elastic Cache - Get or Create Cache Cluster")
+
+		// Set the security group of the cache cluster
+		req.CacheCluster.SecurityGroupIds = aws.StringSlice([]string{securityGroupId})
+
+		svc := elasticache.New(req.awsSession())
+
+		descRes, err := svc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
+			CacheClusterId: req.CacheCluster.CacheClusterId,
+			ShowCacheNodeInfo: aws.Bool(true),
+		})
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elasticache.ErrCodeCacheClusterNotFoundFault {
+				return errors.Wrapf(err, "failed to describe cache cluster '%s'", *req.CacheCluster.CacheClusterId)
+			}
+		} else if len(descRes.CacheClusters) > 0 {
+			cacheCluster = descRes.CacheClusters[0]
+		}
+
+		if cacheCluster == nil {
+			// If no repository was found, create one.
+			createRes, err := svc.CreateCacheCluster(req.CacheCluster)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create cluster '%s'",  *req.CacheCluster.CacheClusterId)
+			}
+			cacheCluster = createRes.CacheCluster
+
+			/*
+				// TODO: Tag cache cluster, ARN for the cache cluster is not readly available.
+				_, err = svc.AddTagsToResource(&elasticache.AddTagsToResourceInput{
+					ResourceName: ???,
+					Tags: []*elasticache.Tag{
+						{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+						{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
+					},
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to create cluster '%s'",  *req.CacheCluster.CacheClusterId)
+				}
+			*/
+
+			log.Printf("\t\tCreated: %s", *cacheCluster.CacheClusterId)
+		} else {
+			log.Printf("\t\tFound: %s", *cacheCluster.CacheClusterId)
+		}
+
+		// The status of the cluster.
+		log.Printf("\t\t\tStatus: %s", *cacheCluster.CacheClusterStatus)
+
+		// If the cache cluster is not active as was recently created, wait for it to become active.
+		if *cacheCluster.CacheClusterStatus != "available" {
+			log.Printf("\t\tWhat for cluster to become available.")
+			err = svc.WaitUntilCacheClusterAvailable(&elasticache.DescribeCacheClustersInput{
+				CacheClusterId: req.CacheCluster.CacheClusterId,
+			})
+		}
+
+
+
+
+
+
+
+		if *cacheCluster.Engine == "redis" {
+			customCacheParameterGroupName := fmt.Sprintf("%s.%s", req.ProjectNameCamel(), *cacheCluster.Engine)
+
+			// If the cache cluster is using the default parameter group, create a new custom group.
+			if strings.HasPrefix(*cacheCluster.CacheParameterGroup.CacheParameterGroupName, "default") {
+				// Lookup the group family from the current cache parameter group.
+				descRes, err := svc.DescribeCacheParameterGroups(&elasticache.DescribeCacheParameterGroupsInput{
+					CacheParameterGroupName: cacheCluster.CacheParameterGroup.CacheParameterGroupName,
+				})
+				if err != nil {
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elasticache.ErrCodeCacheClusterNotFoundFault {
+						return errors.Wrapf(err, "failed to describe cache parameter group '%s'", *req.CacheCluster.CacheClusterId)
+					}
+				}
+
+				log.Printf("\t\tCreated custom Cache Parameter Group : %s", customCacheParameterGroupName)
+				_, err = svc.CreateCacheParameterGroup(&elasticache.CreateCacheParameterGroupInput{
+					CacheParameterGroupFamily: descRes.CacheParameterGroups[0].CacheParameterGroupFamily,
+					CacheParameterGroupName: aws.String(customCacheParameterGroupName),
+					Description: aws.String(fmt.Sprintf("Customized default parameter group for redis4.0 with cluster mode on")),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to cache parameter group '%s'", customCacheParameterGroupName)
+				}
+
+				log.Printf("\t\tSet Cache Parameter Group : %s", customCacheParameterGroupName)
+				_, err = svc.ModifyCacheCluster(&elasticache.ModifyCacheClusterInput{
+					CacheClusterId: cacheCluster.CacheClusterId,
+					CacheParameterGroupName: aws.String(customCacheParameterGroupName),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed modify cache parameter group '%s' for cache cluster '%s'", customCacheParameterGroupName, *cacheCluster.CacheClusterId)
+				}
+			}
+
+			// Only modify the cache parameter group if the cache cluster is custom one created to allow other groups to
+			// be set on the cache cluster but not modified.
+			if *cacheCluster.CacheParameterGroup.CacheParameterGroupName == customCacheParameterGroupName {
+				log.Printf("\t\tUpdating Cache Parameter Group : %s", *cacheCluster.CacheParameterGroup.CacheParameterGroupName)
+
+				updateParams := []*elasticache.ParameterNameValue{
+					// Recommended to be set to allkeys-lru to avoid OOM since redis will be used as an ephemeral store.
+					&elasticache.ParameterNameValue{
+						ParameterName: aws.String("maxmemory-policy"),
+						ParameterValue: aws.String("allkeys-lru"),
+					},
+				}
+				_, err = svc.ModifyCacheParameterGroup(&elasticache.ModifyCacheParameterGroupInput{
+					CacheParameterGroupName: cacheCluster.CacheParameterGroup.CacheParameterGroupName,
+					ParameterNameValues: updateParams,
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to modify cache parameter group '%s'", * cacheCluster.CacheParameterGroup.CacheParameterGroupName)
+				}
+
+				for _, p := range updateParams {
+					log.Printf("\t\t\tSet '%s' to '%s'", p.ParameterName, p.ParameterValue)
+				}
+			}
+		}
+
+		log.Printf("\t%s\tUsing Cache Cluster '%s'.\n", tests.Success, *cacheCluster.CacheClusterId)
+	}
+
+	return nil
+
 	log.Println("ECS - Get or Create Cluster")
 	var ecsCluster *ecs.Cluster
 	{
@@ -625,6 +1159,68 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{AWSLOGS_GROUP}":  req.CloudWatchLogGroupName,
 			"{ENV}":            req.Env,
 			"{DATADOG_APIKEY}": datadogApiKey,
+			"{DATADOG_ESSENTIAL}": "true",
+			"{HTTP_HOST}": "0.0.0.0:80",
+			"{HTTPS_HOST}": "", // Not enabled by default
+			"{APP_BASE_URL}": "", // Not set by default, requires a hostname to be defined.
+
+			"{CACHE_HOST}": "", // Not enabled by default
+
+			"{DB_HOST}": "XXXXXXXXXXXXXXXXXX",
+			"{DB_USER}": "XXXXXXXXXXXXXXXXXX",
+			"{DB_PASS}": "XXXXXXXXXXXXXXXXXX",
+			"{DB_DATABASE}": "XXXXXXXXXXXXXXXXXX",
+			"{DB_DRIVER}": "postgres",
+			"{DB_DISABLE_TLS}": "false",
+
+			// Directly map GitLab CICD env variables set during deploy.
+			"{CI_COMMIT_REF_NAME}": os.Getenv("CI_COMMIT_REF_NAME"),
+			"{CI_COMMIT_REF_SLUG}": os.Getenv("CI_COMMIT_REF_SLUG"),
+			"{CI_COMMIT_SHA}": os.Getenv("CI_COMMIT_SHA"),
+			"{CI_COMMIT_TAG}": os.Getenv("CI_COMMIT_TAG"),
+			"{CI_COMMIT_TITLE}": os.Getenv("CI_COMMIT_TITLE"),
+			"{CI_COMMIT_DESCRIPTION}": os.Getenv("CI_COMMIT_DESCRIPTION"),
+			"{CI_COMMIT_JOB_ID}": os.Getenv("CI_COMMIT_JOB_ID"),
+			"{CI_COMMIT_JOB_URL}": os.Getenv("CI_COMMIT_JOB_URL"),
+			"{CI_COMMIT_PIPELINE_ID}": os.Getenv("CI_COMMIT_PIPELINE_ID"),
+			"{CI_COMMIT_PIPELINE_URL}": os.Getenv("CI_COMMIT_PIPELINE_URL"),
+		}
+
+		// When the datadog API key is empty, don't force the container to be essential have have the whole task fail.
+		if datadogApiKey == "" {
+			placeholders["{DATADOG_ESSENTIAL}"] = "false"
+		}
+
+		// When there is no Elastic Load Balancer, we need to terminate HTTPS on the app.
+		if req.EnableHTTPS && !req.EnableEcsElb {
+			placeholders["{HTTPS_HOST}"] = "0.0.0.0:443"
+		}
+
+		// When a domain name if defined for the service, set the App Base URL. Default to HTTPS if enabled.
+		if req.ServiceDomainName != "" {
+			var appSchema string
+			if req.EnableHTTPS {
+				appSchema = "https"
+			} else {
+				appSchema = "http"
+			}
+
+			placeholders["{APP_BASE_URL}"] = fmt.Sprintf("%s://%s/", appSchema, req.ServiceDomainName)
+		}
+
+		// When cache cache is set, set the host and port.
+		if cacheCluster != nil {
+			var cacheHost string
+			if cacheCluster.ConfigurationEndpoint != nil {
+				// Works for memcache.
+				cacheHost = fmt.Sprintf("%s:%d", *cacheCluster.ConfigurationEndpoint.Address, *cacheCluster.ConfigurationEndpoint.Port)
+			} else if len(cacheCluster.CacheNodes) > 0 {
+				// Works for redis.
+				cacheHost = fmt.Sprintf("%s:%d", *cacheCluster.CacheNodes[0].Endpoint.Address, *cacheCluster.CacheNodes[0].Endpoint.Port)
+			} else {
+				return errors.New("Unable to determine cache host from cache cluster")
+			}
+			placeholders["{CACHE_HOST}"] = cacheHost
 		}
 
 		// Loop through all the placeholders and create a list of keys to search json.
@@ -865,7 +1461,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					res, err := svc.CreateRole(&iam.CreateRoleInput{
 						RoleName:                 aws.String(req.EcsExecutionRoleName),
 						Description:              aws.String(fmt.Sprintf("Provides access to other AWS service resources that are required to run Amazon ECS tasks for %s. ", req.ProjectName)),
-						AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
+						AssumeRolePolicyDocument: aws.String("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs-tasks.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"),
 						Tags: []*iam.Tag{
 							&iam.Tag{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
 							&iam.Tag{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
@@ -1190,7 +1786,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			desiredCount = 1
 		}
 
-		_, err := svc.UpdateService(&ecs.UpdateServiceInput{
+		updateRes, err := svc.UpdateService(&ecs.UpdateServiceInput{
 			Cluster:                       ecsCluster.ClusterName,
 			Service:                       ecsService.ServiceName,
 			DesiredCount:                  aws.Int64(desiredCount),
@@ -1207,164 +1803,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to update service '%s'", *ecsService.ServiceName)
 		}
+		ecsService = updateRes.Service
 
 		log.Printf("\t%s\tUpdated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 	} else {
-
-		log.Println("EC2 - Find Subnets")
-		var subnetsIDs []string
-		var vpcId string
-		{
-			svc := ec2.New(req.awsSession())
-
-			var subnets []*ec2.Subnet
-			if true { // len(req.ec2SubnetIds) == 0 {
-				log.Println("\t\tFind all subnets are that default for each available AZ.")
-
-				err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-					for _, s := range res.Subnets {
-						if *s.DefaultForAz {
-							subnets = append(subnets, s)
-						}
-					}
-					return !lastPage
-				})
-				if err != nil {
-					return errors.Wrap(err, "failed to find default subnets")
-				}
-				/*} else {
-				log.Println("\t\tFind all subnets for the IDs provided.")
-
-				err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
-					SubnetIds: aws.StringSlice(flags.Ec2SubnetIds),
-				}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-					for _, s := range res.Subnets {
-						subnets = append(subnets, s)
-					}
-					return !lastPage
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to find subnets: %s", strings.Join(flags.Ec2SubnetIds, ", "))
-				} else if len(flags.Ec2SubnetIds) != len(subnets)  {
-					return errors.Errorf("failed to find all subnets, expected %d, got %d", len(flags.Ec2SubnetIds) != len(subnets))
-				}*/
-			}
-
-			if len(subnets) == 0 {
-				return errors.New("failed to find any subnets, expected at least 1")
-			}
-
-			for _, s := range subnets {
-				if s.VpcId == nil {
-					continue
-				}
-				if vpcId == "" {
-					vpcId = *s.VpcId
-				} else if vpcId != *s.VpcId {
-					return errors.Errorf("invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, vpcId, *s.VpcId)
-				}
-
-				subnetsIDs = append(subnetsIDs, *s.SubnetId)
-				log.Printf("\t\t\t%s", *s.SubnetId)
-			}
-
-			log.Printf("\t\tFound %d subnets.\n", len(subnets))
-		}
-
-		log.Println("EC2 - Find Security Group")
-		var securityGroupId string
-		{
-			svc := ec2.New(req.awsSession())
-
-			log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
-
-			err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
-				GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
-			}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
-				for _, s := range res.SecurityGroups {
-					if *s.GroupName == req.Ec2SecurityGroupName {
-						securityGroupId = *s.GroupId
-						break
-					}
-
-				}
-				return !lastPage
-			})
-			if err != nil {
-				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
-					return errors.Wrapf(err, "failed to find security group '%s'", req.Ec2SecurityGroupName)
-				}
-			}
-
-			if securityGroupId == "" {
-				// If no security group was found, create one.
-				createRes, err := svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
-					// The name of the security group.
-					// Constraints: Up to 255 characters in length. Cannot start with sg-.
-					// Constraints for EC2-Classic: ASCII characters
-					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-					// GroupName is a required field
-					GroupName: aws.String(req.Ec2SecurityGroupName),
-					// A description for the security group. This is informational only.
-					// Constraints: Up to 255 characters in length
-					// Constraints for EC2-Classic: ASCII characters
-					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-					// Description is a required field
-					Description: aws.String(fmt.Sprintf("Security group for %s running on ECS cluster %s", req.ProjectName, req.EcsClusterName)),
-					// [EC2-VPC] The ID of the VPC. Required for EC2-VPC.
-					VpcId: aws.String(vpcId),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
-				}
-				securityGroupId = *createRes.GroupId
-
-				log.Printf("\t\tCreated: %s.", req.Ec2SecurityGroupName)
-			} else {
-				log.Printf("\t\tFound: %s.", req.Ec2SecurityGroupName)
-			}
-
-			ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
-				// Enable services to be publicly available via HTTP port 80
-				&ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					CidrIp:     aws.String("0.0.0.0/0"),
-					FromPort:   aws.Int64(80),
-					ToPort:     aws.Int64(80),
-					GroupId:    aws.String(securityGroupId),
-				},
-				// Allow all services in the security group to access other services.
-				&ec2.AuthorizeSecurityGroupIngressInput{
-					SourceSecurityGroupName: aws.String(req.Ec2SecurityGroupName),
-					GroupId:                 aws.String(securityGroupId),
-				},
-			}
-
-			// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
-			// HTTPS is terminated via the web server and not on the Load Balancer.
-			if !req.EnableEcsElb {
-				// Enable services to be publicly available via HTTPS port 443
-				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					CidrIp:     aws.String("0.0.0.0/0"),
-					FromPort:   aws.Int64(443),
-					ToPort:     aws.Int64(443),
-					GroupId:    aws.String(securityGroupId),
-				})
-			}
-
-			// Add all the default ingress to the security group.
-			for _, ingressInput := range ingressInputs {
-				_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
-				if err != nil {
-					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
-						return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.Ec2SecurityGroupName)
-					}
-				}
-			}
-
-			log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
-		}
 
 		// If an Elastic Load Balancer is enabled, then ensure one exists else create one.
 		var ecsELBs []*ecs.LoadBalancer
@@ -1926,6 +2368,537 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			log.Printf("\t%s\tCreated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 		}
 	}
+
+	log.Println("\tWaiting for service to enter stable state.")
+	{
+
+		// Helper method to get the logs from cloudwatch for a specific task ID.
+		getTaskLogs := func(taskId string) ([]string, error) {
+			if req.S3BucketPrivateName == "" {
+				// No private S3 bucket defined so unable to export logs streams.
+				return []string{}, nil
+			}
+
+			// Stream name generated by ECS for the awslogs driver.
+			logStreamName := fmt.Sprintf("ecs/%s/%s", *ecsService.ServiceName, taskId)
+
+			// Define s3 key prefix used to export the stream logs to.
+			s3KeyPrefix := filepath.Join(req.S3BucketTempPrefix, "logs/cloudwatchlogs/exports", req.CloudWatchLogGroupName)
+
+			var downloadPrefix string
+			{
+				svc := cloudwatchlogs.New(req.awsSession())
+
+				createRes, err := svc.CreateExportTask(&cloudwatchlogs.CreateExportTaskInput{
+					LogGroupName: aws.String(req.CloudWatchLogGroupName),
+					LogStreamNamePrefix: aws.String(logStreamName),
+					//TaskName: aws.String(taskId),
+					Destination: aws.String( req.S3BucketPrivateName),
+					DestinationPrefix: aws.String(s3KeyPrefix),
+					From: aws.Int64(startTime.UTC().AddDate(0, 0, -1).UnixNano() / int64(time.Millisecond)),
+					To: aws.Int64(time.Now().UTC().AddDate(0, 0, 1).UnixNano() / int64(time.Millisecond)),
+				})
+				if err != nil {
+					return []string{}, errors.Wrapf(err, "failed to create export task for from log group '%s' with stream name prefix '%s'", req.CloudWatchLogGroupName, logStreamName)
+				}
+				exportTaskId := *createRes.TaskId
+
+				for {
+					descRes, err := svc.DescribeExportTasks(&cloudwatchlogs.DescribeExportTasksInput{
+						TaskId: aws.String(exportTaskId),
+					})
+					if err != nil {
+						return []string{}, errors.Wrapf(err, "failed to describe export task '%s' for from log group '%s' with stream name prefix '%s'", exportTaskId, req.CloudWatchLogGroupName, logStreamName)
+					}
+					taskStatus :=  *descRes.ExportTasks[0].Status.Code
+
+					if  taskStatus == "COMPLETED" {
+						downloadPrefix = filepath.Join(s3KeyPrefix, exportTaskId) + "/"
+						break
+					} else if taskStatus == "CANCELLED" || taskStatus == "FAILED" {
+						break
+					}
+					time.Sleep(time.Second * 5)
+				}
+			}
+
+			var logLines []string
+			if downloadPrefix != "" {
+				svc := s3.New(req.awsSession())
+
+				var s3Keys []string
+				err := svc.ListObjectsPages(&s3.ListObjectsInput{
+					Bucket: aws.String(req.S3BucketPrivateName),
+					Prefix: aws.String(downloadPrefix),
+				},
+					func(res *s3.ListObjectsOutput, lastPage bool) bool {
+						for _, obj := range res.Contents {
+							s3Keys = append(s3Keys, *obj.Key)
+						}
+						return !lastPage
+					})
+				if err != nil {
+					return []string{}, errors.Wrapf(err, "failed to list objects from s3 bucket '%s' with prefix '%s'", req.S3BucketPrivateName, downloadPrefix)
+				}
+
+				for _, s3Key := range s3Keys {
+					res, err := svc.GetObject(&s3.GetObjectInput{
+						Bucket: aws.String(req.S3BucketPrivateName),
+						Key: aws.String(s3Key),
+					})
+					if err != nil {
+						return []string{}, errors.Wrapf(err, "failed to get object '%s' from s3 bucket", s3Key, req.S3BucketPrivateName)
+					}
+					r,_ := gzip.NewReader(res.Body)
+					dat, err := ioutil.ReadAll(r)
+					res.Body.Close()
+					if err != nil {
+						return []string{}, errors.Wrapf(err, "failed to read object '%s' from s3 bucket", s3Key, req.S3BucketPrivateName)
+					}
+
+					for _, l := range strings.Split(string(dat), "\n") {
+						l = strings.TrimSpace(l)
+						if l == "" {
+							continue
+						}
+						logLines = append(logLines, l)
+					}
+				}
+			}
+
+			return logLines, nil
+		}
+
+		// Helper method to display tasks errors that failed to start while we wait for the service to stable state.
+		taskLogLines := make(map[string][]string)
+		checkTasks := func() (bool, error) {
+			svc := ecs.New(req.awsSession())
+
+			serviceTaskRes, err := svc.ListTasks(&ecs.ListTasksInput{
+				Cluster:     aws.String(req.EcsClusterName),
+				ServiceName: aws.String(req.EcsServiceName),
+				DesiredStatus: aws.String("STOPPED"),
+			})
+			if err != nil {
+				return false, errors.Wrapf(err, "failed to list tasks for cluster '%s' service '%s'", req.EcsClusterName, req.EcsServiceName)
+			}
+
+			if len(serviceTaskRes.TaskArns) == 0 {
+				return false, nil
+			}
+
+			taskRes, err := svc.DescribeTasks(&ecs.DescribeTasksInput{
+				Cluster: aws.String(req.EcsClusterName),
+				Tasks:   serviceTaskRes.TaskArns,
+			})
+			if err != nil {
+				return false, errors.Wrapf(err, "failed to describe %d tasks for cluster '%s'", len(serviceTaskRes.TaskArns), req.EcsClusterName)
+			}
+
+			var failures []*ecs.Failure
+			var stoppedCnt int64
+			for _, t := range taskRes.Tasks {
+				if *t.TaskDefinitionArn != *taskDef.TaskDefinitionArn || t.TaskArn == nil {
+					continue
+				}
+				stoppedCnt = stoppedCnt + 1
+
+				taskId := filepath.Base(*t.TaskArn)
+
+				log.Printf("\t\t\tTask %s stopped\n", *t.TaskArn)
+				for _, tc := range t.Containers {
+					if tc.ExitCode != nil && tc.Reason != nil {
+						log.Printf("\t\t\tContainer %s exited with %d - %s.\n", *tc.Name, *tc.ExitCode, *tc.Reason)
+					} else if tc.ExitCode != nil {
+						log.Printf("\t\t\tContainer %s exited with %d.\n", *tc.Name, *tc.ExitCode)
+					} else  {
+						log.Printf("\t\t\tContainer %s exited.\n", *tc.Name)
+					}
+				}
+
+				// Avoid exporting the logs multiple times.
+				logLines, ok := taskLogLines[taskId]
+				if !ok {
+					logLines, err = getTaskLogs(taskId)
+					if err != nil {
+						return false, errors.Wrapf(err, "failed to get logs for task %s for cluster '%s'", *t.TaskArn, req.EcsClusterName)
+					}
+					taskLogLines[taskId] = logLines
+				}
+
+				if len(logLines) > 0 {
+					log.Printf("\t\t\tTask Logs:\n")
+					for _, l := range logLines {
+						log.Printf("\t\t\t\t%s\n", l)
+					}
+				}
+
+				log.Printf("\t%s\tTask %s failed with %s - %s.\n", tests.Failed, *t.TaskArn, *t.StopCode, *t.StoppedReason)
+
+				// Limit failures to only the current task definition.
+				for _, f := range taskRes.Failures {
+					if *f.Arn == *t.TaskArn {
+						failures = append(failures, f)
+					}
+				}
+			}
+
+			if len(failures) > 0 {
+				for _, t := range failures {
+					log.Printf("\t%s\tTask %s failed with %s.\n", tests.Failed, *t.Arn, *t.Reason)
+				}
+			}
+
+			// If the number of stopped tasks with the current task def match the desired count for the service,
+			// then we no longer need to continue to check the status of the tasks.
+			if stoppedCnt == *ecsService.DesiredCount {
+				return true, nil
+			}
+
+			return false, nil
+		}
+
+		// New wait group with only a count of one, this will allow the first go worker to exit to cancel both.
+		checkErr := make(chan error, 1)
+
+		// Check the status of the service tasks and print out info for debugging.
+		ticker := time.NewTicker(10 * time.Second)
+		go func() {
+			for {
+				select {
+				case <- ticker.C:
+					stop, err := checkTasks()
+					if err != nil {
+						log.Printf("\t%s\tFailed to check tasks.\n%+v\n", tests.Failed, err)
+					}
+
+					if stop {
+						checkErr <- errors.New("all tasks for service are stopped")
+						return
+					}
+				}
+			}
+		}()
+
+		// Use the AWS ECS method to check for the service to be stable.
+		go func() {
+			svc := ecs.New(req.awsSession())
+			err := svc.WaitUntilServicesStable(&ecs.DescribeServicesInput{
+				Cluster: ecsCluster.ClusterArn,
+				Services: aws.StringSlice([]string{*ecsService.ServiceArn}),
+			})
+			if err != nil {
+				checkErr <- errors.Wrapf(err, "failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
+			} else {
+				// All done.
+				checkErr <- nil
+			}
+		}()
+
+		if err := <-checkErr;  err != nil {
+			log.Printf("\t%s\tFailed to check tasks.\n%+v\n", tests.Failed, err)
+			return nil
+		}
+
+		// Wait for one of the methods to finish and then ensure the ticker is stopped.
+		ticker.Stop()
+
+		log.Printf("\t%s\tService running.\n", tests.Success)
+	}
+
+	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
+	var zoneArecNames = map[string][]string{}
+	if req.ServiceDomainName != "" {
+		log.Println("Route 53 - Get or create hosted zones.")
+
+		svc := route53.New(req.awsSession())
+
+		log.Println("\tList all hosted zones.")
+		var zones []*route53.HostedZone
+		err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{},
+			func(res *route53.ListHostedZonesOutput, lastPage bool) bool {
+			for _, z := range res.HostedZones {
+				zones = append(zones, z)
+			}
+			return !lastPage
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed list route 53 hosted zones")
+		}
+
+		// Generate a slice with the primary domain name and include all the alternative domain names.
+		lookupDomains := []string{req.ServiceDomainName}
+		for _, dn := range req.ServiceDomainNameAliases {
+			lookupDomains = append(lookupDomains, dn)
+		}
+
+		// Loop through all the defined domain names and find the associated zone even when they are a sub domain.
+		for _, dn := range lookupDomains {
+			log.Printf("\t\tFind zone for domain '%s'", dn)
+
+			// Get the top level domain from url.
+			zoneName := domainutil.Domain(dn)
+			log.Printf("\t\t\tTop Level Domain: '%s'", zoneName)
+
+			// Check if url has subdomain.
+			var subdomain string
+			if domainutil.HasSubdomain(dn) {
+				subdomain = domainutil.Subdomain(dn)
+				log.Printf("\t\t\tsubdomain: '%s'", subdomain)
+			}
+
+			// Start at the top level domain and try to find a hosted zone. Search until a match is found or there are
+			// no more domain levels to search for.
+			var zoneId string
+			for {
+				log.Printf("\t\t\tChecking zone '%s' for associated hosted zone.", zoneName)
+
+				// Loop over each one of hosted zones and try to find match.
+				for _, z := range zones {
+					log.Printf("\t\t\t\tChecking if %s matches %s", *z.Name, zoneName)
+
+					if strings.TrimRight(*z.Name, ".") == zoneName {
+						zoneId = *z.Id
+						break
+					}
+				}
+
+				if zoneId != "" || zoneName == dn {
+					// Found a matching zone or have search all possibilities!
+					break
+				}
+
+				// If we have not found a hosted zone, append the next level from the domain to the zone.
+				pts := strings.Split(subdomain, ".")
+				subs := []string{}
+				for idx, sn := range pts {
+					if idx == len(pts)-1 {
+						zoneName = sn + "." + zoneName
+					} else {
+						subs = append(subs, sn)
+					}
+				}
+				subdomain = strings.Join(subs, ".")
+			}
+
+			var aName string
+			if zoneId == "" {
+
+				// Get the top level domain from url again.
+				zoneName := domainutil.Domain(dn)
+
+				log.Printf("\t\t\tNo hosted zone found for '%s', create '%s'.", dn, zoneName)
+				createRes, err := svc.CreateHostedZone(&route53.CreateHostedZoneInput{
+					Name: aws.String(zoneName),
+					HostedZoneConfig: &route53.HostedZoneConfig{
+						Comment: aws.String(fmt.Sprintf("Public hosted zone created by saas-starter-kit.")),
+					},
+
+					// A unique string that identifies the request and that allows failed CreateHostedZone
+					// requests to be retried without the risk of executing the operation twice.
+					// You must use a unique CallerReference string every time you submit a CreateHostedZone
+					// request. CallerReference can be any unique string, for example, a date/time
+					// stamp.
+					//
+					// CallerReference is a required field
+					CallerReference: aws.String("truss-deploy"),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
+				}
+				zoneId = *createRes.HostedZone.Id
+
+				log.Printf("\t\t\tCreated hosted zone '%s'", zoneId)
+
+				// The fully qualified A record name.
+				aName = dn
+			} else {
+				log.Printf("\t\t\tFound hosted zone '%s'", zoneId)
+
+				// The fully qualified A record name.
+				if subdomain != "" {
+					aName = subdomain + "." + zoneName
+				} else {
+					aName = zoneName
+				}
+			}
+
+			// Add the A record to be maintained for the zone.
+			if _, ok := zoneArecNames[zoneId]; !ok {
+				zoneArecNames[zoneId] = []string{}
+			}
+			zoneArecNames[zoneId] = append(zoneArecNames[zoneId], aName)
+
+			log.Printf("\t%s\tZone '%s' found with A record name '%s'.\n", tests.Success, zoneId, aName)
+		}
+	}
+
+	if req.EnableEcsElb {
+		// TODO: Need to connect ELB to route53
+	} else {
+		log.Println("\tFind network interface IDs for running tasks.")
+		var networkInterfaceIds []string
+		{
+			svc := ecs.New(req.awsSession())
+
+			log.Println("\t\tFind tasks for service.")
+			servceTaskRes, err := svc.ListTasks(&ecs.ListTasksInput{
+				Cluster:     aws.String(req.EcsClusterName),
+				ServiceName: aws.String(req.EcsServiceName),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to list tasks for cluster '%s' service '%s'", req.EcsClusterName, req.EcsServiceName)
+			}
+
+			log.Println("\t\tDescribe tasks for service.")
+			taskRes, err := svc.DescribeTasks(&ecs.DescribeTasksInput{
+				Cluster: aws.String(req.EcsClusterName),
+				Tasks:   servceTaskRes.TaskArns,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to describe %d tasks for cluster '%s'", len(servceTaskRes.TaskArns), req.EcsClusterName)
+			}
+
+			var failures []*ecs.Failure
+			var taskArns []string
+			for _, t := range taskRes.Tasks {
+				if t.TaskDefinitionArn != taskDef.TaskDefinitionArn {
+					continue
+				}
+
+				taskArns = append(taskArns, *t.TaskArn)
+
+				// Limit failures to only the current task definition.
+				for _, f := range taskRes.Failures {
+					if *f.Arn == *t.TaskArn {
+						failures = append(failures, f)
+					}
+				}
+			}
+
+			if len(failures) > 0 {
+				for _, t := range failures {
+					log.Printf("\t%s\tTask %s failed with %s.\n", tests.Failed, *t.Arn, *t.Reason)
+				}
+			} else {
+				log.Printf("\t%s\tTasks founds.\n", tests.Success)
+			}
+
+			log.Println("\t\tWaiting for tasks to enter running state.")
+			{
+				var err error
+				err = svc.WaitUntilTasksRunning(&ecs.DescribeTasksInput{
+					Cluster: ecsCluster.ClusterArn,
+					Tasks:   aws.StringSlice(taskArns),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to wait for tasks to enter running state for cluster '%s'", req.EcsClusterName)
+				}
+				log.Printf("\t%s\tTasks running.\n", tests.Success)
+			}
+
+			log.Println("\t\tDescribe tasks for running tasks.")
+			{
+				taskRes, err := svc.DescribeTasks(&ecs.DescribeTasksInput{
+					Cluster: aws.String(req.EcsClusterName),
+					Tasks:   aws.StringSlice(taskArns),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to describe %d running tasks for cluster '%s'", len(taskArns), req.EcsClusterName)
+				}
+
+				for _, t := range taskRes.Tasks {
+					if t.Attachments == nil {
+						continue
+					}
+
+					for _, a := range t.Attachments {
+						if a.Details == nil {
+							continue
+						}
+
+						for _, ad := range a.Details {
+							if ad.Name != nil && *ad.Name == "networkInterfaceId" {
+								networkInterfaceIds = append(networkInterfaceIds, *ad.Value)
+							}
+						}
+					}
+				}
+
+				log.Printf("\t%s\tFound %d network interface IDs.\n", tests.Success, len(networkInterfaceIds))
+			}
+		}
+
+		log.Println("\tGet public IPs for network interface IDs.")
+		var publicIps []string
+		{
+			svc := ec2.New(req.awsSession())
+
+			log.Println("\t\tDescribe network interfaces.")
+			res, err := svc.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
+				NetworkInterfaceIds: aws.StringSlice(networkInterfaceIds),
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to describe network interfaces")
+			}
+
+			for _, ni := range res.NetworkInterfaces {
+				if ni.Association == nil || ni.Association.PublicIp == nil {
+					continue
+				}
+				publicIps = append(publicIps, *ni.Association.PublicIp)
+			}
+
+			log.Printf("\t%s\tFound %d public IPs.\n", tests.Success, len(publicIps))
+		}
+
+		log.Println("\tUpdate public IPs for hosted zones.")
+		{
+			svc := route53.New(req.awsSession())
+
+			// Public IPs to be served as round robin.
+			log.Printf("\t\tPublic IPs:\n")
+			rrs := []*route53.ResourceRecord{}
+			for _, ip := range publicIps {
+				log.Printf("\t\t\t%s\n", ip)
+				rrs = append(rrs, &route53.ResourceRecord{Value: aws.String(ip)})
+			}
+
+			for zoneId, aNames := range zoneArecNames {
+				log.Printf("\t\tChange zone '%s'.\n", zoneId)
+
+				input := &route53.ChangeResourceRecordSetsInput{
+					ChangeBatch: &route53.ChangeBatch{
+						Changes: []*route53.Change{},
+					},
+					HostedZoneId: aws.String(zoneId),
+				}
+
+				// Add all the A record names with the same set of public IPs.
+				for _, aName := range aNames {
+					log.Printf("\t\t\tAdd A record for '%s'.\n", aName)
+
+					input.ChangeBatch.Changes = append(input.ChangeBatch.Changes, &route53.Change{
+						Action: aws.String("UPSERT"),
+						ResourceRecordSet: &route53.ResourceRecordSet{
+							Name:            aws.String(aName),
+							ResourceRecords: rrs,
+							TTL:             aws.Int64(60),
+							Type:            aws.String("A"),
+						},
+					})
+				}
+
+				_, err := svc.ChangeResourceRecordSets(input)
+				if err != nil {
+					return errors.Wrapf(err, "failed to update A records for zone '%s'", zoneId)
+				}
+			}
+
+			log.Printf("\t%s\tDNS entries updated.\n", tests.Success)
+		}
+	}
+
 
 	// If Elastic cache is enabled, need to add ingress to security group
 

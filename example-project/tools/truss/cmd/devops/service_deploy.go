@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/elasticache"
 	"io"
 	"io/ioutil"
 	"log"
@@ -20,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/pborman/uuid"
+	"github.com/aws/aws-sdk-go/service/elasticache"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/bobesa/go-domain-util/domainutil"
@@ -305,6 +306,40 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				NumCacheNodes:             aws.Int64(1),
 				Port:                      aws.Int64(6379),
 				SnapshotRetentionLimit:    aws.Int64(7),
+			}
+
+			// Recommended to be set to allkeys-lru to avoid OOM since redis will be used as an ephemeral store.
+			req.CacheClusterParameter = []*elasticache.ParameterNameValue{
+				&elasticache.ParameterNameValue{
+					ParameterName: aws.String("maxmemory-policy"),
+					ParameterValue: aws.String("allkeys-lru"),
+				},
+			}
+
+			// RDS cluster is used for Aurora which is limited to regions and db instance types so not good for example.
+			req.DBCluster = nil
+
+			// RDS settings for a Postgres database Instance. Could defined different settings by env.
+			req.DBInstance  = &rds.CreateDBInstanceInput{
+				DBInstanceIdentifier: aws.String(req.ProjectName+"-"+req.Env+"-01"),
+				DBName: aws.String("shared"),
+				Engine: aws.String("postgres"),
+				MasterUsername:              aws.String("god"),
+				MasterUserPassword:          aws.String("mypassword"), // When empty auto generated.
+				Port:                        aws.Int64(5432),
+				DBInstanceClass: aws.String("db.t2.small"),
+				AllocatedStorage: aws.Int64(20),
+				MultiAZ: aws.Bool(false),
+				PubliclyAccessible: aws.Bool(false),
+				StorageEncrypted:            aws.Bool(true),
+				BackupRetentionPeriod: aws.Int64(7),
+				EnablePerformanceInsights: aws.Bool(false),
+				AutoMinorVersionUpgrade:            aws.Bool(true),
+				CopyTagsToSnapshot: aws.Bool(true),
+				Tags: []*rds.Tag{
+					{Key: aws.String(awsTagNameProject), Value: aws.String(req.ProjectName)},
+					{Key: aws.String(awsTagNameEnv), Value: aws.String(req.Env)},
+				},
 			}
 
 			log.Printf("\t%s\tDefaults set.", tests.Success)
@@ -603,7 +638,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		log.Printf("\t%s\tUsing Log Group '%s'.\n", tests.Success, req.CloudWatchLogGroupName)
 	}
-
 
 	log.Println("S3 - Setup Buckets")
 	{
@@ -961,6 +995,178 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
 	}
 
+	var dbCluster *rds.DBCluster
+	if req.DBCluster != nil {
+		log.Println("RDS - Get or Create Database Cluster")
+
+		svc := rds.New(req.awsSession())
+
+		descRes, err := svc.DescribeDBClusters(&rds.DescribeDBClustersInput{
+			DBClusterIdentifier: req.DBCluster.DBClusterIdentifier,
+		})
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != rds.ErrCodeDBClusterNotFoundFault {
+				return errors.Wrapf(err, "failed to describe database cluster '%s'", *req.DBCluster.DBClusterIdentifier)
+			}
+		} else if len(descRes.DBClusters) > 0 {
+			dbCluster = descRes.DBClusters[0]
+		}
+
+		if dbCluster == nil {
+			// If no cluster was found, create one.
+			createRes, err := svc.CreateDBCluster(req.DBCluster)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create cluster '%s'", *req.DBCluster.DBClusterIdentifier)
+			}
+			dbCluster = createRes.DBCluster
+
+			log.Printf("\t\tCreated: %s", *dbCluster.DBClusterArn)
+		} else {
+			log.Printf("\t\tFound: %s", *dbCluster.DBClusterArn)
+		}
+
+		// The status of the cluster.
+		log.Printf("\t\t\tStatus: %s", *dbCluster.Status)
+
+		log.Printf("\t%s\tUsing DB Cluster '%s'.\n", tests.Success, *dbCluster.DatabaseName)
+	}
+
+	var db *DB
+	if req.DBInstance != nil {
+		log.Println("RDS - Get or Create Database Instance")
+
+		// Secret ID used to store the DB username and password across deploys.
+		dbSecretId := filepath.Join(req.ProjectName, req.Env, *req.DBInstance.DBInstanceIdentifier)
+
+		// Retrieve the current secret value if something is stored.
+		{
+			sm := secretsmanager.New(req.awsSession())
+
+			res, err := sm.GetSecretValue(&secretsmanager.GetSecretValueInput{
+				SecretId: aws.String(dbSecretId),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
+					return errors.Wrapf(err, "failed to get value for secret id %s", dbSecretId)
+				}
+			} else {
+				err = json.Unmarshal([]byte(*res.SecretString), &db)
+				if err != nil {
+					return errors.Wrap(err, "failed to json decode db credentials")
+				}
+			}
+		}
+
+		svc := rds.New(req.awsSession())
+
+		req.DBInstance.VpcSecurityGroupIds = aws.StringSlice([]string{securityGroupId})
+
+		if dbCluster != nil {
+			req.DBInstance.DBClusterIdentifier = dbCluster.DBClusterIdentifier
+		} else {
+			req.DBInstance.DBClusterIdentifier = nil
+		}
+
+		var dbInstance *rds.DBInstance
+		descRes, err := svc.DescribeDBInstances(&rds.DescribeDBInstancesInput{
+			DBInstanceIdentifier: req.DBInstance.DBInstanceIdentifier,
+		})
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != rds.ErrCodeDBInstanceNotFoundFault {
+				return errors.Wrapf(err, "failed to describe database instance '%s'", *req.DBInstance.DBInstanceIdentifier)
+			}
+		} else if len(descRes.DBInstances) > 0 {
+			dbInstance = descRes.DBInstances[0]
+		}
+
+		if dbInstance == nil {
+			if db == nil {
+				db = &DB{
+					Host: fmt.Sprintf("%s:%d", *dbInstance.Endpoint.Address, *dbInstance.Endpoint.Port),
+					User: *dbInstance.MasterUsername,
+					Pass: *req.DBInstance.MasterUserPassword,
+					Database : *dbInstance.DBName,
+					Driver: *dbInstance.Engine,
+					DisableTLS: false,
+				}
+
+				// Store the secret first in the event that create fails.
+				{
+					sm := secretsmanager.New(req.awsSession())
+
+					dat, err := json.Marshal(db)
+					if err != nil {
+						return errors.Wrap(err, "failed to marshal db credentials")
+					}
+
+					_, err = sm.CreateSecret(&secretsmanager.CreateSecretInput{
+						Name:         aws.String(dbSecretId),
+						SecretString: aws.String(string(dat)),
+					})
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceExistsException {
+							return errors.Wrap(err, "failed to create new secret with db credentials")
+						}
+						_, err = sm.UpdateSecret(&secretsmanager.UpdateSecretInput{
+							SecretId:         aws.String(dbSecretId),
+							SecretString: aws.String(string(dat)),
+						})
+						if err != nil {
+							return errors.Wrap(err, "failed to update secret with db credentials")
+						}
+					}
+					log.Printf("\t\tStored Secret\n")
+				}
+			}
+
+			// If master password is not set, pull from cluster or generate random.
+			if req.DBInstance.MasterUserPassword == nil {
+				if req.DBCluster.MasterUserPassword != nil && *req.DBCluster.MasterUserPassword != "" {
+					req.DBInstance.MasterUserPassword = req.DBCluster.MasterUserPassword
+				} else {
+					req.DBInstance.MasterUserPassword = aws.String(uuid.NewRandom().String())
+				}
+			}
+
+			// If no cluster was found, create one.
+			createRes, err := svc.CreateDBInstance(req.DBInstance)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create instance '%s'",  *req.DBInstance.DBInstanceIdentifier)
+			}
+			dbInstance = createRes.DBInstance
+
+			log.Printf("\t\tCreated: %s", *dbInstance.DBInstanceArn)
+		} else {
+			log.Printf("\t\tFound: %s", *dbInstance.DBInstanceArn)
+		}
+
+		// The status of the instance.
+		log.Printf("\t\t\tStatus: %s", *dbInstance.DBInstanceStatus)
+
+		// If the instance is not active as was recently created, wait for it to become active.
+		if *dbInstance.DBInstanceStatus != "available" {
+			log.Printf("\t\tWhat for instance to become available.")
+			err = svc.WaitUntilDBInstanceAvailable(&rds.DescribeDBInstancesInput{
+				DBInstanceIdentifier: dbInstance.DBInstanceIdentifier,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to wait for database instance '%s' to enter available state", *req.DBInstance.DBInstanceIdentifier)
+			}
+		}
+
+
+
+
+
+
+
+		return nil
+
+
+
+		log.Printf("\t%s\tUsing DB Instance '%s'.\n", tests.Success, *dbInstance.DBInstanceIdentifier)
+	}
+
 	var cacheCluster *elasticache.CacheCluster
 	if req.CacheCluster != nil {
 		log.Println("Elastic Cache - Get or Create Cache Cluster")
@@ -1018,16 +1224,15 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			err = svc.WaitUntilCacheClusterAvailable(&elasticache.DescribeCacheClustersInput{
 				CacheClusterId: req.CacheCluster.CacheClusterId,
 			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to wait for cache cluster '%s' to enter available state", req.CacheCluster.CacheClusterId)
+			}
 		}
 
-
-
-
-
-
-
-		if *cacheCluster.Engine == "redis" {
-			customCacheParameterGroupName := fmt.Sprintf("%s.%s", req.ProjectNameCamel(), *cacheCluster.Engine)
+		// If there are custom cache group parameters set, then create a new group and keep them modified.
+		if len(req.CacheClusterParameter) > 0 {
+			customCacheParameterGroupName := fmt.Sprintf("%s-%s%s", strings.ToLower(req.ProjectNameCamel()), *cacheCluster.Engine, *cacheCluster.EngineVersion)
+			customCacheParameterGroupName = strings.Replace(customCacheParameterGroupName, ".", "-", -1)
 
 			// If the cache cluster is using the default parameter group, create a new custom group.
 			if strings.HasPrefix(*cacheCluster.CacheParameterGroup.CacheParameterGroupName, "default") {
@@ -1045,20 +1250,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				_, err = svc.CreateCacheParameterGroup(&elasticache.CreateCacheParameterGroupInput{
 					CacheParameterGroupFamily: descRes.CacheParameterGroups[0].CacheParameterGroupFamily,
 					CacheParameterGroupName: aws.String(customCacheParameterGroupName),
-					Description: aws.String(fmt.Sprintf("Customized default parameter group for redis4.0 with cluster mode on")),
+					Description: aws.String(fmt.Sprintf("Customized default parameter group for %s %s", *cacheCluster.Engine, *cacheCluster.EngineVersion)),
 				})
 				if err != nil {
 					return errors.Wrapf(err, "failed to cache parameter group '%s'", customCacheParameterGroupName)
 				}
 
 				log.Printf("\t\tSet Cache Parameter Group : %s", customCacheParameterGroupName)
-				_, err = svc.ModifyCacheCluster(&elasticache.ModifyCacheClusterInput{
+				updateRes, err := svc.ModifyCacheCluster(&elasticache.ModifyCacheClusterInput{
 					CacheClusterId: cacheCluster.CacheClusterId,
 					CacheParameterGroupName: aws.String(customCacheParameterGroupName),
 				})
 				if err != nil {
 					return errors.Wrapf(err, "failed modify cache parameter group '%s' for cache cluster '%s'", customCacheParameterGroupName, *cacheCluster.CacheClusterId)
 				}
+				cacheCluster = updateRes.CacheCluster
 			}
 
 			// Only modify the cache parameter group if the cache cluster is custom one created to allow other groups to
@@ -1066,31 +1272,22 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			if *cacheCluster.CacheParameterGroup.CacheParameterGroupName == customCacheParameterGroupName {
 				log.Printf("\t\tUpdating Cache Parameter Group : %s", *cacheCluster.CacheParameterGroup.CacheParameterGroupName)
 
-				updateParams := []*elasticache.ParameterNameValue{
-					// Recommended to be set to allkeys-lru to avoid OOM since redis will be used as an ephemeral store.
-					&elasticache.ParameterNameValue{
-						ParameterName: aws.String("maxmemory-policy"),
-						ParameterValue: aws.String("allkeys-lru"),
-					},
-				}
 				_, err = svc.ModifyCacheParameterGroup(&elasticache.ModifyCacheParameterGroupInput{
 					CacheParameterGroupName: cacheCluster.CacheParameterGroup.CacheParameterGroupName,
-					ParameterNameValues: updateParams,
+					ParameterNameValues: req.CacheClusterParameter,
 				})
 				if err != nil {
 					return errors.Wrapf(err, "failed to modify cache parameter group '%s'", * cacheCluster.CacheParameterGroup.CacheParameterGroupName)
 				}
 
-				for _, p := range updateParams {
-					log.Printf("\t\t\tSet '%s' to '%s'", p.ParameterName, p.ParameterValue)
+				for _, p := range req.CacheClusterParameter {
+					log.Printf("\t\t\tSet '%s' to '%s'", *p.ParameterName, *p.ParameterValue)
 				}
 			}
 		}
 
 		log.Printf("\t%s\tUsing Cache Cluster '%s'.\n", tests.Success, *cacheCluster.CacheClusterId)
 	}
-
-	return nil
 
 	log.Println("ECS - Get or Create Cluster")
 	var ecsCluster *ecs.Cluster
@@ -1166,12 +1363,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			"{CACHE_HOST}": "", // Not enabled by default
 
-			"{DB_HOST}": "XXXXXXXXXXXXXXXXXX",
-			"{DB_USER}": "XXXXXXXXXXXXXXXXXX",
-			"{DB_PASS}": "XXXXXXXXXXXXXXXXXX",
-			"{DB_DATABASE}": "XXXXXXXXXXXXXXXXXX",
-			"{DB_DRIVER}": "postgres",
-			"{DB_DISABLE_TLS}": "false",
+			"{DB_HOST}": "",
+			"{DB_USER}": "",
+			"{DB_PASS}": "",
+			"{DB_DATABASE}": "",
+			"{DB_DRIVER}": "",
+			"{DB_DISABLE_TLS}": "",
 
 			// Directly map GitLab CICD env variables set during deploy.
 			"{CI_COMMIT_REF_NAME}": os.Getenv("CI_COMMIT_REF_NAME"),
@@ -1208,7 +1405,22 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			placeholders["{APP_BASE_URL}"] = fmt.Sprintf("%s://%s/", appSchema, req.ServiceDomainName)
 		}
 
-		// When cache cache is set, set the host and port.
+		// When db is set, update the placeholders.
+		if db != nil {
+			placeholders["{DB_HOST}"] = db.Host
+			placeholders["{DB_USER}"] = db.User
+			placeholders["{DB_PASS}"] = db.Pass
+			placeholders["{DB_DATABASE}"] = db.Database
+			placeholders["{DB_DRIVER}"] = db.Driver
+
+			if db.DisableTLS {
+				placeholders["{DB_DISABLE_TLS}"] = "true"
+			} else {
+				placeholders["{DB_DISABLE_TLS}"] = "false"
+			}
+		}
+
+		// When cache cluster is set, set the host and port.
 		if cacheCluster != nil {
 			var cacheHost string
 			if cacheCluster.ConfigurationEndpoint != nil {

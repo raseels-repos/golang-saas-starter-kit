@@ -2,6 +2,7 @@ package devops
 
 import (
 	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go/service/rds"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -80,10 +81,25 @@ type serviceDeployRequest struct {
 	RecreateService                         bool     `validate:"omitempty"`
 
 	CacheCluster *elasticache.CreateCacheClusterInput
+	CacheClusterParameter []*elasticache.ParameterNameValue
+
+	DBCluster *rds.CreateDBClusterInput
+	DBInstance *rds.CreateDBInstanceInput
+
 	ReleaseImage string
 	BuildTags    []string
 	flags        ServiceDeployFlags
 	_awsSession  *session.Session
+}
+
+// DB mimics the general info needed for services used to define placeholders.
+type DB struct {
+	Host       string
+	User       string
+	Pass       string
+	Database   string
+	Driver     string
+	DisableTLS bool
 }
 
 // projectNameCamel takes a project name and returns the camel cased version.

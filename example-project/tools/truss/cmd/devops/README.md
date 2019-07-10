@@ -67,6 +67,10 @@
 	    "logs:DescribeLogStreams",
 	    "logs:CreateExportTask",
 	    "logs:DescribeExportTasks",
+	    "rds:CreateDBCluster",
+	    "rds:CreateDBInstance",
+	    "rds:DescribeDBClusters",
+	    "rds:DescribeDBInstances",
 	    "s3:CreateBucket",
 	    "s3:DeleteObject",
         "s3:DeleteObjectVersion",
@@ -82,10 +86,22 @@
         "s3:PutBucketPublicAccessBlock",
         "route53:CreateHostedZone",
         "route53:ListHostedZones",
+        "secretsmanager:CreateSecret",
         "secretsmanager:ListSecrets",
-        "secretsmanager:GetSecretValue"
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
       ],
       "Resource": "*"
+    },
+    {
+        "Action": "iam:CreateServiceLinkedRole",
+        "Effect": "Allow",
+        "Resource": "arn:aws:iam::*:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS",
+        "Condition": {
+            "StringLike": {
+                "iam:AWSServiceName":"rds.amazonaws.com"
+            }
+        }
     }
   ]
 }

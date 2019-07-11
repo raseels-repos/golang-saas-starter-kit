@@ -27,8 +27,6 @@
       "memoryReservation": 128,
       "volumesFrom": [],
       "environment": [
-        {"name": "AWS_ACCESS_KEY_ID", "value": "-"},
-        {"name": "AWS_SECRET_ACCESS_KEY", "value": "-"},
         {"name": "AWS_REGION", "value": "{AWS_REGION}"},
         {"name": "AWS_USE_ROLE", "value": "true"},
         {"name": "AWSLOGS_GROUP", "value": "{AWSLOGS_GROUP}"},
@@ -60,7 +58,10 @@
         {"name": "DD_TRACE_AGENT_HOSTNAME", "value": "127.0.0.1"},
         {"name": "DD_TRACE_AGENT_PORT", "value": "8126"},
         {"name": "DD_SERVICE_NAME", "value": "{ECS_SERVICE}"},
-        {"name": "DD_ENV", "value": "{ENV}"}
+        {"name": "DD_ENV", "value": "{ENV}"},
+        {"name": "ROUTE53_UPDATE_TASK_IPS", "value": "{ROUTE53_UPDATE_TASK_IPS}"},
+        {"name": "ROUTE53_ZONES", "value": "{ROUTE53_ZONES}"},
+        {"name": "ECS_ENABLE_CONTAINER_METADATA", "value": "true"}
       ],
       "healthCheck": {
         "retries": 3,

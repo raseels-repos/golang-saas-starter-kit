@@ -1,12 +1,18 @@
 package devops
 
 import (
-	"github.com/aws/aws-sdk-go/service/elasticache"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/rds"
-	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -41,7 +47,6 @@ type ServiceDeployFlags struct {
 
 // serviceDeployRequest defines the details needed to execute a service deployment.
 type serviceDeployRequest struct {
-	// Required flags.
 	ServiceName            string         `validate:"required"`
 	ServiceDir             string         `validate:"required"`
 	Env                    string         `validate:"oneof=dev stage prod"`
@@ -50,45 +55,65 @@ type serviceDeployRequest struct {
 	DockerFile             string         `validate:"required"`
 	GoModFile              string         `validate:"required"`
 	GoModName              string         `validate:"required"`
-	EcrRepositoryName      string         `validate:"required"`
-	EcsClusterName         string         `validate:"required"`
-	EcsServiceName         string         `validate:"required"`
-	EcsExecutionRoleName   string         `validate:"required"`
-	EcsTaskRoleName        string         `validate:"required"`
-	EcsTaskPolicyName      string         `validate:"required"`
 
-	EcsTaskPolicy *iam.CreatePolicyInput
-	EcsTaskPolicyDocument IamPolicyDocument
-
-
-	EcsServiceDesiredCount int64          `validate:"required"`
-	Ec2SecurityGroupName   string         `validate:"required"`
-	CloudWatchLogGroupName string         `validate:"required"`
-	S3BucketTempPrefix     string          `validate:"required"`
-	AwsCreds               awsCredentials `validate:"required,dive,required"`
-
-	// Optional flags.
 	EnableHTTPS                             bool     `validate:"omitempty"`
 	ServiceDomainName                       string   `validate:"omitempty,required_with=EnableHTTPS,fqdn"`
 	ServiceDomainNameAliases                []string `validate:"omitempty,dive,fqdn"`
-	S3BucketPrivateName      string          `validate:"omitempty"`
-	S3BucketPublicName       string          `validate:"omitempty"`
+
+	AwsCreds               awsCredentials `validate:"required,dive,required"`
+
+	EcrRepositoryName      string         `validate:"required"`
+	EcrRepository *ecr.CreateRepositoryInput
 	EcrRepositoryMaxImages                  int      `validate:"omitempty"`
+
+	EcsClusterName         string         `validate:"required"`
+	EcsCluster *ecs.CreateClusterInput
+
+	EcsServiceName         string         `validate:"required"`
+	EcsServiceDesiredCount int64          `validate:"required"`
 	EcsServiceMinimumHealthyPercent         *int64   `validate:"omitempty"`
 	EcsServiceMaximumPercent                *int64   `validate:"omitempty"`
 	EscServiceHealthCheckGracePeriodSeconds *int64   `validate:"omitempty"`
-	ElbDeregistrationDelay                  *int     `validate:"omitempty"`
-	EnableLambdaVPC                         bool     `validate:"omitempty"`
+
+	EcsExecutionRoleName   string         `validate:"required"`
+	EcsExecutionRole *iam.CreateRoleInput
+	EcsExecutionRolePolicyArns []string  `validate:"required"`
+
+	EcsTaskRoleName        string         `validate:"required"`
+	EcsTaskRole *iam.CreateRoleInput
+
+	EcsTaskPolicyName      string         `validate:"required"`
+	EcsTaskPolicy *iam.CreatePolicyInput
+	EcsTaskPolicyDocument IamPolicyDocument
+
+	Ec2SecurityGroupName   string         `validate:"required"`
+	Ec2SecurityGroup *ec2.CreateSecurityGroupInput
+
+	CloudWatchLogGroupName string         `validate:"required"`
+	CloudWatchLogGroup *cloudwatchlogs.CreateLogGroupInput
+
+	S3BucketTempPrefix     string          `validate:"required_with=S3BucketPrivateName S3BucketPublicName"`
+	S3BucketPrivateName      string          `validate:"omitempty"`
+	S3BucketPublicName       string          `validate:"omitempty"`
+	S3Buckets []S3Bucket
+
 	EnableEcsElb                            bool     `validate:"omitempty"`
 	ElbLoadBalancerName                     string   `validate:"omitempty"`
+	ElbLoadBalancer *elbv2.CreateLoadBalancerInput
+	ElbDeregistrationDelay                  *int     `validate:"omitempty"`
+	ElbSecurityGroupName   string         `validate:"omitempty"`
+	ElbSecurityGroup *ec2.CreateSecurityGroupInput
+
+	VpcPublicName string `validate:"omitempty"`
+	VpcPublic *ec2.CreateVpcInput
+	VpcPublicSubnetsDesired int `validate:"omitempty"`
+
+	EnableLambdaVPC                         bool     `validate:"omitempty"`
 	NoBuild                                 bool     `validate:"omitempty"`
 	NoDeploy                                bool     `validate:"omitempty"`
 	NoCache                                 bool     `validate:"omitempty"`
 	NoPush                                  bool     `validate:"omitempty"`
 	RecreateService                         bool     `validate:"omitempty"`
-
-
-
 
 	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
 	SDService *servicediscovery.CreateServiceInput
@@ -103,6 +128,15 @@ type serviceDeployRequest struct {
 	BuildTags    []string
 	flags        ServiceDeployFlags
 	_awsSession  *session.Session
+}
+
+type S3Bucket struct {
+	Name string  `validate:"omitempty"`
+	Input *s3.CreateBucketInput
+	LifecycleRules []*s3.LifecycleRule
+	CORSRules  []*s3.CORSRule
+	PublicAccessBlock *s3.PublicAccessBlockConfiguration
+	Policy string
 }
 
 // DB mimics the general info needed for services used to define placeholders.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -107,8 +108,8 @@ func main() {
 			AnalyticsRate float64 `default:"0.10" envconfig:"ANALYTICS_RATE"`
 		}
 		Aws struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID" required:"true"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" required:"true" json:"-"` // don't print
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
 			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
 
 			// Get an AWS session from an implicit source if no explicit
@@ -117,7 +118,7 @@ func main() {
 			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			UseAwsSecretManager bool          `default:false envconfig:"USE_AWS_SECRET_MANAGER"`
+			UseAwsSecretManager bool          `default:"false" envconfig:"USE_AWS_SECRET_MANAGER"`
 			AwsSecretID         string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
@@ -199,9 +200,14 @@ func main() {
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
 		awsSession = session.Must(session.NewSession())
+
+		log.Printf("main : AWS : Using role.\n")
+
 	} else {
 		creds := credentials.NewStaticCredentials(cfg.Aws.AccessKeyID, cfg.Aws.SecretAccessKey, "")
 		awsSession = session.New(&aws.Config{Region: aws.String(cfg.Aws.Region), Credentials: creds})
+
+		log.Printf("main : AWS : Using static credentials\n")
 	}
 	awsSession = awstrace.WrapSession(awsSession)
 
@@ -309,6 +315,13 @@ func main() {
 	}
 
 	// =========================================================================
+	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
+	err = devops.EcsServiceTaskInit(log, awsSession)
+	if err != nil {
+		log.Fatalf("main : Ecs Service Task init : %v",  err)
+	}
+
+	// =========================================================================
 	// Start API Service
 
 	// Programmatically set swagger info.
@@ -357,6 +370,12 @@ func main() {
 
 	case sig := <-shutdown:
 		log.Printf("main : %v : Start shutdown..", sig)
+
+		// Ensure the public IP address for the task is removed from Route53.
+		err = devops.EcsServiceTaskTaskShutdown(log, awsSession)
+		if err != nil {
+			log.Fatalf("main : Ecs Service Task shutdown : %v",  err)
+		}
 
 		// Create context for Shutdown call.
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)

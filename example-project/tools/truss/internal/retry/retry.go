@@ -5,8 +5,8 @@
 package retry
 
 import (
-"context"
-"time"
+	"context"
+	"time"
 )
 
 // queryPollIntervals is a slice of the delays before re-checking the status on
@@ -37,7 +37,6 @@ var DefaultPollIntervals = []time.Duration{
 	30 * time.Second,
 	time.Minute,
 }
-
 
 // delayer keeps track of the current delay between retries.
 type delayer struct {

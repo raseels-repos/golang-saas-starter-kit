@@ -11,12 +11,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
-	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 // EcsServiceTaskInit allows newly spun up ECS Service Tasks to register their public IP with Route 53.
@@ -92,8 +92,8 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 		service := serviceRes.Services[0]
 
 		servceTaskRes, err := svc.ListTasks(&ecs.ListTasksInput{
-			Cluster:     aws.String(ecsClusterName),
-			ServiceName: aws.String(ecsServiceName),
+			Cluster:       aws.String(ecsClusterName),
+			ServiceName:   aws.String(ecsServiceName),
 			DesiredStatus: aws.String("RUNNING"),
 		})
 		if err != nil {
@@ -127,7 +127,7 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 				}
 
 				for _, a := range t.Attachments {
-					if a.Details == nil ||  *a.Id != *c.NetworkInterfaces[0].AttachmentId {
+					if a.Details == nil || *a.Id != *c.NetworkInterfaces[0].AttachmentId {
 						continue
 					}
 
@@ -143,12 +143,12 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 		}
 
 		if len(networkInterfaceIds) > 0 {
-			log.Printf("Found %d network interface IDs.\n",  len(networkInterfaceIds))
+			log.Printf("Found %d network interface IDs.\n", len(networkInterfaceIds))
 			break
 		}
 
 		// Found no network interfaces, try again.
-		log.Println( "Found no network interfaces.")
+		log.Println("Found no network interfaces.")
 		time.Sleep((time.Duration(a) * time.Second * 10) * time.Duration(a))
 	}
 
@@ -178,7 +178,7 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 		}
 
 		// Found no public IPs, try again.
-		log.Println( "Found no public IPs.")
+		log.Println("Found no public IPs.")
 		time.Sleep((time.Duration(a) * time.Second * 10) * time.Duration(a))
 	}
 
@@ -231,7 +231,6 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 
 	return nil
 }
-
 
 /*
 http://169.254.170.2/v2/metadata,
@@ -353,4 +352,4 @@ http://169.254.170.2/v2/metadata,
 	"PullStartedAt": "2019-07-11T05:36:35.407114703Z",
 	"PullStoppedAt": "2019-07-11T05:36:54.128398742Z"
 }
- */
+*/

@@ -16,11 +16,10 @@ import (
 	"syscall"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
-	"golang.org/x/crypto/acme/autocert"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -28,6 +27,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
+	"golang.org/x/crypto/acme/autocert"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -320,7 +320,7 @@ func main() {
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
 	err = devops.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
-		log.Fatalf("main : Ecs Service Task init : %v",  err)
+		log.Fatalf("main : Ecs Service Task init : %v", err)
 	}
 
 	// =========================================================================
@@ -368,7 +368,6 @@ func main() {
 		}()
 	}
 
-
 	// Start the HTTPS service listening for requests.
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
@@ -378,7 +377,6 @@ func main() {
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
 		}
-
 
 		// Note: use a sensible value for data directory
 		// this is where cached certificates are stored
@@ -398,8 +396,6 @@ func main() {
 			Cache:      autocert.DirCache(dataDir),
 		}
 		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
-
-
 
 		httpServers = append(httpServers, api)
 
@@ -423,7 +419,7 @@ func main() {
 		// Ensure the public IP address for the task is removed from Route53.
 		err = devops.EcsServiceTaskTaskShutdown(log, awsSession)
 		if err != nil {
-			log.Fatalf("main : Ecs Service Task shutdown : %v",  err)
+			log.Fatalf("main : Ecs Service Task shutdown : %v", err)
 		}
 
 		// Create context for Shutdown call.

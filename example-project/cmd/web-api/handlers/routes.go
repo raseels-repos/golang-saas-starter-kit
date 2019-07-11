@@ -9,9 +9,9 @@ import (
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	_ "geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
-	_ "geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
 )
 
 // API returns a handler for a set of routes.
@@ -23,7 +23,7 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
 		MasterDB: masterDB,
-		Redis: redis,
+		Redis:    redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 	app.Handle("GET", "/ping", check.Ping)

@@ -2,7 +2,9 @@ package devops
 
 import (
 	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -54,6 +56,11 @@ type serviceDeployRequest struct {
 	EcsExecutionRoleName   string         `validate:"required"`
 	EcsTaskRoleName        string         `validate:"required"`
 	EcsTaskPolicyName      string         `validate:"required"`
+
+	EcsTaskPolicy *iam.CreatePolicyInput
+	EcsTaskPolicyDocument IamPolicyDocument
+
+
 	EcsServiceDesiredCount int64          `validate:"required"`
 	Ec2SecurityGroupName   string         `validate:"required"`
 	CloudWatchLogGroupName string         `validate:"required"`
@@ -79,6 +86,12 @@ type serviceDeployRequest struct {
 	NoCache                                 bool     `validate:"omitempty"`
 	NoPush                                  bool     `validate:"omitempty"`
 	RecreateService                         bool     `validate:"omitempty"`
+
+
+
+
+	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
+	SDService *servicediscovery.CreateServiceInput
 
 	CacheCluster *elasticache.CreateCacheClusterInput
 	CacheClusterParameter []*elasticache.ParameterNameValue

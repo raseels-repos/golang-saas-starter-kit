@@ -1,6 +1,7 @@
 module geeks-accelerator/oss/saas-starter-kit/example-project
 
 require (
+	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
 	github.com/aws/aws-sdk-go v1.20.16
 	github.com/bobesa/go-domain-util v0.0.0-20180815122459-1d708c097a6a
@@ -10,6 +11,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v0.7.3-0.20180815000130-e05b657120a6
 	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/camelcase v1.0.0
@@ -43,6 +45,7 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/prometheus/client_golang v1.0.0 // indirect
 	github.com/sergi/go-diff v1.0.0
 	github.com/sethgrid/pester v0.0.0-20190127155807-68a33a018ad0
 	github.com/sirupsen/logrus v1.4.2 // indirect
@@ -55,6 +58,7 @@ require (
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	golang.org/x/tools v0.0.0-20190708203411-c8855242db9c // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.22.0 // indirect

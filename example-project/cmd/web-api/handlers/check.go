@@ -28,16 +28,24 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	// check redis
-	//err = c.Redis.Ping().Err()
-	//if err != nil {
-	//	return errors.Wrap(err, "Redis failed")
-	//}
+	err = c.Redis.Ping().Err()
+	if err != nil {
+		return errors.Wrap(err, "Redis failed")
+	}
 
 	status := struct {
 		Status string `json:"status"`
 	}{
 		Status: "ok",
 	}
+
+	return web.RespondJson(ctx, w, status, http.StatusOK)
+}
+
+// Ping validates the service is ready to accept requests.
+func (c *Check) Ping(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	status := "pong"
 
 	return web.RespondJson(ctx, w, status, http.StatusOK)
 }

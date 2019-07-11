@@ -23,8 +23,10 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
 		MasterDB: masterDB,
+		Redis: redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
+	app.Handle("GET", "/ping", check.Ping)
 
 	// Register user management and authentication endpoints.
 	u := User{

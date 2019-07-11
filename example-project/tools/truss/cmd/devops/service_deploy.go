@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/internal/retry"
+	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/pborman/uuid"
 	"github.com/aws/aws-sdk-go/service/elasticache"
@@ -42,71 +44,6 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
-
-// baseServicePolicyDocument defines the default permissions required to access AWS services for all deployed services.
-var baseServicePolicyDocument = IamPolicyDocument{
-	Version: "2012-10-17",
-	Statement: []IamStatementEntry{
-		IamStatementEntry{
-			Sid:    "DefaultServiceAccess",
-			Effect: "Allow",
-			Action: []string{
-				"s3:HeadBucket",
-				"ec2:DescribeNetworkInterfaces",
-				"ec2:DeleteNetworkInterface",
-				"ecs:ListTasks",
-				"ecs:DescribeTasks",
-				"ec2:DescribeNetworkInterfaces",
-				"route53:ListHostedZones",
-				"route53:ListResourceRecordSets",
-				"route53:ChangeResourceRecordSets",
-				"ecs:UpdateService",
-				"ses:SendEmail",
-			},
-			Resource: "*",
-		},
-		IamStatementEntry{
-			Sid:    "ServiceInvokeLambda",
-			Effect: "Allow",
-			Action: []string{
-				"iam:GetRole",
-				"lambda:InvokeFunction",
-				"lambda:ListVersionsByFunction",
-				"lambda:GetFunction",
-				"lambda:InvokeAsync",
-				"lambda:GetFunctionConfiguration",
-				"iam:PassRole",
-				"lambda:GetAlias",
-				"lambda:GetPolicy",
-			},
-			Resource: []string{
-				"arn:aws:iam:::role/*",
-				"arn:aws:lambda:::function:*",
-			},
-		},
-		IamStatementEntry{
-			Sid:    "datadoglambda",
-			Effect: "Allow",
-			Action: []string{
-				"cloudwatch:Get*",
-				"cloudwatch:List*",
-				"ec2:Describe*",
-				"support:*",
-				"tag:GetResources",
-				"tag:GetTagKeys",
-				"tag:GetTagValues",
-			},
-			Resource: "*",
-		},
-	},
-}
-
-/*
-// requiredCmdsBuild proves a list of required executables for completing build.
-var requiredCmdsDeploy = [][]string{
-	[]string{"docker", "version", "-f", "{{.Client.Version}}"},
-}
-*/
 
 // NewServiceDeployRequest generated a new request for executing deploy for a given set of flags.
 func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*serviceDeployRequest, error) {
@@ -254,7 +191,72 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			// Set default AWS ECS Task Policy Name.
 			req.EcsTaskPolicyName = fmt.Sprintf("%s%sServices", req.ProjectNameCamel(), strcase.ToCamel(req.Env))
+			req.EcsTaskPolicy = &iam.CreatePolicyInput{
+				PolicyName:     aws.String(req.EcsTaskPolicyName),
+				Description:    aws.String(fmt.Sprintf("Defines access for %s services. ", req.ProjectName)),
+			}
 			log.Printf("\t\t\tSet ECS Task Policy Name to '%s'.", req.EcsTaskPolicyName)
+
+			// EcsTaskPolicyDocument defines the default document policy used to create the AWS ECS Task Policy. If the
+			// policy already exists, the permissions will be used to add new required actions, but not for removal.
+			// The policy document grants the permissions required for deployed services to access AWS services.
+			req.EcsTaskPolicyDocument = IamPolicyDocument{
+				Version: "2012-10-17",
+				Statement: []IamStatementEntry{
+					IamStatementEntry{
+						Sid:    "DefaultServiceAccess",
+						Effect: "Allow",
+						Action: []string{
+							"s3:HeadBucket",
+							"ec2:DescribeNetworkInterfaces",
+							"ec2:DeleteNetworkInterface",
+							"ecs:ListTasks",
+							"ecs:DescribeTasks",
+							"ec2:DescribeNetworkInterfaces",
+							"route53:ListHostedZones",
+							"route53:ListResourceRecordSets",
+							"route53:ChangeResourceRecordSets",
+							"ecs:UpdateService",
+							"ses:SendEmail",
+						},
+						Resource: "*",
+					},
+					IamStatementEntry{
+						Sid:    "ServiceInvokeLambda",
+						Effect: "Allow",
+						Action: []string{
+							"iam:GetRole",
+							"lambda:InvokeFunction",
+							"lambda:ListVersionsByFunction",
+							"lambda:GetFunction",
+							"lambda:InvokeAsync",
+							"lambda:GetFunctionConfiguration",
+							"iam:PassRole",
+							"lambda:GetAlias",
+							"lambda:GetPolicy",
+						},
+						Resource: []string{
+							"arn:aws:iam:::role/*",
+							"arn:aws:lambda:::function:*",
+						},
+					},
+					IamStatementEntry{
+						Sid:    "datadoglambda",
+						Effect: "Allow",
+						Action: []string{
+							"cloudwatch:Get*",
+							"cloudwatch:List*",
+							"ec2:Describe*",
+							"support:*",
+							"tag:GetResources",
+							"tag:GetTagKeys",
+							"tag:GetTagValues",
+						},
+						Resource: "*",
+					},
+				},
+			}
+
 
 			// Set default Cloudwatch Log Group Name.
 			req.CloudWatchLogGroupName = fmt.Sprintf("logs/env_%s/aws/ecs/cluster_%s/service_%s", req.Env, req.EcsClusterName, req.ServiceName)
@@ -263,6 +265,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			// Set default EC2 Security Group Name.
 			req.Ec2SecurityGroupName = req.EcsClusterName
 			log.Printf("\t\t\tSet ECS Security Group Name to '%s'.", req.Ec2SecurityGroupName)
+
 
 			// Set default ELB Load Balancer Name when ELB is enabled.
 			if req.EnableEcsElb {
@@ -294,6 +297,64 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			// S3 temp prefix, a life cycle policy will be applied to this.
 			req.S3BucketTempPrefix = "tmp/"
+
+			// Service Discovery Namespace settings.
+			req.SDNamepsace = &servicediscovery.CreatePrivateDnsNamespaceInput{
+				Name: aws.String(req.EcsClusterName),
+				Description: aws.String(fmt.Sprintf("Private DNS namespace used for services running on the ECS Cluster %s", req.EcsClusterName)),
+
+				// A unique string that identifies the request and that allows failed CreatePrivateDnsNamespace
+				// requests to be retried without the risk of executing the operation twice.
+				// CreatorRequestId can be any unique string, for example, a date/time stamp.
+				CreatorRequestId: aws.String("truss-deploy"),
+			}
+
+			// Service Discovery Service settings.
+			req.SDService = &servicediscovery.CreateServiceInput{
+				Name: aws.String(req.EcsServiceName),
+				Description: aws.String(fmt.Sprintf("Service %s running on the ECS Cluster %s", req.EcsServiceName, req.EcsClusterName)),
+
+				// A complex type that contains information about the Amazon Route 53 records
+				// that you want AWS Cloud Map to create when you register an instance.
+				DnsConfig: &servicediscovery.DnsConfig{
+					DnsRecords: []*servicediscovery.DnsRecord{
+						{
+							// The amount of time, in seconds, that you want DNS resolvers to cache the
+							// settings for this record.
+							TTL: aws.Int64(300),
+
+							// The type of the resource, which indicates the type of value that Route 53
+							// returns in response to DNS queries.
+							Type: aws.String("A"),
+						},
+					},
+				},
+
+				// A complex type that contains information about an optional custom health
+				// check.
+				//
+				// If you specify a health check configuration, you can specify either HealthCheckCustomConfig
+				// or HealthCheckConfig but not both.
+				HealthCheckCustomConfig: &servicediscovery.HealthCheckCustomConfig{
+					// The number of 30-second intervals that you want Cloud Map to wait after receiving
+					// an UpdateInstanceCustomHealthStatus request before it changes the health
+					// status of a service instance. For example, suppose you specify a value of
+					// 2 for FailureTheshold, and then your application sends an UpdateInstanceCustomHealthStatus
+					// request. Cloud Map waits for approximately 60 seconds (2 x 30) before changing
+					// the status of the service instance based on that request.
+					//
+					// Sending a second or subsequent UpdateInstanceCustomHealthStatus request with
+					// the same value before FailureThreshold x 30 seconds has passed doesn't accelerate
+					// the change. Cloud Map still waits FailureThreshold x 30 seconds after the
+					// first request to make the change.
+					FailureThreshold: aws.Int64(3),
+				},
+
+				// A unique string that identifies the request and that allows failed CreatePrivateDnsNamespace
+				// requests to be retried without the risk of executing the operation twice.
+				// CreatorRequestId can be any unique string, for example, a date/time stamp.
+				CreatorRequestId: aws.String("truss-deploy"),
+			}
 
 			// Elastic Cache settings for a Redis cache cluster. Could defined different settings by env.
 			req.CacheCluster = &elasticache.CreateCacheClusterInput{
@@ -342,6 +403,8 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				},
 			}
 
+
+
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
 
@@ -359,26 +422,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 // Run is the main entrypoint for deploying a service for a given target env.
 func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
-
-	/*
-		log.Println("Verify required commands are installed.")
-		for _, cmdVals := range requiredCmdsDeploy {
-			cmd := exec.Command(cmdVals[0], cmdVals[1:]...)
-			cmd.Env = os.Environ()
-
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				return errors.WithMessagef(err, "failed to execute %s - %s\n%s", strings.Join(cmdVals, " "), string(out))
-			}
-
-			log.Printf("\t%s\t%s - %s", tests.Success, cmdVals[0], string(out))
-		}
-
-		// Pull the current env variables to be passed in for command execution.
-		envVars := EnvVars(os.Environ())
-
-	*/
-
+	
 	startTime := time.Now()
 
 	// Load the AWS ECR repository. Try to find by name else create new one.
@@ -526,10 +570,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.Wrap(err, "failed to create docker build context")
 		}
 
-		_, err = docker.ImageBuild(context.Background(), buildCtx, buildOpts)
+		res, err := docker.ImageBuild(context.Background(), buildCtx, buildOpts)
 		if err != nil {
 			return errors.Wrap(err, "failed to build docker image")
 		}
+		io.Copy(os.Stdout, res.Body)
+		res.Body.Close()
 
 		// Push the newly built docker container to the registry.
 		if req.NoPush == false {
@@ -855,38 +901,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := ec2.New(req.awsSession())
 
+		log.Println("\t\tFind all subnets are that default for each available AZ.")
+
 		var subnets []*ec2.Subnet
-		if true { // len(req.ec2SubnetIds) == 0 {
-			log.Println("\t\tFind all subnets are that default for each available AZ.")
-
-			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-				for _, s := range res.Subnets {
-					if *s.DefaultForAz {
-						subnets = append(subnets, s)
-					}
-				}
-				return !lastPage
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to find default subnets")
-			}
-			/*} else {
-			log.Println("\t\tFind all subnets for the IDs provided.")
-
-			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
-				SubnetIds: aws.StringSlice(flags.Ec2SubnetIds),
-			}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-				for _, s := range res.Subnets {
+		err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
+			for _, s := range res.Subnets {
+				if *s.DefaultForAz {
 					subnets = append(subnets, s)
 				}
-				return !lastPage
-			})
-			if err != nil {
-				return errors.Wrapf(err, "failed to find subnets: %s", strings.Join(flags.Ec2SubnetIds, ", "))
-			} else if len(flags.Ec2SubnetIds) != len(subnets)  {
-				return errors.Errorf("failed to find all subnets, expected %d, got %d", len(flags.Ec2SubnetIds) != len(subnets))
-			}*/
+			}
+			return !lastPage
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to find default subnets")
 		}
+
 
 		if len(subnets) == 0 {
 			return errors.New("failed to find any subnets, expected at least 1")
@@ -1328,6 +1357,310 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		log.Printf("\t%s\tUsing Cache Cluster '%s'.\n", tests.Success, *cacheCluster.CacheClusterId)
+	}
+
+	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
+	var zoneArecNames = map[string][]string{}
+	if req.ServiceDomainName != "" {
+		log.Println("Route 53 - Get or create hosted zones.")
+
+		svc := route53.New(req.awsSession())
+
+		log.Println("\tList all hosted zones.")
+		var zones []*route53.HostedZone
+		err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{},
+			func(res *route53.ListHostedZonesOutput, lastPage bool) bool {
+				for _, z := range res.HostedZones {
+					zones = append(zones, z)
+				}
+				return !lastPage
+			})
+		if err != nil {
+			return errors.Wrap(err, "failed list route 53 hosted zones")
+		}
+
+		// Generate a slice with the primary domain name and include all the alternative domain names.
+		lookupDomains := []string{req.ServiceDomainName}
+		for _, dn := range req.ServiceDomainNameAliases {
+			lookupDomains = append(lookupDomains, dn)
+		}
+
+		// Loop through all the defined domain names and find the associated zone even when they are a sub domain.
+		for _, dn := range lookupDomains {
+			log.Printf("\t\tFind zone for domain '%s'", dn)
+
+			// Get the top level domain from url.
+			zoneName := domainutil.Domain(dn)
+			var subdomain string
+			if zoneName == "" {
+				// Handle domain names that have weird TDL: ie .tech
+				zoneName = dn
+				log.Printf("\t\t\tNon-standard Level Domain: '%s'", zoneName)
+			} else {
+				log.Printf("\t\t\tTop Level Domain: '%s'", zoneName)
+
+				// Check if url has subdomain.
+				if domainutil.HasSubdomain(dn) {
+					subdomain = domainutil.Subdomain(dn)
+					log.Printf("\t\t\tsubdomain: '%s'", subdomain)
+				}
+			}
+
+			// Start at the top level domain and try to find a hosted zone. Search until a match is found or there are
+			// no more domain levels to search for.
+			var zoneId string
+			for {
+				log.Printf("\t\t\tChecking zone '%s' for associated hosted zone.", zoneName)
+
+				// Loop over each one of hosted zones and try to find match.
+				for _, z := range zones {
+					zn := strings.TrimRight(*z.Name, ".")
+
+					log.Printf("\t\t\t\tChecking if '%s' matches '%s'", zn, zoneName)
+					if zn == zoneName {
+						zoneId = *z.Id
+						break
+					}
+				}
+
+				if zoneId != "" || zoneName == dn {
+					// Found a matching zone or have search all possibilities!
+					break
+				}
+
+				// If we have not found a hosted zone, append the next level from the domain to the zone.
+				pts := strings.Split(subdomain, ".")
+				subs := []string{}
+				for idx, sn := range pts {
+					if idx == len(pts)-1 {
+						zoneName = sn + "." + zoneName
+					} else {
+						subs = append(subs, sn)
+					}
+				}
+				subdomain = strings.Join(subs, ".")
+			}
+
+			var aName string
+			if zoneId == "" {
+
+				// Get the top level domain from url again.
+				zoneName := domainutil.Domain(dn)
+				if zoneName == "" {
+					// Handle domain names that have weird TDL: ie .tech
+					zoneName = dn
+				}
+
+				log.Printf("\t\t\tNo hosted zone found for '%s', create '%s'.", dn, zoneName)
+				createRes, err := svc.CreateHostedZone(&route53.CreateHostedZoneInput{
+					Name: aws.String(zoneName),
+					HostedZoneConfig: &route53.HostedZoneConfig{
+						Comment: aws.String(fmt.Sprintf("Public hosted zone created by saas-starter-kit.")),
+					},
+
+					// A unique string that identifies the request and that allows failed CreateHostedZone
+					// requests to be retried without the risk of executing the operation twice.
+					// You must use a unique CallerReference string every time you submit a CreateHostedZone
+					// request. CallerReference can be any unique string, for example, a date/time
+					// stamp.
+					//
+					// CallerReference is a required field
+					CallerReference: aws.String("truss-deploy"),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
+				}
+				zoneId = *createRes.HostedZone.Id
+
+				log.Printf("\t\t\tCreated hosted zone '%s'", zoneId)
+
+				// The fully qualified A record name.
+				aName = dn
+			} else {
+				log.Printf("\t\t\tFound hosted zone '%s'", zoneId)
+
+				// The fully qualified A record name.
+				if subdomain != "" {
+					aName = subdomain + "." + zoneName
+				} else {
+					aName = zoneName
+				}
+			}
+
+			// Add the A record to be maintained for the zone.
+			if _, ok := zoneArecNames[zoneId]; !ok {
+				zoneArecNames[zoneId] = []string{}
+			}
+			zoneArecNames[zoneId] = append(zoneArecNames[zoneId], aName)
+
+			log.Printf("\t%s\tZone '%s' found with A record name '%s'.\n", tests.Success, zoneId, aName)
+		}
+	}
+
+	// Setup service discovery.
+	var sdService *servicediscovery.Service
+	{
+		log.Println("SD - Get or Create Namespace")
+
+		svc := servicediscovery.New(req.awsSession())
+
+		log.Println("\t\tList all the private namespaces and try to find an existing entry.")
+
+		listNamespaces := func() (*servicediscovery.NamespaceSummary, error) {
+			var found *servicediscovery.NamespaceSummary
+			err := svc.ListNamespacesPages(&servicediscovery.ListNamespacesInput{
+				Filters: []*servicediscovery.NamespaceFilter{
+					&servicediscovery.NamespaceFilter{
+						Name:      aws.String("TYPE"),
+						Condition: aws.String("EQ"),
+						Values:    aws.StringSlice([]string{"DNS_PRIVATE"}),
+					},
+				},
+			}, func(res *servicediscovery.ListNamespacesOutput, lastPage bool) bool {
+				for _, n := range res.Namespaces {
+					if *n.Name == *req.SDNamepsace.Name {
+						found = n
+						return false
+					}
+				}
+				return !lastPage
+			})
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to list namespaces")
+			}
+
+			return found, nil
+		}
+
+		sdNamespace, err := listNamespaces()
+		if err != nil {
+			return err
+		}
+
+		if sdNamespace == nil {
+			// Link the namespace to the VPC.
+			req.SDNamepsace.Vpc = aws.String(vpcId)
+
+			log.Println("\t\tCreate private namespace.")
+
+			// If no namespace was found, create one.
+			createRes, err := svc.CreatePrivateDnsNamespace(req.SDNamepsace)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create namespace '%s'", *req.SDNamepsace.Name)
+			}
+			operationId := createRes.OperationId
+
+			log.Println("\t\tWait for create operation to finish.")
+			retryFunc := func() (bool, error) {
+				opRes, err := svc.GetOperation(&servicediscovery.GetOperationInput{
+					OperationId: operationId,
+				})
+				if err != nil {
+					return true, err
+				}
+
+				log.Printf("\t\t\tStatus: %s.", *opRes.Operation.Status)
+
+				// The status of the operation. Values include the following:
+				//    * SUBMITTED: This is the initial state immediately after you submit a
+				//    request.
+				//    * PENDING: AWS Cloud Map is performing the operation.
+				//    * SUCCESS: The operation succeeded.
+				//    * FAIL: The operation failed. For the failure reason, see ErrorMessage.
+				if *opRes.Operation.Status == "SUCCESS" {
+					return true, nil
+				} else if *opRes.Operation.Status == "FAIL" {
+					err = errors.Errorf("operation failed")
+					err = awserr.New(*opRes.Operation.ErrorCode, *opRes.Operation.ErrorMessage, err)
+					return true, err
+				}
+
+				return false, nil
+			}
+			err = retry.Retry(context.Background(), nil, retryFunc)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get operation for namespace '%s'", *req.SDNamepsace.Name)
+			}
+
+			// Now that the create operation is complete, try to find the namespace again.
+			sdNamespace, err = listNamespaces()
+			if err != nil {
+				return err
+			}
+
+			log.Printf("\t\tCreated: %s.", *sdNamespace.Arn)
+		} else {
+			log.Printf("\t\tFound: %s.", *sdNamespace.Arn)
+
+			// The number of services that are associated with the namespace.
+			if sdNamespace.ServiceCount != nil {
+				log.Printf("\t\t\tServiceCount: %d.", *sdNamespace.ServiceCount)
+			}
+		}
+
+		log.Printf("\t%s\tUsing Service Discovery Namespace '%s'.\n", tests.Success, *sdNamespace.Id)
+
+
+		// Try to find an existing entry for the current service.
+		var existingService *servicediscovery.ServiceSummary
+		err = svc.ListServicesPages(&servicediscovery.ListServicesInput{
+			Filters: []*servicediscovery.ServiceFilter{
+				&servicediscovery.ServiceFilter{
+					Name:      aws.String("NAMESPACE_ID"),
+					Condition: aws.String("EQ"),
+					Values:    aws.StringSlice([]string{*sdNamespace.Id}),
+				},
+			},
+		}, func(res *servicediscovery.ListServicesOutput, lastPage bool) bool {
+			for _, n := range res.Services {
+				if *n.Name == req.EcsServiceName {
+					existingService = n
+					return false
+				}
+			}
+			return !lastPage
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to list services for namespace '%s'", *sdNamespace.Id)
+		}
+
+		if existingService == nil {
+			// Link the service to the namespace.
+			req.SDService.NamespaceId = sdNamespace.Id
+
+			// If no namespace was found, create one.
+			createRes, err := svc.CreateService(req.SDService)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create service '%s'", *req.SDService.Name)
+			}
+			sdService = createRes.Service
+
+
+			log.Printf("\t\tCreated: %s.", *sdService.Arn)
+		} else {
+
+			// If no namespace was found, create one.
+			getRes, err := svc.GetService(&servicediscovery.GetServiceInput{
+				Id: existingService.Id,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to get service '%s'", *req.SDService.Name)
+			}
+			sdService = getRes.Service
+
+
+			log.Printf("\t\tFound: %s.", *sdService.Arn)
+
+			// The number of instances that are currently associated with the service. Instances
+			// that were previously associated with the service but that have been deleted
+			// are not included in the count.
+			if sdService.InstanceCount != nil {
+				log.Printf("\t\t\tInstanceCount: %d.", *sdService.InstanceCount)
+			}
+
+		}
+
+		log.Printf("\t%s\tUsing Service Discovery Service '%s'.\n", tests.Success, *sdService.Id)
 	}
 
 	// Try to find AWS ECS Cluster by name or create new one.
@@ -1805,7 +2138,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					}
 
 					var updateDoc bool
-					for _, baseStmt := range baseServicePolicyDocument.Statement {
+					for _, baseStmt := range req.EcsTaskPolicyDocument.Statement {
 						var found bool
 						for curIdx, curStmt := range curDoc.Statement {
 							if baseStmt.Sid != curStmt.Sid {
@@ -1857,17 +2190,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						}
 					}
 				} else {
-					dat, err := json.Marshal(baseServicePolicyDocument)
+					dat, err := json.Marshal(req.EcsTaskPolicyDocument)
 					if err != nil {
 						return errors.Wrap(err, "failed to json encode policy document")
 					}
+					req.EcsTaskPolicy.PolicyDocument = aws.String(string(dat))
 
 					// If no repository was found, create one.
-					res, err := svc.CreatePolicy(&iam.CreatePolicyInput{
-						PolicyName:     aws.String(req.EcsTaskPolicyName),
-						Description:    aws.String(fmt.Sprintf("Defines access for %s services. ", req.ProjectName)),
-						PolicyDocument: aws.String(string(dat)),
-					})
+					res, err := svc.CreatePolicy(req.EcsTaskPolicy)
 					if err != nil {
 						return errors.Wrapf(err, "failed to create task policy '%s'", req.EcsTaskPolicyName)
 					}
@@ -2004,10 +2334,16 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			recreateService = true
 			forceDelete = true
 		} else if req.EnableEcsElb && (ecsService.LoadBalancers == nil || len(ecsService.LoadBalancers) == 0) {
-			// Service was created with no ELB and now ELB is enabled.
+			// Service was created without ELB and now ELB is enabled.
 			recreateService = true
 		} else if !req.EnableEcsElb && (ecsService.LoadBalancers != nil && len(ecsService.LoadBalancers) > 0) {
 			// Service was created with ELB and now ELB is disabled.
+			recreateService = true
+		} else if sdService != nil && sdService.Arn != nil && (ecsService.ServiceRegistries == nil || len(ecsService.ServiceRegistries) == 0) {
+			// Service was created without Service Discovery and now Service Discovery is enabled.
+			recreateService = true
+		} else if (sdService == nil || sdService.Arn == nil) && (ecsService.ServiceRegistries != nil && len(ecsService.ServiceRegistries) > 0) {
+			// Service was created with Service Discovery and now Service Discovery is disabled.
 			recreateService = true
 		}
 
@@ -2016,7 +2352,30 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			svc := ecs.New(req.awsSession())
 
-			_, err := svc.DeleteService(&ecs.DeleteServiceInput{
+			// The service cannot be stopped while it is scaled above 0
+			if ecsService.DesiredCount  != nil &&  *ecsService.DesiredCount > 0 {
+				log.Println("\t\tScaling service down to zero.")
+				_, err := svc.UpdateService(&ecs.UpdateServiceInput{
+					Cluster: ecsService.ClusterArn,
+					Service: ecsService.ServiceArn,
+					DesiredCount: aws.Int64(int64(0)),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to update service '%s'", ecsService.ServiceName)
+				}
+
+				log.Println("\t\tWait for the service to scale down.")
+				err = svc.WaitUntilServicesStable(&ecs.DescribeServicesInput{
+					Cluster: ecsCluster.ClusterArn,
+					Services: aws.StringSlice([]string{*ecsService.ServiceArn}),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
+				}
+			}
+
+			log.Println("\t\tDelete Service.")
+			res, err := svc.DeleteService(&ecs.DeleteServiceInput{
 				Cluster: ecsService.ClusterArn,
 				Service: ecsService.ServiceArn,
 
@@ -2026,8 +2385,9 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Force: aws.Bool(forceDelete),
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
+				return errors.Wrapf(err, "failed to delete service '%s'", ecsService.ServiceName)
 			}
+			ecsService = res.Service
 
 			log.Printf("\t%s\tDelete Service.\n", tests.Success)
 		}
@@ -2611,6 +2971,18 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				},
 			}
 
+
+			// Add the Service Discovery registry to the ECS service.
+			if sdService != nil {
+				if serviceInput.ServiceRegistries == nil {
+					serviceInput.ServiceRegistries = []*ecs.ServiceRegistry{}
+				}
+				serviceInput.ServiceRegistries = append(serviceInput.ServiceRegistries, &ecs.ServiceRegistry{
+					RegistryArn: sdService.Arn,
+				})
+			}
+
+
 			createRes, err := svc.CreateService(serviceInput)
 
 			// If tags aren't enabled for the account, try the request again without them.
@@ -2867,133 +3239,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tService running.\n", tests.Success)
 	}
 
-	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
-	var zoneArecNames = map[string][]string{}
-	if req.ServiceDomainName != "" {
-		log.Println("Route 53 - Get or create hosted zones.")
-
-		svc := route53.New(req.awsSession())
-
-		log.Println("\tList all hosted zones.")
-		var zones []*route53.HostedZone
-		err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{},
-			func(res *route53.ListHostedZonesOutput, lastPage bool) bool {
-			for _, z := range res.HostedZones {
-				zones = append(zones, z)
-			}
-			return !lastPage
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed list route 53 hosted zones")
-		}
-
-		// Generate a slice with the primary domain name and include all the alternative domain names.
-		lookupDomains := []string{req.ServiceDomainName}
-		for _, dn := range req.ServiceDomainNameAliases {
-			lookupDomains = append(lookupDomains, dn)
-		}
-
-		// Loop through all the defined domain names and find the associated zone even when they are a sub domain.
-		for _, dn := range lookupDomains {
-			log.Printf("\t\tFind zone for domain '%s'", dn)
-
-			// Get the top level domain from url.
-			zoneName := domainutil.Domain(dn)
-			log.Printf("\t\t\tTop Level Domain: '%s'", zoneName)
-
-			// Check if url has subdomain.
-			var subdomain string
-			if domainutil.HasSubdomain(dn) {
-				subdomain = domainutil.Subdomain(dn)
-				log.Printf("\t\t\tsubdomain: '%s'", subdomain)
-			}
-
-			// Start at the top level domain and try to find a hosted zone. Search until a match is found or there are
-			// no more domain levels to search for.
-			var zoneId string
-			for {
-				log.Printf("\t\t\tChecking zone '%s' for associated hosted zone.", zoneName)
-
-				// Loop over each one of hosted zones and try to find match.
-				for _, z := range zones {
-					log.Printf("\t\t\t\tChecking if %s matches %s", *z.Name, zoneName)
-
-					if strings.TrimRight(*z.Name, ".") == zoneName {
-						zoneId = *z.Id
-						break
-					}
-				}
-
-				if zoneId != "" || zoneName == dn {
-					// Found a matching zone or have search all possibilities!
-					break
-				}
-
-				// If we have not found a hosted zone, append the next level from the domain to the zone.
-				pts := strings.Split(subdomain, ".")
-				subs := []string{}
-				for idx, sn := range pts {
-					if idx == len(pts)-1 {
-						zoneName = sn + "." + zoneName
-					} else {
-						subs = append(subs, sn)
-					}
-				}
-				subdomain = strings.Join(subs, ".")
-			}
-
-			var aName string
-			if zoneId == "" {
-
-				// Get the top level domain from url again.
-				zoneName := domainutil.Domain(dn)
-
-				log.Printf("\t\t\tNo hosted zone found for '%s', create '%s'.", dn, zoneName)
-				createRes, err := svc.CreateHostedZone(&route53.CreateHostedZoneInput{
-					Name: aws.String(zoneName),
-					HostedZoneConfig: &route53.HostedZoneConfig{
-						Comment: aws.String(fmt.Sprintf("Public hosted zone created by saas-starter-kit.")),
-					},
-
-					// A unique string that identifies the request and that allows failed CreateHostedZone
-					// requests to be retried without the risk of executing the operation twice.
-					// You must use a unique CallerReference string every time you submit a CreateHostedZone
-					// request. CallerReference can be any unique string, for example, a date/time
-					// stamp.
-					//
-					// CallerReference is a required field
-					CallerReference: aws.String("truss-deploy"),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
-				}
-				zoneId = *createRes.HostedZone.Id
-
-				log.Printf("\t\t\tCreated hosted zone '%s'", zoneId)
-
-				// The fully qualified A record name.
-				aName = dn
-			} else {
-				log.Printf("\t\t\tFound hosted zone '%s'", zoneId)
-
-				// The fully qualified A record name.
-				if subdomain != "" {
-					aName = subdomain + "." + zoneName
-				} else {
-					aName = zoneName
-				}
-			}
-
-			// Add the A record to be maintained for the zone.
-			if _, ok := zoneArecNames[zoneId]; !ok {
-				zoneArecNames[zoneId] = []string{}
-			}
-			zoneArecNames[zoneId] = append(zoneArecNames[zoneId], aName)
-
-			log.Printf("\t%s\tZone '%s' found with A record name '%s'.\n", tests.Success, zoneId, aName)
-		}
-	}
-
 	if req.EnableEcsElb {
 		// TODO: Need to connect ELB to route53
 	} else {
@@ -3006,6 +3251,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			servceTaskRes, err := svc.ListTasks(&ecs.ListTasksInput{
 				Cluster:     aws.String(req.EcsClusterName),
 				ServiceName: aws.String(req.EcsServiceName),
+				DesiredStatus: aws.String("RUNNING"),
 			})
 			if err != nil {
 				return errors.Wrapf(err, "failed to list tasks for cluster '%s' service '%s'", req.EcsClusterName, req.EcsServiceName)
@@ -3020,43 +3266,18 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return errors.Wrapf(err, "failed to describe %d tasks for cluster '%s'", len(servceTaskRes.TaskArns), req.EcsClusterName)
 			}
 
-			var failures []*ecs.Failure
 			var taskArns []string
 			for _, t := range taskRes.Tasks {
-				if t.TaskDefinitionArn != taskDef.TaskDefinitionArn {
+				if *t.TaskDefinitionArn != *taskDef.TaskDefinitionArn {
 					continue
 				}
 
+				log.Printf("\t\t\t%s: %s\n", *t.TaskArn, *t.LastStatus)
+
 				taskArns = append(taskArns, *t.TaskArn)
 
-				// Limit failures to only the current task definition.
-				for _, f := range taskRes.Failures {
-					if *f.Arn == *t.TaskArn {
-						failures = append(failures, f)
-					}
-				}
 			}
-
-			if len(failures) > 0 {
-				for _, t := range failures {
-					log.Printf("\t%s\tTask %s failed with %s.\n", tests.Failed, *t.Arn, *t.Reason)
-				}
-			} else {
-				log.Printf("\t%s\tTasks founds.\n", tests.Success)
-			}
-
-			log.Println("\t\tWaiting for tasks to enter running state.")
-			{
-				var err error
-				err = svc.WaitUntilTasksRunning(&ecs.DescribeTasksInput{
-					Cluster: ecsCluster.ClusterArn,
-					Tasks:   aws.StringSlice(taskArns),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to wait for tasks to enter running state for cluster '%s'", req.EcsClusterName)
-				}
-				log.Printf("\t%s\tTasks running.\n", tests.Success)
-			}
+			log.Printf("\t%s\tTasks founds.\n", tests.Success)
 
 			log.Println("\t\tDescribe tasks for running tasks.")
 			{
@@ -3072,6 +3293,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					if t.Attachments == nil {
 						continue
 					}
+
+					// t.Containers[0].NetworkInterfaces[0].Ipv6Address
 
 					for _, a := range t.Attachments {
 						if a.Details == nil {

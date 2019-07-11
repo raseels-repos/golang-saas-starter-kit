@@ -106,7 +106,7 @@ type serviceDeployRequest struct {
 
 	VpcPublicName string `validate:"omitempty"`
 	VpcPublic *ec2.CreateVpcInput
-	VpcPublicSubnetsDesired int `validate:"omitempty"`
+	VpcPublicSubnets []*ec2.CreateSubnetInput
 
 	EnableLambdaVPC                         bool     `validate:"omitempty"`
 	NoBuild                                 bool     `validate:"omitempty"`

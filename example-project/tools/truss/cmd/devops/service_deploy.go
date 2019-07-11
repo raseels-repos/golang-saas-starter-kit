@@ -482,7 +482,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 					// [Application Load Balancers] The type of IP addresses used by the subnets
 					// for your load balancer. The possible values are ipv4 (for IPv4 addresses)
 					// and dualstack (for IPv4 and IPv6 addresses).
-					IpAddressType: aws.String("dualstack"),
+					IpAddressType: aws.String("ipv4"),
 					// The nodes of an Internet-facing load balancer have public IP addresses. The
 					// DNS name of an Internet-facing load balancer is publicly resolvable to the
 					// public IP addresses of the nodes. Therefore, Internet-facing load balancers
@@ -491,7 +491,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 					// DNS name of an internal load balancer is publicly resolvable to the private
 					// IP addresses of the nodes. Therefore, internal load balancers can only route
 					// requests from clients with access to the VPC for the load balancer.
-					Scheme: aws.String("Internet-facing"),
+					Scheme: aws.String("internet-facing"),
 					// The type of load balancer.
 					Type: aws.String("application"),
 					// One or more tags to assign to the load balancer.
@@ -503,30 +503,32 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				log.Printf("\t\t\tSet ELB Name to '%s'.", req.ElbLoadBalancerName)
 
 				// Define a new Security Group that is outside the VPC for a public facing ELB.
-				req.ElbSecurityGroupName = req.ElbLoadBalancerName+"-elb"
-				req.ElbSecurityGroup = &ec2.CreateSecurityGroupInput{
-					// The name of the security group.
-					// Constraints: Up to 255 characters in length. Cannot start with sg-.
-					// Constraints for EC2-Classic: ASCII characters
-					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-					// GroupName is a required field
-					GroupName: aws.String(req.ElbSecurityGroupName),
+				//req.ElbSecurityGroupName = req.ElbLoadBalancerName+"-elb"
+				//req.ElbSecurityGroup = &ec2.CreateSecurityGroupInput{
+				//	// The name of the security group.
+				//	// Constraints: Up to 255 characters in length. Cannot start with sg-.
+				//	// Constraints for EC2-Classic: ASCII characters
+				//	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+				//	// GroupName is a required field
+				//	GroupName: aws.String(req.ElbSecurityGroupName),
+				//
+				//	// A description for the security group. This is informational only.
+				//	// Constraints: Up to 255 characters in length
+				//	// Constraints for EC2-Classic: ASCII characters
+				//	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+				//	// Description is a required field
+				//	Description: aws.String(fmt.Sprintf("Security group for ELB %s", req.ElbSecurityGroupName)),
+				//}
+				//log.Printf("\t\t\tSet ELB Security Group Name to '%s'.", req.ElbSecurityGroupName)
 
-					// A description for the security group. This is informational only.
-					// Constraints: Up to 255 characters in length
-					// Constraints for EC2-Classic: ASCII characters
-					// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-					// Description is a required field
-					Description: aws.String(fmt.Sprintf("Security group for ELB %s", req.ElbSecurityGroupName)),
-				}
-				log.Printf("\t\t\tSet ELB Security Group Name to '%s'.", req.ElbSecurityGroupName)
-
-
-
-				req.VpcPublicName = req.ProjectName+"-public"
-				req.VpcPublic =  &ec2.CreateVpcInput{
-					CidrBlock: aws.String("10.0.0.0/16"),
-				}
+				//req.VpcPublicName = req.ProjectName+"-public"
+				//req.VpcPublic =  &ec2.CreateVpcInput{
+				//	CidrBlock: aws.String("10.0.0.0/16"),
+				//}
+				//req.VpcPublicSubnets =  []*ec2.CreateSubnetInput{
+				//	{CidrBlock:aws.String("10.0.0.0/24")},
+				//	{CidrBlock:aws.String("10.0.1.0/24")},
+				//}
 			}
 
 			// Set ECS configs based on specified env.
@@ -1049,8 +1051,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	}
 
 	// Find the default VPC and associated subnets. Custom subnets outside of the default VPC are not currently supported.
-	var subnetsIDs []string
-	var vpcId string
+	var projectSubnetsIDs []string
+	var projectVpcId string
 	{
 		log.Println("EC2 - Find Subnets")
 
@@ -1079,13 +1081,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			if s.VpcId == nil {
 				continue
 			}
-			if vpcId == "" {
-				vpcId = *s.VpcId
-			} else if vpcId != *s.VpcId {
-				return errors.Errorf("invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, vpcId, *s.VpcId)
+			if projectVpcId == "" {
+				projectVpcId = *s.VpcId
+			} else if projectVpcId != *s.VpcId {
+				return errors.Errorf("invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, projectVpcId, *s.VpcId)
 			}
 
-			subnetsIDs = append(subnetsIDs, *s.SubnetId)
+			projectSubnetsIDs = append(projectSubnetsIDs, *s.SubnetId)
 			log.Printf("\t\t\t%s", *s.SubnetId)
 		}
 
@@ -1102,7 +1104,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
 
 		// Link The ID of the VPC.
-		req.Ec2SecurityGroup.VpcId = aws.String(vpcId)
+		req.Ec2SecurityGroup.VpcId = aws.String(projectVpcId)
 
 		err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
 			GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
@@ -1152,15 +1154,26 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
 		// HTTPS is terminated via the web server and not on the Load Balancer.
-		if !req.EnableEcsElb && req.EnableHTTPS {
-			// Enable services to be publicly available via HTTPS port 443
-			ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-				IpProtocol: aws.String("tcp"),
-				CidrIp:     aws.String("0.0.0.0/0"),
-				FromPort:   aws.Int64(443),
-				ToPort:     aws.Int64(443),
-				GroupId:    aws.String(securityGroupId),
-			})
+		if req.EnableHTTPS {
+			if req.EnableEcsElb {
+				// Enable services to be publicly available via HTTPS port 443 and forwarded to port 80.
+				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+					IpProtocol: aws.String("tcp"),
+					CidrIp:     aws.String("0.0.0.0/0"),
+					FromPort:   aws.Int64(443),
+					ToPort:     aws.Int64(80),
+					GroupId:    aws.String(securityGroupId),
+				})
+			} else {
+				// Enable services to be publicly available via HTTPS port 443.
+				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+					IpProtocol: aws.String("tcp"),
+					CidrIp:     aws.String("0.0.0.0/0"),
+					FromPort:   aws.Int64(443),
+					ToPort:     aws.Int64(443),
+					GroupId:    aws.String(securityGroupId),
+				})
+			}
 		}
 
 		// Add all the default ingress to the security group.
@@ -1220,16 +1233,18 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		log.Printf("\t\tDescribe subnets for public VPC.\n")
 		{
+			var existing []*ec2.Subnet
 			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
 				Filters: []*ec2.Filter{
 					&ec2.Filter{
-						Name:   aws.String("cidr-block"),
-						Values: aws.StringSlice([]string{*req.VpcPublic.CidrBlock}),
+						Name:   aws.String("tag:"+awsTagNameName),
+						Values: aws.StringSlice([]string{req.VpcPublicName}),
 					},
 				},
 			}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 				for _, s := range res.Subnets {
 					publicSubnetIDs = append(publicSubnetIDs, *s.SubnetId)
+					existing = append(existing, s)
 				}
 				return !lastPage
 			})
@@ -1239,20 +1254,31 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			log.Printf("\t\tFound %d existing public subnets.\n", len(publicSubnetIDs))
 
-			// If there are no subnets, create them. There is no easy way to label the subnets to detect which ones
-			// have been created when the CidrBlock is the same for them.
-
-			for i := len(publicSubnetIDs); i < req.VpcPublicSubnetsDesired; i++  {
-				createRes, err := svc.CreateSubnet(&ec2.CreateSubnetInput{
-					VpcId: aws.String(publicVpcId),
-					CidrBlock: req.VpcPublic.CidrBlock,
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create public vpc subnet")
+			// If there are no subnets, create them.
+			for _, subnet := range req.VpcPublicSubnets {
+				var found bool
+				for _, e := range existing {
+					if *e.CidrBlock == *subnet.CidrBlock {
+						log.Printf("\t\tFound: %s.", *e.SubnetId)
+						found = true
+						break
+					}
 				}
-				publicSubnetIDs = append(publicSubnetIDs, *createRes.Subnet.SubnetId)
 
-				log.Printf("\t\tCreated: %s.", *createRes.Subnet.SubnetId)
+				if !found {
+					subnet.VpcId = aws.String(publicVpcId)
+					createRes, err := svc.CreateSubnet(subnet)
+					if err != nil {
+						return errors.Wrapf(err, "failed to create public vpc subnet")
+					}
+					publicSubnetIDs = append(publicSubnetIDs, *createRes.Subnet.SubnetId)
+
+					if err := ec2TagResource(*createRes.Subnet.SubnetId, req.VpcPublicName, nil); err != nil {
+						return err
+					}
+
+					log.Printf("\t\tCreated: %s.", *createRes.Subnet.SubnetId)
+				}
 			}
 		}
 
@@ -1260,6 +1286,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t\tFind internet gateway or create new one.\n")
 		var internetGatewayId string
 		{
+			var hasAttachment bool
 			err := svc.DescribeInternetGatewaysPages(&ec2.DescribeInternetGatewaysInput{
 				Filters: []*ec2.Filter{
 					&ec2.Filter{
@@ -1270,6 +1297,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}, func(res *ec2.DescribeInternetGatewaysOutput, lastPage bool) bool {
 				for _, s := range res.InternetGateways {
 					internetGatewayId = *s.InternetGatewayId
+					if len(s.Attachments) > 0 {
+						hasAttachment = true
+					}
+					break
 				}
 				return !lastPage
 			})
@@ -1291,6 +1322,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				log.Printf("\t\tCreated: %s.", internetGatewayId)
 			} else {
 				log.Printf("\t\tFound: %s.", internetGatewayId)
+			}
+
+			if !hasAttachment {
+				log.Printf("\t\tAttached to VPC.")
+				_, err = svc.AttachInternetGateway(&ec2.AttachInternetGatewayInput{
+					InternetGatewayId: aws.String(internetGatewayId),
+					VpcId: aws.String(publicVpcId),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to attach internet gateway '%s' to vpc '%s'", )
+				}
 			}
 		}
 
@@ -1352,9 +1394,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 	}
-
-
-	return nil
 
 	// If a database cluster is defined, ensure it exists else create a new one.
 	var dbCluster *rds.DBCluster
@@ -1860,7 +1899,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		if sdNamespace == nil {
 			// Link the namespace to the VPC.
-			req.SDNamepsace.Vpc = aws.String(vpcId)
+			req.SDNamepsace.Vpc = aws.String(projectVpcId)
 
 			log.Println("\t\tCreate private namespace.")
 
@@ -1982,6 +2021,492 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		log.Printf("\t%s\tUsing Service Discovery Service '%s'.\n", tests.Success, *sdService.Id)
+	}
+
+	// If an Elastic Load Balancer is enabled, then ensure one exists else create one.
+	var ecsELBs []*ecs.LoadBalancer
+	var elb *elbv2.LoadBalancer
+	if req.EnableEcsElb {
+
+		var certificateArn string
+		if req.EnableHTTPS {
+			log.Println("ACM - Find Elastic Load Balance")
+
+			svc := acm.New(req.awsSession())
+
+			err := svc.ListCertificatesPages(&acm.ListCertificatesInput{},
+				func(res *acm.ListCertificatesOutput, lastPage bool) bool {
+					for _, cert := range res.CertificateSummaryList {
+						if *cert.DomainName == req.ServiceDomainName {
+							certificateArn = *cert.CertificateArn
+							return false
+						}
+					}
+					return !lastPage
+				})
+			if err != nil {
+				return errors.Wrapf(err, "failed to list certificates for '%s'", req.ServiceDomainName)
+			}
+
+			if certificateArn == "" {
+				// Create hash of all the domain names to be used to mark unique requests.
+				idempotencyToken := req.ServiceDomainName + "|" + strings.Join(req.ServiceDomainNameAliases, "|")
+				idempotencyToken = fmt.Sprintf("%x", md5.Sum([]byte(idempotencyToken)))
+
+				// If no certicate was found, create one.
+				createRes, err := svc.RequestCertificate(&acm.RequestCertificateInput{
+					// Fully qualified domain name (FQDN), such as www.example.com, that you want
+					// to secure with an ACM certificate. Use an asterisk (*) to create a wildcard
+					// certificate that protects several sites in the same domain. For example,
+					// *.example.com protects www.example.com, site.example.com, and images.example.com.
+					//
+					// The first domain name you enter cannot exceed 63 octets, including periods.
+					// Each subsequent Subject Alternative Name (SAN), however, can be up to 253
+					// octets in length.
+					//
+					// DomainName is a required field
+					DomainName: aws.String(req.ServiceDomainName),
+
+					// Customer chosen string that can be used to distinguish between calls to RequestCertificate.
+					// Idempotency tokens time out after one hour. Therefore, if you call RequestCertificate
+					// multiple times with the same idempotency token within one hour, ACM recognizes
+					// that you are requesting only one certificate and will issue only one. If
+					// you change the idempotency token for each call, ACM recognizes that you are
+					// requesting multiple certificates.
+					IdempotencyToken: aws.String(idempotencyToken),
+
+					// Currently, you can use this parameter to specify whether to add the certificate
+					// to a certificate transparency log. Certificate transparency makes it possible
+					// to detect SSL/TLS certificates that have been mistakenly or maliciously issued.
+					// Certificates that have not been logged typically produce an error message
+					// in a browser. For more information, see Opting Out of Certificate Transparency
+					// Logging (https://docs.aws.amazon.com/acm/latest/userguide/acm-bestpractices.html#best-practices-transparency).
+					Options: &acm.CertificateOptions{
+						CertificateTransparencyLoggingPreference: aws.String("DISABLED"),
+					},
+
+					// Additional FQDNs to be included in the Subject Alternative Name extension
+					// of the ACM certificate. For example, add the name www.example.net to a certificate
+					// for which the DomainName field is www.example.com if users can reach your
+					// site by using either name. The maximum number of domain names that you can
+					// add to an ACM certificate is 100. However, the initial limit is 10 domain
+					// names. If you need more than 10 names, you must request a limit increase.
+					// For more information, see Limits (https://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html).
+					SubjectAlternativeNames: aws.StringSlice(req.ServiceDomainNameAliases),
+
+					// The method you want to use if you are requesting a public certificate to
+					// validate that you own or control domain. You can validate with DNS (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-dns.html)
+					// or validate with email (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-email.html).
+					// We recommend that you use DNS validation.
+					ValidationMethod: aws.String("DNS"),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to create certiciate '%s'", req.ServiceDomainName)
+				}
+				certificateArn = *createRes.CertificateArn
+
+				log.Printf("\t\tCreated certiciate '%s'", req.ServiceDomainName)
+			} else {
+				log.Printf("\t\tFound certiciate '%s'", req.ServiceDomainName)
+			}
+
+			log.Printf("\t%s\tUsing ACM Certicate '%s'.\n", tests.Success, certificateArn)
+		}
+
+		/*
+			var elbSecurityGroupId string
+			{
+				svc := ec2.New(req.awsSession())
+
+				err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
+					GroupNames: aws.StringSlice([]string{req.ElbSecurityGroupName}),
+				}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
+					for _, s := range res.SecurityGroups {
+						if *s.GroupName == req.ElbSecurityGroupName {
+							elbSecurityGroupId = *s.GroupId
+							break
+						}
+					}
+					return !lastPage
+				})
+				if err != nil {
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
+						return errors.Wrapf(err, "failed to find security group '%s'", req.ElbSecurityGroupName)
+					}
+				}
+
+				if elbSecurityGroupId == "" {
+					// If no security group was found, create one.
+					createRes, err := svc.CreateSecurityGroup(req.ElbSecurityGroup)
+					if err != nil {
+						return errors.Wrapf(err, "failed to create security group '%s'", req.ElbSecurityGroupName)
+					}
+					elbSecurityGroupId = *createRes.GroupId
+
+					log.Printf("\t\tCreated: %s.", req.ElbSecurityGroupName)
+				} else {
+					log.Printf("\t\tFound: %s.", req.ElbSecurityGroupName)
+				}
+
+				ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
+					// Enable services to be publicly available via HTTP port 80
+					&ec2.AuthorizeSecurityGroupIngressInput{
+						IpProtocol: aws.String("tcp"),
+						CidrIp:     aws.String("0.0.0.0/0"),
+						FromPort:   aws.Int64(80),
+						ToPort:     aws.Int64(80),
+						GroupId:    aws.String(elbSecurityGroupId),
+					},
+				}
+
+				// HTTPS is terminated via the web server and not on the Load Balancer.
+				if req.EnableHTTPS {
+					// Enable services to be publicly available via HTTPS port 443
+					ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+						IpProtocol: aws.String("tcp"),
+						CidrIp:     aws.String("0.0.0.0/0"),
+						FromPort:   aws.Int64(443),
+						ToPort:     aws.Int64(80),
+						GroupId:    aws.String(elbSecurityGroupId),
+					})
+				}
+
+				// Add all the default ingress to the security group.
+				for _, ingressInput := range ingressInputs {
+					_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
+							return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.ElbSecurityGroupName)
+						}
+					}
+				}
+
+				log.Printf("\t%s\tUsing ELB Security Group '%s'.\n", tests.Success, req.ElbSecurityGroupName)
+			}
+		*/
+
+		log.Println("EC2 - Find Elastic Load Balance")
+		{
+			svc := elbv2.New(req.awsSession())
+
+			err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{
+				Names: []*string{aws.String(req.ElbLoadBalancerName)},
+			}, func(res *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
+				for _, lb := range res.LoadBalancers {
+					if *lb.LoadBalancerName == req.ElbLoadBalancerName {
+						elb = lb
+						return false
+					}
+				}
+				return !lastPage
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeLoadBalancerNotFoundException {
+					return errors.Wrapf(err, "failed to describe load balancer '%s'", req.ElbLoadBalancerName)
+				}
+			}
+
+			var curListeners []*elbv2.Listener
+			if elb == nil {
+
+				// Link the security group and subnets to the Load Balancer
+				req.ElbLoadBalancer.SecurityGroups = aws.StringSlice([]string{securityGroupId})
+				req.ElbLoadBalancer.Subnets = aws.StringSlice(projectSubnetsIDs)
+
+				//req.ElbLoadBalancer.SubnetMappings = []*elbv2.SubnetMapping{}
+				//for _, subnetId := range projectSubnetsIDs {
+				//	req.ElbLoadBalancer.SubnetMappings = append(req.ElbLoadBalancer.SubnetMappings, &elbv2.SubnetMapping{
+				//		SubnetId: aws.String(subnetId),
+				//	})
+				//}
+
+				dat, _ := json.Marshal(req.ElbLoadBalancer)
+				fmt.Println(string(dat))
+
+				// If no repository was found, create one.
+				createRes, err := svc.CreateLoadBalancer(req.ElbLoadBalancer)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create load balancer '%s'", req.ElbLoadBalancerName)
+				}
+				elb = createRes.LoadBalancers[0]
+
+				log.Printf("\t\tCreated: %s.", *elb.LoadBalancerArn)
+			} else {
+				log.Printf("\t\tFound: %s.", *elb.LoadBalancerArn)
+
+				// Search for existing listeners associated with the load balancer.
+				res, err := svc.DescribeListeners(&elbv2.DescribeListenersInput{
+					// The Amazon Resource Name (ARN) of the load balancer.
+					LoadBalancerArn: elb.LoadBalancerArn,
+					// There are two target groups, return both associated listeners if they exist.
+					PageSize: aws.Int64(2),
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to find listeners for load balancer '%s'", req.ElbLoadBalancerName)
+				}
+				curListeners = res.Listeners
+			}
+
+			// The state code. The initial state of the load balancer is provisioning. After
+			// the load balancer is fully set up and ready to route traffic, its state is
+			// active. If the load balancer could not be set up, its state is failed.
+			log.Printf("\t\t\tState: %s.", *elb.State.Code)
+
+			// Default target groups.
+			targetGroupInputs := []*elbv2.CreateTargetGroupInput{
+				// Default target group for HTTP via port 80.
+				&elbv2.CreateTargetGroupInput{
+					// The name of the target group.
+					// This name must be unique per region per account, can have a maximum of 32
+					// characters, must contain only alphanumeric characters or hyphens, and must
+					// not begin or end with a hyphen.
+					// Name is a required field
+					Name: aws.String(fmt.Sprintf("%s-http", *elb.LoadBalancerName)),
+
+					// The port on which the targets receive traffic. This port is used unless you
+					// specify a port override when registering the target. If the target is a Lambda
+					// function, this parameter does not apply.
+					Port: aws.Int64(80),
+
+					// The protocol to use for routing traffic to the targets. For Application Load
+					// Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers,
+					// the supported protocols are TCP, TLS, UDP, or TCP_UDP. A TCP_UDP listener
+					// must be associated with a TCP_UDP target group. If the target is a Lambda
+					// function, this parameter does not apply.
+					Protocol: aws.String("HTTP"),
+
+					// Indicates whether health checks are enabled. If the target type is lambda,
+					// health checks are disabled by default but can be enabled. If the target type
+					// is instance or ip, health checks are always enabled and cannot be disabled.
+					HealthCheckEnabled: aws.Bool(true),
+
+					// The approximate amount of time, in seconds, between health checks of an individual
+					// target. For HTTP and HTTPS health checks, the range is 5–300 seconds. For
+					// TCP health checks, the supported values are 10 and 30 seconds. If the target
+					// type is instance or ip, the default is 30 seconds. If the target type is
+					// lambda, the default is 35 seconds.
+					HealthCheckIntervalSeconds: aws.Int64(30),
+
+					// [HTTP/HTTPS health checks] The ping path that is the destination on the targets
+					// for health checks. The default is /.
+					HealthCheckPath: aws.String("/ping"),
+
+					// The protocol the load balancer uses when performing health checks on targets.
+					// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
+					// the default is TCP. The TCP protocol is supported for health checks only
+					// if the protocol of the target group is TCP, TLS, UDP, or TCP_UDP. The TLS,
+					// UDP, and TCP_UDP protocols are not supported for health checks.
+					HealthCheckProtocol: aws.String("HTTP"),
+
+					// The amount of time, in seconds, during which no response from a target means
+					// a failed health check. For target groups with a protocol of HTTP or HTTPS,
+					// the default is 5 seconds. For target groups with a protocol of TCP or TLS,
+					// this value must be 6 seconds for HTTP health checks and 10 seconds for TCP
+					// and HTTPS health checks. If the target type is lambda, the default is 30
+					// seconds.
+					HealthCheckTimeoutSeconds: aws.Int64(5),
+
+					// The number of consecutive health checks successes required before considering
+					// an unhealthy target healthy. For target groups with a protocol of HTTP or
+					// HTTPS, the default is 5. For target groups with a protocol of TCP or TLS,
+					// the default is 3. If the target type is lambda, the default is 5.
+					HealthyThresholdCount: aws.Int64(3),
+
+					// The number of consecutive health check failures required before considering
+					// a target unhealthy. For target groups with a protocol of HTTP or HTTPS, the
+					// default is 2. For target groups with a protocol of TCP or TLS, this value
+					// must be the same as the healthy threshold count. If the target type is lambda,
+					// the default is 2.
+					UnhealthyThresholdCount: aws.Int64(3),
+
+					// [HTTP/HTTPS health checks] The HTTP codes to use when checking for a successful
+					// response from a target.
+					Matcher: &elbv2.Matcher{
+						HttpCode: aws.String("200"),
+					},
+
+					// The type of target that you must specify when registering targets with this
+					// target group. You can't specify targets for a target group using more than
+					// one target type.
+					//
+					//    * instance - Targets are specified by instance ID. This is the default
+					//    value. If the target group protocol is UDP or TCP_UDP, the target type
+					//    must be instance.
+					//
+					//    * ip - Targets are specified by IP address. You can specify IP addresses
+					//    from the subnets of the virtual private cloud (VPC) for the target group,
+					//    the RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and
+					//    the RFC 6598 range (100.64.0.0/10). You can't specify publicly routable
+					//    IP addresses.
+					//
+					//    * lambda - The target groups contains a single Lambda function.
+					TargetType: aws.String("ip"),
+
+					// The identifier of the virtual private cloud (VPC). If the target is a Lambda
+					// function, this parameter does not apply.
+					VpcId: aws.String(projectVpcId),
+				},
+			}
+
+			// If HTTPS is enabled, then add the associated target group.
+			if req.EnableHTTPS {
+				// Default target group for HTTPS via port 443.
+				targetGroupInputs = append(targetGroupInputs, &elbv2.CreateTargetGroupInput{
+					Name:                       aws.String(fmt.Sprintf("%s-https", *elb.LoadBalancerName)),
+					Port:                       aws.Int64(443),
+					Protocol:                   aws.String("HTTPS"),
+					HealthCheckEnabled:         aws.Bool(true),
+					HealthCheckIntervalSeconds: aws.Int64(30),
+					HealthCheckPath:            aws.String("/ping"),
+					HealthCheckProtocol:        aws.String("HTTPS"),
+					HealthCheckTimeoutSeconds:  aws.Int64(5),
+					HealthyThresholdCount:      aws.Int64(3),
+					UnhealthyThresholdCount:    aws.Int64(3),
+					Matcher: &elbv2.Matcher{
+						HttpCode: aws.String("200"),
+					},
+					TargetType: aws.String("ip"),
+					VpcId:      aws.String(projectVpcId),
+				})
+			}
+
+			for _, targetGroupInput := range targetGroupInputs {
+				var targetGroup *elbv2.TargetGroup
+				err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
+					LoadBalancerArn: elb.LoadBalancerArn,
+				}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
+					for _, tg := range res.TargetGroups {
+						if *tg.TargetGroupName == *targetGroupInput.Name {
+							targetGroup = tg
+							return false
+						}
+					}
+					return !lastPage
+				})
+				if err != nil {
+					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeTargetGroupNotFoundException {
+						return errors.Wrapf(err, "failed to describe target group '%s'", *targetGroupInput.Name)
+					}
+				}
+
+				if targetGroup == nil {
+					// If no target group was found, create one.
+					createRes, err := svc.CreateTargetGroup(targetGroupInput)
+					if err != nil {
+						return errors.Wrapf(err, "failed to create target group '%s'", *targetGroupInput.Name)
+					}
+					targetGroup = createRes.TargetGroups[0]
+
+					log.Printf("\t\tAdded target group: %s.", *targetGroup.TargetGroupArn)
+				} else {
+					log.Printf("\t\tHas target group: %s.", *targetGroup.TargetGroupArn)
+				}
+
+				ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
+					// The name of the container (as it appears in a container definition) to associate
+					// with the load balancer.
+					ContainerName: aws.String(req.EcsServiceName),
+					// The port on the container to associate with the load balancer. This port
+					// must correspond to a containerPort in the service's task definition. Your
+					// container instances must allow ingress traffic on the hostPort of the port
+					// mapping.
+					ContainerPort: targetGroup.Port,
+					// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
+					// group or groups associated with a service or task set.
+					TargetGroupArn: targetGroup.TargetGroupArn,
+				})
+
+				if req.ElbDeregistrationDelay != nil {
+					// If no target group was found, create one.
+					_, err = svc.ModifyTargetGroupAttributes(&elbv2.ModifyTargetGroupAttributesInput{
+						TargetGroupArn: targetGroup.TargetGroupArn,
+						Attributes: []*elbv2.TargetGroupAttribute{
+							&elbv2.TargetGroupAttribute{
+								// The name of the attribute.
+								Key: aws.String("deregistration_delay.timeout_seconds"),
+
+								// The value of the attribute.
+								Value: aws.String(strconv.Itoa(*req.ElbDeregistrationDelay)),
+							},
+						},
+					})
+					if err != nil {
+						return errors.Wrapf(err, "failed to modify target group '%s' attributes", *targetGroupInput.Name)
+					}
+
+					log.Printf("\t\t\tSet sttributes.")
+				}
+
+				var foundListener bool
+				for _, cl := range curListeners {
+					if cl.Port == targetGroupInput.Port {
+						foundListener = true
+						break
+					}
+				}
+
+				if !foundListener {
+					listenerInput := &elbv2.CreateListenerInput{
+						// The actions for the default rule. The rule must include one forward action
+						// or one or more fixed-response actions.
+						//
+						// If the action type is forward, you specify a target group. The protocol of
+						// the target group must be HTTP or HTTPS for an Application Load Balancer.
+						// The protocol of the target group must be TCP, TLS, UDP, or TCP_UDP for a
+						// Network Load Balancer.
+						//
+						// DefaultActions is a required field
+						DefaultActions: []*elbv2.Action{
+							&elbv2.Action{
+								// The type of action. Each rule must include exactly one of the following types
+								// of actions: forward, fixed-response, or redirect.
+								//
+								// Type is a required field
+								Type: aws.String("forward"),
+
+								// The Amazon Resource Name (ARN) of the target group. Specify only when Type
+								// is forward.
+								TargetGroupArn: targetGroup.TargetGroupArn,
+							},
+						},
+
+						// The Amazon Resource Name (ARN) of the load balancer.
+						//
+						// LoadBalancerArn is a required field
+						LoadBalancerArn: elb.LoadBalancerArn,
+
+						// The port on which the load balancer is listening.
+						//
+						// Port is a required field
+						Port: targetGroup.Port,
+
+						// The protocol for connections from clients to the load balancer. For Application
+						// Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load
+						// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP.
+						//
+						// Protocol is a required field
+						Protocol: targetGroup.Protocol,
+					}
+
+					if *listenerInput.Protocol == "HTTPS" {
+						listenerInput.Certificates = append(listenerInput.Certificates, &elbv2.Certificate{
+							CertificateArn: aws.String(certificateArn),
+							IsDefault:      aws.Bool(true),
+						})
+					}
+
+					// If no repository was found, create one.
+					createRes, err := svc.CreateListener(listenerInput)
+					if err != nil {
+						return errors.Wrapf(err, "failed to create listener '%s'", req.ElbLoadBalancerName)
+					}
+
+					log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
+				}
+			}
+
+			log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
+		}
 	}
 
 	// Try to find AWS ECS Cluster by name or create new one.
@@ -2749,494 +3274,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUpdated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 	} else {
 
-		// If an Elastic Load Balancer is enabled, then ensure one exists else create one.
-		var ecsELBs []*ecs.LoadBalancer
-		if req.EnableEcsElb {
-
-			var certificateArn string
-			if req.EnableHTTPS {
-				log.Println("ACM - Find Elastic Load Balance")
-
-				svc := acm.New(req.awsSession())
-
-				err := svc.ListCertificatesPages(&acm.ListCertificatesInput{},
-					func(res *acm.ListCertificatesOutput, lastPage bool) bool {
-						for _, cert := range res.CertificateSummaryList {
-							if *cert.DomainName == req.ServiceDomainName {
-								certificateArn = *cert.CertificateArn
-								return false
-							}
-						}
-						return !lastPage
-					})
-				if err != nil {
-					return errors.Wrapf(err, "failed to list certificates for '%s'", req.ServiceDomainName)
-				}
-
-				if certificateArn == "" {
-					// Create hash of all the domain names to be used to mark unique requests.
-					idempotencyToken := req.ServiceDomainName + "|" + strings.Join(req.ServiceDomainNameAliases, "|")
-					idempotencyToken = fmt.Sprintf("%x", md5.Sum([]byte(idempotencyToken)))
-
-					// If no certicate was found, create one.
-					createRes, err := svc.RequestCertificate(&acm.RequestCertificateInput{
-						// Fully qualified domain name (FQDN), such as www.example.com, that you want
-						// to secure with an ACM certificate. Use an asterisk (*) to create a wildcard
-						// certificate that protects several sites in the same domain. For example,
-						// *.example.com protects www.example.com, site.example.com, and images.example.com.
-						//
-						// The first domain name you enter cannot exceed 63 octets, including periods.
-						// Each subsequent Subject Alternative Name (SAN), however, can be up to 253
-						// octets in length.
-						//
-						// DomainName is a required field
-						DomainName: aws.String(req.ServiceDomainName),
-
-						// Customer chosen string that can be used to distinguish between calls to RequestCertificate.
-						// Idempotency tokens time out after one hour. Therefore, if you call RequestCertificate
-						// multiple times with the same idempotency token within one hour, ACM recognizes
-						// that you are requesting only one certificate and will issue only one. If
-						// you change the idempotency token for each call, ACM recognizes that you are
-						// requesting multiple certificates.
-						IdempotencyToken: aws.String(idempotencyToken),
-
-						// Currently, you can use this parameter to specify whether to add the certificate
-						// to a certificate transparency log. Certificate transparency makes it possible
-						// to detect SSL/TLS certificates that have been mistakenly or maliciously issued.
-						// Certificates that have not been logged typically produce an error message
-						// in a browser. For more information, see Opting Out of Certificate Transparency
-						// Logging (https://docs.aws.amazon.com/acm/latest/userguide/acm-bestpractices.html#best-practices-transparency).
-						Options: &acm.CertificateOptions{
-							CertificateTransparencyLoggingPreference: aws.String("DISABLED"),
-						},
-
-						// Additional FQDNs to be included in the Subject Alternative Name extension
-						// of the ACM certificate. For example, add the name www.example.net to a certificate
-						// for which the DomainName field is www.example.com if users can reach your
-						// site by using either name. The maximum number of domain names that you can
-						// add to an ACM certificate is 100. However, the initial limit is 10 domain
-						// names. If you need more than 10 names, you must request a limit increase.
-						// For more information, see Limits (https://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html).
-						SubjectAlternativeNames: aws.StringSlice(req.ServiceDomainNameAliases),
-
-						// The method you want to use if you are requesting a public certificate to
-						// validate that you own or control domain. You can validate with DNS (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-dns.html)
-						// or validate with email (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-email.html).
-						// We recommend that you use DNS validation.
-						ValidationMethod: aws.String("DNS"),
-					})
-					if err != nil {
-						return errors.Wrapf(err, "failed to create certiciate '%s'", req.ServiceDomainName)
-					}
-					certificateArn = *createRes.CertificateArn
-
-					log.Printf("\t\tCreated certiciate '%s'", req.ServiceDomainName)
-				} else {
-					log.Printf("\t\tFound certiciate '%s'", req.ServiceDomainName)
-				}
-
-				log.Printf("\t%s\tUsing ACM Certicate '%s'.\n", tests.Success, certificateArn)
-			}
-
-			var elbSecurityGroupId string
-			{
-				svc := ec2.New(req.awsSession())
-
-				err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
-					GroupNames: aws.StringSlice([]string{req.ElbSecurityGroupName}),
-				}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
-					for _, s := range res.SecurityGroups {
-						if *s.GroupName == req.ElbSecurityGroupName {
-							elbSecurityGroupId = *s.GroupId
-							break
-						}
-					}
-					return !lastPage
-				})
-				if err != nil {
-					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
-						return errors.Wrapf(err, "failed to find security group '%s'", req.ElbSecurityGroupName)
-					}
-				}
-
-				if elbSecurityGroupId == "" {
-					// If no security group was found, create one.
-					createRes, err := svc.CreateSecurityGroup(req.ElbSecurityGroup)
-					if err != nil {
-						return errors.Wrapf(err, "failed to create security group '%s'", req.ElbSecurityGroupName)
-					}
-					elbSecurityGroupId = *createRes.GroupId
-
-					log.Printf("\t\tCreated: %s.", req.ElbSecurityGroupName)
-				} else {
-					log.Printf("\t\tFound: %s.", req.ElbSecurityGroupName)
-				}
-
-				ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
-					// Enable services to be publicly available via HTTP port 80
-					&ec2.AuthorizeSecurityGroupIngressInput{
-						IpProtocol: aws.String("tcp"),
-						CidrIp:     aws.String("0.0.0.0/0"),
-						FromPort:   aws.Int64(80),
-						ToPort:     aws.Int64(80),
-						GroupId:    aws.String(elbSecurityGroupId),
-					},
-				}
-
-				// HTTPS is terminated via the web server and not on the Load Balancer.
-				if req.EnableHTTPS {
-					// Enable services to be publicly available via HTTPS port 443
-					ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-						IpProtocol: aws.String("tcp"),
-						CidrIp:     aws.String("0.0.0.0/0"),
-						FromPort:   aws.Int64(443),
-						ToPort:     aws.Int64(80),
-						GroupId:    aws.String(elbSecurityGroupId),
-					})
-				}
-
-				// Add all the default ingress to the security group.
-				for _, ingressInput := range ingressInputs {
-					_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
-					if err != nil {
-						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
-							return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.ElbSecurityGroupName)
-						}
-					}
-				}
-
-				log.Printf("\t%s\tUsing ELB Security Group '%s'.\n", tests.Success, req.ElbSecurityGroupName)
-			}
-
-
-			log.Println("EC2 - Find Elastic Load Balance")
-			{
-				svc := elbv2.New(req.awsSession())
-
-				var elb *elbv2.LoadBalancer
-				err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{
-					Names: []*string{aws.String(req.ElbLoadBalancerName)},
-				}, func(res *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
-					for _, lb := range res.LoadBalancers {
-						if *lb.LoadBalancerName == req.ElbLoadBalancerName {
-							elb = lb
-							return false
-						}
-					}
-					return !lastPage
-				})
-				if err != nil {
-					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeLoadBalancerNotFoundException {
-						return errors.Wrapf(err, "failed to describe load balancer '%s'", req.ElbLoadBalancerName)
-					}
-				}
-
-				var curListeners []*elbv2.Listener
-				if elb == nil {
-
-					// Link the security group and subnets to the Load Balancer
-					req.ElbLoadBalancer.SecurityGroups = aws.StringSlice([]string{req.ElbSecurityGroupName})
-					req.ElbLoadBalancer.Subnets = aws.StringSlice(subnetsIDs)
-
-
-					//req.ElbLoadBalancer.SubnetMappings = []*elbv2.SubnetMapping{}
-					//for _, subnetId := range subnetsIDs {
-					//	req.ElbLoadBalancer.SubnetMappings = append(req.ElbLoadBalancer.SubnetMappings, &elbv2.SubnetMapping{
-					//		SubnetId: aws.String(subnetId),
-					//	})
-					//}
-
-
-					dat, _ := json.Marshal(req.ElbLoadBalancer)
-					fmt.Println(string(dat))
-
-					// If no repository was found, create one.
-					createRes, err := svc.CreateLoadBalancer(req.ElbLoadBalancer)
-					if err != nil {
-						return errors.Wrapf(err, "failed to create load balancer '%s'", req.ElbLoadBalancerName)
-					}
-					elb = createRes.LoadBalancers[0]
-
-					log.Printf("\t\tCreated: %s.", *elb.LoadBalancerArn)
-				} else {
-					log.Printf("\t\tFound: %s.", *elb.LoadBalancerArn)
-
-					// Search for existing listeners associated with the load balancer.
-					res, err := svc.DescribeListeners(&elbv2.DescribeListenersInput{
-						// The Amazon Resource Name (ARN) of the load balancer.
-						LoadBalancerArn: elb.LoadBalancerArn,
-						// There are two target groups, return both associated listeners if they exist.
-						PageSize: aws.Int64(2),
-					})
-					if err != nil {
-						return errors.Wrapf(err, "failed to find listeners for load balancer '%s'", req.ElbLoadBalancerName)
-					}
-					curListeners = res.Listeners
-				}
-
-				// The state code. The initial state of the load balancer is provisioning. After
-				// the load balancer is fully set up and ready to route traffic, its state is
-				// active. If the load balancer could not be set up, its state is failed.
-				log.Printf("\t\t\tState: %s.", *elb.State.Code)
-
-				// Default target groups.
-				targetGroupInputs := []*elbv2.CreateTargetGroupInput{
-					// Default target group for HTTP via port 80.
-					&elbv2.CreateTargetGroupInput{
-						// The name of the target group.
-						// This name must be unique per region per account, can have a maximum of 32
-						// characters, must contain only alphanumeric characters or hyphens, and must
-						// not begin or end with a hyphen.
-						// Name is a required field
-						Name: aws.String(fmt.Sprintf("%s-http", *elb.LoadBalancerName)),
-
-						// The port on which the targets receive traffic. This port is used unless you
-						// specify a port override when registering the target. If the target is a Lambda
-						// function, this parameter does not apply.
-						Port: aws.Int64(80),
-
-						// The protocol to use for routing traffic to the targets. For Application Load
-						// Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers,
-						// the supported protocols are TCP, TLS, UDP, or TCP_UDP. A TCP_UDP listener
-						// must be associated with a TCP_UDP target group. If the target is a Lambda
-						// function, this parameter does not apply.
-						Protocol: aws.String("HTTP"),
-
-						// Indicates whether health checks are enabled. If the target type is lambda,
-						// health checks are disabled by default but can be enabled. If the target type
-						// is instance or ip, health checks are always enabled and cannot be disabled.
-						HealthCheckEnabled: aws.Bool(true),
-
-						// The approximate amount of time, in seconds, between health checks of an individual
-						// target. For HTTP and HTTPS health checks, the range is 5–300 seconds. For
-						// TCP health checks, the supported values are 10 and 30 seconds. If the target
-						// type is instance or ip, the default is 30 seconds. If the target type is
-						// lambda, the default is 35 seconds.
-						HealthCheckIntervalSeconds: aws.Int64(30),
-
-						// [HTTP/HTTPS health checks] The ping path that is the destination on the targets
-						// for health checks. The default is /.
-						HealthCheckPath: aws.String("/ping"),
-
-						// The protocol the load balancer uses when performing health checks on targets.
-						// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
-						// the default is TCP. The TCP protocol is supported for health checks only
-						// if the protocol of the target group is TCP, TLS, UDP, or TCP_UDP. The TLS,
-						// UDP, and TCP_UDP protocols are not supported for health checks.
-						HealthCheckProtocol: aws.String("HTTP"),
-
-						// The amount of time, in seconds, during which no response from a target means
-						// a failed health check. For target groups with a protocol of HTTP or HTTPS,
-						// the default is 5 seconds. For target groups with a protocol of TCP or TLS,
-						// this value must be 6 seconds for HTTP health checks and 10 seconds for TCP
-						// and HTTPS health checks. If the target type is lambda, the default is 30
-						// seconds.
-						HealthCheckTimeoutSeconds: aws.Int64(5),
-
-						// The number of consecutive health checks successes required before considering
-						// an unhealthy target healthy. For target groups with a protocol of HTTP or
-						// HTTPS, the default is 5. For target groups with a protocol of TCP or TLS,
-						// the default is 3. If the target type is lambda, the default is 5.
-						HealthyThresholdCount: aws.Int64(3),
-
-						// The number of consecutive health check failures required before considering
-						// a target unhealthy. For target groups with a protocol of HTTP or HTTPS, the
-						// default is 2. For target groups with a protocol of TCP or TLS, this value
-						// must be the same as the healthy threshold count. If the target type is lambda,
-						// the default is 2.
-						UnhealthyThresholdCount: aws.Int64(3),
-
-						// [HTTP/HTTPS health checks] The HTTP codes to use when checking for a successful
-						// response from a target.
-						Matcher: &elbv2.Matcher{
-							HttpCode: aws.String("200"),
-						},
-
-						// The type of target that you must specify when registering targets with this
-						// target group. You can't specify targets for a target group using more than
-						// one target type.
-						//
-						//    * instance - Targets are specified by instance ID. This is the default
-						//    value. If the target group protocol is UDP or TCP_UDP, the target type
-						//    must be instance.
-						//
-						//    * ip - Targets are specified by IP address. You can specify IP addresses
-						//    from the subnets of the virtual private cloud (VPC) for the target group,
-						//    the RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and
-						//    the RFC 6598 range (100.64.0.0/10). You can't specify publicly routable
-						//    IP addresses.
-						//
-						//    * lambda - The target groups contains a single Lambda function.
-						TargetType: aws.String("ip"),
-
-						// The identifier of the virtual private cloud (VPC). If the target is a Lambda
-						// function, this parameter does not apply.
-						VpcId: aws.String(vpcId),
-					},
-				}
-
-				// If HTTPS is enabled, then add the associated target group.
-				if req.EnableHTTPS {
-					// Default target group for HTTPS via port 443.
-					targetGroupInputs = append(targetGroupInputs, &elbv2.CreateTargetGroupInput{
-						Name:                       aws.String(fmt.Sprintf("%s-https", *elb.LoadBalancerName)),
-						Port:                       aws.Int64(443),
-						Protocol:                   aws.String("HTTPS"),
-						HealthCheckEnabled:         aws.Bool(true),
-						HealthCheckIntervalSeconds: aws.Int64(30),
-						HealthCheckPath:            aws.String("/ping"),
-						HealthCheckProtocol:        aws.String("HTTPS"),
-						HealthCheckTimeoutSeconds:  aws.Int64(5),
-						HealthyThresholdCount:      aws.Int64(3),
-						UnhealthyThresholdCount:    aws.Int64(3),
-						Matcher: &elbv2.Matcher{
-							HttpCode: aws.String("200"),
-						},
-						TargetType: aws.String("ip"),
-						VpcId:      aws.String(vpcId),
-					})
-				}
-
-				for _, targetGroupInput := range targetGroupInputs {
-					var targetGroup *elbv2.TargetGroup
-					err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
-						LoadBalancerArn: elb.LoadBalancerArn,
-						Names:           []*string{aws.String(req.ElbLoadBalancerName)},
-					}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
-						for _, tg := range res.TargetGroups {
-							if *tg.TargetGroupName == *targetGroupInput.Name {
-								targetGroup = tg
-								return false
-							}
-						}
-						return !lastPage
-					})
-					if err != nil {
-						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeTargetGroupNotFoundException {
-							return errors.Wrapf(err, "failed to describe target group '%s'", *targetGroupInput.Name)
-						}
-					}
-
-					if targetGroup == nil {
-						// If no target group was found, create one.
-						createRes, err := svc.CreateTargetGroup(targetGroupInput)
-						if err != nil {
-							return errors.Wrapf(err, "failed to create target group '%s'", *targetGroupInput.Name)
-						}
-						targetGroup = createRes.TargetGroups[0]
-
-						log.Printf("\t\tAdded target group: %s.", *targetGroup.TargetGroupArn)
-					} else {
-						log.Printf("\t\tHas target group: %s.", *targetGroup.TargetGroupArn)
-					}
-
-					ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
-						// The name of the container (as it appears in a container definition) to associate
-						// with the load balancer.
-						ContainerName: aws.String(req.EcsServiceName),
-						// The port on the container to associate with the load balancer. This port
-						// must correspond to a containerPort in the service's task definition. Your
-						// container instances must allow ingress traffic on the hostPort of the port
-						// mapping.
-						ContainerPort: targetGroup.Port,
-						// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
-						// group or groups associated with a service or task set.
-						TargetGroupArn: targetGroup.TargetGroupArn,
-					})
-
-					if req.ElbDeregistrationDelay != nil {
-						// If no target group was found, create one.
-						_, err = svc.ModifyTargetGroupAttributes(&elbv2.ModifyTargetGroupAttributesInput{
-							TargetGroupArn: targetGroup.TargetGroupArn,
-							Attributes: []*elbv2.TargetGroupAttribute{
-								&elbv2.TargetGroupAttribute{
-									// The name of the attribute.
-									Key: aws.String("deregistration_delay.timeout_seconds"),
-
-									// The value of the attribute.
-									Value: aws.String(strconv.Itoa(*req.ElbDeregistrationDelay)),
-								},
-							},
-						})
-						if err != nil {
-							return errors.Wrapf(err, "failed to modify target group '%s' attributes", *targetGroupInput.Name)
-						}
-
-						log.Printf("\t\t\tSet sttributes.")
-					}
-
-					var foundListener bool
-					for _, cl := range curListeners {
-						if cl.Port == targetGroupInput.Port {
-							foundListener = true
-							break
-						}
-					}
-
-					if !foundListener {
-						listenerInput := &elbv2.CreateListenerInput{
-							// The actions for the default rule. The rule must include one forward action
-							// or one or more fixed-response actions.
-							//
-							// If the action type is forward, you specify a target group. The protocol of
-							// the target group must be HTTP or HTTPS for an Application Load Balancer.
-							// The protocol of the target group must be TCP, TLS, UDP, or TCP_UDP for a
-							// Network Load Balancer.
-							//
-							// DefaultActions is a required field
-							DefaultActions: []*elbv2.Action{
-								&elbv2.Action{
-									// The type of action. Each rule must include exactly one of the following types
-									// of actions: forward, fixed-response, or redirect.
-									//
-									// Type is a required field
-									Type: aws.String("forward"),
-
-									// The Amazon Resource Name (ARN) of the target group. Specify only when Type
-									// is forward.
-									TargetGroupArn: targetGroup.TargetGroupArn,
-								},
-							},
-
-							// The Amazon Resource Name (ARN) of the load balancer.
-							//
-							// LoadBalancerArn is a required field
-							LoadBalancerArn: elb.LoadBalancerArn,
-
-							// The port on which the load balancer is listening.
-							//
-							// Port is a required field
-							Port: targetGroup.Port,
-
-							// The protocol for connections from clients to the load balancer. For Application
-							// Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load
-							// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP.
-							//
-							// Protocol is a required field
-							Protocol: targetGroup.Protocol,
-						}
-
-						if *listenerInput.Protocol == "HTTPS" {
-							listenerInput.Certificates = append(listenerInput.Certificates, &elbv2.Certificate{
-								CertificateArn: aws.String(certificateArn),
-								IsDefault:      aws.Bool(true),
-							})
-						}
-
-						// If no repository was found, create one.
-						createRes, err := svc.CreateListener(listenerInput)
-						if err != nil {
-							return errors.Wrapf(err, "failed to create listener '%s'", req.ElbLoadBalancerName)
-						}
-
-						log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
-					}
-				}
-
-				log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
-			}
-		}
-
 		log.Println("ECS - Create Service")
 		{
 
@@ -3323,7 +3360,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						// that can be specified per AwsVpcConfiguration.
 						// All specified subnets must be from the same VPC.
 						// Subnets is a required field
-						Subnets: aws.StringSlice(subnetsIDs),
+						Subnets: aws.StringSlice(projectSubnetsIDs),
 					},
 				},
 

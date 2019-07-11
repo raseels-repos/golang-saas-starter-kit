@@ -104,8 +104,6 @@ type serviceDeployRequest struct {
 
 	ElbTargetGroupName                     string   `validate:"omitempty"`
 	ElbTargetGroup *elbv2.CreateTargetGroupInput
-	//ElbSecurityGroupName   string         `validate:"omitempty"`
-	//ElbSecurityGroup *ec2.CreateSecurityGroupInput
 
 	VpcPublicName string `validate:"omitempty"`
 	VpcPublic *ec2.CreateVpcInput

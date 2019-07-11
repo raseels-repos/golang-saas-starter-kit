@@ -591,35 +591,6 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 					TargetType: aws.String("ip"),
 				}
 				log.Printf("\t\t\tSet ELB Target Group Name to '%s'.", req.ElbTargetGroupName )
-
-
-				// Define a new Security Group that is outside the VPC for a public facing ELB.
-				//req.ElbSecurityGroupName = req.ElbLoadBalancerName+"-elb"
-				//req.ElbSecurityGroup = &ec2.CreateSecurityGroupInput{
-				//	// The name of the security group.
-				//	// Constraints: Up to 255 characters in length. Cannot start with sg-.
-				//	// Constraints for EC2-Classic: ASCII characters
-				//	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-				//	// GroupName is a required field
-				//	GroupName: aws.String(req.ElbSecurityGroupName),
-				//
-				//	// A description for the security group. This is informational only.
-				//	// Constraints: Up to 255 characters in length
-				//	// Constraints for EC2-Classic: ASCII characters
-				//	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-				//	// Description is a required field
-				//	Description: aws.String(fmt.Sprintf("Security group for ELB %s", req.ElbSecurityGroupName)),
-				//}
-				//log.Printf("\t\t\tSet ELB Security Group Name to '%s'.", req.ElbSecurityGroupName)
-
-				//req.VpcPublicName = req.ProjectName+"-public"
-				//req.VpcPublic =  &ec2.CreateVpcInput{
-				//	CidrBlock: aws.String("10.0.0.0/16"),
-				//}
-				//req.VpcPublicSubnets =  []*ec2.CreateSubnetInput{
-				//	{CidrBlock:aws.String("10.0.0.0/24")},
-				//	{CidrBlock:aws.String("10.0.1.0/24")},
-				//}
 			}
 
 			// Set ECS configs based on specified env.
@@ -2270,78 +2241,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			log.Printf("\t%s\tUsing ACM Certicate '%s'.\n", tests.Success, certificateArn)
 		}
 
-		/*
-			var elbSecurityGroupId string
-			{
-				svc := ec2.New(req.awsSession())
-
-				err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
-					GroupNames: aws.StringSlice([]string{req.ElbSecurityGroupName}),
-				}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
-					for _, s := range res.SecurityGroups {
-						if *s.GroupName == req.ElbSecurityGroupName {
-							elbSecurityGroupId = *s.GroupId
-							break
-						}
-					}
-					return !lastPage
-				})
-				if err != nil {
-					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
-						return errors.Wrapf(err, "failed to find security group '%s'", req.ElbSecurityGroupName)
-					}
-				}
-
-				if elbSecurityGroupId == "" {
-					// If no security group was found, create one.
-					createRes, err := svc.CreateSecurityGroup(req.ElbSecurityGroup)
-					if err != nil {
-						return errors.Wrapf(err, "failed to create security group '%s'", req.ElbSecurityGroupName)
-					}
-					elbSecurityGroupId = *createRes.GroupId
-
-					log.Printf("\t\tCreated: %s.", req.ElbSecurityGroupName)
-				} else {
-					log.Printf("\t\tFound: %s.", req.ElbSecurityGroupName)
-				}
-
-				ingressInputs := []*ec2.AuthorizeSecurityGroupIngressInput{
-					// Enable services to be publicly available via HTTP port 80
-					&ec2.AuthorizeSecurityGroupIngressInput{
-						IpProtocol: aws.String("tcp"),
-						CidrIp:     aws.String("0.0.0.0/0"),
-						FromPort:   aws.Int64(80),
-						ToPort:     aws.Int64(80),
-						GroupId:    aws.String(elbSecurityGroupId),
-					},
-				}
-
-				// HTTPS is terminated via the web server and not on the Load Balancer.
-				if req.EnableHTTPS {
-					// Enable services to be publicly available via HTTPS port 443
-					ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-						IpProtocol: aws.String("tcp"),
-						CidrIp:     aws.String("0.0.0.0/0"),
-						FromPort:   aws.Int64(443),
-						ToPort:     aws.Int64(80),
-						GroupId:    aws.String(elbSecurityGroupId),
-					})
-				}
-
-				// Add all the default ingress to the security group.
-				for _, ingressInput := range ingressInputs {
-					_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
-					if err != nil {
-						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
-							return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.ElbSecurityGroupName)
-						}
-					}
-				}
-
-				log.Printf("\t%s\tUsing ELB Security Group '%s'.\n", tests.Success, req.ElbSecurityGroupName)
-			}
-		*/
-
 		log.Println("EC2 - Find Elastic Load Balance")
 		{
 			svc := elbv2.New(req.awsSession())
@@ -2369,16 +2268,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// Link the security group and subnets to the Load Balancer
 				req.ElbLoadBalancer.SecurityGroups = aws.StringSlice([]string{securityGroupId})
 				req.ElbLoadBalancer.Subnets = aws.StringSlice(projectSubnetsIDs)
-
-				//req.ElbLoadBalancer.SubnetMappings = []*elbv2.SubnetMapping{}
-				//for _, subnetId := range projectSubnetsIDs {
-				//	req.ElbLoadBalancer.SubnetMappings = append(req.ElbLoadBalancer.SubnetMappings, &elbv2.SubnetMapping{
-				//		SubnetId: aws.String(subnetId),
-				//	})
-				//}
-
-				dat, _ := json.Marshal(req.ElbLoadBalancer)
-				fmt.Println(string(dat))
 
 				// If no repository was found, create one.
 				createRes, err := svc.CreateLoadBalancer(req.ElbLoadBalancer)
@@ -2408,8 +2297,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// the load balancer is fully set up and ready to route traffic, its state is
 			// active. If the load balancer could not be set up, its state is failed.
 			log.Printf("\t\t\tState: %s.", *elb.State.Code)
-
-
+			
 			var targetGroup *elbv2.TargetGroup
 			err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
 				LoadBalancerArn: elb.LoadBalancerArn,

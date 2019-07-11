@@ -1,4 +1,4 @@
-package deploy
+package devops
 
 import (
 	"github.com/aws/aws-sdk-go/aws"

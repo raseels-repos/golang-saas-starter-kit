@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-app/handlers"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/deploy"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/img-resize"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
@@ -277,7 +277,7 @@ func main() {
 	case "sync-static":
 		// sync static files to S3
 		if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
-			err = deploy.SyncS3StaticFiles(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticDir)
+			err = devops.SyncS3StaticFiles(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticDir)
 			if err != nil {
 				log.Fatalf("main : deploy : %v", err)
 			}
@@ -291,7 +291,7 @@ func main() {
 	// a publicly available image URL.
 	var staticS3UrlFormatter func(string) string
 	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled || cfg.App.StaticS3.ImgResizeEnabled {
-		s3UrlFormatter, err := deploy.S3UrlFormatter(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticS3.CloudFrontEnabled)
+		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticS3.CloudFrontEnabled)
 		if err != nil {
 			log.Fatalf("main : S3UrlFormatter failed : %v", err)
 		}

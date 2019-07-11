@@ -1155,25 +1155,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
 		// HTTPS is terminated via the web server and not on the Load Balancer.
 		if req.EnableHTTPS {
-			if req.EnableEcsElb {
-				// Enable services to be publicly available via HTTPS port 443 and forwarded to port 80.
-				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					CidrIp:     aws.String("0.0.0.0/0"),
-					FromPort:   aws.Int64(443),
-					ToPort:     aws.Int64(80),
-					GroupId:    aws.String(securityGroupId),
-				})
-			} else {
-				// Enable services to be publicly available via HTTPS port 443.
-				ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
-					IpProtocol: aws.String("tcp"),
-					CidrIp:     aws.String("0.0.0.0/0"),
-					FromPort:   aws.Int64(443),
-					ToPort:     aws.Int64(443),
-					GroupId:    aws.String(securityGroupId),
-				})
-			}
+			// Enable services to be publicly available via HTTPS port 443.
+			ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+				IpProtocol: aws.String("tcp"),
+				CidrIp:     aws.String("0.0.0.0/0"),
+				FromPort:   aws.Int64(443),
+				ToPort:     aws.Int64(443),
+				GroupId:    aws.String(securityGroupId),
+			})
 		}
 
 		// Add all the default ingress to the security group.
@@ -2101,13 +2090,90 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					ValidationMethod: aws.String("DNS"),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to create certiciate '%s'", req.ServiceDomainName)
+					return errors.Wrapf(err, "failed to create certificate '%s'", req.ServiceDomainName)
 				}
 				certificateArn = *createRes.CertificateArn
 
-				log.Printf("\t\tCreated certiciate '%s'", req.ServiceDomainName)
+				log.Printf("\t\tCreated certificate '%s'", req.ServiceDomainName)
 			} else {
-				log.Printf("\t\tFound certiciate '%s'", req.ServiceDomainName)
+				log.Printf("\t\tFound certificate '%s'", req.ServiceDomainName)
+			}
+
+
+			descRes, err := svc.DescribeCertificate(&acm.DescribeCertificateInput{
+				CertificateArn: aws.String(certificateArn),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to describe certificate '%s'", certificateArn)
+			}
+			cert := descRes.Certificate
+
+			log.Printf("\t\t\tStatus: %s", *cert.Status)
+
+			if *cert.Status == "PENDING_VALIDATION" {
+				svc := route53.New(req.awsSession())
+
+				log.Println("\tList all hosted zones.")
+
+				var zoneValOpts = map[string][]*acm.DomainValidation{}
+				for _, opt := range cert.DomainValidationOptions {
+					var found bool
+					for zoneId, aNames := range zoneArecNames {
+						for _, aName := range aNames {
+							fmt.Println(*opt.DomainName, " ==== ", aName)
+
+							if *opt.DomainName == aName {
+								if _, ok := zoneValOpts[zoneId]; !ok {
+									zoneValOpts[zoneId] = []*acm.DomainValidation{}
+								}
+								zoneValOpts[zoneId] = append(zoneValOpts[zoneId], opt)
+								found = true
+								break
+							}
+						}
+
+						if found {
+							break
+						}
+					}
+
+					if !found {
+						return errors.Errorf("Failed to find zone ID for '%s'", *opt.DomainName)
+					}
+				}
+
+				for zoneId, opts := range zoneValOpts {
+					for _, opt := range opts {
+						if *opt.ValidationStatus == "SUCCESS" {
+							continue
+						}
+
+						input := &route53.ChangeResourceRecordSetsInput{
+							ChangeBatch: &route53.ChangeBatch{
+								Changes: []*route53.Change{
+									&route53.Change{
+										Action: aws.String("UPSERT"),
+										ResourceRecordSet: &route53.ResourceRecordSet{
+											Name: opt.ResourceRecord.Name,
+											ResourceRecords: []*route53.ResourceRecord{
+												&route53.ResourceRecord{Value: opt.ResourceRecord.Value},
+											},
+											Type: opt.ResourceRecord.Type,
+											TTL:  aws.Int64(60),
+										},
+									},
+								},
+							},
+							HostedZoneId: aws.String(zoneId),
+						}
+
+						log.Printf("\tAdded verification record for '%s'.\n", *opt.ResourceRecord.Name)
+						_, err := svc.ChangeResourceRecordSets(input)
+						if err != nil {
+							return errors.Wrapf(err, "failed to update A records for zone '%s'", zoneId)
+						}
+					}
+				}
 			}
 
 			log.Printf("\t%s\tUsing ACM Certicate '%s'.\n", tests.Success, certificateArn)
@@ -2261,7 +2327,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// characters, must contain only alphanumeric characters or hyphens, and must
 					// not begin or end with a hyphen.
 					// Name is a required field
-					Name: aws.String(fmt.Sprintf("%s-http", *elb.LoadBalancerName)),
+					Name: aws.String(fmt.Sprintf("%s-http", req.EcsServiceName)),
 
 					// The port on which the targets receive traffic. This port is used unless you
 					// specify a port override when registering the target. If the target is a Lambda
@@ -2348,17 +2414,18 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				},
 			}
 
+			/*
 			// If HTTPS is enabled, then add the associated target group.
 			if req.EnableHTTPS {
 				// Default target group for HTTPS via port 443.
 				targetGroupInputs = append(targetGroupInputs, &elbv2.CreateTargetGroupInput{
-					Name:                       aws.String(fmt.Sprintf("%s-https", *elb.LoadBalancerName)),
+					Name:                       aws.String(fmt.Sprintf("%s-https", req.EcsServiceName)),
 					Port:                       aws.Int64(443),
-					Protocol:                   aws.String("HTTPS"),
+					Protocol:                   aws.String("HTTP"),
 					HealthCheckEnabled:         aws.Bool(true),
 					HealthCheckIntervalSeconds: aws.Int64(30),
 					HealthCheckPath:            aws.String("/ping"),
-					HealthCheckProtocol:        aws.String("HTTPS"),
+					HealthCheckProtocol:        aws.String("HTTP"),
 					HealthCheckTimeoutSeconds:  aws.Int64(5),
 					HealthyThresholdCount:      aws.Int64(3),
 					UnhealthyThresholdCount:    aws.Int64(3),
@@ -2369,6 +2436,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					VpcId:      aws.String(projectVpcId),
 				})
 			}
+			*/
 
 			for _, targetGroupInput := range targetGroupInputs {
 				var targetGroup *elbv2.TargetGroup
@@ -2401,20 +2469,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				} else {
 					log.Printf("\t\tHas target group: %s.", *targetGroup.TargetGroupArn)
 				}
-
-				ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
-					// The name of the container (as it appears in a container definition) to associate
-					// with the load balancer.
-					ContainerName: aws.String(req.EcsServiceName),
-					// The port on the container to associate with the load balancer. This port
-					// must correspond to a containerPort in the service's task definition. Your
-					// container instances must allow ingress traffic on the hostPort of the port
-					// mapping.
-					ContainerPort: targetGroup.Port,
-					// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
-					// group or groups associated with a service or task set.
-					TargetGroupArn: targetGroup.TargetGroupArn,
-				})
 
 				if req.ElbDeregistrationDelay != nil {
 					// If no target group was found, create one.
@@ -2491,7 +2545,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					if *listenerInput.Protocol == "HTTPS" {
 						listenerInput.Certificates = append(listenerInput.Certificates, &elbv2.Certificate{
 							CertificateArn: aws.String(certificateArn),
-							IsDefault:      aws.Bool(true),
 						})
 					}
 
@@ -2503,11 +2556,75 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 					log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
 				}
+
+				// HTTPS is terminated at the load balance by the listener and should be forwarded to the container
+				// via port 80. Port 80 is included already, so don't add a second ELB (not supported).
+				if *targetGroup.Port == 443 {
+					continue
+				}
+
+				ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
+					// The name of the container (as it appears in a container definition) to associate
+					// with the load balancer.
+					ContainerName: aws.String(req.EcsServiceName),
+					// The port on the container to associate with the load balancer. This port
+					// must correspond to a containerPort in the service's task definition. Your
+					// container instances must allow ingress traffic on the hostPort of the port
+					// mapping.
+					ContainerPort: targetGroup.Port,
+					// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
+					// group or groups associated with a service or task set.
+					TargetGroupArn: targetGroup.TargetGroupArn,
+				})
+			}
+			
+			{
+				log.Println("Ensure Load Balancer DNS name exists for hosted zones.")
+				log.Printf("\t\tDNSName: '%s'.\n", *elb.DNSName)
+
+				svc := route53.New(req.awsSession())
+
+				for zoneId, aNames := range zoneArecNames {
+					log.Printf("\tChange zone '%s'.\n", zoneId)
+
+					input := &route53.ChangeResourceRecordSetsInput{
+						ChangeBatch: &route53.ChangeBatch{
+							Changes: []*route53.Change{},
+						},
+						HostedZoneId: aws.String(zoneId),
+					}
+
+					// Add all the A record names with the same set of public IPs.
+					for _, aName := range aNames {
+						log.Printf("\t\tAdd A record for '%s'.\n", aName)
+
+						input.ChangeBatch.Changes = append(input.ChangeBatch.Changes, &route53.Change{
+							Action: aws.String("UPSERT"),
+							ResourceRecordSet: &route53.ResourceRecordSet{
+								Name:            aws.String(aName),
+								Type:            aws.String("A"),
+								AliasTarget: &route53.AliasTarget{
+									HostedZoneId: elb.CanonicalHostedZoneId,
+									DNSName: elb.DNSName,
+									EvaluateTargetHealth: aws.Bool(true),
+								},
+							},
+						})
+					}
+
+					log.Printf("\tUpdated '%s'.\n", zoneId)
+					_, err := svc.ChangeResourceRecordSets(input)
+					if err != nil {
+						return errors.Wrapf(err, "failed to update A records for zone '%s'", zoneId)
+					}
+				}
 			}
 
 			log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
 		}
 	}
+	
+	return nil
 
 	// Try to find AWS ECS Cluster by name or create new one.
 	var ecsCluster *ecs.Cluster
@@ -3288,6 +3405,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				healthCheckGracePeriodSeconds = req.EscServiceHealthCheckGracePeriodSeconds
 			}
 
+			// When ELB is enabled get the following error when using the default VPC.
+			// 	Status reason 	CannotPullContainerError:
+			// 		Error response from daemon:
+			// 			Get https://888955683113.dkr.ecr.us-west-2.amazonaws.com/v2/:
+			// 				net/http: request canceled while waiting for connection
+			// 				(Client.Timeout exceeded while awaiting headers)
+			assignPublicIp = aws.String("ENABLED")
+
 			serviceInput := &ecs.CreateServiceInput{
 				// The short name or full Amazon Resource Name (ARN) of the cluster that your
 				// service is running on. If you do not specify a cluster, the default cluster
@@ -3652,15 +3777,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		ticker.Stop()
 
 		log.Printf("\t%s\tService running.\n", tests.Success)
-	}
-
-	if req.EnableEcsElb {
-		// TODO: Need to connect ELB to route53
-	} else {
-		// This happens on the task Level when the service starts.
-		//if err := devops.RegisterEcsServiceTasksRoute53(log, req.awsSession(), req.EcsClusterName, req.EcsServiceName, zoneArecNames); err != nil {
-		//	return err
-		//}
 	}
 
 	return nil

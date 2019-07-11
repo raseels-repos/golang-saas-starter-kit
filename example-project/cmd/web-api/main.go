@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
+	"golang.org/x/crypto/acme/autocert"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -342,23 +344,70 @@ func main() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	api := http.Server{
-		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
-		ReadTimeout:    cfg.HTTP.ReadTimeout,
-		WriteTimeout:   cfg.HTTP.WriteTimeout,
-		MaxHeaderBytes: 1 << 20,
-	}
-
 	// Make a channel to listen for errors coming from the listener. Use a
 	// buffered channel so the goroutine can exit if we don't collect this error.
 	serverErrors := make(chan error, 1)
 
-	// Start the service listening for requests.
-	go func() {
-		log.Printf("main : API Listening %s", cfg.HTTP.Host)
-		serverErrors <- api.ListenAndServe()
-	}()
+	// Make an list of HTTP servers for both HTTP and HTTPS requests.
+	var httpServers []http.Server
+
+	// Start the HTTP service listening for requests.
+	if cfg.HTTP.Host != "" {
+		api := http.Server{
+			Addr:           cfg.HTTP.Host,
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
+			ReadTimeout:    cfg.HTTP.ReadTimeout,
+			WriteTimeout:   cfg.HTTP.WriteTimeout,
+			MaxHeaderBytes: 1 << 20,
+		}
+		httpServers = append(httpServers, api)
+
+		go func() {
+			log.Printf("main : API Listening %s", cfg.HTTP.Host)
+			serverErrors <- api.ListenAndServe()
+		}()
+	}
+
+
+	// Start the HTTPS service listening for requests.
+	if cfg.HTTPS.Host != "" {
+		api := http.Server{
+			Addr:           cfg.HTTPS.Host,
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
+			ReadTimeout:    cfg.HTTPS.ReadTimeout,
+			WriteTimeout:   cfg.HTTPS.WriteTimeout,
+			MaxHeaderBytes: 1 << 20,
+		}
+
+
+		// Note: use a sensible value for data directory
+		// this is where cached certificates are stored
+		dataDir := "."
+		hostPolicy := func(ctx context.Context, host string) error {
+			// Note: change to your real domain
+			allowedHost := "www.mydomain.com"
+			if host == allowedHost {
+				return nil
+			}
+			return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+		}
+
+		m := &autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: hostPolicy,
+			Cache:      autocert.DirCache(dataDir),
+		}
+		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+
+
+
+		httpServers = append(httpServers, api)
+
+		go func() {
+			log.Printf("main : API Listening %s", cfg.HTTPS.Host)
+			serverErrors <- api.ListenAndServeTLS("", "")
+		}()
+	}
 
 	// =========================================================================
 	// Shutdown
@@ -381,11 +430,16 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
 		defer cancel()
 
-		// Asking listener to shutdown and load shed.
-		err := api.Shutdown(ctx)
-		if err != nil {
-			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
-			err = api.Close()
+		// Handle closing connections for both possible HTTP servers.
+		for _, api := range httpServers {
+
+			// Asking listener to shutdown and load shed.
+			err := api.Shutdown(ctx)
+			if err != nil {
+				log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
+				err = api.Close()
+			}
+
 		}
 
 		// Log the status of this shutdown.

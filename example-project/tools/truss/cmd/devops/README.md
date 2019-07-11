@@ -8,7 +8,9 @@
       "Sid": "ServiceDeployPermissions",    
       "Effect": "Allow",
       "Action": [
-        "ec2:DescribeSubnets",
+        "acm:ListCertificates",
+        "acm:RequestCertificate",
+        "acm:DescribeCertificate",
         "ec2:DescribeSubnets",
         "ec2:DescribeSecurityGroups",
         "ec2:CreateSecurityGroup",

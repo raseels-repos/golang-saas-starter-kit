@@ -99,10 +99,13 @@ type serviceDeployRequest struct {
 
 	EnableEcsElb                            bool     `validate:"omitempty"`
 	ElbLoadBalancerName                     string   `validate:"omitempty"`
-	ElbLoadBalancer *elbv2.CreateLoadBalancerInput
 	ElbDeregistrationDelay                  *int     `validate:"omitempty"`
-	ElbSecurityGroupName   string         `validate:"omitempty"`
-	ElbSecurityGroup *ec2.CreateSecurityGroupInput
+	ElbLoadBalancer *elbv2.CreateLoadBalancerInput
+
+	ElbTargetGroupName                     string   `validate:"omitempty"`
+	ElbTargetGroup *elbv2.CreateTargetGroupInput
+	//ElbSecurityGroupName   string         `validate:"omitempty"`
+	//ElbSecurityGroup *ec2.CreateSecurityGroupInput
 
 	VpcPublicName string `validate:"omitempty"`
 	VpcPublic *ec2.CreateVpcInput

@@ -502,6 +502,97 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				}
 				log.Printf("\t\t\tSet ELB Name to '%s'.", req.ElbLoadBalancerName)
 
+				req.ElbTargetGroupName = fmt.Sprintf("%s-http", req.EcsServiceName)
+				req.ElbTargetGroup = &elbv2.CreateTargetGroupInput{
+					// The name of the target group.
+					// This name must be unique per region per account, can have a maximum of 32
+					// characters, must contain only alphanumeric characters or hyphens, and must
+					// not begin or end with a hyphen.
+					// Name is a required field
+					Name: aws.String(req.ElbTargetGroupName ),
+
+					// The port on which the targets receive traffic. This port is used unless you
+					// specify a port override when registering the target. If the target is a Lambda
+					// function, this parameter does not apply.
+					Port: aws.Int64(80),
+
+					// The protocol to use for routing traffic to the targets. For Application Load
+					// Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers,
+					// the supported protocols are TCP, TLS, UDP, or TCP_UDP. A TCP_UDP listener
+					// must be associated with a TCP_UDP target group. If the target is a Lambda
+					// function, this parameter does not apply.
+					Protocol: aws.String("HTTP"),
+
+					// Indicates whether health checks are enabled. If the target type is lambda,
+					// health checks are disabled by default but can be enabled. If the target type
+					// is instance or ip, health checks are always enabled and cannot be disabled.
+					HealthCheckEnabled: aws.Bool(true),
+
+					// The approximate amount of time, in seconds, between health checks of an individual
+					// target. For HTTP and HTTPS health checks, the range is 5–300 seconds. For
+					// TCP health checks, the supported values are 10 and 30 seconds. If the target
+					// type is instance or ip, the default is 30 seconds. If the target type is
+					// lambda, the default is 35 seconds.
+					HealthCheckIntervalSeconds: aws.Int64(30),
+
+					// [HTTP/HTTPS health checks] The ping path that is the destination on the targets
+					// for health checks. The default is /.
+					HealthCheckPath: aws.String("/ping"),
+
+					// The protocol the load balancer uses when performing health checks on targets.
+					// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
+					// the default is TCP. The TCP protocol is supported for health checks only
+					// if the protocol of the target group is TCP, TLS, UDP, or TCP_UDP. The TLS,
+					// UDP, and TCP_UDP protocols are not supported for health checks.
+					HealthCheckProtocol: aws.String("HTTP"),
+
+					// The amount of time, in seconds, during which no response from a target means
+					// a failed health check. For target groups with a protocol of HTTP or HTTPS,
+					// the default is 5 seconds. For target groups with a protocol of TCP or TLS,
+					// this value must be 6 seconds for HTTP health checks and 10 seconds for TCP
+					// and HTTPS health checks. If the target type is lambda, the default is 30
+					// seconds.
+					HealthCheckTimeoutSeconds: aws.Int64(5),
+
+					// The number of consecutive health checks successes required before considering
+					// an unhealthy target healthy. For target groups with a protocol of HTTP or
+					// HTTPS, the default is 5. For target groups with a protocol of TCP or TLS,
+					// the default is 3. If the target type is lambda, the default is 5.
+					HealthyThresholdCount: aws.Int64(3),
+
+					// The number of consecutive health check failures required before considering
+					// a target unhealthy. For target groups with a protocol of HTTP or HTTPS, the
+					// default is 2. For target groups with a protocol of TCP or TLS, this value
+					// must be the same as the healthy threshold count. If the target type is lambda,
+					// the default is 2.
+					UnhealthyThresholdCount: aws.Int64(3),
+
+					// [HTTP/HTTPS health checks] The HTTP codes to use when checking for a successful
+					// response from a target.
+					Matcher: &elbv2.Matcher{
+						HttpCode: aws.String("200"),
+					},
+
+					// The type of target that you must specify when registering targets with this
+					// target group. You can't specify targets for a target group using more than
+					// one target type.
+					//
+					//    * instance - Targets are specified by instance ID. This is the default
+					//    value. If the target group protocol is UDP or TCP_UDP, the target type
+					//    must be instance.
+					//
+					//    * ip - Targets are specified by IP address. You can specify IP addresses
+					//    from the subnets of the virtual private cloud (VPC) for the target group,
+					//    the RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and
+					//    the RFC 6598 range (100.64.0.0/10). You can't specify publicly routable
+					//    IP addresses.
+					//
+					//    * lambda - The target groups contains a single Lambda function.
+					TargetType: aws.String("ip"),
+				}
+				log.Printf("\t\t\tSet ELB Target Group Name to '%s'.", req.ElbTargetGroupName )
+
+
 				// Define a new Security Group that is outside the VPC for a public facing ELB.
 				//req.ElbSecurityGroupName = req.ElbLoadBalancerName+"-elb"
 				//req.ElbSecurityGroup = &ec2.CreateSecurityGroupInput{
@@ -2318,182 +2409,75 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// active. If the load balancer could not be set up, its state is failed.
 			log.Printf("\t\t\tState: %s.", *elb.State.Code)
 
-			// Default target groups.
-			targetGroupInputs := []*elbv2.CreateTargetGroupInput{
-				// Default target group for HTTP via port 80.
-				&elbv2.CreateTargetGroupInput{
-					// The name of the target group.
-					// This name must be unique per region per account, can have a maximum of 32
-					// characters, must contain only alphanumeric characters or hyphens, and must
-					// not begin or end with a hyphen.
-					// Name is a required field
-					Name: aws.String(fmt.Sprintf("%s-http", req.EcsServiceName)),
 
-					// The port on which the targets receive traffic. This port is used unless you
-					// specify a port override when registering the target. If the target is a Lambda
-					// function, this parameter does not apply.
-					Port: aws.Int64(80),
-
-					// The protocol to use for routing traffic to the targets. For Application Load
-					// Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers,
-					// the supported protocols are TCP, TLS, UDP, or TCP_UDP. A TCP_UDP listener
-					// must be associated with a TCP_UDP target group. If the target is a Lambda
-					// function, this parameter does not apply.
-					Protocol: aws.String("HTTP"),
-
-					// Indicates whether health checks are enabled. If the target type is lambda,
-					// health checks are disabled by default but can be enabled. If the target type
-					// is instance or ip, health checks are always enabled and cannot be disabled.
-					HealthCheckEnabled: aws.Bool(true),
-
-					// The approximate amount of time, in seconds, between health checks of an individual
-					// target. For HTTP and HTTPS health checks, the range is 5–300 seconds. For
-					// TCP health checks, the supported values are 10 and 30 seconds. If the target
-					// type is instance or ip, the default is 30 seconds. If the target type is
-					// lambda, the default is 35 seconds.
-					HealthCheckIntervalSeconds: aws.Int64(30),
-
-					// [HTTP/HTTPS health checks] The ping path that is the destination on the targets
-					// for health checks. The default is /.
-					HealthCheckPath: aws.String("/ping"),
-
-					// The protocol the load balancer uses when performing health checks on targets.
-					// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
-					// the default is TCP. The TCP protocol is supported for health checks only
-					// if the protocol of the target group is TCP, TLS, UDP, or TCP_UDP. The TLS,
-					// UDP, and TCP_UDP protocols are not supported for health checks.
-					HealthCheckProtocol: aws.String("HTTP"),
-
-					// The amount of time, in seconds, during which no response from a target means
-					// a failed health check. For target groups with a protocol of HTTP or HTTPS,
-					// the default is 5 seconds. For target groups with a protocol of TCP or TLS,
-					// this value must be 6 seconds for HTTP health checks and 10 seconds for TCP
-					// and HTTPS health checks. If the target type is lambda, the default is 30
-					// seconds.
-					HealthCheckTimeoutSeconds: aws.Int64(5),
-
-					// The number of consecutive health checks successes required before considering
-					// an unhealthy target healthy. For target groups with a protocol of HTTP or
-					// HTTPS, the default is 5. For target groups with a protocol of TCP or TLS,
-					// the default is 3. If the target type is lambda, the default is 5.
-					HealthyThresholdCount: aws.Int64(3),
-
-					// The number of consecutive health check failures required before considering
-					// a target unhealthy. For target groups with a protocol of HTTP or HTTPS, the
-					// default is 2. For target groups with a protocol of TCP or TLS, this value
-					// must be the same as the healthy threshold count. If the target type is lambda,
-					// the default is 2.
-					UnhealthyThresholdCount: aws.Int64(3),
-
-					// [HTTP/HTTPS health checks] The HTTP codes to use when checking for a successful
-					// response from a target.
-					Matcher: &elbv2.Matcher{
-						HttpCode: aws.String("200"),
-					},
-
-					// The type of target that you must specify when registering targets with this
-					// target group. You can't specify targets for a target group using more than
-					// one target type.
-					//
-					//    * instance - Targets are specified by instance ID. This is the default
-					//    value. If the target group protocol is UDP or TCP_UDP, the target type
-					//    must be instance.
-					//
-					//    * ip - Targets are specified by IP address. You can specify IP addresses
-					//    from the subnets of the virtual private cloud (VPC) for the target group,
-					//    the RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and
-					//    the RFC 6598 range (100.64.0.0/10). You can't specify publicly routable
-					//    IP addresses.
-					//
-					//    * lambda - The target groups contains a single Lambda function.
-					TargetType: aws.String("ip"),
-
-					// The identifier of the virtual private cloud (VPC). If the target is a Lambda
-					// function, this parameter does not apply.
-					VpcId: aws.String(projectVpcId),
-				},
-			}
-
-			/*
-			// If HTTPS is enabled, then add the associated target group.
-			if req.EnableHTTPS {
-				// Default target group for HTTPS via port 443.
-				targetGroupInputs = append(targetGroupInputs, &elbv2.CreateTargetGroupInput{
-					Name:                       aws.String(fmt.Sprintf("%s-https", req.EcsServiceName)),
-					Port:                       aws.Int64(443),
-					Protocol:                   aws.String("HTTP"),
-					HealthCheckEnabled:         aws.Bool(true),
-					HealthCheckIntervalSeconds: aws.Int64(30),
-					HealthCheckPath:            aws.String("/ping"),
-					HealthCheckProtocol:        aws.String("HTTP"),
-					HealthCheckTimeoutSeconds:  aws.Int64(5),
-					HealthyThresholdCount:      aws.Int64(3),
-					UnhealthyThresholdCount:    aws.Int64(3),
-					Matcher: &elbv2.Matcher{
-						HttpCode: aws.String("200"),
-					},
-					TargetType: aws.String("ip"),
-					VpcId:      aws.String(projectVpcId),
-				})
-			}
-			*/
-
-			for _, targetGroupInput := range targetGroupInputs {
-				var targetGroup *elbv2.TargetGroup
-				err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
-					LoadBalancerArn: elb.LoadBalancerArn,
-				}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
-					for _, tg := range res.TargetGroups {
-						if *tg.TargetGroupName == *targetGroupInput.Name {
-							targetGroup = tg
-							return false
-						}
+			var targetGroup *elbv2.TargetGroup
+			err = svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{
+				LoadBalancerArn: elb.LoadBalancerArn,
+			}, func(res *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
+				for _, tg := range res.TargetGroups {
+					if *tg.TargetGroupName == req.ElbTargetGroupName  {
+						targetGroup = tg
+						return false
 					}
-					return !lastPage
+				}
+				return !lastPage
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeTargetGroupNotFoundException {
+					return errors.Wrapf(err, "failed to describe target group '%s'", req.ElbTargetGroupName )
+				}
+			}
+
+			if targetGroup == nil {
+				// The identifier of the virtual private cloud (VPC). If the target is a Lambda
+				// function, this parameter does not apply.
+				req.ElbTargetGroup.VpcId = aws.String(projectVpcId)
+
+				// If no target group was found, create one.
+				createRes, err := svc.CreateTargetGroup(req.ElbTargetGroup)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create target group '%s'", req.ElbTargetGroupName )
+				}
+				targetGroup = createRes.TargetGroups[0]
+
+				log.Printf("\t\tAdded target group: %s.", *targetGroup.TargetGroupArn)
+			} else {
+				log.Printf("\t\tHas target group: %s.", *targetGroup.TargetGroupArn)
+			}
+
+			if req.ElbDeregistrationDelay != nil {
+				// If no target group was found, create one.
+				_, err = svc.ModifyTargetGroupAttributes(&elbv2.ModifyTargetGroupAttributesInput{
+					TargetGroupArn: targetGroup.TargetGroupArn,
+					Attributes: []*elbv2.TargetGroupAttribute{
+						&elbv2.TargetGroupAttribute{
+							// The name of the attribute.
+							Key: aws.String("deregistration_delay.timeout_seconds"),
+
+							// The value of the attribute.
+							Value: aws.String(strconv.Itoa(*req.ElbDeregistrationDelay)),
+						},
+					},
 				})
 				if err != nil {
-					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeTargetGroupNotFoundException {
-						return errors.Wrapf(err, "failed to describe target group '%s'", *targetGroupInput.Name)
-					}
+					return errors.Wrapf(err, "failed to modify target group '%s' attributes", req.ElbTargetGroupName )
 				}
 
-				if targetGroup == nil {
-					// If no target group was found, create one.
-					createRes, err := svc.CreateTargetGroup(targetGroupInput)
-					if err != nil {
-						return errors.Wrapf(err, "failed to create target group '%s'", *targetGroupInput.Name)
-					}
-					targetGroup = createRes.TargetGroups[0]
+				log.Printf("\t\t\tSet sttributes.")
+			}
 
-					log.Printf("\t\tAdded target group: %s.", *targetGroup.TargetGroupArn)
-				} else {
-					log.Printf("\t\tHas target group: %s.", *targetGroup.TargetGroupArn)
-				}
+			listenerPorts := map[string]int64 {
+				"HTTP": 80,
+			}
+			if req.EnableHTTPS {
+				listenerPorts["HTTPS"] = 443
+			}
 
-				if req.ElbDeregistrationDelay != nil {
-					// If no target group was found, create one.
-					_, err = svc.ModifyTargetGroupAttributes(&elbv2.ModifyTargetGroupAttributesInput{
-						TargetGroupArn: targetGroup.TargetGroupArn,
-						Attributes: []*elbv2.TargetGroupAttribute{
-							&elbv2.TargetGroupAttribute{
-								// The name of the attribute.
-								Key: aws.String("deregistration_delay.timeout_seconds"),
-
-								// The value of the attribute.
-								Value: aws.String(strconv.Itoa(*req.ElbDeregistrationDelay)),
-							},
-						},
-					})
-					if err != nil {
-						return errors.Wrapf(err, "failed to modify target group '%s' attributes", *targetGroupInput.Name)
-					}
-
-					log.Printf("\t\t\tSet sttributes.")
-				}
+			for listenerProtocol, listenerPort := range listenerPorts {
 
 				var foundListener bool
 				for _, cl := range curListeners {
-					if cl.Port == targetGroupInput.Port {
+					if *cl.Port == listenerPort {
 						foundListener = true
 						break
 					}
@@ -2532,17 +2516,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						// The port on which the load balancer is listening.
 						//
 						// Port is a required field
-						Port: targetGroup.Port,
+						Port: aws.Int64(listenerPort),
 
 						// The protocol for connections from clients to the load balancer. For Application
 						// Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load
 						// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP.
 						//
 						// Protocol is a required field
-						Protocol: targetGroup.Protocol,
+						Protocol: aws.String(listenerProtocol),
 					}
 
-					if *listenerInput.Protocol == "HTTPS" {
+					if listenerProtocol == "HTTPS" {
 						listenerInput.Certificates = append(listenerInput.Certificates, &elbv2.Certificate{
 							CertificateArn: aws.String(certificateArn),
 						})
@@ -2556,27 +2540,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 					log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
 				}
-
-				// HTTPS is terminated at the load balance by the listener and should be forwarded to the container
-				// via port 80. Port 80 is included already, so don't add a second ELB (not supported).
-				if *targetGroup.Port == 443 {
-					continue
-				}
-
-				ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
-					// The name of the container (as it appears in a container definition) to associate
-					// with the load balancer.
-					ContainerName: aws.String(req.EcsServiceName),
-					// The port on the container to associate with the load balancer. This port
-					// must correspond to a containerPort in the service's task definition. Your
-					// container instances must allow ingress traffic on the hostPort of the port
-					// mapping.
-					ContainerPort: targetGroup.Port,
-					// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
-					// group or groups associated with a service or task set.
-					TargetGroupArn: targetGroup.TargetGroupArn,
-				})
 			}
+
+			ecsELBs = append(ecsELBs, &ecs.LoadBalancer{
+				// The name of the container (as it appears in a container definition) to associate
+				// with the load balancer.
+				ContainerName: aws.String(req.EcsServiceName),
+				// The port on the container to associate with the load balancer. This port
+				// must correspond to a containerPort in the service's task definition. Your
+				// container instances must allow ingress traffic on the hostPort of the port
+				// mapping.
+				ContainerPort: targetGroup.Port,
+				// The full Amazon Resource Name (ARN) of the Elastic Load Balancing target
+				// group or groups associated with a service or task set.
+				TargetGroupArn: targetGroup.TargetGroupArn,
+			})
 			
 			{
 				log.Println("Ensure Load Balancer DNS name exists for hosted zones.")
@@ -2623,8 +2601,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			log.Printf("\t%s\tUsing ELB '%s'.\n", tests.Success, *elb.LoadBalancerName)
 		}
 	}
-	
-	return nil
 
 	// Try to find AWS ECS Cluster by name or create new one.
 	var ecsCluster *ecs.Cluster

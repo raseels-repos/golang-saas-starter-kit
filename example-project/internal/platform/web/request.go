@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -14,6 +15,22 @@ import (
 	"github.com/xwb1989/sqlparser/dependency/querypb"
 	"gopkg.in/go-playground/validator.v9"
 	en_translations "gopkg.in/go-playground/validator.v9/translations/en"
+)
+
+// Headers
+const (
+	HeaderUpgrade = "Upgrade"
+	HeaderXForwardedFor       = "X-Forwarded-For"
+	HeaderXForwardedProto     = "X-Forwarded-Proto"
+	HeaderXForwardedProtocol  = "X-Forwarded-Protocol"
+	HeaderXForwardedSsl       = "X-Forwarded-Ssl"
+	HeaderXUrlScheme          = "X-Url-Scheme"
+	HeaderXHTTPMethodOverride = "X-HTTP-Method-Override"
+	HeaderXRealIP             = "X-Real-IP"
+	HeaderXRequestID          = "X-Request-ID"
+	HeaderXRequestedWith      = "X-Requested-With"
+	HeaderServer              = "Server"
+	HeaderOrigin              = "Origin"
 )
 
 // validate holds the settings and caches for validating request struct values.
@@ -153,4 +170,45 @@ func RequestIsJson(r *http.Request) bool {
 	}
 
 	return false
+}
+
+func RequestIsTLS(r *http.Request) bool {
+	return r.TLS != nil
+}
+
+func RequestIsWebSocket(r *http.Request) bool {
+	upgrade := r.Header.Get(HeaderUpgrade)
+	return strings.ToLower(upgrade) == "websocket"
+}
+
+func RequestScheme(r *http.Request) string {
+	// Can't use `r.Request.URL.Scheme`
+	// See: https://groups.google.com/forum/#!topic/golang-nuts/pMUkBlQBDF0
+	if RequestIsTLS(r) {
+		return "https"
+	}
+	if scheme := r.Header.Get(HeaderXForwardedProto); scheme != "" {
+		return scheme
+	}
+	if scheme := r.Header.Get(HeaderXForwardedProtocol); scheme != "" {
+		return scheme
+	}
+	if ssl := r.Header.Get(HeaderXForwardedSsl); ssl == "on" {
+		return "https"
+	}
+	if scheme := r.Header.Get(HeaderXUrlScheme); scheme != "" {
+		return scheme
+	}
+	return "http"
+}
+
+func RequestRealIP(r *http.Request) string {
+	if ip := r.Header.Get(HeaderXForwardedFor); ip != "" {
+		return strings.Split(ip, ", ")[0]
+	}
+	if ip := r.Header.Get(HeaderXRealIP); ip != "" {
+		return ip
+	}
+	ra, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ra
 }

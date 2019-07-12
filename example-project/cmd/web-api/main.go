@@ -7,6 +7,7 @@ import (
 	"expvar"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
@@ -295,6 +297,31 @@ func main() {
 		log.Fatalf("main : Constructing authenticator : %v", err)
 	}
 
+
+	// =========================================================================
+	// Init redirect middleware to ensure all requests go to the primary domain.
+
+	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
+	if err != nil {
+		log.Fatalf("main : Parse App Base URL : %s : %v", cfg.App.BaseUrl, err)
+	}
+
+	var primaryDomain string
+	if strings.Contains(baseSiteUrl.Host, ":") {
+		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
+		if err != nil {
+			log.Fatalf("main : SplitHostPort : %s : %v", baseSiteUrl.Host, err)
+		}
+	} else {
+		primaryDomain = baseSiteUrl.Host
+	}
+
+	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
+		DomainName: primaryDomain,
+		HTTPSEnabled: (cfg.HTTPS.Host != ""),
+	})
+
+
 	// =========================================================================
 	// Start Tracing Support
 	th := fmt.Sprintf("%s:%d", cfg.Trace.Host, cfg.Trace.Port)
@@ -355,7 +382,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, redirect),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -372,7 +399,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator),
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, redirect),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

@@ -2553,6 +2553,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{HTTP_HOST}":         "0.0.0.0:80",
 			"{HTTPS_HOST}":        "", // Not enabled by default
 			"{APP_BASE_URL}":      "", // Not set by default, requires a hostname to be defined.
+			//"{DOMAIN_NAME}":      req.ServiceDomainName,
+			//"{DOMAIN_NAME_ALIASES}":	strings.Join(req.ServiceDomainNameAliases, ","),
 
 			"{CACHE_HOST}": "", // Not enabled by default
 

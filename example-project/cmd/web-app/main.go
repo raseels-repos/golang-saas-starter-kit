@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
@@ -286,6 +288,29 @@ func main() {
 	}
 
 	// =========================================================================
+	// Init redirect middleware to ensure all requests go to the primary domain.
+
+	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
+	if err != nil {
+		log.Fatalf("main : Parse App Base URL : %s : %v", cfg.App.BaseUrl, err)
+	}
+
+	var primaryDomain string
+	if strings.Contains(baseSiteUrl.Host, ":") {
+		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
+		if err != nil {
+			log.Fatalf("main : SplitHostPort : %s : %v", baseSiteUrl.Host, err)
+		}
+	} else {
+		primaryDomain = baseSiteUrl.Host
+	}
+
+	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
+		DomainName: primaryDomain,
+		HTTPSEnabled: (cfg.HTTPS.Host != ""),
+	})
+
+	// =========================================================================
 	// URL Formatter
 	// s3UrlFormatter is a help function used by to convert an s3 key to
 	// a publicly available image URL.
@@ -530,7 +555,7 @@ func main() {
 
 	app := http.Server{
 		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, masterDb, nil, renderer),
+		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, masterDb, nil, renderer, redirect),
 		ReadTimeout:    cfg.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20,

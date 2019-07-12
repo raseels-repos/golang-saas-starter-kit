@@ -15,10 +15,20 @@ import (
 )
 
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator) http.Handler {
+func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, globalMids ...web.Middleware) http.Handler {
+
+	// Define base middlewares applied to all requests.
+	middlewares := []web.Middleware{
+		mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics(),
+	}
+
+	// Append any global middlewares if they were included.
+	if len(globalMids) > 0 {
+		middlewares = append(middlewares, globalMids...)
+	}
 
 	// Construct the web.App which holds all routes as well as common Middleware.
-	app := web.NewApp(shutdown, log, mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics())
+	app := web.NewApp(shutdown, log, middlewares...)
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{

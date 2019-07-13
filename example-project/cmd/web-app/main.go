@@ -306,7 +306,7 @@ func main() {
 	}
 
 	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
-		DomainName: primaryDomain,
+		DomainName:   primaryDomain,
 		HTTPSEnabled: (cfg.HTTPS.Host != ""),
 	})
 

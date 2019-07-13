@@ -30,6 +30,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
@@ -84,13 +85,14 @@ func main() {
 			Host         string        `default:"" envconfig:"HOST"`
 			ReadTimeout  time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
 			WriteTimeout time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
+			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
 		App struct {
 			Name            string        `default:"web-api" envconfig:"NAME"`
-			Project          string     `default:"" envconfig:"PROJECT"`
+			Project         string        `default:"" envconfig:"PROJECT"`
 			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://example-project.com"`
-			HostPrimary        string          `envconfig:"HOST_PRIMARY" example:"example-project.com"`
-			HostNames []string `envconfig:"HOST_NAMES" example:"subdomain.example-project.com"`
+			HostPrimary     string        `envconfig:"HOST_PRIMARY" example:"example-project.com"`
+			HostNames       []string      `envconfig:"HOST_NAMES" example:"subdomain.example-project.com"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
@@ -116,12 +118,12 @@ func main() {
 			AnalyticsRate float64 `default:"0.10" envconfig:"ANALYTICS_RATE"`
 		}
 		Aws struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
-			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
-			S3BucketPrivate          string `envconfig:"S3_BUCKET_PRIVATE"`
-			S3BucketPublic          string `envconfig:"S3_BUCKET_PUBLIC"`
-			SecretsManagerConfigPrefix         string        `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
+			AccessKeyID                string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey            string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region                     string `default:"us-east-1" envconfig:"AWS_REGION"`
+			S3BucketPrivate            string `envconfig:"S3_BUCKET_PRIVATE"`
+			S3BucketPublic             string `envconfig:"S3_BUCKET_PUBLIC"`
+			SecretsManagerConfigPrefix string `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
 
 			// Get an AWS session from an implicit source if no explicit
 			// configuration is provided. This is useful for taking advantage of
@@ -179,7 +181,6 @@ func main() {
 		cfg.Aws.SecretsManagerConfigPrefix = filepath.Join(pts...)
 	}
 
-
 	// If base URL is empty, set the default value from the HTTP Host
 	if cfg.App.BaseUrl == "" {
 		baseUrl := cfg.HTTP.Host
@@ -195,7 +196,6 @@ func main() {
 		}
 		cfg.App.BaseUrl = baseUrl
 	}
-
 
 	// =========================================================================
 	// Log App Info
@@ -238,7 +238,6 @@ func main() {
 	if awsSession != nil {
 		awsSession = awstrace.WrapSession(awsSession)
 	}
-
 
 	// =========================================================================
 	// Start Redis
@@ -310,7 +309,6 @@ func main() {
 	}
 	defer masterDb.Close()
 
-
 	// =========================================================================
 	// Init new Authenticator
 	var authenticator *auth.Authenticator
@@ -324,29 +322,40 @@ func main() {
 		log.Fatalf("main : Constructing authenticator : %+v", err)
 	}
 
-
 	// =========================================================================
 	// Init redirect middleware to ensure all requests go to the primary domain.
-	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
-	if err != nil {
-		log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
-	}
+	primaryDomain := cfg.App.HostPrimary
 
-	var primaryDomain string
-	if strings.Contains(baseSiteUrl.Host, ":") {
-		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
+	// When primary host is not set, we can parse host from the base app URL.
+	if primaryDomain == "" {
+		baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
 		if err != nil {
-			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
+			log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
 		}
-	} else {
-		primaryDomain = baseSiteUrl.Host
+
+		if strings.Contains(baseSiteUrl.Host, ":") {
+			primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
+			if err != nil {
+				log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
+			}
+		} else {
+			primaryDomain = baseSiteUrl.Host
+		}
 	}
 
 	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
-		DomainName: primaryDomain,
+		RedirectConfig: mid.RedirectConfig{
+			Code: http.StatusMovedPermanently,
+			Skipper: func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) bool {
+				if r.URL.Path == "/ping" {
+					return true
+				}
+				return false
+			},
+		},
+		DomainName:   primaryDomain,
 		HTTPSEnabled: (cfg.HTTPS.Host != ""),
 	})
-
 
 	// =========================================================================
 	// Start Tracing Support
@@ -369,14 +378,12 @@ func main() {
 		}()
 	}
 
-
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
 	err = devops.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
 		log.Fatalf("main : Ecs Service Task init : %+v", err)
 	}
-
 
 	// =========================================================================
 	// Start API Service
@@ -448,7 +455,10 @@ func main() {
 		// Enable autocert to store certs via Secret Manager.
 		secretPrefix := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "autocert")
 
-		cache, err := devops.NewSecretManagerAutocertCache(log, awsSession, secretPrefix)
+		// Local file cache to reduce requests hitting Secret Manager.
+		localCache := autocert.DirCache(os.TempDir())
+
+		cache, err := devops.NewSecretManagerAutocertCache(log, awsSession, secretPrefix, localCache)
 		if err != nil {
 			log.Fatalf("main : HTTPS : %+v", err)
 		}
@@ -459,11 +469,15 @@ func main() {
 			Cache:      cache,
 		}
 		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+		api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, acme.ALPNProto)
+		if !cfg.HTTPS.DisableHTTP2 {
+			api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, "h2")
+		}
 
 		httpServers = append(httpServers, api)
 
 		go func() {
-			log.Printf("main : API Listening %s", cfg.HTTPS.Host)
+			log.Printf("main : API Listening %s with SSL cert for hosts %s", cfg.HTTPS.Host, strings.Join(hosts, ", "))
 			serverErrors <- api.ListenAndServeTLS("", "")
 		}()
 	}

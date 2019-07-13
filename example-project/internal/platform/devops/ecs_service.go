@@ -3,9 +3,6 @@ package devops
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"github.com/sethgrid/pester"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -31,15 +28,6 @@ func EcsServiceTaskInit(log *log.Logger, awsSession *session.Session) error {
 	// If both env variables are empty, this instance of the services is not running on AWS ECS.
 	if ecsClusterName == "" && ecsServiceName == "" {
 		return nil
-	}
-
-	res, err := pester.Get("http://169.254.170.2/v2/metadata")
-	if err != nil {
-		fmt.Println("http://169.254.170.2/v2/metadata failed", err.Error())
-	} else {
-		dat, _ := ioutil.ReadAll(res.Body)
-		res.Body.Close()
-		fmt.Println("http://169.254.170.2/v2/metadata, OK", string(dat))
 	}
 
 	var zoneArecNames = map[string][]string{}
@@ -241,6 +229,15 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 }
 
 /*
+res, err := pester.Get("http://169.254.170.2/v2/metadata")
+if err != nil {
+	fmt.Println("http://169.254.170.2/v2/metadata failed", err.Error())
+} else {
+	dat, _ := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	fmt.Println("http://169.254.170.2/v2/metadata, OK", string(dat))
+}
+
 http://169.254.170.2/v2/metadata,
 
 {

@@ -22,7 +22,7 @@ func SyncCfgInit(log *log.Logger, awsSession *session.Session, secretPrefix, wat
 	localfiles := make(map[string]time.Time)
 
 	// Do the initial sync before starting file watch to download any existing configs.
-	err :=  SyncCfgDir(log, awsSession, secretPrefix, watchDir, localfiles)
+	err := SyncCfgDir(log, awsSession, secretPrefix, watchDir, localfiles)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,6 @@ func SyncCfgInit(log *log.Logger, awsSession *session.Session, secretPrefix, wat
 		// Init the watch to wait for sync local files to Secret Manager.
 		WatchCfgDir(log, awsSession, secretPrefix, watchDir, watcher, localfiles)
 
-
 		// Init ticker to sync remote files from Secret Manager locally at the defined interval.
 		if syncInterval.Seconds() > 0 {
 			ticker := time.NewTicker(syncInterval)
@@ -52,7 +51,7 @@ func SyncCfgInit(log *log.Logger, awsSession *session.Session, secretPrefix, wat
 					log.Println("AWS Secrets Manager : Checking for remote updates")
 
 					// Do the initial sync before starting file watch to download any existing configs.
-					err :=  SyncCfgDir(log, awsSession, secretPrefix, watchDir, localfiles)
+					err := SyncCfgDir(log, awsSession, secretPrefix, watchDir, localfiles)
 					if err != nil {
 						log.Printf("AWS Secrets Manager : Remote sync error - %+v", err)
 					}
@@ -82,7 +81,7 @@ func SyncCfgDir(log *log.Logger, awsSession *session.Session, secretPrefix, watc
 		for _, s := range res.SecretList {
 
 			// Skip any secret that does not have a matching prefix.
-			if !strings.HasPrefix(*s.Name, secretPrefix)  {
+			if !strings.HasPrefix(*s.Name, secretPrefix) {
 				continue
 			}
 
@@ -192,7 +191,7 @@ func handleWatchCfgEvent(log *log.Logger, awsSession *session.Session, secretPre
 
 					// Restore secret after it was already previously deleted.
 					_, err = svc.RestoreSecret(&secretsmanager.RestoreSecretInput{
-						SecretId:         aws.String(secretID),
+						SecretId: aws.String(secretID),
 					})
 					if err != nil {
 						return errors.Wrapf(err, "file watcher failed to restore secret %s for %s", secretID, event.Name)
@@ -205,7 +204,7 @@ func handleWatchCfgEvent(log *log.Logger, awsSession *session.Session, secretPre
 
 			// If where was a resource exists error for create, then need to update the secret instead.
 			_, err = svc.UpdateSecret(&secretsmanager.UpdateSecretInput{
-				SecretId:         aws.String(secretID),
+				SecretId:     aws.String(secretID),
 				SecretString: aws.String(string(dat)),
 			})
 			if err != nil {
@@ -225,7 +224,7 @@ func handleWatchCfgEvent(log *log.Logger, awsSession *session.Session, secretPre
 
 		// Create the new entry in AWS Secret Manager for the file.
 		_, err := svc.DeleteSecret(&secretsmanager.DeleteSecretInput{
-			SecretId:         aws.String(secretID),
+			SecretId: aws.String(secretID),
 
 			// (Optional) Specifies that the secret is to be deleted without any recovery
 			// window. You can't use both this parameter and the RecoveryWindowInDays parameter

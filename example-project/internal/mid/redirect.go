@@ -2,9 +2,10 @@ package mid
 
 import (
 	"context"
+	"net/http"
+
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"net/http"
 )
 
 type (
@@ -25,7 +26,7 @@ type (
 	// DomainNameRedirectConfig defines the details needed to apply redirects based on domain names.
 	DomainNameRedirectConfig struct {
 		RedirectConfig
-		DomainName       	string
+		DomainName   string
 		HTTPSEnabled bool
 	}
 
@@ -50,14 +51,12 @@ func DefaultSkipper(ctx context.Context, w http.ResponseWriter, r *http.Request,
 
 // HTTPSRedirectWithConfig returns an HTTPSRedirect middleware with config.
 // See `HTTPSRedirect()`.
-func DomainNameRedirect(config DomainNameRedirectConfig) web.Middleware  {
+func DomainNameRedirect(config DomainNameRedirectConfig) web.Middleware {
 	return redirect(config.RedirectConfig, func(scheme, host, uri string) (ok bool, url string) {
 
 		// Redirects http requests to https.
 		if config.HTTPSEnabled {
 			if ok = scheme != "https"; ok {
-				url = "https://" + host + uri
-
 				scheme = "https"
 			}
 		}
@@ -65,15 +64,14 @@ func DomainNameRedirect(config DomainNameRedirectConfig) web.Middleware  {
 		// Redirects all domain name alternatives to the primary hostname.
 		if host != config.DomainName {
 			host = config.DomainName
+			ok = true
 		}
-
 
 		url = scheme + "://" + host + uri
 
 		return
 	})
 }
-
 
 // HTTPSRedirect redirects http requests to https.
 // For example, http://geeksinthewoods.com will be redirect to https://geeksinthewoods.com.
@@ -83,7 +81,7 @@ func HTTPSRedirect() web.Middleware {
 
 // HTTPSRedirectWithConfig returns an HTTPSRedirect middleware with config.
 // See `HTTPSRedirect()`.
-func HTTPSRedirectWithConfig(config RedirectConfig)web.Middleware  {
+func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme, host, uri string) (ok bool, url string) {
 		if ok = scheme != "https"; ok {
 			url = "https://" + host + uri
@@ -100,7 +98,7 @@ func HTTPSWWWRedirect() web.Middleware {
 
 // HTTPSWWWRedirectWithConfig returns an HTTPSRedirect middleware with config.
 // See `HTTPSWWWRedirect()`.
-func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware  {
+func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme, host, uri string) (ok bool, url string) {
 		if ok = scheme != "https" && host[:3] != www; ok {
 			url = "https://www." + host + uri
@@ -117,7 +115,7 @@ func HTTPSNonWWWRedirect() web.Middleware {
 
 // HTTPSNonWWWRedirectWithConfig returns an HTTPSRedirect middleware with config.
 // See `HTTPSNonWWWRedirect()`.
-func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware  {
+func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme, host, uri string) (ok bool, url string) {
 		if ok = scheme != "https"; ok {
 			if host[:3] == www {
@@ -154,7 +152,7 @@ func NonWWWRedirect() web.Middleware {
 
 // NonWWWRedirectWithConfig returns an HTTPSRedirect middleware with config.
 // See `NonWWWRedirect()`.
-func NonWWWRedirectWithConfig(config RedirectConfig)  web.Middleware {
+func NonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme, host, uri string) (ok bool, url string) {
 		if ok = host[:3] == www; ok {
 			url = scheme + "://" + host[4:] + uri

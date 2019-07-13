@@ -7,32 +7,44 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/acme/autocert"
-	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 // SecretManagerAutocertCache implements the autocert.Cache interface for AWS Secrets Manager that is used by Manager
 // to store and retrieve previously obtained certificates and other account data as opaque blobs.
-type SecretManagerAutocertCache struct  {
-	awsSession *session.Session
-	log *log.Logger
+type SecretManagerAutocertCache struct {
+	awsSession   *session.Session
+	log          *log.Logger
 	secretPrefix string
+	cache        autocert.Cache
 }
 
 // NewSecretManagerAutocertCache provides the functionality to keep config files sync'd between running tasks and across deployments.
-func NewSecretManagerAutocertCache(log *log.Logger, awsSession *session.Session, secretPrefix string ) (*SecretManagerAutocertCache, error) {
+func NewSecretManagerAutocertCache(log *log.Logger, awsSession *session.Session, secretPrefix string, cache autocert.Cache) (*SecretManagerAutocertCache, error) {
 	return &SecretManagerAutocertCache{
 		awsSession,
 		log,
 		secretPrefix,
+		cache,
 	}, nil
 }
 
 // Get returns a certificate data for the specified key.
 // If there's no such key, Get returns ErrCacheMiss.
 func (c *SecretManagerAutocertCache) Get(ctx context.Context, key string) ([]byte, error) {
+
+	// Check short term cache.
+	if c.cache != nil {
+		v, err := c.cache.Get(ctx, key)
+		if err != nil && err != autocert.ErrCacheMiss {
+			return nil, errors.WithStack(err)
+		} else if len(v) > 0 {
+			return v, nil
+		}
+	}
 
 	svc := secretsmanager.New(c.awsSession)
 
@@ -43,7 +55,7 @@ func (c *SecretManagerAutocertCache) Get(ctx context.Context, key string) ([]byt
 		SecretId: aws.String(secretID),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == secretsmanager.ErrCodeResourceNotFoundException {
+		if aerr, ok := err.(awserr.Error); ok && (aerr.Code() == secretsmanager.ErrCodeResourceNotFoundException || aerr.Code() == secretsmanager.ErrCodeInvalidRequestException) {
 			return nil, autocert.ErrCacheMiss
 		}
 
@@ -52,7 +64,7 @@ func (c *SecretManagerAutocertCache) Get(ctx context.Context, key string) ([]byt
 
 	log.Printf("AWS Secrets Manager : Secret %s found", secretID)
 
-	return res.SecretBinary, nil
+	return []byte(*res.SecretString), nil
 }
 
 // Put stores the data in the cache under the specified key.
@@ -70,28 +82,27 @@ func (c *SecretManagerAutocertCache) Put(ctx context.Context, key string, data [
 		SecretString: aws.String(string(data)),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); !ok {
+		aerr, ok := err.(awserr.Error)
 
-			if aerr.Code() == secretsmanager.ErrCodeInvalidRequestException {
-				// InvalidRequestException: You can't create this secret because a secret with this
-				// 							 name is already scheduled for deletion.
+		if ok && aerr.Code() == secretsmanager.ErrCodeInvalidRequestException {
+			// InvalidRequestException: You can't create this secret because a secret with this
+			// 							 name is already scheduled for deletion.
 
-				// Restore secret after it was already previously deleted.
-				_, err = svc.RestoreSecret(&secretsmanager.RestoreSecretInput{
-					SecretId:         aws.String(secretID),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "autocert failed to restore secret %s", secretID)
-				}
-
-			} else if aerr.Code() != secretsmanager.ErrCodeResourceExistsException {
-				return errors.Wrapf(err, "autocert failed to create secret %s", secretID)
+			// Restore secret after it was already previously deleted.
+			_, err = svc.RestoreSecret(&secretsmanager.RestoreSecretInput{
+				SecretId: aws.String(secretID),
+			})
+			if err != nil {
+				return errors.Wrapf(err, "autocert failed to restore secret %s", secretID)
 			}
+
+		} else if !ok || aerr.Code() != secretsmanager.ErrCodeResourceExistsException {
+			return errors.Wrapf(err, "autocert failed to create secret %s", secretID)
 		}
 
 		// If where was a resource exists error for create, then need to update the secret instead.
 		_, err = svc.UpdateSecret(&secretsmanager.UpdateSecretInput{
-			SecretId:         aws.String(secretID),
+			SecretId:     aws.String(secretID),
 			SecretString: aws.String(string(data)),
 		})
 		if err != nil {
@@ -101,6 +112,13 @@ func (c *SecretManagerAutocertCache) Put(ctx context.Context, key string, data [
 		log.Printf("AWS Secrets Manager : Secret %s updated", secretID)
 	} else {
 		log.Printf("AWS Secrets Manager : Secret %s created", secretID)
+	}
+
+	if c.cache != nil {
+		err = c.cache.Put(ctx, key, data)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	return nil
@@ -116,7 +134,7 @@ func (c *SecretManagerAutocertCache) Delete(ctx context.Context, key string) err
 
 	// Create the new entry in AWS Secret Manager for the file.
 	_, err := svc.DeleteSecret(&secretsmanager.DeleteSecretInput{
-		SecretId:         aws.String(secretID),
+		SecretId: aws.String(secretID),
 
 		// (Optional) Specifies that the secret is to be deleted without any recovery
 		// window. You can't use both this parameter and the RecoveryWindowInDays parameter
@@ -145,7 +163,14 @@ func (c *SecretManagerAutocertCache) Delete(ctx context.Context, key string) err
 		return errors.Wrapf(err, "autocert failed to delete secret %s", secretID)
 	}
 
-	log.Printf("AWS Secrets Manager : Secret %s deleted for %s", secretID)
+	log.Printf("AWS Secrets Manager : Secret %s deleted", secretID)
+
+	if c.cache != nil {
+		err = c.cache.Delete(ctx, key)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
 
 	return nil
 }

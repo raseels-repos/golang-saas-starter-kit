@@ -80,21 +80,21 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			AwsCreds:    awsCreds,
 
 			// Optional flags.
-			ProjectRoot:              flags.ProjectRoot,
-			ProjectName:              flags.ProjectName,
-			DockerFile:               flags.DockerFile,
-			EnableHTTPS:              flags.EnableHTTPS,
-			ServiceHostPrimary:       flags.ServiceHostPrimary,
-			ServiceHostNames: 		  flags.ServiceHostNames,
-			S3BucketPrivateName:      flags.S3BucketPrivateName,
-			S3BucketPublicName:       flags.S3BucketPublicName,
-			EnableLambdaVPC:          flags.EnableLambdaVPC,
-			EnableEcsElb:             flags.EnableEcsElb,
-			NoBuild:                  flags.NoBuild,
-			NoDeploy:                 flags.NoDeploy,
-			NoCache:                  flags.NoCache,
-			NoPush:                   flags.NoPush,
-			RecreateService:          flags.RecreateService,
+			ProjectRoot:         flags.ProjectRoot,
+			ProjectName:         flags.ProjectName,
+			DockerFile:          flags.DockerFile,
+			EnableHTTPS:         flags.EnableHTTPS,
+			ServiceHostPrimary:  flags.ServiceHostPrimary,
+			ServiceHostNames:    flags.ServiceHostNames,
+			S3BucketPrivateName: flags.S3BucketPrivateName,
+			S3BucketPublicName:  flags.S3BucketPublicName,
+			EnableLambdaVPC:     flags.EnableLambdaVPC,
+			EnableEcsElb:        flags.EnableEcsElb,
+			NoBuild:             flags.NoBuild,
+			NoDeploy:            flags.NoDeploy,
+			NoCache:             flags.NoCache,
+			NoPush:              flags.NoPush,
+			RecreateService:     flags.RecreateService,
 
 			flags: flags,
 		}
@@ -403,6 +403,8 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 							"secretsmanager:GetSecretValue",
 							"secretsmanager:CreateSecret",
 							"secretsmanager:UpdateSecret",
+							"secretsmanager:RestoreSecret",
+							"secretsmanager:DeleteSecret",
 						},
 						Resource: "*",
 					},
@@ -1780,7 +1782,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
 	var zoneArecNames = map[string][]string{}
-	if req.ServiceHostPrimary != ""  {
+	if req.ServiceHostPrimary != "" {
 		log.Println("Route 53 - Get or create hosted zones.")
 
 		svc := route53.New(req.awsSession())
@@ -2554,24 +2556,24 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// List of placeholders that can be used in task definition and replaced on deployment.
 		placeholders := map[string]string{
-			"{SERVICE}":           req.ServiceName,
-			"{RELEASE_IMAGE}":     req.ReleaseImage,
-			"{ECS_CLUSTER}":       req.EcsClusterName,
-			"{ECS_SERVICE}":       req.EcsServiceName,
-			"{AWS_REGION}":        req.AwsCreds.Region,
-			"{AWS_LOGS_GROUP}":     req.CloudWatchLogGroupName,
-			"{AWS_AWS_S3_BUCKET_PRIVATE}": req.S3BucketPrivateName,
-			"{S3_BUCKET_PUBLIC}": req.S3BucketPublicName,
-			"{ENV}":               req.Env,
-			"{DATADOG_APIKEY}":    datadogApiKey,
-			"{DATADOG_ESSENTIAL}": "true",
-			"{HTTP_HOST}":         "0.0.0.0:80",
-			"{HTTPS_HOST}":        "", // Not enabled by default
+			"{SERVICE}":               req.ServiceName,
+			"{RELEASE_IMAGE}":         req.ReleaseImage,
+			"{ECS_CLUSTER}":           req.EcsClusterName,
+			"{ECS_SERVICE}":           req.EcsServiceName,
+			"{AWS_REGION}":            req.AwsCreds.Region,
+			"{AWS_LOGS_GROUP}":        req.CloudWatchLogGroupName,
+			"{AWS_S3_BUCKET_PRIVATE}": req.S3BucketPrivateName,
+			"{AWS_S3_BUCKET_PUBLIC}":  req.S3BucketPublicName,
+			"{ENV}":                   req.Env,
+			"{DATADOG_APIKEY}":        datadogApiKey,
+			"{DATADOG_ESSENTIAL}":     "true",
+			"{HTTP_HOST}":             "0.0.0.0:80",
+			"{HTTPS_HOST}":            "", // Not enabled by default
 
-			"{APP_PROJECT}": req.ProjectName,
-			"{APP_BASE_URL}":      "", // Not set by default, requires a hostname to be defined.
-			"{HOST_PRIMARY}":      req.ServiceHostPrimary,
-			"{HOST_NAMES}":			strings.Join(req.ServiceHostNames, ","),
+			"{APP_PROJECT}":  req.ProjectName,
+			"{APP_BASE_URL}": "", // Not set by default, requires a hostname to be defined.
+			"{HOST_PRIMARY}": req.ServiceHostPrimary,
+			"{HOST_NAMES}":   strings.Join(req.ServiceHostNames, ","),
 
 			"{CACHE_HOST}": "", // Not enabled by default
 

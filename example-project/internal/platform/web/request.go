@@ -19,7 +19,7 @@ import (
 
 // Headers
 const (
-	HeaderUpgrade = "Upgrade"
+	HeaderUpgrade             = "Upgrade"
 	HeaderXForwardedFor       = "X-Forwarded-For"
 	HeaderXForwardedProto     = "X-Forwarded-Proto"
 	HeaderXForwardedProtocol  = "X-Forwarded-Protocol"

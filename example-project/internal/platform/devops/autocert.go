@@ -21,7 +21,7 @@ type SecretManagerAutocertCache struct  {
 	secretPrefix string
 }
 
-// SyncCfgInit provides the functionality to keep config files sync'd between running tasks and across deployments.
+// NewSecretManagerAutocertCache provides the functionality to keep config files sync'd between running tasks and across deployments.
 func NewSecretManagerAutocertCache(log *log.Logger, awsSession *session.Session, secretPrefix string ) (*SecretManagerAutocertCache, error) {
 	return &SecretManagerAutocertCache{
 		awsSession,

@@ -92,7 +92,6 @@ func main() {
 			HostPrimary        string          `envconfig:"HOST_PRIMARY" example:"example-project.com"`
 			HostNames []string `envconfig:"HOST_NAMES" example:"subdomain.example-project.com"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			ConfigDir     string        `default:"" envconfig:"CONFIG_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
@@ -123,7 +122,6 @@ func main() {
 			S3BucketPrivate          string `envconfig:"S3_BUCKET_PRIVATE"`
 			S3BucketPublic          string `envconfig:"S3_BUCKET_PUBLIC"`
 			SecretsManagerConfigPrefix         string        `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
-			SecretsManagerConfigSyncInterval time.Duration  `default:"5m" envconfig:"SECRETS_MANAGER_CONFIG_SYNC_INTERVAL"`
 
 			// Get an AWS session from an implicit source if no explicit
 			// configuration is provided. This is useful for taking advantage of
@@ -196,20 +194,6 @@ func main() {
 			baseUrl = "http://" + baseUrl
 		}
 		cfg.App.BaseUrl = baseUrl
-	}
-
-	// Set the default config directory used to store config files locally that will be sync'd to AWS Secrets Manager
-	// and distributed to all other running services. This include Let's Encrypt for HTTPS when not using an Elastic
-	// Load Balancer.
-	// Note: All files stored in this directory are uploaded to AWS Secrets Manager.
-	if cfg.App.ConfigDir == "" {
-		if cfg.App.ConfigDir == "" {
-			cfg.App.ConfigDir = filepath.Join(os.TempDir(), cfg.App.Name, "cfg")
-
-			if err := os.MkdirAll(cfg.App.ConfigDir, os.ModePerm); err != nil {
-				log.Fatalf("main : Make config directory : %s : %+v", cfg.App.ConfigDir, err)
-			}
-		}
 	}
 
 
@@ -388,24 +372,6 @@ func main() {
 
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
-	if awsSession != nil {
-		syncPrefix := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "sync-config")
-
-		// Download all config files from Secret Manager.
-		f, err := devops.SyncCfgInit(log, awsSession, syncPrefix, cfg.App.ConfigDir, cfg.Aws.SecretsManagerConfigSyncInterval)
-		if err != nil {
-			log.Fatalf("main : AWS Secrets Manager config download : %+v", err)
-		}
-
-		// Start the watcher worker.
-		if f != nil {
-			go f()
-		}
-	}
-
-
-	// =========================================================================
-	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
 	err = devops.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
 		log.Fatalf("main : Ecs Service Task init : %+v", err)
@@ -479,10 +445,18 @@ func main() {
 			}
 		}
 
+		// Enable autocert to store certs via Secret Manager.
+		secretPrefix := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "autocert")
+
+		cache, err := devops.NewSecretManagerAutocertCache(log, awsSession, secretPrefix)
+		if err != nil {
+			log.Fatalf("main : HTTPS : %+v", err)
+		}
+
 		m := &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
 			HostPolicy: autocert.HostWhitelist(hosts...),
-			Cache:      autocert.DirCache(cfg.App.ConfigDir),
+			Cache:      cache,
 		}
 		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
 

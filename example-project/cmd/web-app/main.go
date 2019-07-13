@@ -135,12 +135,12 @@ func main() {
 
 	// For additional details refer to https://github.com/kelseyhightower/envconfig
 	if err := envconfig.Process(service, &cfg); err != nil {
-		log.Fatalf("main : Parsing Config : %v", err)
+		log.Fatalf("main : Parsing Config : %+v", err)
 	}
 
 	if err := flag.Process(&cfg); err != nil {
 		if err != flag.ErrHelp {
-			log.Fatalf("main : Parsing Command Line : %v", err)
+			log.Fatalf("main : Parsing Command Line : %+v", err)
 		}
 		return // We displayed help.
 	}
@@ -184,7 +184,7 @@ func main() {
 	{
 		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
 		if err != nil {
-			log.Fatalf("main : Marshalling Config to JSON : %v", err)
+			log.Fatalf("main : Marshalling Config to JSON : %+v", err)
 		}
 		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
@@ -225,12 +225,12 @@ func main() {
 	if cfg.Redis.MaxmemoryPolicy != "" {
 		err := redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
 		if err != nil && !strings.Contains(err.Error(), "unknown command") {
-			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %v", err)
+			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %+v", err)
 		}
 	} else {
 		evictPolicy, err := redisClient.ConfigGet(evictPolicyConfigKey).Result()
 		if err != nil && !strings.Contains(err.Error(), "unknown command") {
-			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %v", err)
+			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %+v", err)
 		} else if evictPolicy != nil && len(evictPolicy) > 0 && evictPolicy[1] != "allkeys-lru" {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
@@ -269,7 +269,7 @@ func main() {
 	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName(service))
 	masterDb, err := sqlxtrace.Open(cfg.DB.Driver, dbUrl.String())
 	if err != nil {
-		log.Fatalf("main : Register DB : %s : %v", cfg.DB.Driver, err)
+		log.Fatalf("main : Register DB : %s : %+v", cfg.DB.Driver, err)
 	}
 	defer masterDb.Close()
 
@@ -281,7 +281,7 @@ func main() {
 		if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
 			err = devops.SyncS3StaticFiles(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticDir)
 			if err != nil {
-				log.Fatalf("main : deploy : %v", err)
+				log.Fatalf("main : deploy : %+v", err)
 			}
 		}
 		return
@@ -292,14 +292,14 @@ func main() {
 
 	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
 	if err != nil {
-		log.Fatalf("main : Parse App Base URL : %s : %v", cfg.App.BaseUrl, err)
+		log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
 	}
 
 	var primaryDomain string
 	if strings.Contains(baseSiteUrl.Host, ":") {
 		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
 		if err != nil {
-			log.Fatalf("main : SplitHostPort : %s : %v", baseSiteUrl.Host, err)
+			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
 		}
 	} else {
 		primaryDomain = baseSiteUrl.Host
@@ -318,7 +318,7 @@ func main() {
 	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled || cfg.App.StaticS3.ImgResizeEnabled {
 		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticS3.CloudFrontEnabled)
 		if err != nil {
-			log.Fatalf("main : S3UrlFormatter failed : %v", err)
+			log.Fatalf("main : S3UrlFormatter failed : %+v", err)
 		}
 
 		staticS3UrlFormatter = func(p string) string {
@@ -341,7 +341,7 @@ func main() {
 	} else {
 		baseUrl, err := url.Parse(cfg.App.BaseUrl)
 		if err != nil {
-			log.Fatalf("main : url Parse(%s) : %v", cfg.App.BaseUrl, err)
+			log.Fatalf("main : url Parse(%s) : %+v", cfg.App.BaseUrl, err)
 		}
 
 		staticUrlFormatter = func(p string) string {
@@ -521,7 +521,7 @@ func main() {
 	// Template Renderer used to generate HTML response for web experience.
 	renderer, err := template_renderer.NewTemplateRenderer(cfg.App.TemplateDir, enableHotReload, gvd, t, eh)
 	if err != nil {
-		log.Fatalf("main : Marshalling Config to JSON : %v", err)
+		log.Fatalf("main : Marshalling Config to JSON : %+v", err)
 	}
 
 	// =========================================================================
@@ -577,7 +577,7 @@ func main() {
 	// Blocking main and waiting for shutdown.
 	select {
 	case err := <-serverErrors:
-		log.Fatalf("main : Error starting server: %v", err)
+		log.Fatalf("main : Error starting server: %+v", err)
 
 	case sig := <-shutdown:
 		log.Printf("main : %v : Start shutdown..", sig)
@@ -598,7 +598,7 @@ func main() {
 		case sig == syscall.SIGSTOP:
 			log.Fatal("main : Integrity issue caused shutdown")
 		case err != nil:
-			log.Fatalf("main : Could not stop server gracefully : %v", err)
+			log.Fatalf("main : Could not stop server gracefully : %+v", err)
 		}
 	}
 }

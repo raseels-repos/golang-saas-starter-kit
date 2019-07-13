@@ -28,8 +28,8 @@ type ServiceDeployFlags struct {
 
 	// Optional flags.
 	EnableHTTPS              bool            `validate:"omitempty" example:"false"`
-	ServiceDomainName        string          `validate:"omitempty" example:"example-project.com"`
-	ServiceDomainNameAliases cli.StringSlice `validate:"omitempty" example:"subdomain.example-project.com"`
+	ServiceHostPrimary        string          `validate:"omitempty" example:"example-project.com"`
+	ServiceHostNames cli.StringSlice `validate:"omitempty" example:"subdomain.example-project.com"`
 	S3BucketPrivateName      string          `validate:"omitempty" example:"saas-example-project-private"`
 	S3BucketPublicName       string          `validate:"omitempty" example:"saas-example-project-public"`
 
@@ -57,8 +57,8 @@ type serviceDeployRequest struct {
 	GoModName   string `validate:"required"`
 
 	EnableHTTPS              bool     `validate:"omitempty"`
-	ServiceDomainName        string   `validate:"omitempty,required_with=EnableHTTPS,fqdn"`
-	ServiceDomainNameAliases []string `validate:"omitempty,dive,fqdn"`
+	ServiceHostPrimary        string   `validate:"omitempty,required_with=EnableHTTPS,fqdn"`
+	ServiceHostNames []string `validate:"omitempty,dive,fqdn"`
 
 	AwsCreds awsCredentials `validate:"required,dive,required"`
 

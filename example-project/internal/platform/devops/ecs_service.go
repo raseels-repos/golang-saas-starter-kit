@@ -21,6 +21,10 @@ import (
 
 // EcsServiceTaskInit allows newly spun up ECS Service Tasks to register their public IP with Route 53.
 func EcsServiceTaskInit(log *log.Logger, awsSession *session.Session) error {
+	if awsSession == nil {
+		return nil
+	}
+
 	ecsClusterName := os.Getenv("ECS_CLUSTER")
 	ecsServiceName := os.Getenv("ECS_SERVICE")
 
@@ -78,6 +82,10 @@ func EcsServiceTaskTaskShutdown(log *log.Logger, awsSession *session.Session) er
 
 // RegisterEcsServiceTasksRoute53 registers the public IPs for a ECS Service Task with Route 53.
 func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session, ecsClusterName, ecsServiceName string, zoneArecNames map[string][]string) error {
+	if awsSession == nil {
+		return nil
+	}
+
 	var networkInterfaceIds []string
 	for a := 0; a <= 3; a++ {
 		svc := ecs.New(awsSession)

@@ -108,6 +108,8 @@
         "secretsmanager:ListSecrets",
         "secretsmanager:GetSecretValue",
         "secretsmanager:UpdateSecret",
+        "secretsmanager:RestoreSecret",
+        "secretsmanager:DeleteSecret",
         "servicediscovery:ListNamespaces",
         "servicediscovery:CreatePrivateDnsNamespace",
         "servicediscovery:GetOperation",

@@ -84,8 +84,8 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			ProjectName:              flags.ProjectName,
 			DockerFile:               flags.DockerFile,
 			EnableHTTPS:              flags.EnableHTTPS,
-			ServiceDomainName:        flags.ServiceDomainName,
-			ServiceDomainNameAliases: flags.ServiceDomainNameAliases,
+			ServiceHostPrimary:       flags.ServiceHostPrimary,
+			ServiceHostNames: 		  flags.ServiceHostNames,
 			S3BucketPrivateName:      flags.S3BucketPrivateName,
 			S3BucketPublicName:       flags.S3BucketPublicName,
 			EnableLambdaVPC:          flags.EnableLambdaVPC,
@@ -163,8 +163,14 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			log.Printf("\t\t\tdockerfile: %s", req.DockerFile)
 		}
 
-		log.Println("\tSet defaults not defined in env vars.")
+		log.Println("\tSet defaults.")
 		{
+			// When only service host names are set, choose the first item as the primary host.
+			if req.ServiceHostPrimary == "" && len(req.ServiceHostNames) > 0 {
+				req.ServiceHostPrimary = req.ServiceHostNames[0]
+				log.Printf("\t\t\tSet Service Primary Host to '%s'.", req.ServiceHostPrimary)
+			}
+
 			// S3 temp prefix used by services for short term storage. A lifecycle policy will be used for expiration.
 			req.S3BucketTempPrefix = "tmp/"
 
@@ -191,94 +197,98 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			}
 
 			// Defines the S3 Buckets used for all services.
-			req.S3Buckets = []S3Bucket{
-				// The public S3 Bucket used to serve static files and other assets.
-				S3Bucket{
-					Name: req.S3BucketPublicName,
-					Input: &s3.CreateBucketInput{
-						Bucket: aws.String(req.S3BucketPublicName),
-					},
-					LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
-					CORSRules: []*s3.CORSRule{
-						&s3.CORSRule{
-							// Headers that are specified in the Access-Control-Request-Headers header.
-							// These headers are allowed in a preflight OPTIONS request. In response to
-							// any preflight OPTIONS request, Amazon S3 returns any requested headers that
-							// are allowed.
-							// AllowedHeaders: aws.StringSlice([]string{}),
-
-							// An HTTP method that you allow the origin to execute. Valid values are GET,
-							// PUT, HEAD, POST, and DELETE.
-							//
-							// AllowedMethods is a required field
-							AllowedMethods: aws.StringSlice([]string{"GET", "POST"}),
-
-							// One or more origins you want customers to be able to access the bucket from.
-							//
-							// AllowedOrigins is a required field
-							AllowedOrigins: aws.StringSlice([]string{"*"}),
-
-							// One or more headers in the response that you want customers to be able to
-							// access from their applications (for example, from a JavaScript XMLHttpRequest
-							// object).
-							// ExposeHeaders: aws.StringSlice([]string{}),
-
-							// The time in seconds that your browser is to cache the preflight response
-							// for the specified resource.
-							// MaxAgeSeconds: aws.Int64(),
+			// The public S3 Bucket used to serve static files and other assets.
+			if req.S3BucketPublicName != "" {
+				req.S3Buckets = append(req.S3Buckets,
+					S3Bucket{
+						Name: req.S3BucketPublicName,
+						Input: &s3.CreateBucketInput{
+							Bucket: aws.String(req.S3BucketPublicName),
 						},
-					},
-				},
+						LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
+						CORSRules: []*s3.CORSRule{
+							&s3.CORSRule{
+								// Headers that are specified in the Access-Control-Request-Headers header.
+								// These headers are allowed in a preflight OPTIONS request. In response to
+								// any preflight OPTIONS request, Amazon S3 returns any requested headers that
+								// are allowed.
+								// AllowedHeaders: aws.StringSlice([]string{}),
 
-				// The private S3 Bucket used to persist data for services.
-				S3Bucket{
-					Name: req.S3BucketPrivateName,
-					Input: &s3.CreateBucketInput{
-						Bucket: aws.String(req.S3BucketPrivateName),
-					},
-					LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
-					PublicAccessBlock: &s3.PublicAccessBlockConfiguration{
-						// Specifies whether Amazon S3 should block public access control lists (ACLs)
-						// for this bucket and objects in this bucket. Setting this element to TRUE
-						// causes the following behavior:
-						//
-						//    * PUT Bucket acl and PUT Object acl calls fail if the specified ACL is
-						//    public.
-						//
-						//    * PUT Object calls fail if the request includes a public ACL.
-						//
-						// Enabling this setting doesn't affect existing policies or ACLs.
-						BlockPublicAcls: aws.Bool(true),
+								// An HTTP method that you allow the origin to execute. Valid values are GET,
+								// PUT, HEAD, POST, and DELETE.
+								//
+								// AllowedMethods is a required field
+								AllowedMethods: aws.StringSlice([]string{"GET", "POST"}),
 
-						// Specifies whether Amazon S3 should block public bucket policies for this
-						// bucket. Setting this element to TRUE causes Amazon S3 to reject calls to
-						// PUT Bucket policy if the specified bucket policy allows public access.
-						//
-						// Enabling this setting doesn't affect existing bucket policies.
-						BlockPublicPolicy: aws.Bool(true),
+								// One or more origins you want customers to be able to access the bucket from.
+								//
+								// AllowedOrigins is a required field
+								AllowedOrigins: aws.StringSlice([]string{"*"}),
 
-						// Specifies whether Amazon S3 should restrict public bucket policies for this
-						// bucket. Setting this element to TRUE restricts access to this bucket to only
-						// AWS services and authorized users within this account if the bucket has a
-						// public policy.
-						//
-						// Enabling this setting doesn't affect previously stored bucket policies, except
-						// that public and cross-account access within any public bucket policy, including
-						// non-public delegation to specific accounts, is blocked.
-						RestrictPublicBuckets: aws.Bool(true),
+								// One or more headers in the response that you want customers to be able to
+								// access from their applications (for example, from a JavaScript XMLHttpRequest
+								// object).
+								// ExposeHeaders: aws.StringSlice([]string{}),
 
-						// Specifies whether Amazon S3 should ignore public ACLs for this bucket and
-						// objects in this bucket. Setting this element to TRUE causes Amazon S3 to
-						// ignore all public ACLs on this bucket and objects in this bucket.
-						//
-						// Enabling this setting doesn't affect the persistence of any existing ACLs
-						// and doesn't prevent new public ACLs from being set.
-						IgnorePublicAcls: aws.Bool(true),
-					},
-					Policy: func() string {
-						// Add a bucket policy to enable exports from Cloudwatch Logs for the private S3 bucket.
-						policyResource := strings.Trim(filepath.Join(req.S3BucketPrivateName, req.S3BucketTempPrefix), "/")
-						return fmt.Sprintf(`{
+								// The time in seconds that your browser is to cache the preflight response
+								// for the specified resource.
+								// MaxAgeSeconds: aws.Int64(),
+							},
+						},
+					})
+			}
+
+			// The private S3 Bucket used to persist data for services.
+			if req.S3BucketPrivateName != "" {
+				req.S3Buckets = append(req.S3Buckets,
+					S3Bucket{
+						Name: req.S3BucketPrivateName,
+						Input: &s3.CreateBucketInput{
+							Bucket: aws.String(req.S3BucketPrivateName),
+						},
+						LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
+						PublicAccessBlock: &s3.PublicAccessBlockConfiguration{
+							// Specifies whether Amazon S3 should block public access control lists (ACLs)
+							// for this bucket and objects in this bucket. Setting this element to TRUE
+							// causes the following behavior:
+							//
+							//    * PUT Bucket acl and PUT Object acl calls fail if the specified ACL is
+							//    public.
+							//
+							//    * PUT Object calls fail if the request includes a public ACL.
+							//
+							// Enabling this setting doesn't affect existing policies or ACLs.
+							BlockPublicAcls: aws.Bool(true),
+
+							// Specifies whether Amazon S3 should block public bucket policies for this
+							// bucket. Setting this element to TRUE causes Amazon S3 to reject calls to
+							// PUT Bucket policy if the specified bucket policy allows public access.
+							//
+							// Enabling this setting doesn't affect existing bucket policies.
+							BlockPublicPolicy: aws.Bool(true),
+
+							// Specifies whether Amazon S3 should restrict public bucket policies for this
+							// bucket. Setting this element to TRUE restricts access to this bucket to only
+							// AWS services and authorized users within this account if the bucket has a
+							// public policy.
+							//
+							// Enabling this setting doesn't affect previously stored bucket policies, except
+							// that public and cross-account access within any public bucket policy, including
+							// non-public delegation to specific accounts, is blocked.
+							RestrictPublicBuckets: aws.Bool(true),
+
+							// Specifies whether Amazon S3 should ignore public ACLs for this bucket and
+							// objects in this bucket. Setting this element to TRUE causes Amazon S3 to
+							// ignore all public ACLs on this bucket and objects in this bucket.
+							//
+							// Enabling this setting doesn't affect the persistence of any existing ACLs
+							// and doesn't prevent new public ACLs from being set.
+							IgnorePublicAcls: aws.Bool(true),
+						},
+						Policy: func() string {
+							// Add a bucket policy to enable exports from Cloudwatch Logs for the private S3 bucket.
+							policyResource := strings.Trim(filepath.Join(req.S3BucketPrivateName, req.S3BucketTempPrefix), "/")
+							return fmt.Sprintf(`{
 							"Version": "2012-10-17",
 							"Statement": [
 							  {
@@ -296,8 +306,8 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 							  }
 							]
 						}`, req.S3BucketPrivateName, req.AwsCreds.Region, policyResource, req.AwsCreds.Region)
-					}(),
-				},
+						}(),
+					})
 			}
 
 			// Set default AWS ECR Repository Name.
@@ -1770,7 +1780,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
 	var zoneArecNames = map[string][]string{}
-	if req.ServiceDomainName != "" {
+	if req.ServiceHostPrimary != ""  {
 		log.Println("Route 53 - Get or create hosted zones.")
 
 		svc := route53.New(req.awsSession())
@@ -1789,8 +1799,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		// Generate a slice with the primary domain name and include all the alternative domain names.
-		lookupDomains := []string{req.ServiceDomainName}
-		for _, dn := range req.ServiceDomainNameAliases {
+		lookupDomains := []string{}
+		if req.ServiceHostPrimary != "" {
+			lookupDomains = append(lookupDomains, req.ServiceHostPrimary)
+		}
+		for _, dn := range req.ServiceHostNames {
 			lookupDomains = append(lookupDomains, dn)
 		}
 
@@ -2083,7 +2096,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			err := svc.ListCertificatesPages(&acm.ListCertificatesInput{},
 				func(res *acm.ListCertificatesOutput, lastPage bool) bool {
 					for _, cert := range res.CertificateSummaryList {
-						if *cert.DomainName == req.ServiceDomainName {
+						if *cert.DomainName == req.ServiceHostPrimary {
 							certificateArn = *cert.CertificateArn
 							return false
 						}
@@ -2091,12 +2104,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					return !lastPage
 				})
 			if err != nil {
-				return errors.Wrapf(err, "failed to list certificates for '%s'", req.ServiceDomainName)
+				return errors.Wrapf(err, "failed to list certificates for '%s'", req.ServiceHostPrimary)
 			}
 
 			if certificateArn == "" {
 				// Create hash of all the domain names to be used to mark unique requests.
-				idempotencyToken := req.ServiceDomainName + "|" + strings.Join(req.ServiceDomainNameAliases, "|")
+				idempotencyToken := req.ServiceHostPrimary + "|" + strings.Join(req.ServiceHostNames, "|")
 				idempotencyToken = fmt.Sprintf("%x", md5.Sum([]byte(idempotencyToken)))
 
 				// If no certicate was found, create one.
@@ -2111,7 +2124,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// octets in length.
 					//
 					// DomainName is a required field
-					DomainName: aws.String(req.ServiceDomainName),
+					DomainName: aws.String(req.ServiceHostPrimary),
 
 					// Customer chosen string that can be used to distinguish between calls to RequestCertificate.
 					// Idempotency tokens time out after one hour. Therefore, if you call RequestCertificate
@@ -2138,7 +2151,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// add to an ACM certificate is 100. However, the initial limit is 10 domain
 					// names. If you need more than 10 names, you must request a limit increase.
 					// For more information, see Limits (https://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html).
-					SubjectAlternativeNames: aws.StringSlice(req.ServiceDomainNameAliases),
+					SubjectAlternativeNames: aws.StringSlice(req.ServiceHostNames),
 
 					// The method you want to use if you are requesting a public certificate to
 					// validate that you own or control domain. You can validate with DNS (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-dns.html)
@@ -2147,13 +2160,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					ValidationMethod: aws.String("DNS"),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to create certificate '%s'", req.ServiceDomainName)
+					return errors.Wrapf(err, "failed to create certificate '%s'", req.ServiceHostPrimary)
 				}
 				certificateArn = *createRes.CertificateArn
 
-				log.Printf("\t\tCreated certificate '%s'", req.ServiceDomainName)
+				log.Printf("\t\tCreated certificate '%s'", req.ServiceHostPrimary)
 			} else {
-				log.Printf("\t\tFound certificate '%s'", req.ServiceDomainName)
+				log.Printf("\t\tFound certificate '%s'", req.ServiceHostPrimary)
 			}
 
 			descRes, err := svc.DescribeCertificate(&acm.DescribeCertificateInput{
@@ -2546,15 +2559,19 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{ECS_CLUSTER}":       req.EcsClusterName,
 			"{ECS_SERVICE}":       req.EcsServiceName,
 			"{AWS_REGION}":        req.AwsCreds.Region,
-			"{AWSLOGS_GROUP}":     req.CloudWatchLogGroupName,
+			"{AWS_LOGS_GROUP}":     req.CloudWatchLogGroupName,
+			"{AWS_AWS_S3_BUCKET_PRIVATE}": req.S3BucketPrivateName,
+			"{S3_BUCKET_PUBLIC}": req.S3BucketPublicName,
 			"{ENV}":               req.Env,
 			"{DATADOG_APIKEY}":    datadogApiKey,
 			"{DATADOG_ESSENTIAL}": "true",
 			"{HTTP_HOST}":         "0.0.0.0:80",
 			"{HTTPS_HOST}":        "", // Not enabled by default
+
+			"{APP_PROJECT}": req.ProjectName,
 			"{APP_BASE_URL}":      "", // Not set by default, requires a hostname to be defined.
-			//"{DOMAIN_NAME}":      req.ServiceDomainName,
-			//"{DOMAIN_NAME_ALIASES}":	strings.Join(req.ServiceDomainNameAliases, ","),
+			"{HOST_PRIMARY}":      req.ServiceHostPrimary,
+			"{HOST_NAMES}":			strings.Join(req.ServiceHostNames, ","),
 
 			"{CACHE_HOST}": "", // Not enabled by default
 
@@ -2592,7 +2609,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		// When a domain name if defined for the service, set the App Base URL. Default to HTTPS if enabled.
-		if req.ServiceDomainName != "" {
+		if req.ServiceHostPrimary != "" {
 			var appSchema string
 			if req.EnableHTTPS {
 				appSchema = "https"
@@ -2600,7 +2617,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				appSchema = "http"
 			}
 
-			placeholders["{APP_BASE_URL}"] = fmt.Sprintf("%s://%s/", appSchema, req.ServiceDomainName)
+			placeholders["{APP_BASE_URL}"] = fmt.Sprintf("%s://%s/", appSchema, req.ServiceHostPrimary)
 		}
 
 		// When db is set, update the placeholders.

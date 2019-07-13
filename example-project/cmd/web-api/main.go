@@ -13,13 +13,14 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
@@ -86,8 +87,12 @@ func main() {
 		}
 		App struct {
 			Name            string        `default:"web-api" envconfig:"NAME"`
-			BaseUrl         string        `default:"" envconfig:"BASE_URL"`
+			Project          string     `default:"" envconfig:"PROJECT"`
+			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://example-project.com"`
+			HostPrimary        string          `envconfig:"HOST_PRIMARY" example:"example-project.com"`
+			HostNames []string `envconfig:"HOST_NAMES" example:"subdomain.example-project.com"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
+			ConfigDir     string        `default:"" envconfig:"CONFIG_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
@@ -115,6 +120,10 @@ func main() {
 			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
 			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
 			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+			S3BucketPrivate          string `envconfig:"S3_BUCKET_PRIVATE"`
+			S3BucketPublic          string `envconfig:"S3_BUCKET_PUBLIC"`
+			SecretsManagerConfigPrefix         string        `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
+			SecretsManagerConfigSyncInterval time.Duration  `default:"5m" envconfig:"SECRETS_MANAGER_CONFIG_SYNC_INTERVAL"`
 
 			// Get an AWS session from an implicit source if no explicit
 			// configuration is provided. This is useful for taking advantage of
@@ -123,7 +132,6 @@ func main() {
 		}
 		Auth struct {
 			UseAwsSecretManager bool          `default:"false" envconfig:"USE_AWS_SECRET_MANAGER"`
-			AwsSecretID         string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
@@ -142,12 +150,12 @@ func main() {
 
 	// For additional details refer to https://github.com/kelseyhightower/envconfig
 	if err := envconfig.Process(service, &cfg); err != nil {
-		log.Fatalf("main : Parsing Config : %v", err)
+		log.Fatalf("main : Parsing Config : %+v", err)
 	}
 
 	if err := flag.Process(&cfg); err != nil {
 		if err != flag.ErrHelp {
-			log.Fatalf("main : Parsing Command Line : %v", err)
+			log.Fatalf("main : Parsing Command Line : %+v", err)
 		}
 		return // We displayed help.
 	}
@@ -160,6 +168,19 @@ func main() {
 		cfg.Aws.AccessKeyID = ""
 		cfg.Aws.SecretAccessKey = ""
 	}
+
+	// Set the default AWS Secrets Manager prefix used for name to store config files that will be persisted across
+	// deployments and distributed to each instance of the service running.
+	if cfg.Aws.SecretsManagerConfigPrefix == "" {
+		var pts []string
+		if cfg.App.Project != "" {
+			pts = append(pts, cfg.App.Project)
+		}
+		pts = append(pts, cfg.Env, cfg.App.Name)
+
+		cfg.Aws.SecretsManagerConfigPrefix = filepath.Join(pts...)
+	}
+
 
 	// If base URL is empty, set the default value from the HTTP Host
 	if cfg.App.BaseUrl == "" {
@@ -177,6 +198,21 @@ func main() {
 		cfg.App.BaseUrl = baseUrl
 	}
 
+	// Set the default config directory used to store config files locally that will be sync'd to AWS Secrets Manager
+	// and distributed to all other running services. This include Let's Encrypt for HTTPS when not using an Elastic
+	// Load Balancer.
+	// Note: All files stored in this directory are uploaded to AWS Secrets Manager.
+	if cfg.App.ConfigDir == "" {
+		if cfg.App.ConfigDir == "" {
+			cfg.App.ConfigDir = filepath.Join(os.TempDir(), cfg.App.Name, "cfg")
+
+			if err := os.MkdirAll(cfg.App.ConfigDir, os.ModePerm); err != nil {
+				log.Fatalf("main : Make config directory : %s : %+v", cfg.App.ConfigDir, err)
+			}
+		}
+	}
+
+
 	// =========================================================================
 	// Log App Info
 
@@ -191,7 +227,7 @@ func main() {
 	{
 		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
 		if err != nil {
-			log.Fatalf("main : Marshalling Config to JSON : %v", err)
+			log.Fatalf("main : Marshalling Config to JSON : %+v", err)
 		}
 		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
@@ -207,13 +243,18 @@ func main() {
 
 		log.Printf("main : AWS : Using role.\n")
 
-	} else {
+	} else if cfg.Aws.AccessKeyID != "" {
 		creds := credentials.NewStaticCredentials(cfg.Aws.AccessKeyID, cfg.Aws.SecretAccessKey, "")
 		awsSession = session.New(&aws.Config{Region: aws.String(cfg.Aws.Region), Credentials: creds})
 
 		log.Printf("main : AWS : Using static credentials\n")
 	}
-	awsSession = awstrace.WrapSession(awsSession)
+
+	// Wrap the AWS session to enable tracing.
+	if awsSession != nil {
+		awsSession = awstrace.WrapSession(awsSession)
+	}
+
 
 	// =========================================================================
 	// Start Redis
@@ -237,12 +278,12 @@ func main() {
 	if cfg.Redis.MaxmemoryPolicy != "" {
 		err := redisClient.ConfigSet(evictPolicyConfigKey, cfg.Redis.MaxmemoryPolicy).Err()
 		if err != nil && !strings.Contains(err.Error(), "unknown command") {
-			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %v", err)
+			log.Fatalf("main : redis : ConfigSet maxmemory-policy : %+v", err)
 		}
 	} else {
 		evictPolicy, err := redisClient.ConfigGet(evictPolicyConfigKey).Result()
 		if err != nil && !strings.Contains(err.Error(), "unknown command") {
-			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %v", err)
+			log.Fatalf("main : redis : ConfigGet maxmemory-policy : %+v", err)
 		} else if evictPolicy != nil && len(evictPolicy) > 0 && evictPolicy[1] != "allkeys-lru" {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
@@ -281,36 +322,37 @@ func main() {
 	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName(service))
 	masterDb, err := sqlxtrace.Open(cfg.DB.Driver, dbUrl.String())
 	if err != nil {
-		log.Fatalf("main : Register DB : %s : %v", cfg.DB.Driver, err)
+		log.Fatalf("main : Register DB : %s : %+v", cfg.DB.Driver, err)
 	}
 	defer masterDb.Close()
+
 
 	// =========================================================================
 	// Init new Authenticator
 	var authenticator *auth.Authenticator
 	if cfg.Auth.UseAwsSecretManager {
-		authenticator, err = auth.NewAuthenticatorAws(awsSession, cfg.Auth.AwsSecretID, time.Now().UTC(), cfg.Auth.KeyExpiration)
+		secretName := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "authenticator")
+		authenticator, err = auth.NewAuthenticatorAws(awsSession, secretName, time.Now().UTC(), cfg.Auth.KeyExpiration)
 	} else {
 		authenticator, err = auth.NewAuthenticatorFile("", time.Now().UTC(), cfg.Auth.KeyExpiration)
 	}
 	if err != nil {
-		log.Fatalf("main : Constructing authenticator : %v", err)
+		log.Fatalf("main : Constructing authenticator : %+v", err)
 	}
 
 
 	// =========================================================================
 	// Init redirect middleware to ensure all requests go to the primary domain.
-
 	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
 	if err != nil {
-		log.Fatalf("main : Parse App Base URL : %s : %v", cfg.App.BaseUrl, err)
+		log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
 	}
 
 	var primaryDomain string
 	if strings.Contains(baseSiteUrl.Host, ":") {
 		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
 		if err != nil {
-			log.Fatalf("main : SplitHostPort : %s : %v", baseSiteUrl.Host, err)
+			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
 		}
 	} else {
 		primaryDomain = baseSiteUrl.Host
@@ -343,12 +385,32 @@ func main() {
 		}()
 	}
 
+
+	// =========================================================================
+	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
+	if awsSession != nil {
+		syncPrefix := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "sync-config")
+
+		// Download all config files from Secret Manager.
+		f, err := devops.SyncCfgInit(log, awsSession, syncPrefix, cfg.App.ConfigDir, cfg.Aws.SecretsManagerConfigSyncInterval)
+		if err != nil {
+			log.Fatalf("main : AWS Secrets Manager config download : %+v", err)
+		}
+
+		// Start the watcher worker.
+		if f != nil {
+			go f()
+		}
+	}
+
+
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
 	err = devops.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
-		log.Fatalf("main : Ecs Service Task init : %v", err)
+		log.Fatalf("main : Ecs Service Task init : %+v", err)
 	}
+
 
 	// =========================================================================
 	// Start API Service
@@ -359,7 +421,7 @@ func main() {
 
 		u, err := url.Parse(cfg.App.BaseUrl)
 		if err != nil {
-			log.Fatalf("main : Parse app base url %s : %v", cfg.App.BaseUrl, err)
+			log.Fatalf("main : Parse app base url %s : %+v", cfg.App.BaseUrl, err)
 		}
 
 		docs.SwaggerInfo.Host = u.Host
@@ -395,7 +457,7 @@ func main() {
 		}()
 	}
 
-	// Start the HTTPS service listening for requests.
+	// Start the HTTPS service listening for requests with an SSL Cert auto generated with Let's Encrypt.
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
@@ -405,22 +467,22 @@ func main() {
 			MaxHeaderBytes: 1 << 20,
 		}
 
-		// Note: use a sensible value for data directory
-		// this is where cached certificates are stored
-		dataDir := "."
-		hostPolicy := func(ctx context.Context, host string) error {
-			// Note: change to your real domain
-			allowedHost := "www.mydomain.com"
-			if host == allowedHost {
-				return nil
+		// Generate a unique list of hostnames.
+		var hosts []string
+		if cfg.App.HostPrimary != "" {
+			hosts = append(hosts, cfg.App.HostPrimary)
+		}
+		for _, h := range cfg.App.HostNames {
+			h = strings.TrimSpace(h)
+			if h != cfg.App.HostPrimary {
+				hosts = append(hosts, h)
 			}
-			return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
 		}
 
 		m := &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
-			HostPolicy: hostPolicy,
-			Cache:      autocert.DirCache(dataDir),
+			HostPolicy: autocert.HostWhitelist(hosts...),
+			Cache:      autocert.DirCache(cfg.App.ConfigDir),
 		}
 		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
 
@@ -438,7 +500,7 @@ func main() {
 	// Blocking main and waiting for shutdown.
 	select {
 	case err := <-serverErrors:
-		log.Fatalf("main : Error starting server: %v", err)
+		log.Fatalf("main : Error starting server: %+v", err)
 
 	case sig := <-shutdown:
 		log.Printf("main : %v : Start shutdown..", sig)
@@ -446,7 +508,7 @@ func main() {
 		// Ensure the public IP address for the task is removed from Route53.
 		err = devops.EcsServiceTaskTaskShutdown(log, awsSession)
 		if err != nil {
-			log.Fatalf("main : Ecs Service Task shutdown : %v", err)
+			log.Fatalf("main : Ecs Service Task shutdown : %+v", err)
 		}
 
 		// Create context for Shutdown call.
@@ -470,7 +532,7 @@ func main() {
 		case sig == syscall.SIGSTOP:
 			log.Fatal("main : Integrity issue caused shutdown")
 		case err != nil:
-			log.Fatalf("main : Could not stop server gracefully : %v", err)
+			log.Fatalf("main : Could not stop server gracefully : %+v", err)
 		}
 	}
 }

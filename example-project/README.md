@@ -170,6 +170,12 @@ DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|servic
 ```
 
 
+### gitlab 
+
+[GitLab CI/CD Pipeline Configuration Reference](https://docs.gitlab.com/ee/ci/yaml/)
+
+
+
 ### AWS Permissions
 
 Base required permissions.

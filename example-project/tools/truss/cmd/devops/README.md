@@ -140,7 +140,10 @@
 go run main.go deploy -service=web-api -env=dev
 ```
 
-
+Or 
+```bash
+go run main.go deploy -service=web-api -env=dev -enable_https=true -primary_host=eproc.tech -host_names=www.eproc.tech -host_names=api.eproc.tech -recreate_service=false
+```
 
 
  

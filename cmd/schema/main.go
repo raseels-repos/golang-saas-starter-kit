@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"os"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"

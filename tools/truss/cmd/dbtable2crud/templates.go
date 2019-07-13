@@ -13,7 +13,7 @@ import (
 	"strings"
 	"text/template"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/internal/goparse"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/internal/goparse"
 	"github.com/dustin/go-humanize/english"
 	"github.com/fatih/camelcase"
 	"github.com/iancoleman/strcase"

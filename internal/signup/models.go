@@ -2,8 +2,8 @@ package signup
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 )
 
 // SignupRequest contains information needed perform signup.

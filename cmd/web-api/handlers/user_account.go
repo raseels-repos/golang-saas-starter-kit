@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"

@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/internal/retry"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/internal/retry"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
@@ -2569,6 +2569,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{DATADOG_ESSENTIAL}":     "true",
 			"{HTTP_HOST}":             "0.0.0.0:80",
 			"{HTTPS_HOST}":            "", // Not enabled by default
+			"{HTTPS_ENABLED}":         "false",
 
 			"{APP_PROJECT}":  req.ProjectName,
 			"{APP_BASE_URL}": "", // Not set by default, requires a hostname to be defined.
@@ -2605,9 +2606,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			placeholders["{DATADOG_ESSENTIAL}"] = "false"
 		}
 
-		// When there is no Elastic Load Balancer, we need to terminate HTTPS on the app.
-		if req.EnableHTTPS && !req.EnableEcsElb {
-			placeholders["{HTTPS_HOST}"] = "0.0.0.0:443"
+		// For HTTPS support.
+		if req.EnableHTTPS {
+			placeholders["{HTTPS_ENABLED}"] = "true"
+
+			// When there is no Elastic Load Balancer, we need to terminate HTTPS on the app.
+			if  !req.EnableEcsElb {
+				placeholders["{HTTPS_HOST}"] = "0.0.0.0:443"
+			}
 		}
 
 		// When a domain name if defined for the service, set the App Base URL. Default to HTTPS if enabled.

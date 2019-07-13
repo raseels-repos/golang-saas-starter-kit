@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
 	"github.com/lib/pq"

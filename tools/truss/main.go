@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/cmd/dbtable2crud"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/cmd/devops"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/cmd/dbtable2crud"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/cmd/devops"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"

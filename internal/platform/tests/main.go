@@ -3,7 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"io"
 	"log"
 	"os"
@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/docker"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
 )

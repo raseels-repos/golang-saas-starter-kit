@@ -3,7 +3,7 @@ package logger
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 )
 
 // WithContext manual injects context values to log message including Trace ID

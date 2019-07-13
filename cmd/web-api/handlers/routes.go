@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"os"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
-	saasSwagger "geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid/saas-swagger"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
-	_ "geeks-accelerator/oss/saas-starter-kit/example-project/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )

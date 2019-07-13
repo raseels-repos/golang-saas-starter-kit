@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
 	"github.com/lib/pq"

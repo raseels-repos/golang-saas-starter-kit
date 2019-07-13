@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/schema"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/internal/goparse"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/internal/goparse"
 	"github.com/dustin/go-humanize/english"
 	"github.com/fatih/camelcase"
 	"github.com/jmoiron/sqlx"

@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"testing"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/tests"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/pborman/uuid"
 )
 

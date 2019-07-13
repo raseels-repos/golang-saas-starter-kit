@@ -3,10 +3,10 @@ package user_account
 import (
 	"context"
 	"database/sql/driver"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"

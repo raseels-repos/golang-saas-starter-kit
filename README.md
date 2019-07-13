@@ -89,7 +89,6 @@ Clone the repo into your desired location. This project uses Go modules and does
 You should now be able to compile the project locally.
 
 ```
-cd example-project/
 GO111MODULE=on go install ./...
 ```
 
@@ -101,7 +100,6 @@ This project is using Go Module support for vendoring dependencies.
 We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. 
 
 ```
-cd example-project
 GO111MODULE=on go mod tidy
 ```
 
@@ -129,7 +127,7 @@ There is a `docker-compose` file that knows how to build and run all the service
 Navigate to the root of the project and first set your AWS configs. Copy `sample.env_docker_compose` to `.env_docker_compose` and update the credentials for docker-compose.
 
 ```
-$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit/example-project
+$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit
 $ cp sample.env_docker_compose .env_docker_compose
 ```
 
@@ -163,13 +161,13 @@ Running `docker-compose down` will properly stop and terminate the Docker Compos
 
 
 ## Web App
-[cmd/web-app](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/web-app)
+[cmd/web-app](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/web-app)
 
 Responsive web application that renders HTML using the `html/template` package from the standard library to enable direct interaction with clients and their users. It allows clients to sign up new accounts and provides user authentication with HTTP sessions. The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
 
 ## Web API
-[cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/web-api)
+[cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/web-api)
 
 REST API available to clients for supporting deeper integrations. This API is also a foundation for third-party integrations. The API implements JWT authentication that renders results as JSON to clients. This API is not directly used by the web app to prevent locking the functionally needed internally for development of the web app to the same functionality exposed to clients. It is believed that in the beginning, having to define an additional API for internal purposes is worth at additional effort as the internal API can handle more flexible updates. The API exposed to clients can then be maintained in a more rigid/structured process to manage client expectations.
 
@@ -199,18 +197,18 @@ $ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 ```
 
 ## Schema 
-[cmd/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/cmd/schema)
+[cmd/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/schema)
 
 Schema is a minimalistic database migration helper that can manually be invoked via CLI. It provides schema versioning and migration rollback. 
 
-To support POD architecture, the schema for the entire project is defined globally and is located inside internal: [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/example-project/internal/schema)
+To support POD architecture, the schema for the entire project is defined globally and is located inside internal: [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema)
 
 Keeping a global schema helps ensure business logic then can be decoupled across multiple packages. It’s a firm belief that data models should not be part of feature functionality. Globally defined structs are dangerous as they create large code dependencies. Structs for the same database table can be defined by package to help mitigate large code dependencies. 
 
 The example schema package provides two separate methods for handling schema migration.
-* [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/example-project/internal/schema/migrations.go) 
+* [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/migrations.go) 
 List of direct SQL statements for each migration with defined version ID. A database table is created to persist executed migrations. Upon run of each schema migration run, the migraction logic checks the migration database table to check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a function to enable complex migrations so results from query manipulated before being piped to the next query. 
-* [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/example-project/internal/schema/init_schema.go) 
+* [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/init_schema.go) 
 If you have a lot of migrations, it can be a pain to run all them, as an example, when you are deploying a new instance of the app, in a clean database. To prevent this, use the initSchema function that will run if no migration was run before (in a new clean database). If you are using this to help seed the database, you will need to create everything needed, all tables, foreign keys, etc.
 
 Another bonus with the globally defined schema allows testing to spin up database containers on demand include all the migrations. The testing package enables unit tests to programmatically execute schema migrations before running any unit tests. 
@@ -220,7 +218,7 @@ Another bonus with the globally defined schema allows testing to spin up databas
 
 Login to the local postgres container 
 ```bash
-docker exec -it example-project_postgres_1 /bin/bash
+docker exec -it saas-starter-kit_postgres_1 /bin/bash
 bash-4.4# psql -u postgres shared
 ```
 

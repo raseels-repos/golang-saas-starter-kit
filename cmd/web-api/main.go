@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"log"
 	"net"
 	"net/http"
@@ -18,12 +19,12 @@ import (
 	"syscall"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/docs"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/cmd/web-api/handlers"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/devops"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/flag"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/docs"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -72,6 +73,7 @@ func main() {
 
 	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
+
 	// =========================================================================
 	// Configuration
 	var cfg struct {
@@ -87,12 +89,12 @@ func main() {
 			WriteTimeout time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
 			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
-		App struct {
+		Service struct {
 			Name            string        `default:"web-api" envconfig:"NAME"`
 			Project         string        `default:"" envconfig:"PROJECT"`
-			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://example-project.com"`
-			HostPrimary     string        `envconfig:"HOST_PRIMARY" example:"example-project.com"`
-			HostNames       []string      `envconfig:"HOST_NAMES" example:"subdomain.example-project.com"`
+			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.eproc.tech"`
+			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.eproc.tech"`
+			EnableHTTPS		bool          `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
@@ -160,6 +162,7 @@ func main() {
 		return // We displayed help.
 	}
 
+
 	// =========================================================================
 	// Config Validation & Defaults
 
@@ -173,16 +176,16 @@ func main() {
 	// deployments and distributed to each instance of the service running.
 	if cfg.Aws.SecretsManagerConfigPrefix == "" {
 		var pts []string
-		if cfg.App.Project != "" {
-			pts = append(pts, cfg.App.Project)
+		if cfg.Service.Project != "" {
+			pts = append(pts, cfg.Service.Project)
 		}
-		pts = append(pts, cfg.Env, cfg.App.Name)
+		pts = append(pts, cfg.Env, cfg.Service.Name)
 
 		cfg.Aws.SecretsManagerConfigPrefix = filepath.Join(pts...)
 	}
 
 	// If base URL is empty, set the default value from the HTTP Host
-	if cfg.App.BaseUrl == "" {
+	if cfg.Service.BaseUrl == "" {
 		baseUrl := cfg.HTTP.Host
 		if !strings.HasPrefix(baseUrl, "http") {
 			if strings.HasPrefix(baseUrl, "0.0.0.0:") {
@@ -194,15 +197,39 @@ func main() {
 			}
 			baseUrl = "http://" + baseUrl
 		}
-		cfg.App.BaseUrl = baseUrl
+		cfg.Service.BaseUrl = baseUrl
 	}
 
+	// When HTTPS is not specifically enabled, but an HTTP host is set, enable HTTPS.
+	if !cfg.Service.EnableHTTPS && cfg.HTTPS.Host != "" {
+		cfg.Service.EnableHTTPS = true
+	}
+
+
+	// Determine the primary host by parsing host from the base app URL.
+	baseSiteUrl, err := url.Parse(cfg.Service.BaseUrl)
+	if err != nil {
+		log.Fatalf("main : Parse service base URL : %s : %+v", cfg.Service.BaseUrl, err)
+	}
+
+	// Drop any ports from the base app URL.
+	var primaryServiceHost string
+	if strings.Contains(baseSiteUrl.Host, ":") {
+		primaryServiceHost, _, err = net.SplitHostPort(baseSiteUrl.Host)
+		if err != nil {
+			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
+		}
+	} else {
+		primaryServiceHost = baseSiteUrl.Host
+	}
+
+
 	// =========================================================================
-	// Log App Info
+	// Log Service Info
 
 	// Print the build version for our logs. Also expose it under /debug/vars.
 	expvar.NewString("build").Set(build)
-	log.Printf("main : Started : Application Initializing version %q", build)
+	log.Printf("main : Started : Service Initializing version %q", build)
 	defer log.Println("main : Completed")
 
 	// Print the config for our logs. It's important to any credentials in the config
@@ -215,6 +242,7 @@ func main() {
 		}
 		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
+
 
 	// =========================================================================
 	// Init AWS Session
@@ -238,6 +266,7 @@ func main() {
 	if awsSession != nil {
 		awsSession = awstrace.WrapSession(awsSession)
 	}
+
 
 	// =========================================================================
 	// Start Redis
@@ -271,6 +300,7 @@ func main() {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
 	}
+
 
 	// =========================================================================
 	// Start Database
@@ -322,40 +352,30 @@ func main() {
 		log.Fatalf("main : Constructing authenticator : %+v", err)
 	}
 
+
 	// =========================================================================
-	// Init redirect middleware to ensure all requests go to the primary domain.
-	primaryDomain := cfg.App.HostPrimary
+	// Load middlewares that need to be configured specific for the service.
 
-	// When primary host is not set, we can parse host from the base app URL.
-	if primaryDomain == "" {
-		baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
-		if err != nil {
-			log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
-		}
+	var serviceMiddlewares []web.Middleware
 
-		if strings.Contains(baseSiteUrl.Host, ":") {
-			primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
-			if err != nil {
-				log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
-			}
-		} else {
-			primaryDomain = baseSiteUrl.Host
-		}
+	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
+	if primaryServiceHost != "127.0.0.0" && primaryServiceHost != "localhost" {
+		redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
+			RedirectConfig: mid.RedirectConfig{
+				Code: http.StatusMovedPermanently,
+				Skipper: func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) bool {
+					if r.URL.Path == "/ping" {
+						return true
+					}
+					return false
+				},
+			},
+			DomainName:   primaryServiceHost,
+			HTTPSEnabled: cfg.Service.EnableHTTPS,
+		})
+		serviceMiddlewares = append(serviceMiddlewares, redirect)
 	}
 
-	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
-		RedirectConfig: mid.RedirectConfig{
-			Code: http.StatusMovedPermanently,
-			Skipper: func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) bool {
-				if r.URL.Path == "/ping" {
-					return true
-				}
-				return false
-			},
-		},
-		DomainName:   primaryDomain,
-		HTTPSEnabled: (cfg.HTTPS.Host != ""),
-	})
 
 	// =========================================================================
 	// Start Tracing Support
@@ -371,12 +391,13 @@ func main() {
 	//
 	// /debug/vars - Added to the default mux by the expvars package.
 	// /debug/pprof - Added to the default mux by the net/http/pprof package.
-	if cfg.App.DebugHost != "" {
+	if cfg.Service.DebugHost != "" {
 		go func() {
-			log.Printf("main : Debug Listening %s", cfg.App.DebugHost)
-			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.App.DebugHost, http.DefaultServeMux))
+			log.Printf("main : Debug Listening %s", cfg.Service.DebugHost)
+			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.Service.DebugHost, http.DefaultServeMux))
 		}()
 	}
+
 
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
@@ -392,9 +413,9 @@ func main() {
 	{
 		docs.SwaggerInfo.Version = build
 
-		u, err := url.Parse(cfg.App.BaseUrl)
+		u, err := url.Parse(cfg.Service.BaseUrl)
 		if err != nil {
-			log.Fatalf("main : Parse app base url %s : %+v", cfg.App.BaseUrl, err)
+			log.Fatalf("main : Parse app base url %s : %+v", cfg.Service.BaseUrl, err)
 		}
 
 		docs.SwaggerInfo.Host = u.Host
@@ -417,7 +438,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, redirect),
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -434,7 +455,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, redirect),
+			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -442,12 +463,12 @@ func main() {
 
 		// Generate a unique list of hostnames.
 		var hosts []string
-		if cfg.App.HostPrimary != "" {
-			hosts = append(hosts, cfg.App.HostPrimary)
+		if primaryServiceHost != "" {
+			hosts = append(hosts, primaryServiceHost)
 		}
-		for _, h := range cfg.App.HostNames {
+		for _, h := range cfg.Service.HostNames {
 			h = strings.TrimSpace(h)
-			if h != cfg.App.HostPrimary {
+			if h != "" && h != primaryServiceHost {
 				hosts = append(hosts, h)
 			}
 		}
@@ -482,6 +503,7 @@ func main() {
 		}()
 	}
 
+
 	// =========================================================================
 	// Shutdown
 
@@ -500,7 +522,7 @@ func main() {
 		}
 
 		// Create context for Shutdown call.
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.ShutdownTimeout)
 		defer cancel()
 
 		// Handle closing connections for both possible HTTP servers.
@@ -509,7 +531,7 @@ func main() {
 			// Asking listener to shutdown and load shed.
 			err := api.Shutdown(ctx)
 			if err != nil {
-				log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
+				log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.Service.ShutdownTimeout, err)
 				err = api.Close()
 			}
 

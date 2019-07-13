@@ -4,7 +4,7 @@ import (
 	"log"
 	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/tools/truss/internal/goparse"
+	"geeks-accelerator/oss/saas-starter-kit/tools/truss/internal/goparse"
 	"github.com/fatih/structtag"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"

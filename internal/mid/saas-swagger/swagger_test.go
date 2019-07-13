@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	_ "geeks-accelerator/oss/saas-starter-kit/example-project/internal/mid/saas-swagger/example/docs"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	_ "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger/example/docs"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/stretchr/testify/assert"
 )
 

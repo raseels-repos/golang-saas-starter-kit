@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/pkg/errors"
 	"github.com/swaggo/files"
 	"github.com/swaggo/swag"

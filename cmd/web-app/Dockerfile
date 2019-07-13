@@ -6,7 +6,7 @@ RUN apk --update --no-cache add \
             git
 
 # Change dir to project base.
-WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit/example-project
+WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
 
 # Enable go modules.
 ENV GO111MODULE="on"

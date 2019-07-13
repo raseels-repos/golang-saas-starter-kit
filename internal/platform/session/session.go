@@ -1,7 +1,7 @@
 package session
 
 import (
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 )
 
 // ctxKey represents the type of value for the context key.

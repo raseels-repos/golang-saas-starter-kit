@@ -19,7 +19,7 @@ RUN GO111MODULE=off go get gopkg.in/go-playground/validator.v9 && \
 RUN GO111MODULE=on go get -u github.com/swaggo/swag/cmd/swag
 
 # Change dir to project base.
-WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit/example-project
+WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
 
 # Enable go modules.
 ENV GO111MODULE="on"

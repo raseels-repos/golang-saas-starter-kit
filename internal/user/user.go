@@ -3,10 +3,10 @@ package user
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/example-project/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"

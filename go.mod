@@ -1,4 +1,4 @@
-module geeks-accelerator/oss/saas-starter-kit/example-project
+module geeks-accelerator/oss/saas-starter-kit
 
 require (
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect

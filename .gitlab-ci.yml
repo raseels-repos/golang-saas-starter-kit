@@ -47,7 +47,6 @@ cache:
 
 .deploy_dev_tmpl: &deploy_dev_tmpl
   <<: *deploy_tmpl
-  stage: deploy:dev
   tags:
     - dev
   environment:
@@ -55,7 +54,6 @@ cache:
 
 .deploy_stage_tmpl: &deploy_stage_tmpl
   <<: *deploy_tmpl
-  stage: deploy:stage
   tags:
     - stage
   environment:
@@ -63,7 +61,6 @@ cache:
 
 .deploy_prod_tmpl: &deploy_prod_tmpl
   <<: *deploy_tmpl
-  stage: deploy:prod
   tags:
     - prod
   environment:
@@ -107,7 +104,6 @@ cache:
 
 .deploy_dev_webapi_tmpl: &deploy_dev_webapi_tmpl
   <<: *deploy_dev_tmpl
-  stage: deploy:dev
   tags:
     - dev
   environment:
@@ -123,6 +119,7 @@ cache:
     S3_BUCKET_PUBLIC: saas-starter-kit-public
 webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
+  stage: build:dev
   variables:
     NO_DEPLOY: "true"
   only:
@@ -131,6 +128,7 @@ webapi:build:dev:
     - dev-web-api
 webapi:deploy:dev:
   <<: *deploy_dev_webapi_tmpl
+  stage: deploy:dev
   variables:
     NO_BUILD: "true"
   dependencies:

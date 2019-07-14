@@ -68,7 +68,12 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("\t\t\tAccessKeyID: '%s'", awsCreds.AccessKeyID)
+		if awsCreds.UseRole {
+			log.Printf("\t\t\tUsing role")
+		} else {
+			log.Printf("\t\t\tAccessKeyID: '%s'", awsCreds.AccessKeyID)
+		}
+
 		log.Printf("\t\t\tRegion: '%s'", awsCreds.Region)
 		log.Printf("\t%s\tAWS credentials valid.", tests.Success)
 	}

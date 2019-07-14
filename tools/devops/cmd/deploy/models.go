@@ -170,13 +170,22 @@ func (r *serviceDeployRequest) awsSession() *session.Session {
 // AwsCredentials defines AWS credentials used for deployment. Unable to use roles when deploying
 // using gitlab CI/CD pipeline.
 type awsCredentials struct {
-	AccessKeyID     string `validate:"required"`
-	SecretAccessKey string `validate:"required"`
-	Region          string `validate:"required"`
+	AccessKeyID     string `validate:"required_without=UseRole"`
+	SecretAccessKey string `validate:"required_without=UseRole"`
+	Region          string `validate:"required_without=UseRole"`
+	UseRole          bool
 }
 
 // Session returns a new AWS Session used to access AWS services.
 func (creds awsCredentials) Session() *session.Session {
+
+	if creds.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		return  session.Must(session.NewSession())
+	}
+
 	return session.New(
 		&aws.Config{
 			Region:      aws.String(creds.Region),

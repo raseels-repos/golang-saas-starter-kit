@@ -3,9 +3,11 @@ package deploy
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -25,6 +27,21 @@ const (
 
 func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 	var creds awsCredentials
+
+	if v := getTargetEnv(targetEnv, "AWS_USE_ROLE"); v != "" {
+		creds.UseRole, _ = strconv.ParseBool(v)
+
+		sess, err := session.NewSession()
+		if err != nil {
+			return creds, errors.Wrap(err, "failed to load aws credentials from instance")
+		}
+
+		if  sess.Config != nil && sess.Config.Region != nil {
+			creds.Region = *sess.Config.Region
+		}
+
+		return creds, nil
+	}
 
 	creds.AccessKeyID = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_ACCESS_KEY_ID"))
 	creds.SecretAccessKey = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_SECRET_ACCESS_KEY"))

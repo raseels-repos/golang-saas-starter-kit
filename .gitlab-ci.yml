@@ -133,7 +133,7 @@ webapi:deploy:dev:
     NO_BUILD: "true"
   dependencies:
     - 'webapi:build:dev'
-    - 'db:migrate:dev'
+#    - 'db:migrate:dev'
   only:
     - master
     - dv

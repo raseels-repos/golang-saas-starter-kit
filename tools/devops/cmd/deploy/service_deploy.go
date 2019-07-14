@@ -905,7 +905,9 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Println("Starting docker build")
 
 		// Create tar file of repository for service.
-		buildCtx, err := archive.TarWithOptions(req.ProjectRoot, &archive.TarOptions{})
+		buildCtx, err := archive.TarWithOptions(req.ProjectRoot, &archive.TarOptions{
+			ExcludePatterns: []string{".git/*"},
+		})
 		if err != nil {
 			return errors.Wrap(err, "Failed to create docker build context")
 		}

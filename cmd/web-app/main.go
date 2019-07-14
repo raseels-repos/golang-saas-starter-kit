@@ -6,11 +6,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
-	"golang.org/x/crypto/acme"
-	"golang.org/x/crypto/acme/autocert"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"html/template"
+		"html/template"
 	"log"
 	"net"
 	"net/http"
@@ -24,6 +20,11 @@ import (
 	"syscall"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
@@ -112,7 +113,7 @@ func main() {
 		Aws struct {
 			AccessKeyID                string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
 			SecretAccessKey            string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
-			Region                     string `default:"us-east-1" envconfig:"AWS_REGION"`
+			Region                     string `default:"us-west-2" envconfig:"AWS_REGION"`
 			S3BucketPrivate            string `envconfig:"S3_BUCKET_PRIVATE"`
 			S3BucketPublic             string `envconfig:"S3_BUCKET_PUBLIC"`
 			SecretsManagerConfigPrefix string `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
@@ -159,6 +160,20 @@ func main() {
 	if cfg.Aws.UseRole {
 		cfg.Aws.AccessKeyID = ""
 		cfg.Aws.SecretAccessKey = ""
+
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		if cfg.Aws.Region == "" {
+			sess := session.Must(session.NewSession())
+			md := ec2metadata.New(sess)
+
+			var err error
+			cfg.Aws.Region, err = md.Region()
+			if err != nil {
+				log.Fatalf("main : Load region of ecs metadata : %+v", err)
+			}
+		}
 	}
 
 	// Set the default AWS Secrets Manager prefix used for name to store config files that will be persisted across

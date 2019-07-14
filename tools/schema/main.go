@@ -24,6 +24,17 @@ var build = "develop"
 // ie: export SCHEMA_ENV=dev
 var service = "SCHEMA"
 
+// DB defines the database credentials stored in AWS Secrets Manager as defined by devops.
+type DB struct {
+	Host       string
+	User       string
+	Pass       string
+	Database   string
+	Driver     string
+	DisableTLS bool
+}
+
+
 func main() {
 	// =========================================================================
 	// Logging
@@ -42,6 +53,19 @@ func main() {
 			Driver     string `default:"postgres" envconfig:"DRIVER"`
 			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
 			DisableTLS bool   `default:"true" envconfig:"DISABLE_TLS"`
+		}
+		Project struct {
+			Name       string `default:"saas-starter-kit" envconfig:"Name"`
+		}
+		Aws struct {
+			AccessKeyID                string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey            string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region                     string `default:"us-east-1" envconfig:"AWS_REGION"`
+
+			// Get an AWS session from an implicit source if no explicit
+			// configuration is provided. This is useful for taking advantage of
+			// EC2/ECS instance roles.
+			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 	}
 

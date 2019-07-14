@@ -98,7 +98,7 @@ cache:
   <<: *deploy_dev_tmpl
   tags:
     - dev
-  environment:
+  variables: 
     name: 'dev/${SERVICE}-dev'
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'

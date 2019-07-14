@@ -25,7 +25,6 @@ func main() {
 
 	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-
 	// =========================================================================
 	// Log App Info
 

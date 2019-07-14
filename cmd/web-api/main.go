@@ -73,7 +73,6 @@ func main() {
 
 	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-
 	// =========================================================================
 	// Configuration
 	var cfg struct {
@@ -94,7 +93,7 @@ func main() {
 			Project         string        `default:"" envconfig:"PROJECT"`
 			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.eproc.tech"`
 			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.eproc.tech"`
-			EnableHTTPS		bool          `default:"false" envconfig:"ENABLE_HTTPS"`
+			EnableHTTPS     bool          `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
@@ -162,7 +161,6 @@ func main() {
 		return // We displayed help.
 	}
 
-
 	// =========================================================================
 	// Config Validation & Defaults
 
@@ -205,7 +203,6 @@ func main() {
 		cfg.Service.EnableHTTPS = true
 	}
 
-
 	// Determine the primary host by parsing host from the base app URL.
 	baseSiteUrl, err := url.Parse(cfg.Service.BaseUrl)
 	if err != nil {
@@ -222,7 +219,6 @@ func main() {
 	} else {
 		primaryServiceHost = baseSiteUrl.Host
 	}
-
 
 	// =========================================================================
 	// Log Service Info
@@ -242,7 +238,6 @@ func main() {
 		}
 		log.Printf("main : Config : %v\n", string(cfgJSON))
 	}
-
 
 	// =========================================================================
 	// Init AWS Session
@@ -266,7 +261,6 @@ func main() {
 	if awsSession != nil {
 		awsSession = awstrace.WrapSession(awsSession)
 	}
-
 
 	// =========================================================================
 	// Start Redis
@@ -300,7 +294,6 @@ func main() {
 			log.Printf("main : redis : ConfigGet maxmemory-policy : recommended to be set to allkeys-lru to avoid OOM")
 		}
 	}
-
 
 	// =========================================================================
 	// Start Database
@@ -352,7 +345,6 @@ func main() {
 		log.Fatalf("main : Constructing authenticator : %+v", err)
 	}
 
-
 	// =========================================================================
 	// Load middlewares that need to be configured specific for the service.
 
@@ -376,7 +368,6 @@ func main() {
 		serviceMiddlewares = append(serviceMiddlewares, redirect)
 	}
 
-
 	// =========================================================================
 	// Start Tracing Support
 	th := fmt.Sprintf("%s:%d", cfg.Trace.Host, cfg.Trace.Port)
@@ -397,7 +388,6 @@ func main() {
 			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.Service.DebugHost, http.DefaultServeMux))
 		}()
 	}
-
 
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
@@ -502,7 +492,6 @@ func main() {
 			serverErrors <- api.ListenAndServeTLS("", "")
 		}()
 	}
-
 
 	// =========================================================================
 	// Shutdown

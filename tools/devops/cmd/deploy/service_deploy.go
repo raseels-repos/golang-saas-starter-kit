@@ -1294,7 +1294,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
 	}
 
-
 	// This is only used when service uses Aurora via RDS for serverless Postgres and database cluster is defined.
 	// Aurora Postgres is limited to specific AWS regions and thus not used by default.
 	// If an Aurora Postgres cluster is defined, ensure it exists with RDS else create a new one.
@@ -2460,7 +2459,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			placeholders["{HTTPS_ENABLED}"] = "true"
 
 			// When there is no Elastic Load Balancer, we need to terminate HTTPS on the app.
-			if  !req.EnableEcsElb {
+			if !req.EnableEcsElb {
 				placeholders["{HTTPS_HOST}"] = "0.0.0.0:443"
 			}
 		}

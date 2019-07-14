@@ -110,7 +110,7 @@ cache:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     NO_DEPLOY: 1
-    AWS_USE_ROLE: 1 
+    AWS_USE_ROLE: 1
 webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: build:dev

@@ -3,7 +3,6 @@ package deploy
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
@@ -11,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
@@ -33,11 +34,17 @@ func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 
 		sess, err := session.NewSession()
 		if err != nil {
-			return creds, errors.Wrap(err, "failed to load aws credentials from instance")
+			return creds, errors.Wrap(err, "Failed to load AWS credentials from instance")
 		}
 
-		if  sess.Config != nil && sess.Config.Region != nil {
+		if sess.Config != nil && sess.Config.Region != nil {
 			creds.Region = *sess.Config.Region
+		} else {
+			sm := ec2metadata.New(sess)
+			creds.Region, err = sm.Region()
+			if err != nil {
+				return creds, errors.Wrap(err, "Failed to get region from AWS session")
+			}
 		}
 
 		return creds, nil

@@ -118,7 +118,6 @@ func RespondErrorStatus(ctx context.Context, w http.ResponseWriter, er error, st
 	return nil
 }
 
-
 // RespondText sends text back to the client as plain text with the specified HTTP status code.
 func RespondText(ctx context.Context, w http.ResponseWriter, text string, statusCode int) error {
 	if err := Respond(ctx, w, []byte(text), statusCode, MIMETextPlainCharsetUTF8); err != nil {

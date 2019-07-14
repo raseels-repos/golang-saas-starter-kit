@@ -173,7 +173,7 @@ type awsCredentials struct {
 	AccessKeyID     string `validate:"required_without=UseRole"`
 	SecretAccessKey string `validate:"required_without=UseRole"`
 	Region          string `validate:"required_without=UseRole"`
-	UseRole          bool
+	UseRole         bool
 }
 
 // Session returns a new AWS Session used to access AWS services.
@@ -183,7 +183,7 @@ func (creds awsCredentials) Session() *session.Session {
 		// Get an AWS session from an implicit source if no explicit
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
-		return  session.Must(session.NewSession())
+		return session.Must(session.NewSession())
 	}
 
 	return session.New(

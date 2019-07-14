@@ -98,8 +98,7 @@ cache:
   <<: *deploy_dev_tmpl
   tags:
     - dev
-  variables: 
-    name: 'dev/${SERVICE}-dev'
+  variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
     ENABLE_HTTPS: 1
@@ -115,6 +114,7 @@ webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: build:dev
   environment:
+    name: '${TARGET_ENV}/${SERVICE}-${TARGET_ENV}'
     NO_BUILD: 'false'
   only:
     - master
@@ -124,6 +124,7 @@ webapi:deploy:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: deploy:dev
   environment:
+    name: '${TARGET_ENV}/${SERVICE}-${TARGET_ENV}'
     NO_DEPLOY: 'false'
   dependencies:
     - 'webapi:build:dev'

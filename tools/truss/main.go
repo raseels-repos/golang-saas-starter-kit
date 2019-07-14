@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/tools/truss/cmd/dbtable2crud"
-	"geeks-accelerator/oss/saas-starter-kit/tools/truss/cmd/devops"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
@@ -121,8 +120,6 @@ func main() {
 	// =========================================================================
 	// Start Truss
 
-	var deployFlags devops.ServiceDeployFlags
-
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		{
@@ -206,37 +203,6 @@ func main() {
 				}
 
 				return dbtable2crud.Run(masterDb, log, cfg.DB.Database, dbTable, modelFile, modelName, templateDir, projectPath, c.Bool("saveChanges"))
-			},
-		},
-		{
-			Name:    "deploy",
-			Aliases: []string{"serviceDeploy"},
-			Usage:   "-service=web-api -env=dev",
-			Flags: []cli.Flag{
-				cli.StringFlag{Name: "service", Usage: "name of cmd", Destination: &deployFlags.ServiceName},
-				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod", Destination: &deployFlags.Env},
-				cli.BoolFlag{Name: "enable_https", Usage: "enable HTTPS", Destination: &deployFlags.EnableHTTPS},
-				cli.StringFlag{Name: "primary_host", Usage: "dev, stage, or prod", Destination: &deployFlags.ServiceHostPrimary},
-				cli.StringSliceFlag{Name: "host_names", Usage: "dev, stage, or prod", Value: &deployFlags.ServiceHostNames},
-				cli.StringFlag{Name: "private_bucket", Usage: "dev, stage, or prod", Destination: &deployFlags.S3BucketPrivateName},
-				cli.StringFlag{Name: "public_bucket", Usage: "dev, stage, or prod", Destination: &deployFlags.S3BucketPublicName},
-				cli.StringFlag{Name: "dockerfile", Usage: "DockerFile for service", Destination: &deployFlags.DockerFile},
-				cli.StringFlag{Name: "root", Usage: "project root directory", Destination: &deployFlags.ProjectRoot},
-				cli.StringFlag{Name: "project", Usage: "name of project", Destination: &deployFlags.ProjectName},
-				cli.BoolFlag{Name: "elb", Usage: "enable deployed to use Elastic Load Balancer", Destination: &deployFlags.EnableEcsElb},
-				cli.BoolTFlag{Name: "lambda_vpc", Usage: "deploy lambda behind VPC", Destination: &deployFlags.EnableLambdaVPC},
-				cli.BoolFlag{Name: "no_build", Usage: "skip build and continue directly to deploy", Destination: &deployFlags.NoBuild},
-				cli.BoolFlag{Name: "no_deploy", Usage: "skip deploy after build", Destination: &deployFlags.NoDeploy},
-				cli.BoolFlag{Name: "no_cache", Usage: "skip docker cache", Destination: &deployFlags.NoCache},
-				cli.BoolFlag{Name: "no_push", Usage: "skip docker push after build", Destination: &deployFlags.NoPush},
-				cli.BoolFlag{Name: "recreate_service", Usage: "skip docker push after build", Destination: &deployFlags.RecreateService},
-			},
-			Action: func(c *cli.Context) error {
-				req, err := devops.NewServiceDeployRequest(log, deployFlags)
-				if err != nil {
-					return err
-				}
-				return devops.ServiceDeploy(log, req)
 			},
 		},
 	}

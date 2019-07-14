@@ -405,7 +405,7 @@ instance will be a dedicated host since we need it always up and running, thus i
         * This will limit commits to the master or dev branches from triggering the pipeline to run. This includes a 
         wildcard for any branch named with the prefix `dev-`.
     * When asked the executor type, enter `docker+machine`
-    * When asked for the default Docker image, enter `golang:alpine3.9`
+    * When asked for the default Docker image, enter `geeksaccelerator/docker-library:golang1.12-docker`
         
 13. [Configuring the GitLab Runner](https://docs.gitlab.com/runner/configuration/runner_autoscale_aws/#configuring-the-gitlab-runner)   
 
@@ -418,7 +418,7 @@ instance will be a dedicated host since we need it always up and running, thus i
     ```yaml
       [runners.docker]
         tls_verify = false
-        image = "golang:alpine3.9"
+        image = "geeksaccelerator/docker-library:golang1.12-docker"
         privileged = true
         disable_entrypoint_overwrite = false
         oom_kill_disable = false

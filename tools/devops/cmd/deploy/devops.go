@@ -1,4 +1,4 @@
-package devops
+package deploy
 
 import (
 	"fmt"
@@ -120,36 +120,3 @@ func exists(path string) (bool, error) {
 	}
 	return true, err
 }
-
-/*
-type EnvVars []string
-
-// execCmds executes a set of commands.
-func execCmds(workDir string, envVars *EnvVars, cmds ...[]string) ([]string, error) {
-	if envVars == nil {
-		ev := EnvVars(os.Environ())
-		envVars = &ev
-	}
-
-	var results []string
-	for _, cmdVals := range cmds {
-		cmd := exec.Command(cmdVals[0], cmdVals[1:]...)
-		cmd.Dir = workDir
-		cmd.Env = *envVars
-		out, err := cmd.CombinedOutput()
-
-		fmt.Println(string(out ))
-
-		if err != nil {
-			return results, errors.WithMessagef(err, "failed to execute %s\n%s",  strings.Join(cmdVals, " "), string(out))
-		}
-		results = append(results, string(out))
-
-		// Update the current env vars after command has been executed.
-		ev := EnvVars(cmd.Env)
-		envVars = &ev
-	}
-
-	return results, nil
-}
-*/

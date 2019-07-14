@@ -7,4 +7,4 @@ build:
 	go install .
 
 run:
-	go build . && ./schema
+	go build . && ./truss

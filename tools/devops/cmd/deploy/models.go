@@ -1,4 +1,4 @@
-package devops
+package deploy
 
 import (
 	"strings"

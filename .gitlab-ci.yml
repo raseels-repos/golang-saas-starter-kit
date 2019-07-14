@@ -1,20 +1,25 @@
-image: docker:stable
+image: geeksaccelerator/docker-library:golang1.12-docker
 
 services:
   - docker:dind
 
 variables:
-  AWS_ECS_CLUSTER: example-project
-  AWS_S3_STATIC_BASE_URI: example-project-stage/public
-  CONTAINER_IMAGE: registry.gitlab.com/$CI_PROJECT_PATH
   DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
+  NO_BUILD: "false"
+  NO_DEPLOY: "false"
+  # Optional:
+  # PROJECT_NAME: example-project
+
 
 before_script:
-  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+  - 'cd ./tools/truss && make install'
+  - 'cd ./cmd/schema && make install'
 
 stages:
-  - build:base
+  - build:dev
+  - migrate:dev
+  - deploy:dev
   - build:stage
   - migrate:stage
   - deploy:stage
@@ -31,41 +36,23 @@ cache:
   only:
     - master
 
-.build_tmpl: &build_tmpl
-  <<: *job_tmpl
-  script:
-    - 'git clone http://gitlab+deploy-token-50199:z2WzSQKY9Crzvw98yzTy@gitlab.com/gitw/akverse.git'
-    - 'CI=1 PUSH=${PUSH} PUSH_AWS_REGISTRY=${PUSH_AWS_REGISTRY} ./akverse/scripts/build.sh $SERVICE $TARGET_ENV -'
-
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - 'git clone http://gitlab+deploy-token-50199:z2WzSQKY9Crzvw98yzTy@gitlab.com/gitw/akverse.git'
-    - 'LB=${ENABLE_LB} SD=${ENABLE_SD} VPC=${ENABLE_VPC} S3_BUCKET=${S3_BUCKET} S3_KEY=${S3_KEY} STATIC_S3_URI=${STATIC_S3_URI} ./akverse/scripts/deploy.sh $SERVICE $TARGET_ENV - ${ECS_CLUSTER}'
+    - 'truss deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -no_build=${NO_BUILD} -no_deploy=${NO_DEPLOY}'
 
-.build_base_tmpl: &build_base_tmpl
-  <<: *build_tmpl
-  stage: build:base
-  tags:
-    - stage
-  only:
-    - master
-    - stage
-    - /^stage-.*$/
-    - prod
-    - /^prod-.*$/
+.migrate_tmpl: &migrate_tmpl
+  <<: *job_tmpl
+  script:
+    - './schema ???'
 
-.build_stage_tmpl: &build_stage_tmpl
-  <<: *build_tmpl
-  stage: build:stage
+.deploy_dev_tmpl: &deploy_dev_tmpl
+  <<: *deploy_tmpl
+  stage: deploy:dev
   tags:
-    - stage
-
-.build_prod_tmpl: &build_prod_tmpl
-  <<: *build_tmpl
-  stage: build:prod
-  tags:
-    - prod
+    - dev
+  environment:
+    name: 'dev/${SERVICE}-dev'
 
 .deploy_stage_tmpl: &deploy_stage_tmpl
   <<: *deploy_tmpl
@@ -84,115 +71,76 @@ cache:
     name: 'production/${SERVICE}'
   when: manual
 
+.migrate_dev_tmpl: &migrate_dev_tmpl
+  <<: *migrate_tmpl
+  stage: migrate:dev
+  tags:
+    - dev
+  only:
+    - master
+    - dev
+    - /^dev-.*$/
+
 .migrate_stage_tmpl: &migrate_stage_tmpl
-  <<: *build_tmpl
+  <<: *migrate_tmpl
   stage: migrate:stage
   tags:
     - stage
   only:
-    - master
     - stage
     - /^stage-.*$/
-    - prod
-    - /^prod-.*$/
 
 .migrate_prod_tmpl: &migrate_prod_tmpl
-  <<: *build_tmpl
+  <<: *migrate_tmpl
   stage: migrate:prod
   tags:
     - prod
   when: manual
   only:
-    - master
     - prod
     - /^prod-.*$/
 
-datadog-agent:build:stage:
-  <<: *build_stage_tmpl
-  variables:
-    TARGET_ENV: 'stage'
-    SERVICE: 'datadog-agent'
-    PUSH_AWS_REGISTRY: 1
+#db:migrate:dev:
+#  <<: *migrate_dev_tmpl
+#  variables:
+#    TARGET_ENV: 'stage'
+#    SERVICE: 'schema'
 
-datadog-agent:build:prod:
-  <<: *build_prod_tmpl
+.deploy_dev_webapi_tmpl: &deploy_dev_webapi_tmpl
+  <<: *deploy_dev_tmpl
+  stage: deploy:dev
+  tags:
+    - dev
+  environment:
+    name: 'dev/${SERVICE}-dev'
+    TARGET_ENV: 'dev'
+    SERVICE: 'web-api'
+    ENABLE_HTTPS: "true"
+    ENABLE_ELB: "false"
+    PRIMARY_HOST: eproc.tech
+    HOST_NAMES: www.eproc.tech, api.eproc.tech
+    S3_BUCKET_PRIVATE: saas-starter-kit-private
+    S3_BUCKET_PUBLIC: saas-starter-kit-public
+webapi:build:dev:
+  <<: *deploy_dev_webapi_tmpl
   variables:
-    TARGET_ENV: 'prod'
-    SERVICE: 'datadog-agent'
-    PUSH_AWS_REGISTRY: 1
-  dependencies:
-    - 'datadog-agent:build:stage'
-
-db:migrate:stage:
-  <<: *migrate_stage_tmpl
-  variables:
-    TARGET_ENV: 'stage'
-    SERVICE: 'schema'
-
-db:migrate:prod:
-  <<: *migrate_prod_tmpl
-  variables:
-    TARGET_ENV: 'prod'
-    SERVICE: 'schema'
-  dependencies:
-    - 'db:migrate:stage'
-
-webapi:build:stage:
-  <<: *build_stage_tmpl
-  variables:
-    TARGET_ENV: 'stage'
-    SERVICE: 'webapi'
+    NO_DEPLOY: "true"
   only:
     - master
-    - stage
+    - dev
+    - dev-web-api
+webapi:deploy:dev:
+  <<: *deploy_dev_webapi_tmpl
+  variables:
+    NO_BUILD: "true"
+  dependencies:
+    - 'webapi:build:dev'
+    - 'db:migrate:dev'
+  only:
+    - master
+    - dv
     - stage-webapi
-    - prod
-    - prod-webapi
-webapi:deploy:stage:
-  <<: *deploy_stage_tmpl
-  variables:
-    TARGET_ENV: 'stage'
-    SERVICE: 'webapi'
-    ECS_CLUSTER: '${ECS_CLUSTER}'
-    STATIC_S3_URI: '${AWS_S3_STATIC_BASE_URI}/stage/webapi'
-    ENABLE_LB: 0
-  dependencies:
-    - 'webapi:build:stage'
-    - 'db:migrate:stage'
-    - 'datadog-agent:build:stage'
-  only:
-    - master
-    - stage
-    - stage-webapi
-    - prod
-    - prod-webapi
-webapi:build:prod:
-  <<: *build_prod_tmpl
-  variables:
-    TARGET_ENV: 'prod'
-    SERVICE: 'webapi'
-  dependencies:
-    - 'webapi:deploy:stage'
-  only:
-    - master
-    - prod
-    - prod-webapi
-webapi:deploy:prod:
-  <<: *deploy_prod_tmpl
-  variables:
-    TARGET_ENV: 'prod'
-    SERVICE: 'webapi'
-    ECS_CLUSTER: '${ECS_CLUSTER}'
-    STATIC_S3_URI: '${AWS_S3_STATIC_BASE_URI}/prod/webapi'
-    ENABLE_LB: 0
-  dependencies:
-    - 'webapi:build:prod'
-    - 'db:migrate:prod'
-    - 'datadog-agent:build:prod'
-  only:
-    - master
-    - prod
-    - prod-webapi
+
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

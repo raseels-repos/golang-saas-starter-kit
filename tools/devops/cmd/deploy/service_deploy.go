@@ -726,7 +726,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			// RDS settings for a Postgres database Instance. Could defined different settings by env.
 			req.DBInstance = &rds.CreateDBInstanceInput{
-				DBInstanceIdentifier:      aws.String(req.ProjectName + "-" + req.Env + "-01"),
+				DBInstanceIdentifier:      aws.String(req.ProjectName + "-" + req.Env),
 				DBName:                    aws.String("shared"),
 				Engine:                    aws.String("postgres"),
 				MasterUsername:            aws.String("god"),

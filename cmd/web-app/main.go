@@ -238,6 +238,9 @@ func main() {
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
 		awsSession = session.Must(session.NewSession())
+		if cfg.Aws.Region != "" {
+			awsSession.Config.WithRegion(cfg.Aws.Region)
+		}
 
 		log.Printf("main : AWS : Using role.\n")
 

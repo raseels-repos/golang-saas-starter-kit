@@ -57,6 +57,18 @@ func main() {
 		return // We displayed help.
 	}
 
+
+	/*
+	//
+	DBInstanceIdentifier:      aws.String(req.ProjectName + "-" + req.Env),
+
+
+	Secret ID used to store the DB username and password across deploys.
+			dbSecretId := filepath.Join(req.ProjectName, req.Env, *req.DBInstance.DBInstanceIdentifier)
+
+	*/
+
+
 	// =========================================================================
 	// Log App Info
 

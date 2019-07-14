@@ -183,7 +183,12 @@ func (creds awsCredentials) Session() *session.Session {
 		// Get an AWS session from an implicit source if no explicit
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
-		return session.Must(session.NewSession())
+		sess := session.Must(session.NewSession())
+		if creds.Region != "" {
+			sess.Config.WithRegion(creds.Region)
+		}
+
+		return sess
 	}
 
 	return session.New(

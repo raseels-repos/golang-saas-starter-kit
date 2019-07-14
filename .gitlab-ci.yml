@@ -112,6 +112,7 @@ cache:
     - dev
   environment:
     name: 'dev/${SERVICE}-dev'
+  variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
     ENABLE_HTTPS: "true"

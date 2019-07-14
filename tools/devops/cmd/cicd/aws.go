@@ -1,8 +1,10 @@
-package deploy
+package cicd
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
@@ -26,6 +28,72 @@ const (
 	awsTagNameName              = "Name"
 )
 
+// AwsCredentials defines AWS credentials used for deployment. Unable to use roles when deploying
+// using gitlab CI/CD pipeline.
+type awsCredentials struct {
+	AccessKeyID     string `validate:"required_without=UseRole"`
+	SecretAccessKey string `validate:"required_without=UseRole"`
+	Region          string `validate:"required_without=UseRole"`
+	UseRole         bool
+}
+
+// Session returns a new AWS Session used to access AWS services.
+func (creds awsCredentials) Session() *session.Session {
+
+	if creds.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		sess := session.Must(session.NewSession())
+		if creds.Region != "" {
+			sess.Config.WithRegion(creds.Region)
+		}
+
+		return sess
+	}
+
+	return session.New(
+		&aws.Config{
+			Region:      aws.String(creds.Region),
+			Credentials: credentials.NewStaticCredentials(creds.AccessKeyID, creds.SecretAccessKey, ""),
+		})
+}
+
+// IamPolicyDocument defines an AWS IAM policy used for defining access for IAM roles, users, and groups.
+type IamPolicyDocument struct {
+	Version   string              `json:"Version"`
+	Statement []IamStatementEntry `json:"Statement"`
+}
+
+// IamStatementEntry defines a single statement for an IAM policy.
+type IamStatementEntry struct {
+	Sid      string      `json:"Sid"`
+	Effect   string      `json:"Effect"`
+	Action   []string    `json:"Action"`
+	Resource interface{} `json:"Resource"`
+}
+
+// S3Bucket defines the details need to create a bucket that includes additional configuration.
+type S3Bucket struct {
+	Name              string `validate:"omitempty"`
+	Input             *s3.CreateBucketInput
+	LifecycleRules    []*s3.LifecycleRule
+	CORSRules         []*s3.CORSRule
+	PublicAccessBlock *s3.PublicAccessBlockConfiguration
+	Policy            string
+}
+
+// DB mimics the general info needed for services used to define placeholders.
+type DB struct {
+	Host       string
+	User       string
+	Pass       string
+	Database   string
+	Driver     string
+	DisableTLS bool
+}
+
+// GetAwsCredentials loads the AWS Access Keys from env variables unless a role is used.
 func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 	var creds awsCredentials
 
@@ -65,6 +133,7 @@ func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 	return creds, nil
 }
 
+// GetAwsSecretValue returns the string value for a secret stored in AWS Secrets Manager.
 func GetAwsSecretValue(creds awsCredentials, secretId string) (string, error) {
 	svc := secretsmanager.New(creds.Session())
 
@@ -79,7 +148,7 @@ func GetAwsSecretValue(creds awsCredentials, secretId string) (string, error) {
 }
 
 // EcrPurgeImages ensures pipeline does not generate images for max of 10000 and prevent manual deletion of images.
-func EcrPurgeImages(req *serviceDeployRequest) ([]*ecr.ImageIdentifier, error) {
+func EcrPurgeImages(req *serviceBuildRequest) ([]*ecr.ImageIdentifier, error) {
 
 	svc := ecr.New(req.awsSession())
 

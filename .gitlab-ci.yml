@@ -5,7 +5,6 @@ services:
 
 before_script:
   - 'cd ./tools/devops && make install && cd ../../'
-  - 'cd ./tools/schema && make install && cd ../../'
 
 stages:
   - build:dev
@@ -27,39 +26,22 @@ cache:
   only:
     - master
 
+.build_tmpl: &build_tmpl
+  <<: *job_tmpl
+  script:
+    - 'devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -no_build=${NO_BUILD} -no_deploy=${NO_DEPLOY}'
+    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC}'
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl
   script:
-    - './schema ???'
+    - 'devops migrate -project=${PROJECT_NAME} -env=${TARGET_ENV}'
 
-.deploy_dev_tmpl: &deploy_dev_tmpl
-  <<: *deploy_tmpl
-  tags:
-    - dev
-  environment:
-    name: 'dev/${SERVICE}-dev'
-
-.deploy_stage_tmpl: &deploy_stage_tmpl
-  <<: *deploy_tmpl
-  tags:
-    - stage
-  environment:
-    name: 'stage/${SERVICE}-stage'
-
-.deploy_prod_tmpl: &deploy_prod_tmpl
-  <<: *deploy_tmpl
-  tags:
-    - prod
-  environment:
-    name: 'production/${SERVICE}'
-  when: manual
-
-.migrate_dev_tmpl: &migrate_dev_tmpl
+db:migrate:dev:
   <<: *migrate_tmpl
   stage: migrate:dev
   tags:
@@ -69,33 +51,25 @@ cache:
     - dev
     - /^dev-.*$/
 
-.migrate_stage_tmpl: &migrate_stage_tmpl
-  <<: *migrate_tmpl
-  stage: migrate:stage
+  variables:
+    TARGET_ENV: 'dev'
+
+webapi:build:dev:
+  <<: *build_tmpl
+  stage: build:dev
   tags:
-    - stage
+    - dev
+  variables:
+    TARGET_ENV: 'dev'
+    SERVICE: 'web-api'
+    AWS_USE_ROLE: 'true'
   only:
-    - stage
-    - /^stage-.*$/
-
-.migrate_prod_tmpl: &migrate_prod_tmpl
-  <<: *migrate_tmpl
-  stage: migrate:prod
-  tags:
-    - prod
-  when: manual
-  only:
-    - prod
-    - /^prod-.*$/
-
-#db:migrate:dev:
-#  <<: *migrate_dev_tmpl
-#  variables:
-#    TARGET_ENV: 'stage'
-#    SERVICE: 'schema'
-
-.deploy_dev_webapi_tmpl: &deploy_dev_webapi_tmpl
-  <<: *deploy_dev_tmpl
+    - master
+    - dev
+    - dev-web-api
+webapi:deploy:dev:
+  <<: *deploy_tmpl
+  stage: deploy:dev
   tags:
     - dev
   variables:
@@ -108,24 +82,6 @@ cache:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     AWS_USE_ROLE: 'true'
-    NO_BUILD: 'true'
-    NO_DEPLOY: 'true'
-webapi:build:dev:
-  <<: *deploy_dev_webapi_tmpl
-  stage: build:dev
-  environment:
-    name: '${TARGET_ENV}/${SERVICE}-${TARGET_ENV}'
-    NO_BUILD: 'false'
-  only:
-    - master
-    - dev
-    - dev-web-api
-webapi:deploy:dev:
-  <<: *deploy_dev_webapi_tmpl
-  stage: deploy:dev
-  environment:
-    name: '${TARGET_ENV}/${SERVICE}-${TARGET_ENV}'
-    NO_DEPLOY: 'false'
   dependencies:
     - 'webapi:build:dev'
 #    - 'db:migrate:dev'

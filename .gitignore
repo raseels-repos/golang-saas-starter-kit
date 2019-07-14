@@ -3,3 +3,5 @@ go.mod
 aws.lee
 aws.*
 .env_docker_compose
+
+!aws.go

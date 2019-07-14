@@ -29,6 +29,8 @@ const (
 func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 	var creds awsCredentials
 
+	creds.Region = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_REGION"))
+
 	if v := getTargetEnv(targetEnv, "AWS_USE_ROLE"); v != "" {
 		creds.UseRole, _ = strconv.ParseBool(v)
 
@@ -37,7 +39,7 @@ func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 			return creds, errors.Wrap(err, "Failed to load AWS credentials from instance")
 		}
 
-		if sess.Config != nil && sess.Config.Region != nil {
+		if sess.Config != nil && sess.Config.Region != nil && *sess.Config.Region != "" {
 			creds.Region = *sess.Config.Region
 		} else {
 			sm := ec2metadata.New(sess)
@@ -52,7 +54,6 @@ func GetAwsCredentials(targetEnv string) (awsCredentials, error) {
 
 	creds.AccessKeyID = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_ACCESS_KEY_ID"))
 	creds.SecretAccessKey = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_SECRET_ACCESS_KEY"))
-	creds.Region = strings.TrimSpace(getTargetEnv(targetEnv, "AWS_REGION"))
 
 	errs := validator.New().Struct(creds)
 	if errs != nil {

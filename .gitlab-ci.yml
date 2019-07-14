@@ -12,7 +12,7 @@ variables:
   # PROJECT_NAME: example-project
 
 before_script:
-  - 'cd ./tools/truss && make install && cd ../../'
+  - 'cd ./tools/devops && make install && cd ../../'
   - 'cd ./tools/schema && make install && cd ../../'
 
 stages:
@@ -38,7 +38,7 @@ cache:
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - 'truss deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -no_build=${NO_BUILD} -no_deploy=${NO_DEPLOY}'
+    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -no_build=${NO_BUILD} -no_deploy=${NO_DEPLOY}'
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl

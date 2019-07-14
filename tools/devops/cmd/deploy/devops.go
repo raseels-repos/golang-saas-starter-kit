@@ -3,7 +3,9 @@ package deploy
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -119,4 +121,25 @@ func exists(path string) (bool, error) {
 		return false, nil
 	}
 	return true, err
+}
+
+
+// execCmds executes a set of commands.
+func execCmds(log *log.Logger, workDir string, cmds ...[]string) (error) {
+	for _, cmdVals := range cmds {
+		cmd := exec.Command(cmdVals[0], cmdVals[1:]...)
+		cmd.Dir = workDir
+		cmd.Env = os.Environ()
+
+		cmd.Stderr = log.Writer()
+		cmd.Stdout = log.Writer()
+
+		err := cmd.Run()
+
+		if err != nil {
+			return  errors.WithMessagef(err, "failed to execute %s",  strings.Join(cmdVals, " "))
+		}
+	}
+
+	return  nil
 }

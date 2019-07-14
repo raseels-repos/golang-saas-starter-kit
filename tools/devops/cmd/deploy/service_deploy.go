@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -36,9 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"github.com/bobesa/go-domain-util/domainutil"
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerClient "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/archive"
 	"github.com/iancoleman/strcase"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
@@ -768,8 +764,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	startTime := time.Now()
 
 	// Load the AWS ECR repository. Try to find by name else create new one.
-	var docker *dockerClient.Client
-	var registryAuth string
+	var dockerLoginCmd []string
 	{
 		log.Println("ECR - Get or create repository.")
 
@@ -849,24 +844,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		user := pts[0]
 		pass := pts[1]
 
-		docker, err = dockerClient.NewEnvClient()
-		if err != nil {
-			return errors.WithMessage(err, "failed to init new docker client from env")
+		dockerLoginCmd = []string{
+			"docker",
+			"login",
+			"-u", user,
+			"-p", pass,
+			*res.AuthorizationData[0].ProxyEndpoint,
 		}
-
-		// Try to login to ECR using credentials.
-		loginRes, err := docker.RegistryLogin(context.Background(), dockerTypes.AuthConfig{
-			Username:      user,
-			Password:      pass,
-			ServerAddress: *res.AuthorizationData[0].ProxyEndpoint,
-		})
-		if err != nil {
-			return errors.WithMessage(err, "failed docker registry login")
-		}
-		log.Printf("\t\tStatus: %s", loginRes.Status)
-
-		registryAuth = fmt.Sprintf(`{"Username": "%s", "Password": "%s"}`, user, pass)
-		registryAuth = base64.StdEncoding.EncodeToString([]byte(registryAuth))
 
 		log.Printf("\t%s\tdocker login ok.", tests.Success)
 	}
@@ -878,15 +862,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
 		}
 
-		// Assign struct to variable of build options for the service.
-		buildOpts := dockerTypes.ImageBuildOptions{
-			Tags: []string{req.ReleaseImage},
-			BuildArgs: map[string]*string{
-				"service": &req.ServiceName,
-				"env":     &req.Env,
-			},
-			Dockerfile: dockerFile,
-			NoCache:    req.NoCache,
+		buildCmd := []string{
+			"docker", "build",
+			"--file="+dockerFile,
+			"--build-arg", "service="+req.ServiceName,
+			"--build-arg", "env="+req.Env,
+			"-t", req.ReleaseImage,
 		}
 
 		// Append the build tags.
@@ -898,62 +879,44 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 
 			imageTag := req.ReleaseImage + ":" + t
-			buildOpts.Tags = append(buildOpts.Tags, imageTag)
+			buildCmd = append(buildCmd, "-t", imageTag)
 			builtImageTags = append(builtImageTags, imageTag)
 		}
 
+		// Append the build context to the build command.
+		buildCmd = append(buildCmd, ".")
+
 		log.Println("Starting docker build")
 
-		// Create tar file of repository for service.
-		buildCtx, err := archive.TarWithOptions(req.ProjectRoot, &archive.TarOptions{
-			ExcludePatterns: []string{".git/*"},
-		})
-		if err != nil {
-			return errors.Wrap(err, "Failed to create docker build context")
-		}
-
-		// Build an image of the service that includes the tar file of the repository and the build options.
-		res, err := docker.ImageBuild(context.Background(), buildCtx, buildOpts)
+		err = execCmds(log, req.ProjectRoot, buildCmd)
 		if err != nil {
 			return errors.Wrap(err, "Failed to build docker image")
 		}
-		io.Copy(os.Stdout, res.Body)
-		res.Body.Close()
 
 		// Push the newly built image of the Docker container to the registry.
 		if req.NoPush == false {
 			log.Printf("\t\tPush release image %s", req.ReleaseImage)
 
-			// Common Errors:
-			// 1. Image push failed Error parsing HTTP response: unexpected end of JSON input: ""
-			// 		If you are trying to push to an ECR repository, you need to make sure that the
-			// 		ecr:BatchCheckLayerAvailability permission is also checked. It is not selected by
-			// 		default when using the default push permissions that ECR sets.
-			// 		https://github.com/moby/moby/issues/19010
 
-			pushOpts := dockerTypes.ImagePushOptions{
-				All: true,
-				// Push returns EOF if no 'X-Registry-Auth' header is specified
-				// https://github.com/moby/moby/issues/10983
-				RegistryAuth: registryAuth,
-			}
-
-			closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
+			err = execCmds(log, req.ProjectRoot, dockerLoginCmd)
 			if err != nil {
-				return errors.WithMessagef(err, "Failed to push image %s", req.ReleaseImage)
+				return errors.Wrapf(err, "Failed to push docker image %s", req.ReleaseImage)
 			}
-			io.Copy(os.Stdout, closer)
-			closer.Close()
+
+
+			err = execCmds(log, req.ProjectRoot, []string{"docker", "push", req.ReleaseImage})
+			if err != nil {
+				return errors.Wrapf(err, "Failed to push docker image %s", req.ReleaseImage)
+			}
 
 			// Itererate through the build tags and push the associated Docker container image.
 			for _, t := range builtImageTags {
 				log.Printf("\t\tpush tag %s", t)
-				closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
+
+				err = execCmds(log, req.ProjectRoot,  []string{"docker", "push", t})
 				if err != nil {
-					return errors.WithMessagef(err, "Failed to push image %s", t)
+					return errors.Wrapf(err, "Failed to push docker image %s", t)
 				}
-				io.Copy(os.Stdout, closer)
-				closer.Close()
 			}
 		}
 

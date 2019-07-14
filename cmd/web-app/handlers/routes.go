@@ -6,15 +6,15 @@ import (
 	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/jmoiron/sqlx"
+	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
 const baseLayoutTmpl = "base.tmpl"
 
 // API returns a handler for a set of routes.
-func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string, masterDB *sqlx.DB, authenticator *auth.Authenticator, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
+func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
@@ -32,6 +32,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, staticDir, templateDir string
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
 		MasterDB: masterDB,
+		Redis:    redis,
 		Renderer: renderer,
 	}
 	app.Handle("GET", "/v1/health", check.Health)

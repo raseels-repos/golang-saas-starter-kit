@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"expvar"
 	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"html/template"
 	"log"
@@ -67,15 +70,18 @@ func main() {
 			Host         string        `default:"" envconfig:"HOST"`
 			ReadTimeout  time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
 			WriteTimeout time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
+			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
-		App struct {
-			Name        string `default:"web-app" envconfig:"NAME"`
-			BaseUrl     string `default:"" envconfig:"BASE_URL"`
-			TemplateDir string `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			StaticDir   string `default:"./static" envconfig:"STATIC_DIR"`
+		Service struct {
+			Name        string   `default:"web-app" envconfig:"NAME"`
+			Project     string   `default:"" envconfig:"PROJECT"`
+			BaseUrl     string   `default:"" envconfig:"BASE_URL"  example:"http://eproc.tech"`
+			HostNames   []string `envconfig:"HOST_NAMES" example:"www.eproc.tech"`
+			EnableHTTPS bool     `default:"false" envconfig:"ENABLE_HTTPS"`
+			TemplateDir string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
+			StaticDir   string   `default:"./static" envconfig:"STATIC_DIR"`
 			StaticS3    struct {
 				S3Enabled         bool   `envconfig:"ENABLED"`
-				S3Bucket          string `envconfig:"S3_BUCKET"`
 				S3KeyPrefix       string `default:"public/web_app/static" envconfig:"KEY_PREFIX"`
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
@@ -104,9 +110,12 @@ func main() {
 			AnalyticsRate float64 `default:"0.10" envconfig:"ANALYTICS_RATE"`
 		}
 		Aws struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID" required:"true"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" required:"true" json:"-"` // don't print
-			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
+			AccessKeyID                string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey            string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region                     string `default:"us-east-1" envconfig:"AWS_REGION"`
+			S3BucketPrivate            string `envconfig:"S3_BUCKET_PRIVATE"`
+			S3BucketPublic             string `envconfig:"S3_BUCKET_PUBLIC"`
+			SecretsManagerConfigPrefix string `default:"" envconfig:"SECRETS_MANAGER_CONFIG_PREFIX"`
 
 			// Get an AWS session from an implicit source if no explicit
 			// configuration is provided. This is useful for taking advantage of
@@ -114,8 +123,7 @@ func main() {
 			UseRole bool `envconfig:"AWS_USE_ROLE"`
 		}
 		Auth struct {
-			UseAwsSecretManager bool          `default:false envconfig:"USE_AWS_SECRET_MANAGER"`
-			AwsSecretID         string        `default:"auth-secret-key" envconfig:"AWS_SECRET_ID"`
+			UseAwsSecretManager bool          `default:"false" envconfig:"USE_AWS_SECRET_MANAGER"`
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
@@ -130,7 +138,6 @@ func main() {
 			CiPipelineId        string `envconfig:"CI_COMMIT_PIPELINE_ID"`
 			CiPipelineUrl       string `envconfig:"CI_COMMIT_PIPELINE_URL"`
 		}
-		CMD string `envconfig:"CMD"`
 	}
 
 	// For additional details refer to https://github.com/kelseyhightower/envconfig
@@ -154,8 +161,20 @@ func main() {
 		cfg.Aws.SecretAccessKey = ""
 	}
 
+	// Set the default AWS Secrets Manager prefix used for name to store config files that will be persisted across
+	// deployments and distributed to each instance of the service running.
+	if cfg.Aws.SecretsManagerConfigPrefix == "" {
+		var pts []string
+		if cfg.Service.Project != "" {
+			pts = append(pts, cfg.Service.Project)
+		}
+		pts = append(pts, cfg.Env, cfg.Service.Name)
+
+		cfg.Aws.SecretsManagerConfigPrefix = filepath.Join(pts...)
+	}
+
 	// If base URL is empty, set the default value from the HTTP Host
-	if cfg.App.BaseUrl == "" {
+	if cfg.Service.BaseUrl == "" {
 		baseUrl := cfg.HTTP.Host
 		if !strings.HasPrefix(baseUrl, "http") {
 			if strings.HasPrefix(baseUrl, "0.0.0.0:") {
@@ -167,15 +186,37 @@ func main() {
 			}
 			baseUrl = "http://" + baseUrl
 		}
-		cfg.App.BaseUrl = baseUrl
+		cfg.Service.BaseUrl = baseUrl
+	}
+
+	// When HTTPS is not specifically enabled, but an HTTP host is set, enable HTTPS.
+	if !cfg.Service.EnableHTTPS && cfg.HTTPS.Host != "" {
+		cfg.Service.EnableHTTPS = true
+	}
+
+	// Determine the primary host by parsing host from the base app URL.
+	baseSiteUrl, err := url.Parse(cfg.Service.BaseUrl)
+	if err != nil {
+		log.Fatalf("main : Parse service base URL : %s : %+v", cfg.Service.BaseUrl, err)
+	}
+
+	// Drop any ports from the base app URL.
+	var primaryServiceHost string
+	if strings.Contains(baseSiteUrl.Host, ":") {
+		primaryServiceHost, _, err = net.SplitHostPort(baseSiteUrl.Host)
+		if err != nil {
+			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
+		}
+	} else {
+		primaryServiceHost = baseSiteUrl.Host
 	}
 
 	// =========================================================================
-	// Log App Info
+	// Log Service Info
 
 	// Print the build version for our logs. Also expose it under /debug/vars.
 	expvar.NewString("build").Set(build)
-	log.Printf("main : Started : Application Initializing version %q", build)
+	log.Printf("main : Started : Service Initializing version %q", build)
 	defer log.Println("main : Completed")
 
 	// Print the config for our logs. It's important to any credentials in the config
@@ -197,11 +238,20 @@ func main() {
 		// configuration is provided. This is useful for taking advantage of
 		// EC2/ECS instance roles.
 		awsSession = session.Must(session.NewSession())
-	} else {
+
+		log.Printf("main : AWS : Using role.\n")
+
+	} else if cfg.Aws.AccessKeyID != "" {
 		creds := credentials.NewStaticCredentials(cfg.Aws.AccessKeyID, cfg.Aws.SecretAccessKey, "")
 		awsSession = session.New(&aws.Config{Region: aws.String(cfg.Aws.Region), Credentials: creds})
+
+		log.Printf("main : AWS : Using static credentials\n")
 	}
-	awsSession = awstrace.WrapSession(awsSession)
+
+	// Wrap the AWS session to enable tracing.
+	if awsSession != nil {
+		awsSession = awstrace.WrapSession(awsSession)
+	}
 
 	// =========================================================================
 	// Start Redis
@@ -274,49 +324,35 @@ func main() {
 	defer masterDb.Close()
 
 	// =========================================================================
-	// Deploy
-	switch cfg.CMD {
-	case "sync-static":
-		// sync static files to S3
-		if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
-			err = devops.SyncS3StaticFiles(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticDir)
-			if err != nil {
-				log.Fatalf("main : deploy : %+v", err)
-			}
-		}
-		return
+	// Load middlewares that need to be configured specific for the service.
+
+	var serviceMiddlewares []web.Middleware
+
+	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
+	if primaryServiceHost != "127.0.0.0" && primaryServiceHost != "localhost" {
+		redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
+			RedirectConfig: mid.RedirectConfig{
+				Code: http.StatusMovedPermanently,
+				Skipper: func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) bool {
+					if r.URL.Path == "/ping" {
+						return true
+					}
+					return false
+				},
+			},
+			DomainName:   primaryServiceHost,
+			HTTPSEnabled: cfg.Service.EnableHTTPS,
+		})
+		serviceMiddlewares = append(serviceMiddlewares, redirect)
 	}
-
-	// =========================================================================
-	// Init redirect middleware to ensure all requests go to the primary domain.
-
-	baseSiteUrl, err := url.Parse(cfg.App.BaseUrl)
-	if err != nil {
-		log.Fatalf("main : Parse App Base URL : %s : %+v", cfg.App.BaseUrl, err)
-	}
-
-	var primaryDomain string
-	if strings.Contains(baseSiteUrl.Host, ":") {
-		primaryDomain, _, err = net.SplitHostPort(baseSiteUrl.Host)
-		if err != nil {
-			log.Fatalf("main : SplitHostPort : %s : %+v", baseSiteUrl.Host, err)
-		}
-	} else {
-		primaryDomain = baseSiteUrl.Host
-	}
-
-	redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
-		DomainName:   primaryDomain,
-		HTTPSEnabled: (cfg.HTTPS.Host != ""),
-	})
 
 	// =========================================================================
 	// URL Formatter
 	// s3UrlFormatter is a help function used by to convert an s3 key to
 	// a publicly available image URL.
 	var staticS3UrlFormatter func(string) string
-	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled || cfg.App.StaticS3.ImgResizeEnabled {
-		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.App.StaticS3.S3Bucket, cfg.App.StaticS3.S3KeyPrefix, cfg.App.StaticS3.CloudFrontEnabled)
+	if cfg.Service.StaticS3.S3Enabled || cfg.Service.StaticS3.CloudFrontEnabled || cfg.Service.StaticS3.ImgResizeEnabled {
+		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.Aws.S3BucketPublic, cfg.Service.StaticS3.S3KeyPrefix, cfg.Service.StaticS3.CloudFrontEnabled)
 		if err != nil {
 			log.Fatalf("main : S3UrlFormatter failed : %+v", err)
 		}
@@ -325,9 +361,19 @@ func main() {
 			// When the path starts with a forward slash its referencing a local file,
 			// make sure the static file prefix is included
 			if strings.HasPrefix(p, "/") {
-				p = filepath.Join(cfg.App.StaticS3.S3KeyPrefix, p)
+				p = filepath.Join(cfg.Service.StaticS3.S3KeyPrefix, p)
 			}
 			return s3UrlFormatter(p)
+		}
+	} else {
+		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
+		if err != nil {
+			log.Fatalf("main : url Parse(%s) : %+v", cfg.Service.BaseUrl, err)
+		}
+
+		staticS3UrlFormatter = func(p string) string {
+			baseUrl.Path = p
+			return baseUrl.String()
 		}
 	}
 
@@ -336,12 +382,12 @@ func main() {
 	// templates should be updated to use a fully qualified URL for either the public file on S3
 	// on from the cloudfront distribution.
 	var staticUrlFormatter func(string) string
-	if cfg.App.StaticS3.S3Enabled || cfg.App.StaticS3.CloudFrontEnabled {
+	if cfg.Service.StaticS3.S3Enabled || cfg.Service.StaticS3.CloudFrontEnabled {
 		staticUrlFormatter = staticS3UrlFormatter
 	} else {
-		baseUrl, err := url.Parse(cfg.App.BaseUrl)
+		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
 		if err != nil {
-			log.Fatalf("main : url Parse(%s) : %+v", cfg.App.BaseUrl, err)
+			log.Fatalf("main : url Parse(%s) : %+v", cfg.Service.BaseUrl, err)
 		}
 
 		staticUrlFormatter = func(p string) string {
@@ -410,7 +456,7 @@ func main() {
 		"SiteAssetUrl": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
-				u = staticUrlFormatter(filepath.Join(cfg.App.Name, p))
+				u = staticUrlFormatter(filepath.Join(cfg.Service.Name, p))
 			} else {
 				if !strings.HasPrefix(p, "/") {
 					p = "/" + p
@@ -425,7 +471,7 @@ func main() {
 		"SiteS3Url": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
-				u = staticUrlFormatter(filepath.Join(cfg.App.Name, p))
+				u = staticUrlFormatter(filepath.Join(cfg.Service.Name, p))
 			} else {
 				u = p
 			}
@@ -444,13 +490,13 @@ func main() {
 
 	// Image Formatter - additional functions exposed to templates for resizing images
 	// to support response web applications.
-	imgResizeS3KeyPrefix := filepath.Join(cfg.App.StaticS3.S3KeyPrefix, "images/responsive")
+	imgResizeS3KeyPrefix := filepath.Join(cfg.Service.StaticS3.S3KeyPrefix, "images/responsive")
 
 	imgSrcAttr := func(ctx context.Context, p string, sizes []int, includeOrig bool) template.HTMLAttr {
 		u := staticUrlFormatter(p)
 		var srcAttr string
-		if cfg.App.StaticS3.ImgResizeEnabled {
-			srcAttr, _ = img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, u, sizes, includeOrig)
+		if cfg.Service.StaticS3.ImgResizeEnabled {
+			srcAttr, _ = img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, u, sizes, includeOrig)
 		} else {
 			srcAttr = fmt.Sprintf("src=\"%s\"", u)
 		}
@@ -480,8 +526,8 @@ func main() {
 	}
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
 		imgUrl := staticUrlFormatter(p)
-		if cfg.App.StaticS3.ImgResizeEnabled {
-			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.App.StaticS3.S3Bucket, imgResizeS3KeyPrefix, imgUrl, size)
+		if cfg.Service.StaticS3.ImgResizeEnabled {
+			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
 		}
 		return imgUrl
 	}
@@ -519,7 +565,7 @@ func main() {
 	enableHotReload := cfg.Env == "dev"
 
 	// Template Renderer used to generate HTML response for web experience.
-	renderer, err := template_renderer.NewTemplateRenderer(cfg.App.TemplateDir, enableHotReload, gvd, t, eh)
+	renderer, err := template_renderer.NewTemplateRenderer(cfg.Service.TemplateDir, enableHotReload, gvd, t, eh)
 	if err != nil {
 		log.Fatalf("main : Marshalling Config to JSON : %+v", err)
 	}
@@ -538,11 +584,18 @@ func main() {
 	//
 	// /debug/vars - Added to the default mux by the expvars package.
 	// /debug/pprof - Added to the default mux by the net/http/pprof package.
-	if cfg.App.DebugHost != "" {
+	if cfg.Service.DebugHost != "" {
 		go func() {
-			log.Printf("main : Debug Listening %s", cfg.App.DebugHost)
-			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.App.DebugHost, http.DefaultServeMux))
+			log.Printf("main : Debug Listening %s", cfg.Service.DebugHost)
+			log.Printf("main : Debug Listener closed : %v", http.ListenAndServe(cfg.Service.DebugHost, http.DefaultServeMux))
 		}()
+	}
+
+	// =========================================================================
+	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
+	err = devops.EcsServiceTaskInit(log, awsSession)
+	if err != nil {
+		log.Fatalf("main : Ecs Service Task init : %+v", err)
 	}
 
 	// =========================================================================
@@ -553,23 +606,81 @@ func main() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	app := http.Server{
-		Addr:           cfg.HTTP.Host,
-		Handler:        handlers.APP(shutdown, log, cfg.App.StaticDir, cfg.App.TemplateDir, masterDb, nil, renderer, redirect),
-		ReadTimeout:    cfg.HTTP.ReadTimeout,
-		WriteTimeout:   cfg.HTTP.WriteTimeout,
-		MaxHeaderBytes: 1 << 20,
-	}
-
 	// Make a channel to listen for errors coming from the listener. Use a
 	// buffered channel so the goroutine can exit if we don't collect this error.
 	serverErrors := make(chan error, 1)
 
-	// Start the service listening for requests.
-	go func() {
-		log.Printf("main : APP Listening %s", cfg.HTTP.Host)
-		serverErrors <- app.ListenAndServe()
-	}()
+	// Make an list of HTTP servers for both HTTP and HTTPS requests.
+	var httpServers []http.Server
+
+	// Start the HTTP service listening for requests.
+	if cfg.HTTP.Host != "" {
+		api := http.Server{
+			Addr:           cfg.HTTP.Host,
+			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticDir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			ReadTimeout:    cfg.HTTP.ReadTimeout,
+			WriteTimeout:   cfg.HTTP.WriteTimeout,
+			MaxHeaderBytes: 1 << 20,
+		}
+		httpServers = append(httpServers, api)
+
+		go func() {
+			log.Printf("main : APP Listening %s", cfg.HTTP.Host)
+			serverErrors <- api.ListenAndServe()
+		}()
+	}
+
+	// Start the HTTPS service listening for requests with an SSL Cert auto generated with Let's Encrypt.
+	if cfg.HTTPS.Host != "" {
+		api := http.Server{
+			Addr:           cfg.HTTPS.Host,
+			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticDir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			ReadTimeout:    cfg.HTTPS.ReadTimeout,
+			WriteTimeout:   cfg.HTTPS.WriteTimeout,
+			MaxHeaderBytes: 1 << 20,
+		}
+
+		// Generate a unique list of hostnames.
+		var hosts []string
+		if primaryServiceHost != "" {
+			hosts = append(hosts, primaryServiceHost)
+		}
+		for _, h := range cfg.Service.HostNames {
+			h = strings.TrimSpace(h)
+			if h != "" && h != primaryServiceHost {
+				hosts = append(hosts, h)
+			}
+		}
+
+		// Enable autocert to store certs via Secret Manager.
+		secretPrefix := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "autocert")
+
+		// Local file cache to reduce requests hitting Secret Manager.
+		localCache := autocert.DirCache(os.TempDir())
+
+		cache, err := devops.NewSecretManagerAutocertCache(log, awsSession, secretPrefix, localCache)
+		if err != nil {
+			log.Fatalf("main : HTTPS : %+v", err)
+		}
+
+		m := &autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(hosts...),
+			Cache:      cache,
+		}
+		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+		api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, acme.ALPNProto)
+		if !cfg.HTTPS.DisableHTTP2 {
+			api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, "h2")
+		}
+
+		httpServers = append(httpServers, api)
+
+		go func() {
+			log.Printf("main : APP Listening %s with SSL cert for hosts %s", cfg.HTTPS.Host, strings.Join(hosts, ", "))
+			serverErrors <- api.ListenAndServeTLS("", "")
+		}()
+	}
 
 	// =========================================================================
 	// Shutdown
@@ -583,14 +694,19 @@ func main() {
 		log.Printf("main : %v : Start shutdown..", sig)
 
 		// Create context for Shutdown call.
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.ShutdownTimeout)
 		defer cancel()
 
-		// Asking listener to shutdown and load shed.
-		err := app.Shutdown(ctx)
-		if err != nil {
-			log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.App.ShutdownTimeout, err)
-			err = app.Close()
+		// Handle closing connections for both possible HTTP servers.
+		for _, api := range httpServers {
+
+			// Asking listener to shutdown and load shed.
+			err := api.Shutdown(ctx)
+			if err != nil {
+				log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.Service.ShutdownTimeout, err)
+				err = api.Close()
+			}
+
 		}
 
 		// Log the status of this shutdown.

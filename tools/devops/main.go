@@ -34,6 +34,7 @@ func main() {
 	log.Printf("main : Started : Application Initializing version %q", build)
 	defer log.Println("main : Completed")
 
+	log.Printf("main : Args: %s", strings.Join(os.Args, " "))
 
 	// =========================================================================
 	// Start Truss

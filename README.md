@@ -493,12 +493,22 @@ instance will be a dedicated host since we need it always up and running, thus i
     Description: Gitlab runners for running CICD.
     Rules:                       
         Type        | Protocol  | Port Range    | Source    | Description
-        Custom TCP  | TCP       | 2376          | Anywhere  | Gitlab runner for Docker Machine to communicate with Docker daemon.
         SSH         | TCP       | 22            | My IP     | SSH access for setup.                        
-    ``` 
+    ```        
     
 7. Review and Launch instance. Select an existing key pair or create a new one. This will be used to SSH into the 
     instance for additional configuration. 
+    
+8. Update the security group to reference itself. The instances need to be able to communicate between each other. 
+
+    Navigate to edit the security group and add the following two rules where `SECURITY_GROUP_ID` is replaced with the 
+    name of the security group created in step 6.
+    ``` 
+    Rules:                       
+        Type        | Protocol  | Port Range    | Source            | Description
+        Custom TCP  | TCP       | 2376          | SECURITY_GROUP_ID | Gitlab runner for Docker Machine to communicate with Docker daemon.
+        SSH         | TCP       | 22            | SECURITY_GROUP_ID | SSH access for setup.                        
+    ```     
     
 8. SSH into the newly created instance. 
 
@@ -522,7 +532,7 @@ instance will be a dedicated host since we need it always up and running, thus i
     ```bash
     base=https://github.com/docker/machine/releases/download/v0.16.0 &&
       curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine &&
-      sudo install /tmp/docker-machine /usr/local/bin/docker-machine
+      sudo install /tmp/docker-machine /usr/sbin/docker-machine
     ```
     
 12. [Register the runner](https://docs.gitlab.com/runner/register/index.html).

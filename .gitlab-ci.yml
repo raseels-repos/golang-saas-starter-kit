@@ -12,8 +12,8 @@ variables:
   # PROJECT_NAME: example-project
 
 before_script:
-  - 'cd ./tools/truss && make install'
-  - 'cd ./tools/schema && make install'
+  - 'cd ./tools/truss && make install && cd ../../'
+  - 'cd ./tools/schema && make install && cd ../../'
 
 stages:
   - build:dev

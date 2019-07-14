@@ -1,4 +1,4 @@
-package devops
+package deploy
 
 import (
 	"compress/gzip"
@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
-	"geeks-accelerator/oss/saas-starter-kit/tools/truss/internal/retry"
+	"geeks-accelerator/oss/saas-starter-kit/tools/devops/internal/retry"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
@@ -1026,6 +1026,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		return nil
 	}
+	_ = ec2TagResource
 
 	// Try to find the AWS Cloudwatch Log Group by name or create new one.
 	{

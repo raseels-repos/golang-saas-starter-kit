@@ -47,5 +47,5 @@ func (c *Check) Ping(ctx context.Context, w http.ResponseWriter, r *http.Request
 
 	status := "pong"
 
-	return web.RespondJson(ctx, w, status, http.StatusOK)
+	return web.RespondText(ctx, w, status, http.StatusOK)
 }

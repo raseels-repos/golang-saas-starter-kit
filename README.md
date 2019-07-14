@@ -422,6 +422,181 @@ For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
 
 
 
+## Contribute 
+
+
+### Development Notes regarding this copy of the project. 
+
+#### GitLab CI / CD 
+
+_Shared Runners_ have been disabled for this project. Since the project is open source and we wanted to avoid putting 
+our AWS credentials as pipeline variables. Instead we have deployed our own set of autoscaling runnings on AWS EC2 that 
+utilize AWS IAM Roles. All other configure is defined for CI/CD is defined in `.gitlab-ci.yaml`.  
+
+Below outlines the basic steps to setup [Autoscaling GitLab Runner on AWS](https://docs.gitlab.com/runner/configuration/runner_autoscale_aws/). 
+
+1. Define an [AWS IAM Role](https://console.aws.amazon.com/iam/home?region=us-west-2#/roles$new?step=type) that will be
+attached to the GitLab Runner instances. The role will need permission to scale (EC2), update the cache (via S3) and 
+perform the project specific deployment commands.
+    ```
+    Trusted Entity: AWS Service
+    Service that will use this role: EC2 
+    Attach permissions policies:  AmazonEC2FullAccess, AmazonS3FullAccess, saas-starter-kit-deploy 
+    Role Name: SaasStarterKitEc2RoleForGitLabRunner
+    Role Description: Allows GitLab runners hosted on EC2 instances to call AWS services on your behalf.
+    ``` 
+
+2. Launch a new [AWS EC2 Instance](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#LaunchInstanceWizard). 
+`GitLab Runner` will be installed on this instance and will serve as the bastion that spawns new instances. This 
+instance will be a dedicated host since we need it always up and running, thus it will be the standard costs apply. 
+
+    Note: This doesn't have to be a powerful machine since it will not run any jobs itself, a t2.micro instance will do.
+    ``` 
+    Amazon Machine Image (AMI): Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type - ami-0f2176987ee50226e
+    Instance Type: t2.micro 
+    ``` 
+
+3. Configure Instance Details. 
+
+    Note: Don't forget to select the IAM Role _SaasStarterKitEc2RoleForGitLabRunner_ 
+    ```
+    Number of instances: 1
+    Network: default VPC
+    Subnet: no Preference
+    Auto-assign Public IP: Use subnet setting (Enable)
+    Placement Group: not checked/disabled
+    Capacity Reservation: Open
+    IAM Role: SaasStarterKitEc2RoleForGitLabRunner
+    Shutdown behavior: Stop
+    Enable termination project: checked/enabled
+    Monitoring: not checked/disabled
+    Tenancy: Shared
+    Elastic Interence: not checked/disabled
+    T2/T3 Unlimited: not checked/disabled
+    Advanced Details: none 
+    ```
+    
+4. Add Storage. Increase the volume size for the root device to 100 GiB
+    ```    
+    Volume Type |   Device      | Size (GiB) |  Volume Type 
+    Root        |   /dev/xvda   | 100        |  General Purpose SSD (gp2)
+    ```
+
+5. Add Tags.
+    ```
+    Name:  gitlab-runner 
+    ``` 
+    
+6. Configure Security Group. Create a new security group with the following details:
+    ``` 
+    Name: gitlab-runner
+    Description: Gitlab runners for running CICD.
+    Rules:                       
+        Type        | Protocol  | Port Range    | Source    | Description
+        Custom TCP  | TCP       | 2376          | Anywhere  | Gitlab runner for Docker Machine to communicate with Docker daemon.
+        SSH         | TCP       | 22            | My IP     | SSH access for setup.                        
+    ``` 
+    
+7. Review and Launch instance. Select an existing key pair or create a new one. This will be used to SSH into the 
+    instance for additional configuration. 
+    
+8. SSH into the newly created instance. 
+
+    ```bash
+    ssh -i ~/saas-starter-kit-uswest2-gitlabrunner.pem ec2-user@ec2-52-36-105-172.us-west-2.compute.amazonaws.com
+    ``` 
+     Note: If you get the error `Permissions 0666 are too open`, then you will need to `chmod 400 FILENAME`
+       
+9. Install GitLab Runner from the [official GitLab repository](https://docs.gitlab.com/runner/install/linux-repository.html)
+    ```bash 
+    curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh | sudo bash
+    sudo yum install gitlab-runner
+    ``` 
+    
+10. [Install Docker Community Edition](https://docs.docker.com/install/).
+    ```bash 
+    sudo yum install docker
+    ```
+    
+11. [Install Docker Machine](https://docs.docker.com/machine/install-machine/).
+    ```bash
+    base=https://github.com/docker/machine/releases/download/v0.16.0 &&
+      curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine &&
+      sudo install /tmp/docker-machine /usr/local/bin/docker-machine
+    ```
+    
+12. [Register the runner](https://docs.gitlab.com/runner/register/index.html).
+    ```bash
+    sudo gitlab-runner register
+    ```    
+    Notes: 
+    * When asked for gitlab-ci tags, enter `master,dev,dev-*`
+        * This will limit commits to the master or dev branches from triggering the pipeline to run. This includes a 
+        wildcard for any branch named with the prefix `dev-`.
+    * When asked the executor type, enter `docker+machine`
+    * When asked for the default Docker image, enter `golang:alpine3.9`
+        
+13. [Configuring the GitLab Runner](https://docs.gitlab.com/runner/configuration/runner_autoscale_aws/#configuring-the-gitlab-runner)   
+
+    ```bash
+    sudo vim /etc/gitlab-runner/config.toml
+    ``` 
+    
+    Update the `[runners.docker]` configuration section in `config.toml` to match the example below replacing the 
+    obvious placeholder `XXXXX` with the relevant value. 
+    ```yaml
+      [runners.docker]
+        tls_verify = false
+        image = "golang:alpine3.9"
+        privileged = true
+        disable_entrypoint_overwrite = false
+        oom_kill_disable = false
+        disable_cache = true
+        volumes = ["/cache"]
+        shm_size = 0
+      [runners.cache]
+        Type = "s3"
+        Shared = true
+        [runners.cache.s3]
+          ServerAddress = "s3.us-west-2.amazonaws.com"
+          BucketName = "XXXXX"
+          BucketLocation = "us-west-2"
+      [runners.machine]
+        IdleCount = 0
+        IdleTime = 1800
+        MachineDriver = "amazonec2"
+        MachineName = "gitlab-runner-machine-%s"
+        MachineOptions = [
+          "amazonec2-iam-instance-profile=SaasStarterKitEc2RoleForGitLabRunner",
+          "amazonec2-region=us-west-2",
+          "amazonec2-vpc-id=XXXXX",
+          "amazonec2-subnet-id=XXXXX",
+          "amazonec2-zone=d",
+          "amazonec2-use-private-address=true",
+          "amazonec2-tags=runner-manager-name,gitlab-aws-autoscaler,gitlab,true,gitlab-runner-autoscale,true",
+          "amazonec2-security-group=gitlab-runner",
+          "amazonec2-instance-type=t2.large"
+        ]                         
+    ```  
+    
+    You will need use the same VPC subnet and availability zone as the instance launched in step 2. We are using AWS 
+    region `us-west-2`. The _ServerAddress_ for S3 will need to be updated if the region is changed. For `us-east-1` the
+    _ServerAddress_ is `s3.amazonaws.com`. Under MachineOptions you can add anything that the [AWS Docker Machine](https://docs.docker.com/machine/drivers/aws/#options) 
+    driver supports.
+     
+    Below are some example values for the placeholders to ensure for format of your values are correct. 
+    ```yaml
+    BucketName = saas-starter-kit-usw
+    amazonec2-vpc-id=vpc-5f43f027
+    amazonec2-subnet-id=subnet-693d3110
+    amazonec2-zone=a
+    ``` 
+    
+    Once complete, restart the runner.
+    ```bash 
+    sudo gitlab-runner restart
+    ```
+
 ## What's Next
 
 We are in the process of writing more documentation about this code. We welcome you to make enhancements to this documentation or just send us your feedback and suggestions ; ) 

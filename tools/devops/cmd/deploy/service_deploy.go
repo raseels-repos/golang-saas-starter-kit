@@ -1558,6 +1558,22 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
+		// Ensure cache nodes are set after updating parameters.
+		if len(cacheCluster.CacheNodes) == 0 {
+			// Find Elastic Cache cluster given Id.
+			descRes, err := svc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
+				CacheClusterId:    req.CacheCluster.CacheClusterId,
+				ShowCacheNodeInfo: aws.Bool(true),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elasticache.ErrCodeCacheClusterNotFoundFault {
+					return errors.Wrapf(err, "Failed to describe cache cluster '%s'", *req.CacheCluster.CacheClusterId)
+				}
+			} else if len(descRes.CacheClusters) > 0 {
+				cacheCluster = descRes.CacheClusters[0]
+			}
+		}
+
 		log.Printf("\t%s\tDone setting up Cache Cluster '%s' successfully.\n", tests.Success, *cacheCluster.CacheClusterId)
 	}
 

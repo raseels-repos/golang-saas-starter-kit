@@ -3,14 +3,6 @@ image: geeksaccelerator/docker-library:golang1.12-docker
 services:
   - docker:dind
 
-variables:
-  DOCKER_HOST: tcp://docker:2375
-  DOCKER_DRIVER: overlay2
-  NO_BUILD: 0
-  NO_DEPLOY: 0
-  # Optional:
-  # PROJECT_NAME: example-project
-
 before_script:
   - 'cd ./tools/devops && make install && cd ../../'
   - 'cd ./tools/schema && make install && cd ../../'
@@ -118,6 +110,7 @@ cache:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     NO_DEPLOY: 1
+    AWS_USE_ROLE: 1 
 webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: build:dev

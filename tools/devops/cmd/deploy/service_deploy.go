@@ -812,19 +812,16 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// Tag of release image will always include one with environment and service name.
 		tag1 := req.Env + "-" + req.ServiceName
-		req.BuildTags = append(req.BuildTags, tag1)
 
 		// Generate tags for the release image.
 		if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
 			tag2 := tag1 + "-" + v
-			req.BuildTags = append(req.BuildTags, tag2)
 			req.ReleaseImage = *awsRepo.RepositoryUri + ":" + tag2
 		} else {
 			req.ReleaseImage = *awsRepo.RepositoryUri + ":" + tag1
 		}
 
 		log.Printf("\t\trelease image: %s", req.ReleaseImage)
-		log.Printf("\t\ttags: %s", strings.Join(req.BuildTags, " "))
 		log.Printf("\t%s\tRelease image valid.", tests.Success)
 
 		log.Println("ECR - Retrieve authorization token used for docker login.")
@@ -862,32 +859,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
 		}
 
+		// The initial build command slice.
 		buildCmd := []string{
 			"docker", "build",
 			"--file="+dockerFile,
 			"--build-arg", "service="+req.ServiceName,
 			"--build-arg", "env="+req.Env,
 			"-t", req.ReleaseImage,
+			".",
 		}
-
-		// Append the build tags.
-		var builtImageTags []string
-		for _, t := range req.BuildTags {
-			if strings.HasSuffix(req.ReleaseImage, ":"+t) {
-				// skip duplicate image tags
-				continue
-			}
-
-			imageTag := req.ReleaseImage + ":" + t
-			buildCmd = append(buildCmd, "-t", imageTag)
-			builtImageTags = append(builtImageTags, imageTag)
-		}
-
-		// Append the build context to the build command.
-		buildCmd = append(buildCmd, ".")
 
 		log.Println("Starting docker build")
-
 		err = execCmds(log, req.ProjectRoot, buildCmd)
 		if err != nil {
 			return errors.Wrap(err, "Failed to build docker image")
@@ -895,28 +877,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// Push the newly built image of the Docker container to the registry.
 		if req.NoPush == false {
-			log.Printf("\t\tPush release image %s", req.ReleaseImage)
 
-
+			log.Printf("\t\tDocker Login")
 			err = execCmds(log, req.ProjectRoot, dockerLoginCmd)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to push docker image %s", req.ReleaseImage)
+				return errors.Wrapf(err, "Failed to login to AWS ECR")
 			}
 
-
+			log.Printf("\t\tPush release image %s", req.ReleaseImage)
 			err = execCmds(log, req.ProjectRoot, []string{"docker", "push", req.ReleaseImage})
 			if err != nil {
 				return errors.Wrapf(err, "Failed to push docker image %s", req.ReleaseImage)
-			}
-
-			// Itererate through the build tags and push the associated Docker container image.
-			for _, t := range builtImageTags {
-				log.Printf("\t\tpush tag %s", t)
-
-				err = execCmds(log, req.ProjectRoot,  []string{"docker", "push", t})
-				if err != nil {
-					return errors.Wrapf(err, "Failed to push docker image %s", t)
-				}
 			}
 		}
 

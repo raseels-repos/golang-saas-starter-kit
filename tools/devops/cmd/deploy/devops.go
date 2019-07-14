@@ -123,8 +123,7 @@ func exists(path string) (bool, error) {
 	return true, err
 }
 
-
-// execCmds executes a set of commands.
+// execCmds executes a set of commands using the current env variables.
 func execCmds(log *log.Logger, workDir string, cmds ...[]string) (error) {
 	for _, cmdVals := range cmds {
 		cmd := exec.Command(cmdVals[0], cmdVals[1:]...)

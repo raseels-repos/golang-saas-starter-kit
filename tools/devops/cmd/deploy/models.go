@@ -126,7 +126,6 @@ type serviceDeployRequest struct {
 	DBInstance *rds.CreateDBInstanceInput
 
 	ReleaseImage string
-	BuildTags    []string
 	flags        ServiceDeployFlags
 	_awsSession  *session.Session
 }

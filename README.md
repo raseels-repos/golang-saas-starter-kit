@@ -69,7 +69,7 @@ All business logic should be contained as a package inside the internal director
 
 ## Local Installation
 
-Docker is required to run this project on your local machine. This project uses multiple third-party services that will be hosted locally via docker. 
+Docker is required to run this project on your local machine. This project uses multiple third-party services that will be hosted locally via Docker. 
 * Postgres - Transactional database to handle persistence of all data.
 * Redis - Key / value storage for sessions and other data. Used only as ephemeral storage.
 * Datadog - Provides metrics, logging, and tracing.
@@ -86,11 +86,14 @@ An AWS account is required for deployment for the following AWS dependencies:
 
 Clone the repo into your desired location. This project uses Go modules and does not need to be in your GOPATH. You will need to be using Go >= 1.11.
 
-You should now be able to compile the project locally.
+You should now be able to clone the project. 
 
+```bash
+git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
+cd saas-starter-kit/
 ```
-GO111MODULE=on go install ./...
-```
+
+If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modulels disabled, see the next section.
 
 
 ### Go Modules
@@ -99,15 +102,16 @@ This project is using Go Module support for vendoring dependencies.
 
 We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. 
 
-```
+```bash
 GO111MODULE=on go mod tidy
 ```
 
-It is recommended to use at least go 1.12 and enable go modules.
+It is recommended to use at least Go 1.12 and enable go modules.
 
 ```bash
 echo "export  GO111MODULE=on" >> ~/.bash_profile
 ```
+
 
 
 ### Installing Docker
@@ -121,15 +125,14 @@ https://docs.docker.com/install/
 
 There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a `dockerfile`.
 
+When you run `docker-compose up` it will run all the services including the main.go file for each Go service. The services the project will run are:
+- web-api
+- web-app 
+- postgres
+- mysql
+
 
 ### Running the project
-
-Navigate to the root of the project and first set your AWS configs. Copy `sample.env_docker_compose` to `.env_docker_compose` and update the credentials for docker-compose.
-
-```
-$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit
-$ cp sample.env_docker_compose .env_docker_compose
-```
 
 Use the `docker-compose.yaml` to run all of the services, including the 3rd party services. The first time to run this command, Docker will download the required images for the 3rd party services.
 
@@ -148,7 +151,7 @@ You can hit <ctrl>C in the terminal window running `docker-compose up`.
 
 Once that shutdown sequence is complete, it is important to run the `docker-compose down` command.
 
-```
+```bash
 $ <ctrl>C
 $ docker-compose down
 ```
@@ -156,8 +159,120 @@ $ docker-compose down
 Running `docker-compose down` will properly stop and terminate the Docker Compose session.
 
 
+### Re-starting a specific Go service for development
+
+When writing code in an iterative fashion, it is nice to be able to restart a specific service so it will run updated Go code. This decreases the overhead of stopping all services with `docker-compose down` and then re-starting all the services again with 'docker-compose up'.
+
+To restart a specific service, first use `docker ps` to see the list of services running.
+
+```bash
+docker ps
+CONTAINER ID        IMAGE                            COMMAND                  NAMES
+35043164fd0d        example-project/web-api:latest   "/gosrv"                 saas-starter-kit_web-api_1
+fd844456243e        postgres:11-alpine               "docker-entrypoint.s…"   saas-starter-kit_postgres_1
+dda16bfbb8b5        redis:latest                     "redis-server --appe…"   saas-starter-kit_redis_1
+```
+
+Then use `docker-compose down` for a specific service. In the command include the name of the container for the service to shut down. In the example command, we will shut down down the web-api service so we can start it again.
+
+```bash
+docker-compose down saas-starter-kit_web-api_1
+```
+
+If you are not in the director for the service you want to restart navigate to it. We will go to the directory for the web-api.
+
+```bash
+cd cmd/web-api/
+```
+
+Then you can start the service again by running main.go
+```bash
+go run main.go
+```
 
 
+### Optional. Set AWS and Datadog Configs
+
+By default the project will compile and run without AWS configs or other third-party dependencies. 
+
+As you use start utilizing AWS services in this project and/or ready for deployment, you will need to start specifying AWS configs in a docker-compose file. You can also set credentials for other dependencies in the new docker-compose file too.
+
+The sample docker-compose file is not loaded since it is named sample, which allows the project to run without these configs.
+
+To set AWS configs and credentials for other third-party dependencies, you need to create a copy of the sample docker-compose file without "sample" prepending the file name. 
+
+Navigate to the root of the project. Copy `sample.env_docker_compose` to `.env_docker_compose`. 
+
+```bash
+$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit
+$ cp sample.env_docker_compose .env_docker_compose
+```
+
+The example the docker-compose file specifies these environmental variables. The $ means that the variable is commented out.
+```
+$ AWS_ACCESS_KEY_ID=
+$ AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+$ AWS_USE_ROLE=false
+$ DD_API_KEY=
+```
+
+In your new copy of the example docker-compose file ".env_docker_compose", set the AWS configs by updating the following environmental variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION. Remember to remove the $ before the variable name. 
+
+As noted in the Local Installation section, the project is integrated with Datadog for observability. You can specify the API key for you Datadog account by setting the environmental variable: DD_API_KEY.
+
+
+## Web API
+[cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/web-api)
+
+REST API available to clients for supporting deeper integrations. This API is also a foundation for third-party integrations. The API implements JWT authentication that renders results as JSON to clients. 
+
+This web-api service is not directly used by the web-app service to prevent locking the functionally required for internally development of the web-app service to the same functionality exposed to clients via this web-api service. This separate web-api service can be exposed to clients and be maintained in a more rigid/structured process to manage client expectations.
+
+The web-app will have its own internal API, similar to this external web-api service, but not exposed for third-party integrations. It is believed that in the beginning, having to define an additional API for internal purposes is worth the additional effort as the internal API can handle more flexible updates. 
+
+
+### Making Requests to Web API
+
+Once the web-api service is running it will be available on port 3000. 
+http://localhost:3000
+
+The easiest way to make requests to the web-api service is by using CURL via your CLI.
+
+To make a request to the web-api service you must have an authenticated user. Users can be created with the API but an initial admin user must first be created. The initial admin user can be created with the web-app service. 
+
+
+#### Creating Initial User
+
+Create an initial user using the web-app service first. This pattern is how a user would signup to a SaaS product - a user would create an account on behalf of their organization. The subscription would then be associated with the organization and managed accordingly including billing.
+
+While the web-app service is running, use the signup functionality to create a new user and corresponding account: 
+http://localhost/signup
+
+The email and password used to create the initial user and corresponding account can be used to make authenticated requests to the web-api service. 
+
+#### Authenticating
+
+Before any authenticated requests can be sent you must acquire an auth token. Make a request using HTTP Basic auth with your email and password to get the token.
+
+```bash
+$ curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token
+```
+
+It is best to put the resulting token in an environment variable like `$TOKEN`.
+
+#### Adding Token as Environment Variable
+
+dfadsf
+
+
+#### Authenticated Requests
+
+To make authenticated requests put the token in the `Authorization` header with the `Bearer ` prefix.
+
+```bash
+$ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
+```
 
 
 ## Web App
@@ -165,36 +280,49 @@ Running `docker-compose down` will properly stop and terminate the Docker Compos
 
 Responsive web application that renders HTML using the `html/template` package from the standard library to enable direct interaction with clients and their users. It allows clients to sign up new accounts and provides user authentication with HTTP sessions. The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
+Once the web-app service is running it will be available on port 80. 
+http://localhost/ or http://localhost:80/
 
-## Web API
-[cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/web-api)
-
-REST API available to clients for supporting deeper integrations. This API is also a foundation for third-party integrations. The API implements JWT authentication that renders results as JSON to clients. This API is not directly used by the web app to prevent locking the functionally needed internally for development of the web app to the same functionality exposed to clients. It is believed that in the beginning, having to define an additional API for internal purposes is worth at additional effort as the internal API can handle more flexible updates. The API exposed to clients can then be maintained in a more rigid/structured process to manage client expectations.
+While the web-api service is rocking, this web-app service is still in development. Only the signup functionality works in order for a user to create the initial user with role of admin and a corresponding account for their organization. If you would like to help, please email twins@geeksinthewoods.com.
 
 
-### Making Requests
+### Functionality of Web App
 
-#### Initial User
+The example web-app service is going to allow users to manage checklists. Users with role of admin will be allowed to create new checklists (projects). Each checklist will have tasks (items) associated with it. Tasks can be assigned to users with access to the checklist. Users can then update the status of a task. 
 
-To make a request to the service you must have an authenticated user. Users can be created with the API but an initial admin user must first be created.  While the Web App service is running, signup to create a new account. The email and password used to create the initial account can be used to make API requests. 
+We are referring to "checklists" as "projects" and "tasks" as "items" so this example web-app service will be generic enough for you to leverage and build upon without lots of renaming.
 
-#### Authenticating
+This web-app service eventually will include the following functionality and corresponding web pages:
+- authentication
+    - signup (creates user and account records)
+    - login
+        - with role-based access
+    - logout
+    - forgot password
+    - user management
+        - update user and password
+    - account management
+        - update account
+        - manage user
+            - view user
+            - create and invite user
+            - update user
+- projects (checklists)
+    - index of projects
+        - browse, filter, search
+    - manage projects
+        - view project
+            - with project items
+        - create project
+        - update project
+            - user access
+    - project items (tasks)
+        - view item
+        - create item (adds task to checklist)
+        - update item
 
-Before any authenticated requests can be sent you must acquire an auth token. Make a request using HTTP Basic auth with your email and password to get the token.
 
-```
-$ curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token
-```
 
-It’s best to put the resulting token in an environment variable like `$TOKEN`.
-
-#### Authenticated Requests
-
-To make authenticated requests put the token in the `Authorization` header with the `Bearer ` prefix.
-
-```
-$ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
-```
 
 ## Schema 
 [cmd/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/schema)
@@ -203,26 +331,26 @@ Schema is a minimalistic database migration helper that can manually be invoked 
 
 To support POD architecture, the schema for the entire project is defined globally and is located inside internal: [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema)
 
-Keeping a global schema helps ensure business logic then can be decoupled across multiple packages. It’s a firm belief that data models should not be part of feature functionality. Globally defined structs are dangerous as they create large code dependencies. Structs for the same database table can be defined by package to help mitigate large code dependencies. 
+Keeping a global schema helps ensure business logic can be decoupled across multiple packages. It is a firm belief that data models should not be part of feature functionality. Globally defined structs are dangerous as they create large code dependencies. Structs for the same database table can be defined by package to help mitigate large code dependencies. 
 
-The example schema package provides two separate methods for handling schema migration.
-* [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/migrations.go) 
+The example schema package provides two separate methods for handling schema migration:
+* [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/migrations.go) -
 List of direct SQL statements for each migration with defined version ID. A database table is created to persist executed migrations. Upon run of each schema migration run, the migraction logic checks the migration database table to check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a function to enable complex migrations so results from query manipulated before being piped to the next query. 
-* [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/init_schema.go) 
-If you have a lot of migrations, it can be a pain to run all them, as an example, when you are deploying a new instance of the app, in a clean database. To prevent this, use the initSchema function that will run if no migration was run before (in a new clean database). If you are using this to help seed the database, you will need to create everything needed, all tables, foreign keys, etc.
+* [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/init_schema.go) - 
+If you have a lot of migrations, it can be a pain to run all them. For example, when you are deploying a new instance of the app into a clean database. To prevent this, use the initSchema function that will run as-if no migration was run before (in a new clean database). 
 
-Another bonus with the globally defined schema allows testing to spin up database containers on demand include all the migrations. The testing package enables unit tests to programmatically execute schema migrations before running any unit tests. 
+Another bonus with the globally defined schema is that it enables the testing package to spin up database containers on-demand and automatically include all the migrations. This allows the testing package to programmatically execute schema migrations before running any unit tests. 
 
 
 ### Accessing Postgres 
 
-Login to the local postgres container 
+To login to the local Postgres container, use the following command:
 ```bash
 docker exec -it saas-starter-kit_postgres_1 /bin/bash
 bash-4.4# psql -u postgres shared
 ```
 
-Show tables
+The example project currently only includes a few tables. As more functionality is built into both the web-app and web-api services, the number of tables will expand. You can use the `show tables` command to list them. 
 ```commandline
 shared=# \dt
              List of relations
@@ -238,36 +366,6 @@ shared=# \dt
 
 
 ## Development Notes
-
-
-## Making db calls
-
-Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after determining better method for abstracting the create table and other SQL statements from the main testing logic.
-
-### bindvars
-
-When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
-To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to
-remap the placeholders to the correct database.
-
-```go
-sqlQueryStr = db.Rebind(sqlQueryStr)
-```
-
-For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
-
-### datadog
-
-Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then can set a single env variable.
-```bash
-DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
-```
-
-
-### gitlab 
-
-[GitLab CI/CD Pipeline Configuration Reference](https://docs.gitlab.com/ee/ci/yaml/)
-
 
 
 ### AWS Permissions
@@ -290,6 +388,38 @@ The example web app service allows static files to be served from AWS CloudFront
 ```
 cloudFront:ListDistributions
 ```
+
+
+### Datadog
+
+Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then can set a single env variable.
+```bash
+DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
+```
+
+
+### Gitlab 
+
+[GitLab CI/CD Pipeline Configuration Reference](https://docs.gitlab.com/ee/ci/yaml/)
+
+
+### Postgres and future MySQL support
+
+Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after determining a better method for abstracting the create table and other SQL statements from the main testing logic.
+
+### SQLx bindvars
+
+When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
+
+To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to
+remap the placeholders to the correct database.
+
+```go
+sqlQueryStr = db.Rebind(sqlQueryStr)
+```
+
+For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
+
 
 
 ## What's Next

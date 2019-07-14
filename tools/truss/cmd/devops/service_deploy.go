@@ -45,9 +45,11 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
-// NewServiceDeployRequest generated a new request for executing deploy for a given set of flags.
+// NewServiceDeployRequest generates a new request for executing deployment of a single service
+// for a given set of CLI flags.
 func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*serviceDeployRequest, error) {
 
+	// Validates specified CLI flags map to struct successfully.
 	log.Println("Validate flags.")
 	{
 		errs := validator.New().Struct(flags)
@@ -57,6 +59,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 		log.Printf("\t%s\tFlags ok.", tests.Success)
 	}
 
+	// Verifies AWS credentials specified as environment variables.
 	log.Println("\tVerify AWS credentials.")
 	var awsCreds awsCredentials
 	{
@@ -70,6 +73,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 		log.Printf("\t%s\tAWS credentials valid.", tests.Success)
 	}
 
+	// Generate a deploy request using CLI flags and AWS credentials.
 	log.Println("Generate deploy request.")
 	var req serviceDeployRequest
 	{
@@ -163,6 +167,15 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			log.Printf("\t\t\tdockerfile: %s", req.DockerFile)
 		}
 
+		// Set default configuration values. Primarily setting default values for all the AWS services:
+		// - AWS S3 bucket settings
+		// - AWS ECR repository settings
+		// - AWS ECS cluster, service, task, and task policy settings
+		// - AWS CloudWatch group settings
+		// - AWS EC2 security groups
+		// - AWS ECS settings and enable ELB
+		// - AWS Elastic Cache settings for a Redis cache cluster
+		// - AWS RDS configuration for Postgres via Aurora
 		log.Println("\tSet defaults.")
 		{
 			// When only service host names are set, choose the first item as the primary host.
@@ -744,7 +757,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 	return &req, nil
 }
 
-// Run is the main entrypoint for deploying a service for a given target env.
+// Run is the main entrypoint for deploying a service for a given target environment.
 func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	startTime := time.Now()
@@ -757,6 +770,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := ecr.New(req.awsSession())
 
+		// First try to find ECR repository by name.
 		var awsRepo *ecr.Repository
 		descRes, err := svc.DescribeRepositories(&ecr.DescribeRepositoriesInput{
 			RepositoryNames: []*string{aws.String(req.EcrRepositoryName)},
@@ -786,6 +800,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return err
 			}
 
+			// Since ECR has max number of repository images, need to delete old ones so can stay under limit.
 			// If there are image IDs to delete, delete them.
 			if len(delIds) > 0 {
 				log.Printf("\t\tDeleted %d images that exceeded limit of %d", len(delIds), req.EcrRepositoryMaxImages)
@@ -795,9 +810,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
+		// Tag of release image will always include one with environment and service name.
 		tag1 := req.Env + "-" + req.ServiceName
 		req.BuildTags = append(req.BuildTags, tag1)
 
+		// Generate tags for the release image.
 		if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
 			tag2 := tag1 + "-" + v
 			req.BuildTags = append(req.BuildTags, tag2)
@@ -807,7 +824,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		log.Printf("\t\trelease image: %s", req.ReleaseImage)
-
 		log.Printf("\t\ttags: %s", strings.Join(req.BuildTags, " "))
 		log.Printf("\t%s\tRelease image valid.", tests.Success)
 
@@ -833,6 +849,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.WithMessage(err, "failed to init new docker client from env")
 		}
 
+		// Try to login to ECR using credentials.
 		loginRes, err := docker.RegistryLogin(context.Background(), dockerTypes.AuthConfig{
 			Username:      user,
 			Password:      pass,
@@ -849,13 +866,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tdocker login ok.", tests.Success)
 	}
 
-	// Do the docker build.
+	// Once we can access the repository in ECR, do the docker build.
 	if req.NoBuild == false {
 		dockerFile, err := filepath.Rel(req.ProjectRoot, req.DockerFile)
 		if err != nil {
-			return errors.Wrapf(err, "failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
 		}
 
+		// Assign struct to variable of build options for the service.
 		buildOpts := dockerTypes.ImageBuildOptions{
 			Tags: []string{req.ReleaseImage},
 			BuildArgs: map[string]*string{
@@ -879,23 +897,25 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			builtImageTags = append(builtImageTags, imageTag)
 		}
 
-		log.Println("starting docker build")
+		log.Println("Starting docker build")
 
+		// Create tar file of repository for service.
 		buildCtx, err := archive.TarWithOptions(req.ProjectRoot, &archive.TarOptions{})
 		if err != nil {
-			return errors.Wrap(err, "failed to create docker build context")
+			return errors.Wrap(err, "Failed to create docker build context")
 		}
 
+		// Build an image of the service that includes the tar file of the repository and the build options.
 		res, err := docker.ImageBuild(context.Background(), buildCtx, buildOpts)
 		if err != nil {
-			return errors.Wrap(err, "failed to build docker image")
+			return errors.Wrap(err, "Failed to build docker image")
 		}
 		io.Copy(os.Stdout, res.Body)
 		res.Body.Close()
 
-		// Push the newly built docker container to the registry.
+		// Push the newly built image of the Docker container to the registry.
 		if req.NoPush == false {
-			log.Printf("\t\tpush release image %s", req.ReleaseImage)
+			log.Printf("\t\tPush release image %s", req.ReleaseImage)
 
 			// Common Errors:
 			// 1. Image push failed Error parsing HTTP response: unexpected end of JSON input: ""
@@ -913,17 +933,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
 			if err != nil {
-				return errors.WithMessagef(err, "failed to push image %s", req.ReleaseImage)
+				return errors.WithMessagef(err, "Failed to push image %s", req.ReleaseImage)
 			}
 			io.Copy(os.Stdout, closer)
 			closer.Close()
 
-			// Push all the build tags.
+			// Itererate through the build tags and push the associated Docker container image.
 			for _, t := range builtImageTags {
 				log.Printf("\t\tpush tag %s", t)
 				closer, err := docker.ImagePush(context.Background(), req.ReleaseImage, pushOpts)
 				if err != nil {
-					return errors.WithMessagef(err, "failed to push image %s", t)
+					return errors.WithMessagef(err, "Failed to push image %s", t)
 				}
 				io.Copy(os.Stdout, closer)
 				closer.Close()
@@ -933,21 +953,23 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tbuild complete.\n", tests.Success)
 	}
 
-	// Exit and don't continue if skip deploy.
+	// If skip deploy is set, exit and don't continue.
+	// Used to test build for a service without actually pushing image to specified environment.
 	if req.NoDeploy == true {
 		return nil
 	}
 
-	// Try to find the datadog API Key, this value is optional.
+	// Try to find the Datadog API key, this value is optional.
+	// If Datadog API key is not specified, then integration with Datadog for observability will not be active.
 	var datadogApiKey string
 	{
 		log.Println("Datadog - Get API Key")
 
-		// Load Datadog API Key which can be either stored in an env var or in AWS Secrets Manager.
+		// Load Datadog API key which can be either stored in an environment variable or in AWS Secrets Manager.
 		// 1. Check env vars for [DEV|STAGE|PROD]_DD_API_KEY and DD_API_KEY
 		datadogApiKey = getTargetEnv(req.Env, "DD_API_KEY")
 
-		// 2. Check AWS Secrets Manager for datadog entry prefixed with target env.
+		// 2. Check AWS Secrets Manager for datadog entry prefixed with target environment.
 		if datadogApiKey == "" {
 			prefixedSecretId := strings.ToUpper(req.Env) + "/DATADOG"
 			var err error
@@ -959,7 +981,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
-		// 3. Check AWS Secrets Manager for datadog entry.
+		// 3. Check AWS Secrets Manager for Datadog entry.
 		if datadogApiKey == "" {
 			secretId := "DATADOG"
 			var err error
@@ -978,7 +1000,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
-	// Helper function to tag ECS resources
+	// Helper function to tag ECS resources.
 	ec2TagResource := func(resource, name string, tags ...*ec2.Tag) error {
 		svc := ec2.New(req.awsSession())
 
@@ -1033,6 +1055,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := s3.New(req.awsSession())
 
+		// Iterate through specified S3 buckets. Try to create S3 bucket for each.
+		// Create bucket function will return record and not create it if it already exists.
 		log.Println("\tGet or Create S3 Buckets")
 		for _, bucket := range req.S3Buckets {
 			_, err := svc.CreateBucket(bucket.Input)
@@ -1041,12 +1065,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					return errors.Wrapf(err, "failed to create s3 bucket '%s'", bucket.Name)
 				}
 
+				// If bucket found during create, returns it.
 				log.Printf("\t\tFound: %s.", bucket.Name)
 			} else {
+
+				// If no bucket found during create, create new one.
 				log.Printf("\t\tCreated: %s.", bucket.Name)
 			}
 		}
 
+		// S3 has a delay between when one is created vs when it is available to use.
+		// Thus, need to iterate through each bucket and wait until it exists.
 		log.Println("\tWait for S3 Buckets to exist")
 		for _, bucket := range req.S3Buckets {
 			log.Printf("\t\t%s", bucket.Name)
@@ -1055,12 +1084,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Bucket: aws.String(bucket.Name),
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to wait for s3 bucket '%s' to exist", bucket.Name)
+				return errors.Wrapf(err, "Failed to wait for s3 bucket '%s' to exist", bucket.Name)
 			}
 			log.Printf("\t\t\tExists")
 		}
 
-		log.Println("\tConfigure S3 Buckets to exist")
+		// Loop through each S3 bucket and configure policies.
+		log.Println("\tConfiguring each S3 Bucket")
 		for _, bucket := range req.S3Buckets {
 			log.Printf("\t\t%s", bucket.Name)
 
@@ -1073,7 +1103,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					},
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to configure lifecycle rule for s3 bucket '%s'", bucket.Name)
+					return errors.Wrapf(err, "Failed to configure lifecycle rule for s3 bucket '%s'", bucket.Name)
 				}
 
 				for _, r := range bucket.LifecycleRules {
@@ -1090,7 +1120,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					},
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to put CORS on s3 bucket '%s'", bucket.Name)
+					return errors.Wrapf(err, "Failed to put CORS on s3 bucket '%s'", bucket.Name)
 				}
 				log.Printf("\t\t\tUpdated CORS")
 			}
@@ -1102,7 +1132,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					PublicAccessBlockConfiguration: bucket.PublicAccessBlock,
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to block public access for s3 bucket '%s'", bucket.Name)
+					return errors.Wrapf(err, "Failed to block public access for s3 bucket '%s'", bucket.Name)
 				}
 				log.Printf("\t\t\tBlocked public access")
 			}
@@ -1114,16 +1144,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					Policy: aws.String(bucket.Policy),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to put bucket policy for s3 bucket '%s'", bucket.Name)
+					return errors.Wrapf(err, "Failed to put bucket policy for s3 bucket '%s'", bucket.Name)
 				}
 				log.Printf("\t\t\tUpdated bucket policy")
 			}
 		}
 
-		log.Printf("\t%s\tBuckets setup.\n", tests.Success)
+		log.Printf("\t%s\tS3 buckets configured successfully.\n", tests.Success)
 	}
 
-	// Find the default VPC and associated subnets. Custom subnets outside of the default VPC are not currently supported.
+	// Find the default VPC and associated subnets.
+	// Custom subnets outside of the default VPC are not currently supported.
 	var projectSubnetsIDs []string
 	var projectVpcId string
 	{
@@ -1131,8 +1162,9 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := ec2.New(req.awsSession())
 
-		log.Println("\t\tFind all subnets are that default for each available AZ.")
+		log.Println("\t\tFind all subnets are that default for each availability zone.")
 
+		// Find all subnets that are default for each availability zone.
 		var subnets []*ec2.Subnet
 		err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 			for _, s := range res.Subnets {
@@ -1143,13 +1175,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return !lastPage
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to find default subnets")
+			return errors.Wrap(err, "Failed to find default subnets")
 		}
 
+		// This deployment process requires at least one subnet.
+		// Each AWS account gets a default VPC and default subnet for each availability zone.
+		// Likely error with AWs is can not find at least one.
 		if len(subnets) == 0 {
-			return errors.New("failed to find any subnets, expected at least 1")
+			return errors.New("Failed to find any subnets, expected at least 1")
 		}
 
+		// Iterate through subnets and make sure they belong to the same VPC as the project.
 		for _, s := range subnets {
 			if s.VpcId == nil {
 				continue
@@ -1157,7 +1193,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			if projectVpcId == "" {
 				projectVpcId = *s.VpcId
 			} else if projectVpcId != *s.VpcId {
-				return errors.Errorf("invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, projectVpcId, *s.VpcId)
+				return errors.Errorf("Invalid subnet %s, all subnets should belong to the same VPC, expected %s, got %s", *s.SubnetId, projectVpcId, *s.VpcId)
 			}
 
 			projectSubnetsIDs = append(projectSubnetsIDs, *s.SubnetId)
@@ -1176,9 +1212,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		log.Printf("\t\tFind security group '%s'.\n", req.Ec2SecurityGroupName)
 
-		// Link The ID of the VPC.
+		// Link the ID of the VPC.
 		req.Ec2SecurityGroup.VpcId = aws.String(projectVpcId)
 
+		// Find all the security groups and then parse the group name to get the Id of the security group.
 		err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
 			GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
 		}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
@@ -1192,7 +1229,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidGroup.NotFound" {
-				return errors.Wrapf(err, "failed to find security group '%s'", req.Ec2SecurityGroupName)
+				return errors.Wrapf(err, "Failed to find security group '%s'", req.Ec2SecurityGroupName)
 			}
 		}
 
@@ -1200,7 +1237,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// If no security group was found, create one.
 			createRes, err := svc.CreateSecurityGroup(req.Ec2SecurityGroup)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create security group '%s'", req.Ec2SecurityGroupName)
+				return errors.Wrapf(err, "Failed to create security group '%s'", req.Ec2SecurityGroupName)
 			}
 			securityGroupId = *createRes.GroupId
 
@@ -1225,7 +1262,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			},
 		}
 
-		// When we are not using an Elastic Load Balancer, services need to support direct access via HTTPS.
+		// When not using an Elastic Load Balancer, services need to support direct access via HTTPS.
 		// HTTPS is terminated via the web server and not on the Load Balancer.
 		if req.EnableHTTPS {
 			// Enable services to be publicly available via HTTPS port 443.
@@ -1243,7 +1280,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			_, err = svc.AuthorizeSecurityGroupIngress(ingressInput)
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != "InvalidPermission.Duplicate" {
-					return errors.Wrapf(err, "failed to add ingress for security group '%s'", req.Ec2SecurityGroupName)
+					return errors.Wrapf(err, "Failed to add ingress for security group '%s'", req.Ec2SecurityGroupName)
 				}
 			}
 		}
@@ -1251,224 +1288,23 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing Security Group '%s'.\n", tests.Success, req.Ec2SecurityGroupName)
 	}
 
-	// Create a Public VPC if needed
-	var publicVpcId string
-	var publicSubnetIDs []string
-	if req.VpcPublic != nil {
-		log.Println("EC2 - Find Public VPC")
 
-		svc := ec2.New(req.awsSession())
-
-		log.Printf("\t\tDescribe VPCs, seraching for public VPC.\n")
-		{
-			err := svc.DescribeVpcsPages(&ec2.DescribeVpcsInput{},
-				func(res *ec2.DescribeVpcsOutput, lastPage bool) bool {
-					for _, s := range res.Vpcs {
-						if *s.CidrBlock == *req.VpcPublic.CidrBlock {
-							publicVpcId = *s.VpcId
-							break
-						}
-					}
-					return !lastPage
-				})
-			if err != nil {
-				return errors.Wrapf(err, "failed to find public vpc")
-			}
-
-			if publicVpcId == "" {
-				// If no security group was found, create one.
-				createRes, err := svc.CreateVpc(req.VpcPublic)
-				if err != nil {
-					return errors.Wrapf(err, "failed to create public vpc")
-				}
-				publicVpcId = *createRes.Vpc.VpcId
-
-				if err := ec2TagResource(publicVpcId, req.VpcPublicName, nil); err != nil {
-					return err
-				}
-
-				log.Printf("\t\tCreated: %s.", publicVpcId)
-			} else {
-				log.Printf("\t\tFound: %s.", publicVpcId)
-			}
-		}
-
-		log.Printf("\t\tDescribe subnets for public VPC.\n")
-		{
-			var existing []*ec2.Subnet
-			err := svc.DescribeSubnetsPages(&ec2.DescribeSubnetsInput{
-				Filters: []*ec2.Filter{
-					&ec2.Filter{
-						Name:   aws.String("tag:" + awsTagNameName),
-						Values: aws.StringSlice([]string{req.VpcPublicName}),
-					},
-				},
-			}, func(res *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-				for _, s := range res.Subnets {
-					publicSubnetIDs = append(publicSubnetIDs, *s.SubnetId)
-					existing = append(existing, s)
-				}
-				return !lastPage
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to find public subnets")
-			}
-
-			log.Printf("\t\tFound %d existing public subnets.\n", len(publicSubnetIDs))
-
-			// If there are no subnets, create them.
-			for _, subnet := range req.VpcPublicSubnets {
-				var found bool
-				for _, e := range existing {
-					if *e.CidrBlock == *subnet.CidrBlock {
-						log.Printf("\t\tFound: %s.", *e.SubnetId)
-						found = true
-						break
-					}
-				}
-
-				if !found {
-					subnet.VpcId = aws.String(publicVpcId)
-					createRes, err := svc.CreateSubnet(subnet)
-					if err != nil {
-						return errors.Wrapf(err, "failed to create public vpc subnet")
-					}
-					publicSubnetIDs = append(publicSubnetIDs, *createRes.Subnet.SubnetId)
-
-					if err := ec2TagResource(*createRes.Subnet.SubnetId, req.VpcPublicName, nil); err != nil {
-						return err
-					}
-
-					log.Printf("\t\tCreated: %s.", *createRes.Subnet.SubnetId)
-				}
-			}
-		}
-
-		log.Printf("\t\tFind internet gateway or create new one.\n")
-		var internetGatewayId string
-		{
-			var hasAttachment bool
-			err := svc.DescribeInternetGatewaysPages(&ec2.DescribeInternetGatewaysInput{
-				Filters: []*ec2.Filter{
-					&ec2.Filter{
-						Name:   aws.String("tag:" + awsTagNameName),
-						Values: aws.StringSlice([]string{req.VpcPublicName}),
-					},
-				},
-			}, func(res *ec2.DescribeInternetGatewaysOutput, lastPage bool) bool {
-				for _, s := range res.InternetGateways {
-					internetGatewayId = *s.InternetGatewayId
-					if len(s.Attachments) > 0 {
-						hasAttachment = true
-					}
-					break
-				}
-				return !lastPage
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to find internet gateways")
-			}
-
-			if internetGatewayId == "" {
-				createRes, err := svc.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create public vpc subnet")
-				}
-				internetGatewayId = *createRes.InternetGateway.InternetGatewayId
-
-				if err := ec2TagResource(internetGatewayId, req.VpcPublicName, nil); err != nil {
-					return err
-				}
-
-				log.Printf("\t\tCreated: %s.", internetGatewayId)
-			} else {
-				log.Printf("\t\tFound: %s.", internetGatewayId)
-			}
-
-			if !hasAttachment {
-				log.Printf("\t\tAttached to VPC.")
-				_, err = svc.AttachInternetGateway(&ec2.AttachInternetGatewayInput{
-					InternetGatewayId: aws.String(internetGatewayId),
-					VpcId:             aws.String(publicVpcId),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to attach internet gateway '%s' to vpc '%s'")
-				}
-			}
-		}
-
-		log.Printf("\t\tFind route table or create new one.\n")
-		{
-			var routeTable *ec2.RouteTable
-			descRes, err := svc.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-				Filters: []*ec2.Filter{
-					&ec2.Filter{
-						Name:   aws.String("tag:" + awsTagNameName),
-						Values: aws.StringSlice([]string{req.VpcPublicName}),
-					},
-				},
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to find route tables")
-			} else if len(descRes.RouteTables) > 0 {
-				routeTable = descRes.RouteTables[0]
-			}
-
-			if routeTable == nil {
-				createRes, err := svc.CreateRouteTable(&ec2.CreateRouteTableInput{
-					VpcId: aws.String(publicVpcId),
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create route table")
-				}
-				routeTable = createRes.RouteTable
-
-				if err := ec2TagResource(*routeTable.RouteTableId, req.VpcPublicName, nil); err != nil {
-					return err
-				}
-
-				log.Printf("\t\tCreated: %s.", *routeTable.RouteTableId)
-			} else {
-				log.Printf("\t\tFound: %s.", *routeTable.RouteTableId)
-			}
-
-			var routeAllTrafficCidr = "0.0.0.0/0"
-			var hasAllTrafficRoute bool
-			for _, r := range routeTable.Routes {
-				if *r.DestinationCidrBlock == routeAllTrafficCidr {
-					hasAllTrafficRoute = true
-					break
-				}
-			}
-
-			if !hasAllTrafficRoute {
-				_, err := svc.CreateRoute(&ec2.CreateRouteInput{
-					DestinationCidrBlock: aws.String(routeAllTrafficCidr),
-					GatewayId:            aws.String(internetGatewayId),
-					RouteTableId:         routeTable.RouteTableId,
-				})
-				if err != nil {
-					return errors.Wrapf(err, "failed to create route")
-				}
-
-				log.Printf("\t\tAdded Route: %s.", routeAllTrafficCidr)
-			}
-		}
-	}
-
-	// If a database cluster is defined, ensure it exists else create a new one.
+	// This is only used when service uses Aurora via RDS for serverless Postgres and database cluster is defined.
+	// Aurora Postgres is limited to specific AWS regions and thus not used by default.
+	// If an Aurora Postgres cluster is defined, ensure it exists with RDS else create a new one.
 	var dbCluster *rds.DBCluster
 	if req.DBCluster != nil {
 		log.Println("RDS - Get or Create Database Cluster")
 
 		svc := rds.New(req.awsSession())
 
+		// Try to find a RDS database cluster using cluster identifier.
 		descRes, err := svc.DescribeDBClusters(&rds.DescribeDBClustersInput{
 			DBClusterIdentifier: req.DBCluster.DBClusterIdentifier,
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != rds.ErrCodeDBClusterNotFoundFault {
-				return errors.Wrapf(err, "failed to describe database cluster '%s'", *req.DBCluster.DBClusterIdentifier)
+				return errors.Wrapf(err, "Failed to describe database cluster '%s'", *req.DBCluster.DBClusterIdentifier)
 			}
 		} else if len(descRes.DBClusters) > 0 {
 			dbCluster = descRes.DBClusters[0]
@@ -1478,7 +1314,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// If no cluster was found, create one.
 			createRes, err := svc.CreateDBCluster(req.DBCluster)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create cluster '%s'", *req.DBCluster.DBClusterIdentifier)
+				return errors.Wrapf(err, "Failed to create cluster '%s'", *req.DBCluster.DBClusterIdentifier)
 			}
 			dbCluster = createRes.DBCluster
 
@@ -1493,7 +1329,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing DB Cluster '%s'.\n", tests.Success, *dbCluster.DatabaseName)
 	}
 
-	// If a database instance is defined, ensure it exists else create a new one.
+	// Regardless if deployment is using Aurora or not, still need to setup database instance.
+	// If a database instance is defined, then ensure it exists with RDS in else create a new one.
 	var db *DB
 	if req.DBInstance != nil {
 		log.Println("RDS - Get or Create Database Instance")
@@ -1509,12 +1346,12 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			})
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
-					return errors.Wrapf(err, "failed to get value for secret id %s", dbSecretId)
+					return errors.Wrapf(err, "Failed to get value for secret id %s", dbSecretId)
 				}
 			} else {
 				err = json.Unmarshal([]byte(*res.SecretString), &db)
 				if err != nil {
-					return errors.Wrap(err, "failed to json decode db credentials")
+					return errors.Wrap(err, "Failed to json decode db credentials")
 				}
 			}
 		}
@@ -1540,7 +1377,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != rds.ErrCodeDBInstanceNotFoundFault {
-				return errors.Wrapf(err, "failed to describe database instance '%s'", *req.DBInstance.DBInstanceIdentifier)
+				return errors.Wrapf(err, "Failed to describe database instance '%s'", *req.DBInstance.DBInstanceIdentifier)
 			}
 		} else if len(descRes.DBInstances) > 0 {
 			dbInstance = descRes.DBInstances[0]
@@ -1558,7 +1395,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					}
 				}
 
-				// Only set the password right now, all other details will be set after the database instance is created.
+				// Only set the password right now,
+				// all other configuration details will be set after the database instance is created.
 				db = &DB{
 					Pass: *req.DBInstance.MasterUserPassword,
 				}
@@ -1568,7 +1406,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// Json encode the db details to be stored as secret text.
 					dat, err := json.Marshal(db)
 					if err != nil {
-						return errors.Wrap(err, "failed to marshal db credentials")
+						return errors.Wrap(err, "Failed to marshal db credentials")
 					}
 
 					// Create the new entry in AWS Secret Manager with the database password.
@@ -1589,7 +1427,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 							if err != nil {
 								return errors.Wrap(err, "failed to update secret with db credentials")
 							}*/
-						return errors.Wrap(err, "failed to create new secret with db credentials")
+						return errors.Wrap(err, "Failed to create new secret with db credentials")
 					}
 					log.Printf("\t\tStored Secret\n")
 				}
@@ -1600,7 +1438,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// If no cluster was found, create one.
 			createRes, err := svc.CreateDBInstance(req.DBInstance)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create instance '%s'", *req.DBInstance.DBInstanceIdentifier)
+				return errors.Wrapf(err, "Failed to create instance '%s'", *req.DBInstance.DBInstanceIdentifier)
 			}
 			dbInstance = createRes.DBInstance
 
@@ -1612,34 +1450,34 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// The status of the instance.
 		log.Printf("\t\t\tStatus: %s", *dbInstance.DBInstanceStatus)
 
-		// If the instance is not active as was recently created, wait for it to become active.
+		// If the instance is not active because it was recently created, wait for it to become active.
 		if *dbInstance.DBInstanceStatus != "available" {
-			log.Printf("\t\tWhat for instance to become available.")
+			log.Printf("\t\tWait for instance to become available.")
 			err = svc.WaitUntilDBInstanceAvailable(&rds.DescribeDBInstancesInput{
 				DBInstanceIdentifier: dbInstance.DBInstanceIdentifier,
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to wait for database instance '%s' to enter available state", *req.DBInstance.DBInstanceIdentifier)
+				return errors.Wrapf(err, "Failed to wait for database instance '%s' to enter available state", *req.DBInstance.DBInstanceIdentifier)
 			}
 		}
 
-		// Update the secret with the db instance details. This happens after DB create to help address when the
-		// db instance was successfully created, but the secret failed to save. The db details host should be empty or
+		// Update the secret with the DB instance details. This happens after DB create to help address when the
+		// DB instance was successfully created, but the secret failed to save. The DB details host should be empty or
 		// match the current instance endpoint.
 		curHost := fmt.Sprintf("%s:%d", *dbInstance.Endpoint.Address, *dbInstance.Endpoint.Port)
 		if curHost != db.Host {
 
-			// Copy the instance details to the db struct.
+			// Copy the instance details to the DB struct.
 			db.Host = curHost
 			db.User = *dbInstance.MasterUsername
 			db.Database = *dbInstance.DBName
 			db.Driver = *dbInstance.Engine
 			db.DisableTLS = false
 
-			// Json encode the db details to be stored as text via AWS Secrets Manager.
+			// Json encode the DB details to be stored as text via AWS Secrets Manager.
 			dat, err := json.Marshal(db)
 			if err != nil {
-				return errors.Wrap(err, "failed to marshal db credentials")
+				return errors.Wrap(err, "Failed to marshal db credentials")
 			}
 
 			// Update the current AWS Secret.
@@ -1649,7 +1487,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				SecretString: aws.String(string(dat)),
 			})
 			if err != nil {
-				return errors.Wrap(err, "failed to update secret with db credentials")
+				return errors.Wrap(err, "Failed to update secret with db credentials")
 			}
 
 			log.Printf("\t\tUpdate Secret\n")
@@ -1658,6 +1496,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Printf("\t%s\tUsing DB Instance '%s'.\n", tests.Success, *dbInstance.DBInstanceIdentifier)
 	}
 
+	// Setup AWS Elastic Cache cluster for Redis.
 	var cacheCluster *elasticache.CacheCluster
 	if req.CacheCluster != nil {
 		log.Println("Elastic Cache - Get or Create Cache Cluster")
@@ -1667,13 +1506,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := elasticache.New(req.awsSession())
 
+		// Find Elastic Cache cluster given Id.
 		descRes, err := svc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
 			CacheClusterId:    req.CacheCluster.CacheClusterId,
 			ShowCacheNodeInfo: aws.Bool(true),
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elasticache.ErrCodeCacheClusterNotFoundFault {
-				return errors.Wrapf(err, "failed to describe cache cluster '%s'", *req.CacheCluster.CacheClusterId)
+				return errors.Wrapf(err, "Failed to describe cache cluster '%s'", *req.CacheCluster.CacheClusterId)
 			}
 		} else if len(descRes.CacheClusters) > 0 {
 			cacheCluster = descRes.CacheClusters[0]
@@ -1688,7 +1528,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			cacheCluster = createRes.CacheCluster
 
 			/*
-				// TODO: Tag cache cluster, ARN for the cache cluster is not readly available.
+				// TODO: Tag cache cluster, ARN for the cache cluster when it is not readily available.
 				_, err = svc.AddTagsToResource(&elasticache.AddTagsToResourceInput{
 					ResourceName: ???,
 					Tags: []*elasticache.Tag{
@@ -1709,14 +1549,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		// The status of the cluster.
 		log.Printf("\t\t\tStatus: %s", *cacheCluster.CacheClusterStatus)
 
-		// If the cache cluster is not active as was recently created, wait for it to become active.
+		// If the cache cluster is not active because it was recently created, wait for it to become active.
 		if *cacheCluster.CacheClusterStatus != "available" {
 			log.Printf("\t\tWhat for cluster to become available.")
 			err = svc.WaitUntilCacheClusterAvailable(&elasticache.DescribeCacheClustersInput{
 				CacheClusterId: req.CacheCluster.CacheClusterId,
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to wait for cache cluster '%s' to enter available state", req.CacheCluster.CacheClusterId)
+				return errors.Wrapf(err, "Failed to wait for cache cluster '%s' to enter available state", req.CacheCluster.CacheClusterId)
 			}
 		}
 
@@ -1733,7 +1573,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				})
 				if err != nil {
 					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elasticache.ErrCodeCacheClusterNotFoundFault {
-						return errors.Wrapf(err, "failed to describe cache parameter group '%s'", *req.CacheCluster.CacheClusterId)
+						return errors.Wrapf(err, "Failed to describe cache parameter group '%s'", *req.CacheCluster.CacheClusterId)
 					}
 				}
 
@@ -1744,7 +1584,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					Description:               aws.String(fmt.Sprintf("Customized default parameter group for %s %s", *cacheCluster.Engine, *cacheCluster.EngineVersion)),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to cache parameter group '%s'", customCacheParameterGroupName)
+					return errors.Wrapf(err, "Failed to cache parameter group '%s'", customCacheParameterGroupName)
 				}
 
 				log.Printf("\t\tSet Cache Parameter Group : %s", customCacheParameterGroupName)
@@ -1753,7 +1593,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					CacheParameterGroupName: aws.String(customCacheParameterGroupName),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed modify cache parameter group '%s' for cache cluster '%s'", customCacheParameterGroupName, *cacheCluster.CacheClusterId)
+					return errors.Wrapf(err, "Failed modify cache parameter group '%s' for cache cluster '%s'", customCacheParameterGroupName, *cacheCluster.CacheClusterId)
 				}
 				cacheCluster = updateRes.CacheCluster
 			}
@@ -1777,7 +1617,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 
-		log.Printf("\t%s\tUsing Cache Cluster '%s'.\n", tests.Success, *cacheCluster.CacheClusterId)
+		log.Printf("\t%s\tDone setting up Cache Cluster '%s' successfully.\n", tests.Success, *cacheCluster.CacheClusterId)
 	}
 
 	// Route 53 zone lookup when hostname is set. Supports both top level domains or sub domains.
@@ -1797,7 +1637,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return !lastPage
 			})
 		if err != nil {
-			return errors.Wrap(err, "failed list route 53 hosted zones")
+			return errors.Wrap(err, "Failed list route 53 hosted zones")
 		}
 
 		// Generate a slice with the primary domain name and include all the alternative domain names.
@@ -1848,7 +1688,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				}
 
 				if zoneId != "" || zoneName == dn {
-					// Found a matching zone or have search all possibilities!
+					// Found a matching zone or have to search all possibilities!
 					break
 				}
 
@@ -1892,7 +1732,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					CallerReference: aws.String("truss-deploy"),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
+					return errors.Wrapf(err, "Failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
 				}
 				zoneId = *createRes.HostedZone.Id
 
@@ -1950,7 +1790,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				return !lastPage
 			})
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to list namespaces")
+				return nil, errors.Wrap(err, "Failed to list namespaces")
 			}
 
 			return found, nil
@@ -1970,7 +1810,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// If no namespace was found, create one.
 			createRes, err := svc.CreatePrivateDnsNamespace(req.SDNamepsace)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create namespace '%s'", *req.SDNamepsace.Name)
+				return errors.Wrapf(err, "Failed to create namespace '%s'", *req.SDNamepsace.Name)
 			}
 			operationId := createRes.OperationId
 
@@ -1994,7 +1834,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				if *opRes.Operation.Status == "SUCCESS" {
 					return true, nil
 				} else if *opRes.Operation.Status == "FAIL" {
-					err = errors.Errorf("operation failed")
+					err = errors.Errorf("Operation failed")
 					err = awserr.New(*opRes.Operation.ErrorCode, *opRes.Operation.ErrorMessage, err)
 					return true, err
 				}
@@ -2003,7 +1843,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 			err = retry.Retry(context.Background(), nil, retryFunc)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get operation for namespace '%s'", *req.SDNamepsace.Name)
+				return errors.Wrapf(err, "Failed to get operation for namespace '%s'", *req.SDNamepsace.Name)
 			}
 
 			// Now that the create operation is complete, try to find the namespace again.
@@ -2089,6 +1929,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 	var elb *elbv2.LoadBalancer
 	if req.EnableEcsElb {
 
+		// If HTTPS enabled on ELB, then need to find ARN certificates first.
 		var certificateArn string
 		if req.EnableHTTPS {
 			log.Println("ACM - Find Elastic Load Balance")
@@ -2254,9 +2095,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		{
 			svc := elbv2.New(req.awsSession())
 
+			// Try to find load balancer given a name.
 			err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{
 				Names: []*string{aws.String(req.ElbLoadBalancerName)},
 			}, func(res *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
+				// Loop through the results to find the match ELB.
 				for _, lb := range res.LoadBalancers {
 					if *lb.LoadBalancerName == req.ElbLoadBalancerName {
 						elb = lb
@@ -2267,7 +2110,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			})
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeLoadBalancerNotFoundException {
-					return errors.Wrapf(err, "failed to describe load balancer '%s'", req.ElbLoadBalancerName)
+					return errors.Wrapf(err, "Failed to describe load balancer '%s'", req.ElbLoadBalancerName)
 				}
 			}
 
@@ -2281,7 +2124,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// If no repository was found, create one.
 				createRes, err := svc.CreateLoadBalancer(req.ElbLoadBalancer)
 				if err != nil {
-					return errors.Wrapf(err, "failed to create load balancer '%s'", req.ElbLoadBalancerName)
+					return errors.Wrapf(err, "Failed to create load balancer '%s'", req.ElbLoadBalancerName)
 				}
 				elb = createRes.LoadBalancers[0]
 
@@ -2297,7 +2140,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					PageSize: aws.Int64(2),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to find listeners for load balancer '%s'", req.ElbLoadBalancerName)
+					return errors.Wrapf(err, "Failed to find listeners for load balancer '%s'", req.ElbLoadBalancerName)
 				}
 				curListeners = res.Listeners
 			}
@@ -2321,7 +2164,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			})
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != elbv2.ErrCodeTargetGroupNotFoundException {
-					return errors.Wrapf(err, "failed to describe target group '%s'", req.ElbTargetGroupName)
+					return errors.Wrapf(err, "Failed to describe target group '%s'", req.ElbTargetGroupName)
 				}
 			}
 
@@ -2333,7 +2176,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				// If no target group was found, create one.
 				createRes, err := svc.CreateTargetGroup(req.ElbTargetGroup)
 				if err != nil {
-					return errors.Wrapf(err, "failed to create target group '%s'", req.ElbTargetGroupName)
+					return errors.Wrapf(err, "Failed to create target group '%s'", req.ElbTargetGroupName)
 				}
 				targetGroup = createRes.TargetGroups[0]
 
@@ -2357,7 +2200,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					},
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to modify target group '%s' attributes", req.ElbTargetGroupName)
+					return errors.Wrapf(err, "Failed to modify target group '%s' attributes", req.ElbTargetGroupName)
 				}
 
 				log.Printf("\t\t\tSet sttributes.")
@@ -2432,7 +2275,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// If no repository was found, create one.
 					createRes, err := svc.CreateListener(listenerInput)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create listener '%s'", req.ElbLoadBalancerName)
+						return errors.Wrapf(err, "Failed to create listener '%s'", req.ElbLoadBalancerName)
 					}
 
 					log.Printf("\t\t\tAdded Listener: %s.", *createRes.Listeners[0].ListenerArn)
@@ -2490,7 +2333,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					log.Printf("\tUpdated '%s'.\n", zoneId)
 					_, err := svc.ChangeResourceRecordSets(input)
 					if err != nil {
-						return errors.Wrapf(err, "failed to update A records for zone '%s'", zoneId)
+						return errors.Wrapf(err, "Failed to update A records for zone '%s'", zoneId)
 					}
 				}
 			}
@@ -2511,7 +2354,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != ecs.ErrCodeClusterNotFoundException {
-				return errors.Wrapf(err, "failed to describe cluster '%s'", req.EcsClusterName)
+				return errors.Wrapf(err, "Failed to describe cluster '%s'", req.EcsClusterName)
 			}
 		} else if len(descRes.Clusters) > 0 {
 			ecsCluster = descRes.Clusters[0]
@@ -2521,7 +2364,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// If no repository was found, create one.
 			createRes, err := svc.CreateCluster(req.EcsCluster)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create cluster '%s'", req.EcsClusterName)
+				return errors.Wrapf(err, "Failed to create cluster '%s'", req.EcsClusterName)
 			}
 			ecsCluster = createRes.Cluster
 
@@ -2718,10 +2561,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			dat = []byte(jsonStr)
 		}
 
-		//if flags.Debug {
-		//	log.Println(string(dat))
-		//}
-
 		log.Println("\t\tParse JSON to task definition.")
 		taskDefInput, err := parseTaskDefinitionInput(dat)
 		if err != nil {
@@ -2740,11 +2579,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				taskDefInput.ContainerDefinitions[0].Image = &req.ReleaseImage
 			}
 		}
-
-		//if flags.Debug {
-		//	d, _ := json.Marshal(taskDef)
-		//	log.Println(string(d))
-		//}
 
 		log.Printf("\t\t\tFamily: %s", *taskDefInput.Family)
 		log.Printf("\t\t\tExecutionRoleArn: %s", *taskDefInput.ExecutionRoleArn)
@@ -2781,6 +2615,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 
 			log.Printf("\t\t\tContainer Definitions has defined total memory %d and cpu %d", totalMemory, totalCpu)
+
+			// The selected memory and CPU for ECS Fargate is determined by the made available by AWS.
+			// For more information, reference the section "Task and CPU Memory" on this page:
+			// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+
+			// If your service deployment encounters the ECS error: Invalid CPU or Memory Value Specified
+			// reference this page and the values below may need to be updated accordingly.
+			// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html
 
 			var (
 				selectedMemory int64
@@ -2888,7 +2730,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				})
 				if err != nil {
 					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-						return errors.Wrapf(err, "failed to find task role '%s'", req.EcsExecutionRoleName)
+						return errors.Wrapf(err, "Failed to find task role '%s'", req.EcsExecutionRoleName)
 					}
 				}
 
@@ -2899,7 +2741,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// If no repository was found, create one.
 					res, err := svc.CreateRole(req.EcsExecutionRole)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create task role '%s'", req.EcsExecutionRoleName)
+						return errors.Wrapf(err, "Failed to create task role '%s'", req.EcsExecutionRoleName)
 					}
 					taskDefInput.ExecutionRoleArn = res.Role.Arn
 					log.Printf("\t\t\tCreated role '%s'", *taskDefInput.ExecutionRoleArn)
@@ -2911,7 +2753,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						RoleName:  aws.String(req.EcsExecutionRoleName),
 					})
 					if err != nil {
-						return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, req.EcsExecutionRoleName)
+						return errors.Wrapf(err, "Failed to attach policy '%s' to task role '%s'", policyArn, req.EcsExecutionRoleName)
 					}
 					log.Printf("\t\t\t\tAttached Policy '%s'", policyArn)
 				}
@@ -2943,7 +2785,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					return !lastPage
 				})
 				if err != nil {
-					return errors.Wrap(err, "failed to list IAM policies")
+					return errors.Wrap(err, "Failed to list IAM policies")
 				}
 
 				if policyArn != "" {
@@ -2955,7 +2797,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					})
 					if err != nil {
 						if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-							return errors.Wrapf(err, "failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
+							return errors.Wrapf(err, "Failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
 						}
 					}
 
@@ -2964,14 +2806,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// method to convert the policy back to plain JSON text.
 					curJson, err := url.QueryUnescape(*res.PolicyVersion.Document)
 					if err != nil {
-						return errors.Wrapf(err, "failed to url unescape policy document - %s", string(*res.PolicyVersion.Document))
+						return errors.Wrapf(err, "Failed to url unescape policy document - %s", string(*res.PolicyVersion.Document))
 					}
 
 					// Compare policy documents and add any missing actions for each statement by matching Sid.
 					var curDoc IamPolicyDocument
 					err = json.Unmarshal([]byte(curJson), &curDoc)
 					if err != nil {
-						return errors.Wrapf(err, "failed to json decode policy document - %s", string(curJson))
+						return errors.Wrapf(err, "Failed to json decode policy document - %s", string(curJson))
 					}
 
 					var updateDoc bool
@@ -3012,7 +2854,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					if updateDoc {
 						dat, err := json.Marshal(curDoc)
 						if err != nil {
-							return errors.Wrap(err, "failed to json encode policy document")
+							return errors.Wrap(err, "Failed to json encode policy document")
 						}
 
 						_, err = svc.CreatePolicyVersion(&iam.CreatePolicyVersionInput{
@@ -3022,21 +2864,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						})
 						if err != nil {
 							if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-								return errors.Wrapf(err, "failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
+								return errors.Wrapf(err, "Failed to read policy '%s' version '%s'", req.EcsTaskPolicyName, policyVersionId)
 							}
 						}
 					}
 				} else {
 					dat, err := json.Marshal(req.EcsTaskPolicyDocument)
 					if err != nil {
-						return errors.Wrap(err, "failed to json encode policy document")
+						return errors.Wrap(err, "Failed to json encode policy document")
 					}
 					req.EcsTaskPolicy.PolicyDocument = aws.String(string(dat))
 
 					// If no repository was found, create one.
 					res, err := svc.CreatePolicy(req.EcsTaskPolicy)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create task policy '%s'", req.EcsTaskPolicyName)
+						return errors.Wrapf(err, "Failed to create task policy '%s'", req.EcsTaskPolicyName)
 					}
 
 					policyArn = *res.Policy.Arn
@@ -3056,7 +2898,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				})
 				if err != nil {
 					if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != iam.ErrCodeNoSuchEntityException {
-						return errors.Wrapf(err, "failed to find task role '%s'", req.EcsTaskRoleName)
+						return errors.Wrapf(err, "Failed to find task role '%s'", req.EcsTaskRoleName)
 					}
 				}
 
@@ -3067,7 +2909,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// If no repository was found, create one.
 					res, err := svc.CreateRole(req.EcsTaskRole)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create task role '%s'", req.EcsTaskRoleName)
+						return errors.Wrapf(err, "Failed to create task role '%s'", req.EcsTaskRoleName)
 					}
 					taskDefInput.TaskRoleArn = res.Role.Arn
 					log.Printf("\t\t\tCreated role '%s'", *taskDefInput.TaskRoleArn)
@@ -3086,7 +2928,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					RoleName:  aws.String(req.EcsTaskRoleName),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to attach policy '%s' to task role '%s'", policyArn, req.EcsTaskRoleName)
+					return errors.Wrapf(err, "Failed to attach policy '%s' to task role '%s'", policyArn, req.EcsTaskRoleName)
 				}
 
 				log.Printf("\t%s\tTaskRoleArn updated.\n", tests.Success)
@@ -3100,7 +2942,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// Registers a new task.
 			res, err := svc.RegisterTaskDefinition(taskDefInput)
 			if err != nil {
-				return errors.Wrapf(err, "failed to register task definition '%s'", *taskDefInput.Family)
+				return errors.Wrapf(err, "Failed to register task definition '%s'", *taskDefInput.Family)
 			}
 			taskDef = res.TaskDefinition
 
@@ -3120,13 +2962,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		svc := ecs.New(req.awsSession())
 
+		// Find service by ECS cluster and service name.
 		res, err := svc.DescribeServices(&ecs.DescribeServicesInput{
 			Cluster:  ecsCluster.ClusterArn,
 			Services: []*string{aws.String(req.EcsServiceName)},
 		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != ecs.ErrCodeServiceNotFoundException {
-				return errors.Wrapf(err, "failed to describe service '%s'", req.EcsServiceName)
+				return errors.Wrapf(err, "Failed to describe service '%s'", req.EcsServiceName)
 			}
 		} else if len(res.Services) > 0 {
 			ecsService = res.Services[0]
@@ -3176,12 +3019,15 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			recreateService = true
 		}
 
+		// If determined from above that service needs to be recreated.
 		if recreateService {
+
+			// Needs to delete any associated services on ECS first before it can be recreated.
 			log.Println("ECS - Delete Service")
 
 			svc := ecs.New(req.awsSession())
 
-			// The service cannot be stopped while it is scaled above 0
+			// The service cannot be stopped while it is scaled above 0.
 			if ecsService.DesiredCount != nil && *ecsService.DesiredCount > 0 {
 				log.Println("\t\tScaling service down to zero.")
 				_, err := svc.UpdateService(&ecs.UpdateServiceInput{
@@ -3190,19 +3036,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					DesiredCount: aws.Int64(int64(0)),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to update service '%s'", ecsService.ServiceName)
+					return errors.Wrapf(err, "Failed to update service '%s'", ecsService.ServiceName)
 				}
 
+				// It may take some time for the service to scale down, so need to wait.
 				log.Println("\t\tWait for the service to scale down.")
 				err = svc.WaitUntilServicesStable(&ecs.DescribeServicesInput{
 					Cluster:  ecsCluster.ClusterArn,
 					Services: aws.StringSlice([]string{*ecsService.ServiceArn}),
 				})
 				if err != nil {
-					return errors.Wrapf(err, "failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
+					return errors.Wrapf(err, "Failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
 				}
 			}
 
+			// Once task count is 0 for the service, then can delete it.
 			log.Println("\t\tDelete Service.")
 			res, err := svc.DeleteService(&ecs.DeleteServiceInput{
 				Cluster: ecsService.ClusterArn,
@@ -3214,7 +3062,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Force: aws.Bool(forceDelete),
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to delete service '%s'", ecsService.ServiceName)
+				return errors.Wrapf(err, "Failed to delete service '%s'", ecsService.ServiceName)
 			}
 			ecsService = res.Service
 
@@ -3224,7 +3072,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Services: aws.StringSlice([]string{*ecsService.ServiceArn}),
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
+				return errors.Wrapf(err, "Failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
 			}
 
 			// Manually mark the ECS has inactive since WaitUntilServicesInactive was executed.
@@ -3234,7 +3082,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 	}
 
-	// If the service exists update the service, else create a new service.
+	// If the service exists on ECS, update the service, else create a new service.
 	if ecsService != nil && *ecsService.Status != "INACTIVE" {
 		log.Println("ECS - Update Service")
 
@@ -3269,13 +3117,14 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			ForceNewDeployment: aws.Bool(false),
 		})
 		if err != nil {
-			return errors.Wrapf(err, "failed to update service '%s'", *ecsService.ServiceName)
+			return errors.Wrapf(err, "Failed to update service '%s'", *ecsService.ServiceName)
 		}
 		ecsService = updateRes.Service
 
 		log.Printf("\t%s\tUpdated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 	} else {
 
+		// If not service exists on ECS, then create it.
 		log.Println("ECS - Create Service")
 		{
 
@@ -3290,7 +3139,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				healthCheckGracePeriodSeconds = req.EscServiceHealthCheckGracePeriodSeconds
 			}
 
-			// When ELB is enabled get the following error when using the default VPC.
+			// When ELB is enabled and get the following error when using the default VPC.
 			// 	Status reason 	CannotPullContainerError:
 			// 		Error response from daemon:
 			// 			Get https://888955683113.dkr.ecr.us-west-2.amazonaws.com/v2/:
@@ -3406,13 +3255,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			// If tags aren't enabled for the account, try the request again without them.
 			// https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2/
-			if err != nil && strings.Contains(err.Error(), "new ARN and resource ID format must be enabled") {
+			if err != nil && strings.Contains(err.Error(), "New ARN and resource ID format must be enabled") {
 				serviceInput.Tags = nil
 				createRes, err = svc.CreateService(serviceInput)
 			}
 
 			if err != nil {
-				return errors.Wrapf(err, "failed to create service '%s'", req.EcsServiceName)
+				return errors.Wrapf(err, "Failed to create service '%s'", req.EcsServiceName)
 			}
 			ecsService = createRes.Service
 
@@ -3434,7 +3283,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			// Stream name generated by ECS for the awslogs driver.
 			logStreamName := fmt.Sprintf("ecs/%s/%s", *ecsService.ServiceName, taskId)
 
-			// Define s3 key prefix used to export the stream logs to.
+			// Define S3 key prefix used to export the stream logs to.
 			s3KeyPrefix := filepath.Join(req.S3BucketTempPrefix, "logs/cloudwatchlogs/exports", req.CloudWatchLogGroupName)
 
 			var downloadPrefix string
@@ -3451,7 +3300,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					To:                aws.Int64(time.Now().UTC().AddDate(0, 0, 1).UnixNano() / int64(time.Millisecond)),
 				})
 				if err != nil {
-					return []string{}, errors.Wrapf(err, "failed to create export task for from log group '%s' with stream name prefix '%s'", req.CloudWatchLogGroupName, logStreamName)
+					return []string{}, errors.Wrapf(err, "Failed to create export task for from log group '%s' with stream name prefix '%s'", req.CloudWatchLogGroupName, logStreamName)
 				}
 				exportTaskId := *createRes.TaskId
 
@@ -3460,7 +3309,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						TaskId: aws.String(exportTaskId),
 					})
 					if err != nil {
-						return []string{}, errors.Wrapf(err, "failed to describe export task '%s' for from log group '%s' with stream name prefix '%s'", exportTaskId, req.CloudWatchLogGroupName, logStreamName)
+						return []string{}, errors.Wrapf(err, "Failed to describe export task '%s' for from log group '%s' with stream name prefix '%s'", exportTaskId, req.CloudWatchLogGroupName, logStreamName)
 					}
 					taskStatus := *descRes.ExportTasks[0].Status.Code
 
@@ -3474,6 +3323,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				}
 			}
 
+			// If downloadPrefix is set, then get logs from corresponding file for service.
 			var logLines []string
 			if downloadPrefix != "" {
 				svc := s3.New(req.awsSession())
@@ -3490,16 +3340,17 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						return !lastPage
 					})
 				if err != nil {
-					return []string{}, errors.Wrapf(err, "failed to list objects from s3 bucket '%s' with prefix '%s'", req.S3BucketPrivateName, downloadPrefix)
+					return []string{}, errors.Wrapf(err, "Failed to list objects from s3 bucket '%s' with prefix '%s'", req.S3BucketPrivateName, downloadPrefix)
 				}
 
+				// Iterate trough S3 keys and get logs from file.
 				for _, s3Key := range s3Keys {
 					res, err := svc.GetObject(&s3.GetObjectInput{
 						Bucket: aws.String(req.S3BucketPrivateName),
 						Key:    aws.String(s3Key),
 					})
 					if err != nil {
-						return []string{}, errors.Wrapf(err, "failed to get object '%s' from s3 bucket", s3Key, req.S3BucketPrivateName)
+						return []string{}, errors.Wrapf(err, "Failed to get object '%s' from s3 bucket", s3Key, req.S3BucketPrivateName)
 					}
 					r, _ := gzip.NewReader(res.Body)
 					dat, err := ioutil.ReadAll(r)
@@ -3508,6 +3359,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 						return []string{}, errors.Wrapf(err, "failed to read object '%s' from s3 bucket", s3Key, req.S3BucketPrivateName)
 					}
 
+					// Iterate through file by line break and add each line to array of logs.
 					for _, l := range strings.Split(string(dat), "\n") {
 						l = strings.TrimSpace(l)
 						if l == "" {
@@ -3532,7 +3384,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				DesiredStatus: aws.String("STOPPED"),
 			})
 			if err != nil {
-				return false, errors.Wrapf(err, "failed to list tasks for cluster '%s' service '%s'", req.EcsClusterName, req.EcsServiceName)
+				return false, errors.Wrapf(err, "Failed to list tasks for cluster '%s' service '%s'", req.EcsClusterName, req.EcsServiceName)
 			}
 
 			if len(serviceTaskRes.TaskArns) == 0 {
@@ -3544,7 +3396,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Tasks:   serviceTaskRes.TaskArns,
 			})
 			if err != nil {
-				return false, errors.Wrapf(err, "failed to describe %d tasks for cluster '%s'", len(serviceTaskRes.TaskArns), req.EcsClusterName)
+				return false, errors.Wrapf(err, "Failed to describe %d tasks for cluster '%s'", len(serviceTaskRes.TaskArns), req.EcsClusterName)
 			}
 
 			var failures []*ecs.Failure
@@ -3573,7 +3425,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				if !ok {
 					logLines, err = getTaskLogs(taskId)
 					if err != nil {
-						return false, errors.Wrapf(err, "failed to get logs for task %s for cluster '%s'", *t.TaskArn, req.EcsClusterName)
+						return false, errors.Wrapf(err, "Failed to get logs for task %s for cluster '%s'", *t.TaskArn, req.EcsClusterName)
 					}
 					taskLogLines[taskId] = logLines
 				}
@@ -3631,7 +3483,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					}
 
 					if stop {
-						checkErr <- errors.New("all tasks for service are stopped")
+						checkErr <- errors.New("All tasks for service are stopped")
 						return
 					}
 				}
@@ -3646,7 +3498,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				Services: aws.StringSlice([]string{*ecsService.ServiceArn}),
 			})
 			if err != nil {
-				checkErr <- errors.Wrapf(err, "failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
+				checkErr <- errors.Wrapf(err, "Failed to wait for service '%s' to enter stable state", *ecsService.ServiceName)
 			} else {
 				// All done.
 				checkErr <- nil

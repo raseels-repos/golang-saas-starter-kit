@@ -6,8 +6,8 @@ services:
 variables:
   DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
-  NO_BUILD: "false"
-  NO_DEPLOY: "false"
+  NO_BUILD: 0
+  NO_DEPLOY: 0
   # Optional:
   # PROJECT_NAME: example-project
 
@@ -111,17 +111,16 @@ cache:
   variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
-    ENABLE_HTTPS: "true"
-    ENABLE_ELB: "false"
-    PRIMARY_HOST: eproc.tech
-    HOST_NAMES: www.eproc.tech, api.eproc.tech
-    S3_BUCKET_PRIVATE: saas-starter-kit-private
-    S3_BUCKET_PUBLIC: saas-starter-kit-public
+    ENABLE_HTTPS: 1
+    ENABLE_ELB: 0
+    PRIMARY_HOST: 'eproc.tech'
+    HOST_NAMES: 'www.eproc.tech, api.eproc.tech'
+    S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
+    S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
+    NO_DEPLOY: 1
 webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: build:dev
-  variables:
-    NO_DEPLOY: "true"
   only:
     - master
     - dev
@@ -129,15 +128,13 @@ webapi:build:dev:
 webapi:deploy:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: deploy:dev
-  variables:
-    NO_BUILD: "true"
   dependencies:
     - 'webapi:build:dev'
 #    - 'db:migrate:dev'
   only:
     - master
-    - dv
-    - stage-webapi
+    - dev
+    - dev-web-api
 
 
 #ddlogscollector:deploy:stage:

@@ -157,6 +157,16 @@ func releaseImage(env, serviceName, repositoryUri string) string {
 	return releaseImage
 }
 
+// dBInstanceIdentifier returns the database name.
+func dBInstanceIdentifier(projectName, env string) string {
+	return projectName + "-" + env
+}
+
+// secretID returns the secret name with a standard prefix.
+func secretID(projectName, env, secretName string) string {
+	return filepath.Join(projectName, env, secretName)
+}
+
 // findProjectGoModFile finds the project root directory from the current working directory.
 func findProjectGoModFile() (string, error) {
 	var err error

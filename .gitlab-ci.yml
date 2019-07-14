@@ -50,28 +50,35 @@ db:migrate:dev:
     - master
     - dev
     - /^dev-.*$/
-
   variables:
     TARGET_ENV: 'dev'
+    AWS_USE_ROLE: 'true'
 
 webapi:build:dev:
   <<: *build_tmpl
   stage: build:dev
   tags:
     - dev
-  variables:
-    TARGET_ENV: 'dev'
-    SERVICE: 'web-api'
-    AWS_USE_ROLE: 'true'
   only:
     - master
     - dev
     - dev-web-api
+  variables:
+    TARGET_ENV: 'dev'
+    SERVICE: 'web-api'
+    AWS_USE_ROLE: 'true'
 webapi:deploy:dev:
   <<: *deploy_tmpl
   stage: deploy:dev
   tags:
     - dev
+  only:
+    - master
+    - dev
+    - dev-web-api
+  dependencies:
+    - 'webapi:build:dev'
+  #    - 'db:migrate:dev'
   variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
@@ -82,13 +89,8 @@ webapi:deploy:dev:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     AWS_USE_ROLE: 'true'
-  dependencies:
-    - 'webapi:build:dev'
-#    - 'db:migrate:dev'
-  only:
-    - master
-    - dev
-    - dev-web-api
+
+
 
 
 #ddlogscollector:deploy:stage:

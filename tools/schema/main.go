@@ -53,19 +53,6 @@ func main() {
 			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
 			DisableTLS bool   `default:"true" envconfig:"DISABLE_TLS"`
 		}
-		Project struct {
-			Name string `default:"saas-starter-kit" envconfig:"Name"`
-		}
-		Aws struct {
-			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
-			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
-			Region          string `default:"us-east-1" envconfig:"AWS_REGION"`
-
-			// Get an AWS session from an implicit source if no explicit
-			// configuration is provided. This is useful for taking advantage of
-			// EC2/ECS instance roles.
-			UseRole bool `envconfig:"AWS_USE_ROLE"`
-		}
 	}
 
 	// For additional details refer to https://github.com/kelseyhightower/envconfig
@@ -79,16 +66,6 @@ func main() {
 		}
 		return // We displayed help.
 	}
-
-	/*
-		//
-		DBInstanceIdentifier:      aws.String(req.ProjectName + "-" + req.Env),
-
-
-		Secret ID used to store the DB username and password across deploys.
-				dbSecretId := filepath.Join(req.ProjectName, req.Env, *req.DBInstance.DBInstanceIdentifier)
-
-	*/
 
 	// =========================================================================
 	// Log App Info

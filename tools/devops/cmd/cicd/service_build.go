@@ -55,22 +55,22 @@ func NewServiceBuildRequest(log *log.Logger, flags ServiceBuildFlags) (*serviceB
 		log.Printf("\t%s\tFlags ok.", tests.Success)
 	}
 
-	// Define new service request.
-	sr := &serviceRequest{
-		ServiceName: flags.ServiceName,
-		Env:         flags.Env,
-		ProjectRoot: flags.ProjectRoot,
-		ProjectName: flags.ProjectName,
-		DockerFile:  flags.DockerFile,
-	}
-	if err := sr.init(log); err != nil {
-		return nil, err
-	}
-
 	// Generate a deploy request using CLI flags and AWS credentials.
 	log.Println("Generate deploy request.")
 	var req serviceBuildRequest
 	{
+		// Define new service request.
+		sr := &serviceRequest{
+			ServiceName: flags.ServiceName,
+			Env:         flags.Env,
+			ProjectRoot: flags.ProjectRoot,
+			ProjectName: flags.ProjectName,
+			DockerFile:  flags.DockerFile,
+		}
+		if err := sr.init(log); err != nil {
+			return nil, err
+		}
+
 		req = serviceBuildRequest{
 			serviceRequest: sr,
 

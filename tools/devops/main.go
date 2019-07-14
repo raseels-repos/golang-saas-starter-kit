@@ -39,8 +39,9 @@ func main() {
 	// Start Truss
 
 	var (
-		buildFlags  cicd.ServiceBuildFlags
-		deployFlags cicd.ServiceDeployFlags
+		buildFlags   cicd.ServiceBuildFlags
+		deployFlags  cicd.ServiceDeployFlags
+		migrateFlags cicd.MigrateFlags
 	)
 
 	app := cli.NewApp()
@@ -110,10 +111,17 @@ func main() {
 		{
 			Name:  "migrate",
 			Usage: "-env=dev",
-			Flags: []cli.Flag{},
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod", Destination: &migrateFlags.Env},
+				cli.StringFlag{Name: "root", Usage: "project root directory", Destination: &migrateFlags.ProjectRoot},
+				cli.StringFlag{Name: "project", Usage: "name of project", Destination: &migrateFlags.ProjectName},
+			},
 			Action: func(c *cli.Context) error {
-
-				return nil
+				req, err := cicd.NewMigrateRequest(log, migrateFlags)
+				if err != nil {
+					return err
+				}
+				return cicd.Migrate(log, req)
 			},
 		},
 	}

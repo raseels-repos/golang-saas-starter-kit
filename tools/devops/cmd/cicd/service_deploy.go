@@ -144,22 +144,22 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 		log.Printf("\t%s\tFlags ok.", tests.Success)
 	}
 
-	// Define new service request.
-	sr := &serviceRequest{
-		ServiceName: flags.ServiceName,
-		Env:         flags.Env,
-		ProjectRoot: flags.ProjectRoot,
-		ProjectName: flags.ProjectName,
-		DockerFile:  flags.DockerFile,
-	}
-	if err := sr.init(log); err != nil {
-		return nil, err
-	}
-
 	// Generate a deploy request using CLI flags and AWS credentials.
 	log.Println("Generate deploy request.")
 	var req serviceDeployRequest
 	{
+		// Define new service request.
+		sr := &serviceRequest{
+			ServiceName: flags.ServiceName,
+			Env:         flags.Env,
+			ProjectRoot: flags.ProjectRoot,
+			ProjectName: flags.ProjectName,
+			DockerFile:  flags.DockerFile,
+		}
+		if err := sr.init(log); err != nil {
+			return nil, err
+		}
+
 		req = serviceDeployRequest{
 			serviceRequest: sr,
 
@@ -718,7 +718,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			// RDS settings for a Postgres database Instance. Could defined different settings by env.
 			req.DBInstance = &rds.CreateDBInstanceInput{
-				DBInstanceIdentifier:      aws.String(req.ProjectName + "-" + req.Env),
+				DBInstanceIdentifier:      aws.String(dBInstanceIdentifier(req.ProjectName, req.Env)),
 				DBName:                    aws.String("shared"),
 				Engine:                    aws.String("postgres"),
 				MasterUsername:            aws.String("god"),
@@ -799,7 +799,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		// 2. Check AWS Secrets Manager for datadog entry prefixed with target environment.
 		if datadogApiKey == "" {
-			prefixedSecretId := strings.ToUpper(req.Env) + "/DATADOG"
+			prefixedSecretId := secretID(req.ProjectName, req.Env, "datadog")
 			var err error
 			datadogApiKey, err = GetAwsSecretValue(req.AwsCreds, prefixedSecretId)
 			if err != nil {
@@ -1164,7 +1164,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		log.Println("RDS - Get or Create Database Instance")
 
 		// Secret ID used to store the DB username and password across deploys.
-		dbSecretId := filepath.Join(req.ProjectName, req.Env, *req.DBInstance.DBInstanceIdentifier)
+		dbSecretId := secretID(req.ProjectName, req.Env, *req.DBInstance.DBInstanceIdentifier)
 
 		// Retrieve the current secret value if something is stored.
 		{

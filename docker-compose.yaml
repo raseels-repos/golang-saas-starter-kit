@@ -79,9 +79,9 @@ services:
     env_file:
       - .env_docker_compose
     environment:
-      - WEB_APP_HTTP_HOST=0.0.0.0:3000
+      - WEB_APP_HTTP_HOST=:3000
       - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
-      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4000
+      - WEB_API_APP_DEBUG_HOST=:4000
       - WEB_APP_REDIS_HOST=redis:6379
       - WEB_APP_DB_HOST=postgres:5433
       - WEB_APP_DB_USER=postgres
@@ -112,9 +112,9 @@ services:
     env_file:
       - .env_docker_compose
     environment:
-      - WEB_API_HTTP_HOST=0.0.0.0:3001
+      - WEB_API_HTTP_HOST=:3001
       - WEB_API_APP_BASE_URL=http://127.0.0.1:3001
-      - WEB_API_APP_DEBUG_HOST=0.0.0.0:4001
+      - WEB_API_APP_DEBUG_HOST=:4001
       - WEB_API_REDIS_HOST=redis:6379
       - WEB_API_DB_HOST=postgres:5433
       - WEB_API_DB_USER=postgres

@@ -3,10 +3,6 @@ image: geeksaccelerator/docker-library:golang1.12-docker
 services:
   - docker:dind
 
-variables:
-  NO_BUILD: 'true'
-  NO_DEPLOY: 'true'
-
 before_script:
   - 'cd ./tools/devops && make install && cd ../../'
   - 'cd ./tools/schema && make install && cd ../../'
@@ -104,7 +100,6 @@ cache:
     - dev
   environment:
     name: 'dev/${SERVICE}-dev'
-  variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
     ENABLE_HTTPS: 1
@@ -114,10 +109,12 @@ cache:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     AWS_USE_ROLE: 'true'
+    NO_BUILD: 'true'
+    NO_DEPLOY: 'true'
 webapi:build:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: build:dev
-  variables:
+  environment:
     NO_BUILD: 'false'
   only:
     - master
@@ -126,7 +123,7 @@ webapi:build:dev:
 webapi:deploy:dev:
   <<: *deploy_dev_webapi_tmpl
   stage: deploy:dev
-  variables:
+  environment:
     NO_DEPLOY: 'false'
   dependencies:
     - 'webapi:build:dev'

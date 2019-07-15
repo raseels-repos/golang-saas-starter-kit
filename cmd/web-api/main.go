@@ -50,12 +50,6 @@ var build = "develop"
 var service = "WEB_API"
 
 // @title SaaS Example API
-// @description This is a sample server celler server.
-// @termsOfService http://example.com/terms
-
-// @contact.name API Support
-// @contact.email support@geeksinthewoods.com
-// @contact.url http://example.com/support
 
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html

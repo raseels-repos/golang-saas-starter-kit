@@ -61,7 +61,7 @@ one `docker-compose.yaml` file that is shared between all services.
     
 4. Open the Swagger UI. 
 
-    Navigate your browser to [http://localhost:3000/swagger](http://localhost:3000/swagger).
+    Navigate your browser to [http://localhost:3001/swagger](http://localhost:3001/docs).
     
 5. Signup a new account. 
 
@@ -165,6 +165,19 @@ go get -u github.com/swaggo/swag/cmd/swag
 Run `swag init` in the service's root folder which contains the main.go file. This will parse your comments and generate the required files (docs folder and docs/docs.go).
 ```bash
 swag init
+```
+
+### Additional Annotations
+
+Below are some additional example annotions that can be added to `main.go`
+```go
+// @title SaaS Example API
+// @description This provides a public API...
+// @termsOfService http://example.com/terms
+
+// @contact.name API Support
+// @contact.email support@geeksinthewoods.com
+// @contact.url http://example.com/support
 ```
 
 

@@ -435,76 +435,46 @@ shared=# \dt
 ```
 
 
-## Development Notes
+## Deployment 
 
-
-### AWS Permissions
-
-Base required permissions.
-```
-secretsmanager:CreateSecret
-secretsmanager:GetSecretValue
-secretsmanager:ListSecretVersionIds
-secretsmanager:PutSecretValue
-secretsmanager:UpdateSecret
-```
-
-Additional permissions required for unit tests.
-```
-secretsmanager:DeleteSecret
+This project includes a complete build pipeline that relies on AWS and GitLab. `.gitlab-ci.yaml` the following build 
+stages: 
+```yaml
+stages:
+  - build:dev     # Build containers with configs targeting dev env.
+  - migrate:dev   # Run database migration against the dev database.
+  - deploy:dev    # Deploy the containers built for dev env to AWS ECS. 
+  - build:stage   # Build containers with configs targeting stage env.
+  - migrate:stage # Run database migration against the stage database.
+  - deploy:stage  # Deploy the containers built for stage env to AWS ECS. 
+  - build:prod    # Build containers with configs targeting prod env.
+  - migrate:prod  # Run database migration against the prod database.
+  - deploy:prod   # Deploy the containers built for prod env to AWS ECS. 
 ```
 
-The example web app service allows static files to be served from AWS CloudFront for increased performance. Enable for 
-static files to be served from CloudFront instead of from service directly. 
-```
-cloudFront:ListDistributions
-```
+Currently `.gitlab-ci.yaml` only defines jobs for the first three stages. The remaining stages can be chained together 
+so each job is dependant on the previous or run jobs for each target env independently. 
 
+A build tool called [devops](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/devops) has 
+been included apart of this project to handle creating AWS resources and deploying your services with minimal additional
+configuration. You can customizing any of the configuration in the code. When AWS already a core part of the 
+saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
+project successfully up and running. If you understand GoLang, then you will be a master at devops with this tool.
 
-### Datadog
+The project by default includes a postgres database which adds an additional resource dependency when deploying the 
+project. The tasks running schema migration can not run as shared GitLab Runners since they will be outside the 
+deployment AWS VPC. There are two options here: 
+1. Enable the AWS RDS database to be publicly available.
+2. Run our own GitLab runners inside the same AWS VPC and grant access for them to communicate with the database.
 
-Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then 
-can set a single env variable.
-```bash
-DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
-```
+This project has opted for option 2 and thus setting up the deployment pipeline requires a few more additional steps. 
+Using shared runners hosted by GitLab also requires AWS credentials to be input into GitLab for configuration.  
+Hosted our own GitLab runners uses AWS Roles instead of hardcoding the access key ID and secret access key in GitLab and 
+in other configuration files. And since this project is open source, we wanted to avoid sharing our AWS credentials.
 
+If you don't have an AWS account, signup for one now and then proceed with the deployment setup. 
 
-### Gitlab 
-
-[GitLab CI/CD Pipeline Configuration Reference](https://docs.gitlab.com/ee/ci/yaml/)
-
-
-### Postgres and future MySQL support
-
-Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after 
-determining a better method for abstracting the create table and other SQL statements from the main testing logic.
-
-### SQLx bindvars
-
-When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
-
-To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to
-remap the placeholders to the correct database.
-
-```go
-sqlQueryStr = db.Rebind(sqlQueryStr)
-```
-
-For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
-
-
-
-## Contribute 
-
-
-### Development Notes regarding this copy of the project. 
-
-#### GitLab CI / CD 
-
-_Shared Runners_ have been disabled for this project. Since the project is open source and we wanted to avoid putting 
-our AWS credentials as pipeline variables. Instead we have deployed our own set of autoscaling runnings on AWS EC2 that 
-utilize AWS IAM Roles. All other configure is defined for CI/CD is defined in `.gitlab-ci.yaml`.  
+### Setup GitLab CI / CD
 
 Below outlines the basic steps to setup [Autoscaling GitLab Runner on AWS](https://docs.gitlab.com/runner/configuration/runner_autoscale_aws/). 
 
@@ -679,6 +649,36 @@ instance will be a dedicated host since we need it always up and running, thus i
     ```bash 
     sudo gitlab-runner restart
     ```
+
+
+## Development Notes
+
+### Datadog
+
+Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then 
+can set a single env variable.
+```bash
+DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
+```
+
+### Postgres and future MySQL support
+
+Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after 
+determining a better method for abstracting the create table and other SQL statements from the main testing logic.
+
+### SQLx bindvars
+
+When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
+
+To database agnostic, sqlx supports using `?` for all queries and exposes the method `Rebind` to
+remap the placeholders to the correct database.
+
+```go
+sqlQueryStr = db.Rebind(sqlQueryStr)
+```
+
+For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
+
 
 ## What's Next
 

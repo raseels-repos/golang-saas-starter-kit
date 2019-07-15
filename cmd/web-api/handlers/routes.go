@@ -93,8 +93,8 @@ func API(shutdown chan os.Signal, log *log.Logger, masterDB *sqlx.DB, redis *red
 	// Register swagger documentation.
 	// TODO: Add authentication. Current authenticator requires an Authorization header
 	// 		 which breaks the browser experience.
-	app.Handle("GET", "/swagger/", saasSwagger.WrapHandler)
-	app.Handle("GET", "/swagger/*", saasSwagger.WrapHandler)
+	app.Handle("GET", "/docs/", saasSwagger.WrapHandler)
+	app.Handle("GET", "/docs/*", saasSwagger.WrapHandler)
 
 	return app
 }

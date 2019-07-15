@@ -40,7 +40,7 @@ COPY cmd/web-api/templates /templates
 WORKDIR ./cmd/web-api
 
 # Update the API documentation.
-#RUN swag init
+RUN swag init
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /gosrv .
 

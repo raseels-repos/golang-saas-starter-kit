@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"html/template"
 	"log"
 	"net"
@@ -21,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"

@@ -34,7 +34,7 @@ cache:
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC}'
+    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -static_files_s3={STATIC_FILES_S3_ENABLED} -static_files_cloudfront={STATIC_FILES_CLOUDFRONT_ENABLED} -static_files_img_resize={STATIC_FILES_IMG_RESIZE_ENABLED}'
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl
@@ -52,6 +52,45 @@ db:migrate:dev:
     - /^dev-.*$/
   variables:
     TARGET_ENV: 'dev'
+    AWS_USE_ROLE: 'true'
+
+webapp:build:dev:
+  <<: *build_tmpl
+  stage: build:dev
+  tags:
+    - dev
+  only:
+    - master
+    - dev
+    - dev-web-app
+  variables:
+    TARGET_ENV: 'dev'
+    SERVICE: 'web-app'
+    AWS_USE_ROLE: 'true'
+webapp:deploy:dev:
+  <<: *deploy_tmpl
+  stage: deploy:dev
+  tags:
+    - dev
+  only:
+    - master
+    - dev
+    - dev-web-app
+  dependencies:
+    - 'webapp:build:dev'
+    - 'db:migrate:dev'
+  variables:
+    TARGET_ENV: 'dev'
+    SERVICE: 'web-app'
+    ENABLE_HTTPS: 1
+    ENABLE_ELB: 0
+    PRIMARY_HOST: 'eproc.tech'
+    HOST_NAMES: 'www.eproc.tech, dev.eproc.tech'
+    S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
+    S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
+    STATIC_FILES_S3_ENABLED: 'true'
+    STATIC_FILES_CLOUDFRONT_ENABLED: 'false'
+    STATIC_FILES_IMG_RESIZE_ENABLED: 'true'
     AWS_USE_ROLE: 'true'
 
 webapi:build:dev:
@@ -84,13 +123,14 @@ webapi:deploy:dev:
     SERVICE: 'web-api'
     ENABLE_HTTPS: 1
     ENABLE_ELB: 0
-    PRIMARY_HOST: 'eproc.tech'
-    HOST_NAMES: 'www.eproc.tech, api.eproc.tech'
+    PRIMARY_HOST: 'api.eproc.tech'
+    HOST_NAMES: 'api.dev.eproc.tech'
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
+    STATIC_FILES_S3_ENABLED: 'false'
+    STATIC_FILES_CLOUDFRONT_ENABLED: 'false'
+    STATIC_FILES_IMG_RESIZE_ENABLED: 'false'
     AWS_USE_ROLE: 'true'
-
-
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

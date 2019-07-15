@@ -142,19 +142,26 @@ func ecrRepositoryName(projectName string) string {
 
 // releaseImage returns the name used for tagging a release image will always include one with environment and
 // service name. If the env var CI_COMMIT_REF_NAME is set, it will be appended.
-func releaseImage(env, serviceName, repositoryUri string) string {
+func releaseTag(env, serviceName string) string {
 
 	tag1 := env + "-" + serviceName
 
 	// Generate tags for the release image.
-	var releaseImage string
+	var releaseTag string
 	if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
 		tag2 := tag1 + "-" + v
-		releaseImage = repositoryUri + ":" + tag2
+		releaseTag = tag2
 	} else {
-		releaseImage = repositoryUri + ":" + tag1
+		releaseTag = tag1
 	}
-	return releaseImage
+	return releaseTag
+}
+
+
+// releaseImage returns the name used for tagging a release image will always include one with environment and
+// service name. If the env var CI_COMMIT_REF_NAME is set, it will be appended.
+func releaseImage(env, serviceName, repositoryUri string) string {
+	return repositoryUri + ":" + releaseTag(env, serviceName)
 }
 
 // dBInstanceIdentifier returns the database name.

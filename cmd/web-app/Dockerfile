@@ -38,6 +38,7 @@ COPY --from=builder /static /static
 COPY --from=builder /templates /templates
 
 ENV TEMPLATE_DIR=/templates
+ENV STATIC_DIR=/static
 
 ARG service
 ENV SERVICE_NAME $service

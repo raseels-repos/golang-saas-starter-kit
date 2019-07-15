@@ -1,0 +1,161 @@
+{
+  "family": "{SERVICE}",
+  "executionRoleArn": "",
+  "taskRoleArn": "",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "{ECS_SERVICE}",
+      "image": "{RELEASE_IMAGE}",
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "{AWS_LOGS_GROUP}",
+          "awslogs-region": "{AWS_REGION}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "portMappings": [
+        {
+          "hostPort": 80,
+          "protocol": "tcp",
+          "containerPort": 80
+        }
+      ],
+      "cpu": 128,
+      "memoryReservation": 128,
+      "volumesFrom": [],
+      "environment": [
+        {"name": "AWS_REGION", "value": "{AWS_REGION}"},
+        {"name": "AWS_USE_ROLE", "value": "true"},
+        {"name": "AWSLOGS_GROUP", "value": "{AWS_LOGS_GROUP}"},
+        {"name": "ECS_CLUSTER", "value": "{ECS_CLUSTER}"},
+        {"name": "ECS_SERVICE", "value": "{ECS_SERVICE}"},
+        {"name": "WEB_APP_HTTP_HOST", "value": "{HTTP_HOST}"},
+        {"name": "WEB_APP_HTTPS_HOST", "value": "{HTTPS_HOST}"},
+        {"name": "WEB_APP_SERVICE_PROJECT", "value": "{APP_PROJECT}"},
+        {"name": "WEB_APP_SERVICE_BASE_URL", "value": "{APP_BASE_URL}"},
+        {"name": "WEB_APP_SERVICE_HOST_NAMES", "value": "{HOST_NAMES}"},
+        {"name": "WEB_APP_SERVICE_ENABLE_HTTPS", "value": "{HTTPS_ENABLED}"},
+        {"name": "WEB_APP_SERVICE_STATICFILES_S3_ENABLED", "value": "{STATIC_FILES_S3_ENABLED}"},
+        {"name": "WEB_APP_SERVICE_STATICFILES_S3_PREFIX", "value": "{STATIC_FILES_S3_PREFIX}"},
+        {"name": "WEB_APP_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", "value": "{STATIC_FILES_CLOUDFRONT_ENABLED}"},
+        {"name": "WEB_APP_SERVICE_STATICFILES_IMG_RESIZE_ENABLED", "value": "{STATIC_FILES_IMG_RESIZE_ENABLED}"},
+        {"name": "WEB_APP_REDIS_HOST", "value": "{CACHE_HOST}"},
+        {"name": "WEB_APP_DB_HOST", "value": "{DB_HOST}"},
+        {"name": "WEB_APP_DB_USER", "value": "{DB_USER}"},
+        {"name": "WEB_APP_DB_PASS", "value": "{DB_PASS}"},
+        {"name": "WEB_APP_DB_DATABASE", "value": "{DB_DATABASE}"},
+        {"name": "WEB_APP_DB_DRIVER", "value": "{DB_DRIVER}"},
+        {"name": "WEB_APP_DB_DISABLE_TLS", "value": "{DB_DISABLE_TLS}"},
+        {"name": "WEB_APP_AUTH_USE_AWS_SECRET_MANAGER", "value": "true"},
+        {"name": "WEB_APP_AUTH_AWS_SECRET_ID", "value": "auth-{ECS_SERVICE}"},
+        {"name": "WEB_APP_AWS_S3_BUCKET_PRIVATE", "value": "{AWS_S3_BUCKET_PRIVATE}"},
+        {"name": "WEB_APP_AWS_S3_BUCKET_PUBLIC", "value": "{AWS_S3_BUCKET_PUBLIC}"},
+        {"name": "BUILDINFO_CI_COMMIT_REF_NAME", "value": "{CI_COMMIT_REF_NAME}"},
+        {"name": "BUILDINFO_CI_COMMIT_REF_SLUG", "value": "{CI_COMMIT_REF_SLUG}"},
+        {"name": "BUILDINFO_CI_COMMIT_SHA", "value": "{CI_COMMIT_SHA}"},
+        {"name": "BUILDINFO_CI_COMMIT_TAG", "value": "{CI_COMMIT_TAG}"},
+        {"name": "BUILDINFO_CI_COMMIT_TITLE", "value": "{CI_COMMIT_TITLE}"},
+        {"name": "BUILDINFO_CI_COMMIT_DESCRIPTION", "value": "{CI_COMMIT_DESCRIPTION}"},
+        {"name": "BUILDINFO_CI_COMMIT_JOB_ID", "value": "{CI_COMMIT_JOB_ID}"},
+        {"name": "BUILDINFO_CI_COMMIT_JOB_URL", "value": "{CI_COMMIT_JOB_URL}"},
+        {"name": "BUILDINFO_CI_COMMIT_PIPELINE_ID", "value": "{CI_COMMIT_PIPELINE_ID}"},
+        {"name": "BUILDINFO_CI_COMMIT_PIPELINE_URL", "value": "{CI_COMMIT_PIPELINE_URL}"},
+        {"name": "DATADOG_ADDR", "value": "127.0.0.1:8125"},
+        {"name": "DD_TRACE_AGENT_HOSTNAME", "value": "127.0.0.1"},
+        {"name": "DD_TRACE_AGENT_PORT", "value": "8126"},
+        {"name": "DD_SERVICE_NAME", "value": "{ECS_SERVICE}"},
+        {"name": "DD_ENV", "value": "{ENV}"},
+        {"name": "ROUTE53_UPDATE_TASK_IPS", "value": "{ROUTE53_UPDATE_TASK_IPS}"},
+        {"name": "ROUTE53_ZONES", "value": "{ROUTE53_ZONES}"},
+        {"name": "ECS_ENABLE_CONTAINER_METADATA", "value": "true"}
+      ],
+      "healthCheck": {
+        "retries": 3,
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost/ping || exit 1"
+        ],
+        "timeout": 5,
+        "interval": 60,
+        "startPeriod": 60
+      },
+      "dockerLabels": {
+        "com.datadoghq.ad.check_names": "[\"{ECS_SERVICE}\"]",
+        "com.datadoghq.ad.logs": "[{\"source\": \"docker\", \"service\": \"{ECS_SERVICE}\", \"service_name\": \"{SERVICE}\", \"cluster\": \"{ECS_CLUSTER}\", \"env\": \"{ENV}\"}]",
+        "com.datadoghq.ad.init_configs": "[{}]",
+        "com.datadoghq.ad.instances": "[{\"host\": \"%%host%%\", \"port\": 80}]"
+      },
+      "ulimits": [
+        {
+          "name": "nofile",
+          "softLimit": 987654,
+          "hardLimit": 999999
+        }
+      ]
+    },
+    {
+      "name": "datadog-agent",
+      "image": "datadog/agent:latest",
+      "essential": {DATADOG_ESSENTIAL},
+      "cpu": 128,
+      "memoryReservation": 128,
+      "portMappings": [
+        {
+          "containerPort": 8125
+        },
+        {
+          "containerPort": 8126
+        }
+      ],
+      "environment": [
+        {
+          "name": "DD_API_KEY",
+          "value": "{DATADOG_APIKEY}"
+        },
+        {
+          "name": "DD_LOGS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_RECEIVER_PORT",
+          "value": "8126"
+        },
+        {
+          "name": "DD_APM_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        },
+        {
+          "name": "DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL",
+          "value": "true"
+        },
+        {
+          "name": "DD_TAGS",
+          "value": "source:docker service:{ECS_SERVICE} service_name:{SERVICE} cluster:{ECS_CLUSTER} env:{ENV}"
+        },
+        {
+          "name": "DD_DOGSTATSD_ORIGIN_DETECTION",
+          "value": "true"
+        },
+        {
+          "name": "DD_DOGSTATSD_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        },
+        {
+          "name": "ECS_FARGATE",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "volumes": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ]
+}

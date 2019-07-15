@@ -3,6 +3,7 @@ package cicd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
@@ -260,6 +261,18 @@ func EcrPurgeImages(req *serviceBuildRequest) ([]*ecr.ImageIdentifier, error) {
 	}
 
 	return delIds, nil
+}
+
+// SyncPublicS3Files copies the local files from the static directory to s3 with public-read enabled.
+func SyncPublicS3Files(awsSession *session.Session, staticS3Bucket, staticS3Prefix, staticDir string) error {
+	uploader := s3manager.NewUploader(awsSession)
+
+	di := NewDirectoryIterator(staticS3Bucket, staticS3Prefix, staticDir, "public-read")
+	if err := uploader.UploadWithIterator(aws.BackgroundContext(), di); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // EcsReadTaskDefinition reads a task definition file and json decodes it.

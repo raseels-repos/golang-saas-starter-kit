@@ -79,7 +79,7 @@ func main() {
 	var cfg struct {
 		Env  string `default:"dev" envconfig:"ENV"`
 		HTTP struct {
-			Host         string        `default:"0.0.0.0:3000" envconfig:"HOST"`
+			Host         string        `default:"0.0.0.0:3001" envconfig:"HOST"`
 			ReadTimeout  time.Duration `default:"10s" envconfig:"READ_TIMEOUT"`
 			WriteTimeout time.Duration `default:"10s" envconfig:"WRITE_TIMEOUT"`
 		}
@@ -369,7 +369,7 @@ func main() {
 	var serviceMiddlewares []web.Middleware
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
-	if primaryServiceHost != "127.0.0.0" && primaryServiceHost != "localhost" {
+	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {
 		redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
 			RedirectConfig: mid.RedirectConfig{
 				Code: http.StatusMovedPermanently,

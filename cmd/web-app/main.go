@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"html/template"
 	"log"
 	"net"
@@ -21,7 +22,6 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
-	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/img-resize"
@@ -347,7 +347,7 @@ func main() {
 	var serviceMiddlewares []web.Middleware
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
-	if primaryServiceHost != "127.0.0.0" && primaryServiceHost != "localhost" {
+	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {
 		redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
 			RedirectConfig: mid.RedirectConfig{
 				Code: http.StatusMovedPermanently,
@@ -555,7 +555,7 @@ func main() {
 
 	// global variables exposed for rendering of responses with templates
 	gvd := map[string]interface{}{
-		"_App": map[string]interface{}{
+		"_Service": map[string]interface{}{
 			"ENV":          cfg.Env,
 			"BuildInfo":    cfg.BuildInfo,
 			"BuildVersion": build,

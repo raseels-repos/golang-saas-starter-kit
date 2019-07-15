@@ -44,7 +44,6 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 // Ping validates the service is ready to accept requests.
 func (c *Check) Ping(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-
 	status := "pong"
 
 	return web.RespondText(ctx, w, status, http.StatusOK)

@@ -78,7 +78,7 @@ webapi:deploy:dev:
     - dev-web-api
   dependencies:
     - 'webapi:build:dev'
-  #    - 'db:migrate:dev'
+    - 'db:migrate:dev'
   variables:
     TARGET_ENV: 'dev'
     SERVICE: 'web-api'
@@ -89,7 +89,6 @@ webapi:deploy:dev:
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     AWS_USE_ROLE: 'true'
-
 
 
 

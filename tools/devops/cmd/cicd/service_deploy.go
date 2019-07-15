@@ -100,6 +100,8 @@ type serviceDeployRequest struct {
 	Ec2SecurityGroupName string `validate:"required"`
 	Ec2SecurityGroup     *ec2.CreateSecurityGroupInput
 
+	GitlabRunnerEc2SecurityGroupName string `validate:"required"`
+
 	CloudWatchLogGroupName string `validate:"required"`
 	CloudWatchLogGroup     *cloudwatchlogs.CreateLogGroupInput
 
@@ -487,6 +489,10 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				Description: aws.String(fmt.Sprintf("Security group for %s running on ECS cluster %s", req.ProjectName, req.EcsClusterName)),
 			}
 			log.Printf("\t\t\tSet ECS Security Group Name to '%s'.", req.Ec2SecurityGroupName)
+
+			// Set the name of the EC2 Security Group used by the gitlab runner. This is used to ensure the security
+			// group defined above has access to the RDS cluster/instance and can thus handle schema migrations.
+			req.GitlabRunnerEc2SecurityGroupName = "gitlab-runner"
 
 			// Set default ELB Load Balancer Name when ELB is enabled.
 			if req.EnableEcsElb {
@@ -1049,13 +1055,15 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		req.Ec2SecurityGroup.VpcId = aws.String(projectVpcId)
 
 		// Find all the security groups and then parse the group name to get the Id of the security group.
+		var runnerSgId string
 		err := svc.DescribeSecurityGroupsPages(&ec2.DescribeSecurityGroupsInput{
-			GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName}),
+			GroupNames: aws.StringSlice([]string{req.Ec2SecurityGroupName, req.GitlabRunnerEc2SecurityGroupName}),
 		}, func(res *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
 			for _, s := range res.SecurityGroups {
 				if *s.GroupName == req.Ec2SecurityGroupName {
 					securityGroupId = *s.GroupId
-					break
+				} else if *s.GroupName == req.GitlabRunnerEc2SecurityGroupName {
+					runnerSgId = *s.GroupId
 				}
 			}
 			return !lastPage
@@ -1105,6 +1113,20 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				FromPort:   aws.Int64(443),
 				ToPort:     aws.Int64(443),
 				GroupId:    aws.String(securityGroupId),
+			})
+		}
+
+		// When a db instance is defined, deploy needs access to the RDS instance to handle executing schema migration.
+		if req.DBInstance != nil {
+			// The gitlab runner security group is required when a db instance is defined.
+			if runnerSgId == "" {
+				return errors.Errorf("Failed to find security group '%s'", req.GitlabRunnerEc2SecurityGroupName)
+			}
+
+			// Enable GitLab runner to communicate with deployment created services.
+			ingressInputs = append(ingressInputs, &ec2.AuthorizeSecurityGroupIngressInput{
+				SourceSecurityGroupName: aws.String(req.GitlabRunnerEc2SecurityGroupName),
+				GroupId:                 aws.String(securityGroupId),
 			})
 		}
 
@@ -2302,8 +2324,8 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{CI_COMMIT_REF_SLUG}":     os.Getenv("CI_COMMIT_REF_SLUG"),
 			"{CI_COMMIT_SHA}":          os.Getenv("CI_COMMIT_SHA"),
 			"{CI_COMMIT_TAG}":          os.Getenv("CI_COMMIT_TAG"),
-			"{CI_COMMIT_TITLE}":        os.Getenv("CI_COMMIT_TITLE"),
-			"{CI_COMMIT_DESCRIPTION}":  os.Getenv("CI_COMMIT_DESCRIPTION"),
+			"{CI_COMMIT_TITLE}":        jsonEncodeStringValue(os.Getenv("CI_COMMIT_TITLE")),
+			"{CI_COMMIT_DESCRIPTION}":  jsonEncodeStringValue(os.Getenv("CI_COMMIT_DESCRIPTION")),
 			"{CI_COMMIT_JOB_ID}":       os.Getenv("CI_COMMIT_JOB_ID"),
 			"{CI_COMMIT_JOB_URL}":      os.Getenv("CI_COMMIT_JOB_URL"),
 			"{CI_COMMIT_PIPELINE_ID}":  os.Getenv("CI_COMMIT_PIPELINE_ID"),

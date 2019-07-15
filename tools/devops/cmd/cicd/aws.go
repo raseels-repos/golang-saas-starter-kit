@@ -327,3 +327,9 @@ func convertKeys(j json.RawMessage) json.RawMessage {
 func fixKey(key string) string {
 	return strings.ToTitle(key)
 }
+
+// jsonEncodeStringValue json encodes string values to be used in the ECS task definition.
+func jsonEncodeStringValue(str string) string {
+	dat, _ := json.Marshal(str)
+	return strings.Trim(string(dat), "\"")
+}

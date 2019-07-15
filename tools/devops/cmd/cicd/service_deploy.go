@@ -17,13 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"geeks-accelerator/oss/saas-starter-kit/tools/devops/internal/retry"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecr"
@@ -282,53 +282,76 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						},
 					})
 
-					if flags.S3BucketPublicCloudfront {
+				// The S3 key prefix used as the origin when cloud front is enabled.
+				if req.S3BucketPublicKeyPrefix == "" {
+					req.S3BucketPublicKeyPrefix = "/public"
+				}
 
-					allowedMethods:= &cloudfront.AllowedMethods{}
-					allowedMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+				if flags.S3BucketPublicCloudfront {
+					allowedMethods := &cloudfront.AllowedMethods{
+						Items: aws.StringSlice([]string{"HEAD", "GET"}),
+					}
+					allowedMethods.Quantity = aws.Int64(int64(len(allowedMethods.Items)))
 
-					cacheMethods := &cloudfront.CachedMethods{}
-					cacheMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+					cacheMethods := &cloudfront.CachedMethods{
+						Items: aws.StringSlice([]string{"HEAD", "GET"}),
+					}
+					cacheMethods.Quantity = aws.Int64(int64(len(cacheMethods.Items)))
 					allowedMethods.SetCachedMethods(cacheMethods)
 
-					domainId := "S3"+req.S3BucketPublicName
+					domainId := "S3-" + req.S3BucketPublicName
 					domainName := fmt.Sprintf("%s.s3.%s.amazonaws.com", req.S3BucketPublicName, req.AwsCreds.Region)
 
-					origins := &cloudfront.Origins{}
-					origins.SetItems([]*cloudfront.Origin{
-						&cloudfront.Origin{
-							Id: aws.String(domainId),
-							DomainName: aws.String(domainName),
-							OriginPath: aws.String(req.S3BucketPublicKeyPrefix),
+					origins := &cloudfront.Origins{
+						Items: []*cloudfront.Origin{
+							&cloudfront.Origin{
+								Id:         aws.String(domainId),
+								DomainName: aws.String(domainName),
+								OriginPath: aws.String(req.S3BucketPublicKeyPrefix),
+								S3OriginConfig: &cloudfront.S3OriginConfig{
+									OriginAccessIdentity: aws.String(""),
+								},
+								CustomHeaders: &cloudfront.CustomHeaders{
+									Quantity: aws.Int64(0),
+								},
+							},
 						},
-					})
+					}
+					origins.Quantity = aws.Int64(int64(len(origins.Items)))
 
 					req.CloudfrontPublic = &cloudfront.DistributionConfig{
-						Comment: aws.String(""),
-						Enabled: aws.Bool(true),
-						HttpVersion: aws.String( "http2"),
+						Comment:       aws.String(""),
+						Enabled:       aws.Bool(true),
+						HttpVersion:   aws.String("http2"),
 						IsIPV6Enabled: aws.Bool(true),
 						DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
 							TargetOriginId: aws.String(domainId),
 							AllowedMethods: allowedMethods,
-							Compress: aws.Bool(true),
-							DefaultTTL: aws.Int64(1209600),
-							MinTTL: aws.Int64(604800),
-							MaxTTL: aws.Int64(31536000),
+							Compress:       aws.Bool(true),
+							DefaultTTL:     aws.Int64(1209600),
+							MinTTL:         aws.Int64(604800),
+							MaxTTL:         aws.Int64(31536000),
 							ForwardedValues: &cloudfront.ForwardedValues{
-								QueryString: 	aws.Bool(true),
+								QueryString: aws.Bool(true),
+								Cookies: &cloudfront.CookiePreference{
+									Forward: aws.String("none"),
+								},
 							},
+							TrustedSigners: &cloudfront.TrustedSigners{
+								Enabled:  aws.Bool(false),
+								Quantity: aws.Int64(0),
+							},
+							ViewerProtocolPolicy: aws.String("allow-all"),
 						},
 						Origins: origins,
 						ViewerCertificate: &cloudfront.ViewerCertificate{
-							CertificateSource: aws.String("cloudfront"),
-							MinimumProtocolVersion: aws.String("TLSv1"),
+							CertificateSource:            aws.String("cloudfront"),
+							MinimumProtocolVersion:       aws.String("TLSv1"),
 							CloudFrontDefaultCertificate: aws.Bool(true),
 						},
-						PriceClass: aws.String("PriceClass_All"),
+						PriceClass:      aws.String("PriceClass_All"),
 						CallerReference: aws.String("devops-deploy"),
 					}
-					req.CloudfrontPublic = nil
 				}
 			}
 
@@ -402,11 +425,6 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						}`, req.S3BucketPrivateName, req.AwsCreds.Region, policyResource, req.AwsCreds.Region)
 						}(),
 					})
-			}
-
-			// The S3 key prefix used as the origin when cloud front is enabled.
-			if req.S3BucketPublicKeyPrefix == "" {
-				req.S3BucketPublicKeyPrefix = "public"
 			}
 
 			// The S3 prefix used to upload static files served to public.
@@ -1075,7 +1093,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		_, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
 			DistributionConfig: req.CloudfrontPublic,
-		} )
+		})
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); !ok || (aerr.Code() != cloudfront.ErrCodeDistributionAlreadyExists) {
 				return errors.Wrapf(err, "Failed to create cloudfront distribution '%s'", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
@@ -2406,7 +2424,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{HOST_NAMES}":   strings.Join(req.ServiceHostNames, ","),
 
 			"{STATIC_FILES_S3_ENABLED}":         "false",
-			"{STATIC_FILES_S3_PREFIX}":          "",
+			"{STATIC_FILES_S3_PREFIX}":          req.StaticFilesS3Prefix,
 			"{STATIC_FILES_CLOUDFRONT_ENABLED}": "false",
 			"{STATIC_FILES_IMG_RESIZE_ENABLED}": "false",
 

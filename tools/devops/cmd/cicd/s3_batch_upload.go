@@ -13,7 +13,7 @@ import (
 
 // DirectoryIterator represents an iterator of a specified directory
 type DirectoryIterator struct {
-	dir string
+	dir       string
 	filePaths []string
 	bucket    string
 	keyPrefix string
@@ -37,7 +37,7 @@ func NewDirectoryIterator(bucket, keyPrefix, dir, acl string) s3manager.BatchUpl
 	})
 
 	return &DirectoryIterator{
-		dir: dir,
+		dir:       dir,
 		filePaths: paths,
 		bucket:    bucket,
 		keyPrefix: keyPrefix,
@@ -81,12 +81,12 @@ func (di *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
 	buffer := make([]byte, size)
 	f.Read(buffer)
 
-	nextPath, _ := filepath.Rel(di.dir,  di.next.path)
+	nextPath, _ := filepath.Rel(di.dir, di.next.path)
 
 	return s3manager.BatchUploadObject{
 		Object: &s3manager.UploadInput{
 			Bucket:      aws.String(di.bucket),
-			Key:         aws.String(filepath.Join(di.keyPrefix,nextPath)),
+			Key:         aws.String(filepath.Join(di.keyPrefix, nextPath)),
 			Body:        bytes.NewReader(buffer),
 			ContentType: aws.String(http.DetectContentType(buffer)),
 			ACL:         acl,

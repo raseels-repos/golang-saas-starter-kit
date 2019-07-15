@@ -11,6 +11,7 @@
         "acm:ListCertificates",
         "acm:RequestCertificate",
         "acm:DescribeCertificate",
+        "cloudfront:CreateDistribution",
         "ec2:DescribeSubnets",
         "ec2:DescribeSecurityGroups",
         "ec2:CreateSecurityGroup",

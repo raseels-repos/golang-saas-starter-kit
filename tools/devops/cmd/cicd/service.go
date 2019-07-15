@@ -157,7 +157,6 @@ func releaseTag(env, serviceName string) string {
 	return releaseTag
 }
 
-
 // releaseImage returns the name used for tagging a release image will always include one with environment and
 // service name. If the env var CI_COMMIT_REF_NAME is set, it will be appended.
 func releaseImage(env, serviceName, repositoryUri string) string {

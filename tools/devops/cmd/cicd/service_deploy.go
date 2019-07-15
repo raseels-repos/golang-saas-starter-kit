@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -53,11 +54,12 @@ type ServiceDeployFlags struct {
 	Env         string `validate:"oneof=dev stage prod" example:"dev"`
 
 	// Optional flags.
-	EnableHTTPS         bool            `validate:"omitempty" example:"false"`
-	ServiceHostPrimary  string          `validate:"omitempty" example:"example-project.com"`
-	ServiceHostNames    cli.StringSlice `validate:"omitempty" example:"subdomain.example-project.com"`
-	S3BucketPrivateName string          `validate:"omitempty" example:"saas-example-project-private"`
-	S3BucketPublicName  string          `validate:"omitempty" example:"saas-example-project-public"`
+	EnableHTTPS              bool            `validate:"omitempty" example:"false"`
+	ServiceHostPrimary       string          `validate:"omitempty" example:"example-project.com"`
+	ServiceHostNames         cli.StringSlice `validate:"omitempty" example:"subdomain.example-project.com"`
+	S3BucketPrivateName      string          `validate:"omitempty" example:"saas-example-project-private"`
+	S3BucketPublicName       string          `validate:"omitempty" example:"saas-example-project-public"`
+	S3BucketPublicCloudfront bool            `validate:"omitempty" example:"false"`
 
 	ProjectRoot     string `validate:"omitempty" example:"."`
 	ProjectName     string ` validate:"omitempty" example:"example-project"`
@@ -65,9 +67,8 @@ type ServiceDeployFlags struct {
 	EnableLambdaVPC bool   `validate:"omitempty" example:"false"`
 	EnableEcsElb    bool   `validate:"omitempty" example:"false"`
 
-	StaticFilesS3Enable         bool `validate:"omitempty" example:"false"`
-	StaticFilesCloudfrontEnable bool `validate:"omitempty" example:"false"`
-	StaticFilesImgResizeEnable  bool `validate:"omitempty" example:"false"`
+	StaticFilesS3Enable        bool `validate:"omitempty" example:"false"`
+	StaticFilesImgResizeEnable bool `validate:"omitempty" example:"false"`
 
 	RecreateService bool `validate:"omitempty" example:"false"`
 }
@@ -116,10 +117,11 @@ type serviceDeployRequest struct {
 	S3BucketPublicKeyPrefix string `validate:"omitempty"`
 	S3Buckets               []S3Bucket
 
-	StaticFilesS3Enable         bool   `validate:"omitempty"`
-	StaticFilesS3Prefix         string `validate:"omitempty"`
-	StaticFilesCloudfrontEnable bool   `validate:"omitempty"`
-	StaticFilesImgResizeEnable  bool   `validate:"omitempty"`
+	CloudfrontPublic *cloudfront.DistributionConfig
+
+	StaticFilesS3Enable        bool   `validate:"omitempty"`
+	StaticFilesS3Prefix        string `validate:"omitempty"`
+	StaticFilesImgResizeEnable bool   `validate:"omitempty"`
 
 	EnableEcsElb           bool   `validate:"omitempty"`
 	ElbLoadBalancerName    string `validate:"omitempty"`
@@ -184,15 +186,15 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			ServiceHostPrimary: flags.ServiceHostPrimary,
 			ServiceHostNames:   flags.ServiceHostNames,
 
-			StaticFilesS3Enable:         flags.StaticFilesS3Enable,
-			StaticFilesCloudfrontEnable: flags.StaticFilesCloudfrontEnable,
-			StaticFilesImgResizeEnable:  flags.StaticFilesImgResizeEnable,
+			StaticFilesS3Enable:        flags.StaticFilesS3Enable,
+			StaticFilesImgResizeEnable: flags.StaticFilesImgResizeEnable,
 
 			S3BucketPrivateName: flags.S3BucketPrivateName,
 			S3BucketPublicName:  flags.S3BucketPublicName,
-			EnableLambdaVPC:     flags.EnableLambdaVPC,
-			EnableEcsElb:        flags.EnableEcsElb,
-			RecreateService:     flags.RecreateService,
+
+			EnableLambdaVPC: flags.EnableLambdaVPC,
+			EnableEcsElb:    flags.EnableEcsElb,
+			RecreateService: flags.RecreateService,
 
 			flags: flags,
 		}
@@ -279,6 +281,71 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 							},
 						},
 					})
+
+				/*if flags.S3BucketPublicCloudfront {
+					req.CloudfrontPublic = &cloudfront.DistributionConfig{
+						Comment: aws.String(""),
+						Enabled: aws.Bool(true),
+						HttpVersion: aws.String( "http2"),
+						IsIPV6Enabled: aws.Bool(true),
+
+						// A complex type that describes the default cache behavior if you don't specify
+						// a CacheBehavior element or if files don't match any of the values of PathPattern
+						// in CacheBehavior elements. You must create exactly one default cache behavior.
+						//
+						// DefaultCacheBehavior is a required field
+						DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+							// ......................................
+						},
+
+						// A complex type that contains information about origins for this distribution.
+						//
+						// Origins is a required field
+						Origins: &cloudfront.Origins{
+							// ......................................
+						},
+
+						// A complex type that specifies whether you want viewers to use HTTP or HTTPS
+						// to request your objects, whether you're using an alternate domain name with
+						// HTTPS, and if so, if you're using AWS Certificate Manager (ACM) or a third-party
+						// certificate authority.
+						ViewerCertificate: &cloudfront.ViewerCertificate{
+							// ......................................
+						},
+
+						// The price class that corresponds with the maximum price that you want to
+						// pay for CloudFront service. If you specify PriceClass_All, CloudFront responds
+						// to requests for your objects from all CloudFront edge locations.
+						//
+						// If you specify a price class other than PriceClass_All, CloudFront serves
+						// your objects from the CloudFront edge location that has the lowest latency
+						// among the edge locations in your price class. Viewers who are in or near
+						// regions that are excluded from your specified price class may encounter slower
+						// performance.
+						//
+						// For more information about price classes, see Choosing the Price Class for
+						// a CloudFront Distribution (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html)
+						// in the Amazon CloudFront Developer Guide. For information about CloudFront
+						// pricing, including how price classes (such as Price Class 100) map to CloudFront
+						// regions, see Amazon CloudFront Pricing (http://aws.amazon.com/cloudfront/pricing/).
+						// For price class information, scroll down to see the table at the bottom of
+						// the page.
+						PriceClass: aws.String("PriceClass_All"),
+
+						// A unique value (for example, a date-time stamp) that ensures that the request
+						// can't be replayed.
+						//
+						// If the value of CallerReference is new (regardless of the content of the
+						// DistributionConfig object), CloudFront creates a new distribution.
+						//
+						// If CallerReference is a value that you already sent in a previous request
+						// to create a distribution, CloudFront returns a DistributionAlreadyExists
+						// error.
+						//
+						// CallerReference is a required field
+						CallerReference: aws.String("devops-deploy"),
+					}
+				}*/
 			}
 
 			// The private S3 Bucket used to persist data for services.
@@ -678,7 +745,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				// A unique string that identifies the request and that allows failed CreatePrivateDnsNamespace
 				// requests to be retried without the risk of executing the operation twice.
 				// CreatorRequestId can be any unique string, for example, a date/time stamp.
-				CreatorRequestId: aws.String("truss-deploy"),
+				CreatorRequestId: aws.String("devops-deploy"),
 			}
 
 			// Service Discovery Service settings.
@@ -725,7 +792,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				// A unique string that identifies the request and that allows failed CreatePrivateDnsNamespace
 				// requests to be retried without the risk of executing the operation twice.
 				// CreatorRequestId can be any unique string, for example, a date/time stamp.
-				CreatorRequestId: aws.String("truss-deploy"),
+				CreatorRequestId: aws.String("devops-deploy"),
 			}
 
 			// Elastic Cache settings for a Redis cache cluster. Could defined different settings by env.
@@ -1642,7 +1709,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					// stamp.
 					//
 					// CallerReference is a required field
-					CallerReference: aws.String("truss-deploy"),
+					CallerReference: aws.String("devops-deploy"),
 				})
 				if err != nil {
 					return errors.Wrapf(err, "Failed to create route 53 hosted zone '%s' for domain '%s'", zoneName, dn)
@@ -2395,7 +2462,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 		}
 
 		// Static files served from CloudFront.
-		if req.StaticFilesCloudfrontEnable {
+		if req.CloudfrontPublic != nil {
 			placeholders["{STATIC_FILES_CLOUDFRONT_ENABLED}"] = "true"
 		}
 

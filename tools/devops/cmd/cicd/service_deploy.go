@@ -283,69 +283,125 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 					})
 
 				/*if flags.S3BucketPublicCloudfront {
+
+					allowedMethods:= &cloudfront.AllowedMethods{}
+					allowedMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+					allowedMethods.SetCachedMethods(cloudfront.CachedMethods{}.SetItems(aws.StringSlice([]string{ "HEAD", "GET"})))
+
+					origins := &cloudfront.Origins{}
+					origins.SetItems([]*cloudfront.Origin{
+						&cloudfront.Origin{
+							// A complex type that contains names and values for the custom headers that
+							// you want.
+							CustomHeaders *CustomHeaders `type:"structure"`
+
+							// A complex type that contains information about a custom origin. If the origin
+							// is an Amazon S3 bucket, use the S3OriginConfig element instead.
+							CustomOriginConfig *CustomOriginConfig `type:"structure"`
+
+							// Amazon S3 origins: The DNS name of the Amazon S3 bucket from which you want
+							// CloudFront to get objects for this origin, for example, myawsbucket.s3.amazonaws.com.
+							// If you set up your bucket to be configured as a website endpoint, enter the
+							// Amazon S3 static website hosting endpoint for the bucket.
+							//
+							// For more information about specifying this value for different types of origins,
+							// see Origin Domain Name (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesDomainName)
+							// in the Amazon CloudFront Developer Guide.
+							//
+							// Constraints for Amazon S3 origins:
+							//
+							//    * If you configured Amazon S3 Transfer Acceleration for your bucket, don't
+							//    specify the s3-accelerate endpoint for DomainName.
+							//
+							//    * The bucket name must be between 3 and 63 characters long (inclusive).
+							//
+							//    * The bucket name must contain only lowercase characters, numbers, periods,
+							//    underscores, and dashes.
+							//
+							//    * The bucket name must not contain adjacent periods.
+							//
+							// Custom Origins: The DNS domain name for the HTTP server from which you want
+							// CloudFront to get objects for this origin, for example, www.example.com.
+							//
+							// Constraints for custom origins:
+							//
+							//    * DomainName must be a valid DNS name that contains only a-z, A-Z, 0-9,
+							//    dot (.), hyphen (-), or underscore (_) characters.
+							//
+							//    * The name cannot exceed 128 characters.
+							//
+							// DomainName is a required field
+							DomainName *string `type:"string" required:"true"`
+
+							// A unique identifier for the origin or origin group. The value of Id must
+							// be unique within the distribution.
+							//
+							// When you specify the value of TargetOriginId for the default cache behavior
+							// or for another cache behavior, you indicate the origin to which you want
+							// the cache behavior to route requests by specifying the value of the Id element
+							// for that origin. When a request matches the path pattern for that cache behavior,
+							// CloudFront routes the request to the specified origin. For more information,
+							// see Cache Behavior Settings (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesCacheBehavior)
+							// in the Amazon CloudFront Developer Guide.
+							//
+							// Id is a required field
+							Id *string `type:"string" required:"true"`
+
+							// An optional element that causes CloudFront to request your content from a
+							// directory in your Amazon S3 bucket or your custom origin. When you include
+							// the OriginPath element, specify the directory name, beginning with a /. CloudFront
+							// appends the directory name to the value of DomainName, for example, example.com/production.
+							// Do not include a / at the end of the directory name.
+							//
+							// For example, suppose you've specified the following values for your distribution:
+							//
+							//    * DomainName: An Amazon S3 bucket named myawsbucket.
+							//
+							//    * OriginPath: /production
+							//
+							//    * CNAME: example.com
+							//
+							// When a user enters example.com/index.html in a browser, CloudFront sends
+							// a request to Amazon S3 for myawsbucket/production/index.html.
+							//
+							// When a user enters example.com/acme/index.html in a browser, CloudFront sends
+							// a request to Amazon S3 for myawsbucket/production/acme/index.html.
+							OriginPath *string `type:"string"`
+
+							// A complex type that contains information about the Amazon S3 origin. If the
+							// origin is a custom origin, use the CustomOriginConfig element instead.
+							S3OriginConfig *S3OriginConfig `type:"structure"`
+							// contains filtered or unexported fields
+						}	,
+					})
+
 					req.CloudfrontPublic = &cloudfront.DistributionConfig{
 						Comment: aws.String(""),
 						Enabled: aws.Bool(true),
 						HttpVersion: aws.String( "http2"),
 						IsIPV6Enabled: aws.Bool(true),
-
-						// A complex type that describes the default cache behavior if you don't specify
-						// a CacheBehavior element or if files don't match any of the values of PathPattern
-						// in CacheBehavior elements. You must create exactly one default cache behavior.
-						//
-						// DefaultCacheBehavior is a required field
 						DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-							// ......................................
+							TargetOriginId: aws.String("S3"+req.S3BucketPublicName),
+							AllowedMethods: allowedMethods,
+							Compress: aws.Bool(true),
+							DefaultTTL: aws.Int64(1209600),
+							MinTTL: aws.Int64(604800),
+							MaxTTL: aws.Int64(31536000),
+							ForwardedValues: &cloudfront.ForwardedValues{
+								QueryString: 	aws.Bool(true),
+							},
 						},
 
-						// A complex type that contains information about origins for this distribution.
-						//
-						// Origins is a required field
-						Origins: &cloudfront.Origins{
-							// ......................................
-						},
-
-						// A complex type that specifies whether you want viewers to use HTTP or HTTPS
-						// to request your objects, whether you're using an alternate domain name with
-						// HTTPS, and if so, if you're using AWS Certificate Manager (ACM) or a third-party
-						// certificate authority.
+						Origins: origins,
 						ViewerCertificate: &cloudfront.ViewerCertificate{
-							// ......................................
+							CertificateSource: aws.String("cloudfront"),
+							MinimumProtocolVersion: aws.String("TLSv1"),
+							CloudFrontDefaultCertificate: aws.Bool(true),
 						},
-
-						// The price class that corresponds with the maximum price that you want to
-						// pay for CloudFront service. If you specify PriceClass_All, CloudFront responds
-						// to requests for your objects from all CloudFront edge locations.
-						//
-						// If you specify a price class other than PriceClass_All, CloudFront serves
-						// your objects from the CloudFront edge location that has the lowest latency
-						// among the edge locations in your price class. Viewers who are in or near
-						// regions that are excluded from your specified price class may encounter slower
-						// performance.
-						//
-						// For more information about price classes, see Choosing the Price Class for
-						// a CloudFront Distribution (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html)
-						// in the Amazon CloudFront Developer Guide. For information about CloudFront
-						// pricing, including how price classes (such as Price Class 100) map to CloudFront
-						// regions, see Amazon CloudFront Pricing (http://aws.amazon.com/cloudfront/pricing/).
-						// For price class information, scroll down to see the table at the bottom of
-						// the page.
 						PriceClass: aws.String("PriceClass_All"),
-
-						// A unique value (for example, a date-time stamp) that ensures that the request
-						// can't be replayed.
-						//
-						// If the value of CallerReference is new (regardless of the content of the
-						// DistributionConfig object), CloudFront creates a new distribution.
-						//
-						// If CallerReference is a value that you already sent in a previous request
-						// to create a distribution, CloudFront returns a DistributionAlreadyExists
-						// error.
-						//
-						// CallerReference is a required field
 						CallerReference: aws.String("devops-deploy"),
 					}
-				}*/
+				} */
 			}
 
 			// The private S3 Bucket used to persist data for services.
@@ -3277,7 +3333,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		err := SyncPublicS3Files(req.awsSession(), req.S3BucketPublicName, req.StaticFilesS3Prefix, staticDir)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s '%s'", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
+			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
 		}
 
 		log.Printf("\t%s\tFiles uploaded.\n", tests.Success)
@@ -3521,7 +3577,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		if err := <-checkErr; err != nil {
 			log.Printf("\t%s\tFailed to check tasks.\n%+v\n", tests.Failed, err)
-			return nil
+			return err
 		}
 
 		// Wait for one of the methods to finish and then ensure the ticker is stopped.

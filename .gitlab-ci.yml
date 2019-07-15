@@ -85,7 +85,7 @@ webapp:deploy:dev:
     ENABLE_HTTPS: 1
     ENABLE_ELB: 0
     PRIMARY_HOST: 'eproc.tech'
-    HOST_NAMES: 'www.eproc.tech, dev.eproc.tech'
+    HOST_NAMES: 'www.eproc.tech,dev.eproc.tech'
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     S3_BUCKET_PUBLIC_CLOUDFRONT: 'false'

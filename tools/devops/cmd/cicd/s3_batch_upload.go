@@ -39,6 +39,9 @@ func NewDirectoryIterator(bucket, keyPrefix, dir, acl string) s3manager.BatchUpl
 	var paths []string
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
+
+			path, _ = filepath.Rel(dir, path)
+
 			paths = append(paths, path)
 		}
 		return nil

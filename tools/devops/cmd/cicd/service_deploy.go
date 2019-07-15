@@ -282,97 +282,25 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						},
 					})
 
-				/*if flags.S3BucketPublicCloudfront {
+					if flags.S3BucketPublicCloudfront {
 
 					allowedMethods:= &cloudfront.AllowedMethods{}
 					allowedMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
-					allowedMethods.SetCachedMethods(cloudfront.CachedMethods{}.SetItems(aws.StringSlice([]string{ "HEAD", "GET"})))
+
+					cacheMethods := &cloudfront.CachedMethods{}
+					cacheMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+					allowedMethods.SetCachedMethods(cacheMethods)
+
+					domainId := "S3"+req.S3BucketPublicName
+					domainName := fmt.Sprintf("%s.s3.%s.amazonaws.com", req.S3BucketPublicName, req.AwsCreds.Region)
 
 					origins := &cloudfront.Origins{}
 					origins.SetItems([]*cloudfront.Origin{
 						&cloudfront.Origin{
-							// A complex type that contains names and values for the custom headers that
-							// you want.
-							CustomHeaders *CustomHeaders `type:"structure"`
-
-							// A complex type that contains information about a custom origin. If the origin
-							// is an Amazon S3 bucket, use the S3OriginConfig element instead.
-							CustomOriginConfig *CustomOriginConfig `type:"structure"`
-
-							// Amazon S3 origins: The DNS name of the Amazon S3 bucket from which you want
-							// CloudFront to get objects for this origin, for example, myawsbucket.s3.amazonaws.com.
-							// If you set up your bucket to be configured as a website endpoint, enter the
-							// Amazon S3 static website hosting endpoint for the bucket.
-							//
-							// For more information about specifying this value for different types of origins,
-							// see Origin Domain Name (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesDomainName)
-							// in the Amazon CloudFront Developer Guide.
-							//
-							// Constraints for Amazon S3 origins:
-							//
-							//    * If you configured Amazon S3 Transfer Acceleration for your bucket, don't
-							//    specify the s3-accelerate endpoint for DomainName.
-							//
-							//    * The bucket name must be between 3 and 63 characters long (inclusive).
-							//
-							//    * The bucket name must contain only lowercase characters, numbers, periods,
-							//    underscores, and dashes.
-							//
-							//    * The bucket name must not contain adjacent periods.
-							//
-							// Custom Origins: The DNS domain name for the HTTP server from which you want
-							// CloudFront to get objects for this origin, for example, www.example.com.
-							//
-							// Constraints for custom origins:
-							//
-							//    * DomainName must be a valid DNS name that contains only a-z, A-Z, 0-9,
-							//    dot (.), hyphen (-), or underscore (_) characters.
-							//
-							//    * The name cannot exceed 128 characters.
-							//
-							// DomainName is a required field
-							DomainName *string `type:"string" required:"true"`
-
-							// A unique identifier for the origin or origin group. The value of Id must
-							// be unique within the distribution.
-							//
-							// When you specify the value of TargetOriginId for the default cache behavior
-							// or for another cache behavior, you indicate the origin to which you want
-							// the cache behavior to route requests by specifying the value of the Id element
-							// for that origin. When a request matches the path pattern for that cache behavior,
-							// CloudFront routes the request to the specified origin. For more information,
-							// see Cache Behavior Settings (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesCacheBehavior)
-							// in the Amazon CloudFront Developer Guide.
-							//
-							// Id is a required field
-							Id *string `type:"string" required:"true"`
-
-							// An optional element that causes CloudFront to request your content from a
-							// directory in your Amazon S3 bucket or your custom origin. When you include
-							// the OriginPath element, specify the directory name, beginning with a /. CloudFront
-							// appends the directory name to the value of DomainName, for example, example.com/production.
-							// Do not include a / at the end of the directory name.
-							//
-							// For example, suppose you've specified the following values for your distribution:
-							//
-							//    * DomainName: An Amazon S3 bucket named myawsbucket.
-							//
-							//    * OriginPath: /production
-							//
-							//    * CNAME: example.com
-							//
-							// When a user enters example.com/index.html in a browser, CloudFront sends
-							// a request to Amazon S3 for myawsbucket/production/index.html.
-							//
-							// When a user enters example.com/acme/index.html in a browser, CloudFront sends
-							// a request to Amazon S3 for myawsbucket/production/acme/index.html.
-							OriginPath *string `type:"string"`
-
-							// A complex type that contains information about the Amazon S3 origin. If the
-							// origin is a custom origin, use the CustomOriginConfig element instead.
-							S3OriginConfig *S3OriginConfig `type:"structure"`
-							// contains filtered or unexported fields
-						}	,
+							Id: aws.String(domainId),
+							DomainName: aws.String(domainName),
+							OriginPath: aws.String(req.S3BucketPublicKeyPrefix),
+						},
 					})
 
 					req.CloudfrontPublic = &cloudfront.DistributionConfig{
@@ -381,7 +309,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						HttpVersion: aws.String( "http2"),
 						IsIPV6Enabled: aws.Bool(true),
 						DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-							TargetOriginId: aws.String("S3"+req.S3BucketPublicName),
+							TargetOriginId: aws.String(domainId),
 							AllowedMethods: allowedMethods,
 							Compress: aws.Bool(true),
 							DefaultTTL: aws.Int64(1209600),
@@ -391,7 +319,6 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 								QueryString: 	aws.Bool(true),
 							},
 						},
-
 						Origins: origins,
 						ViewerCertificate: &cloudfront.ViewerCertificate{
 							CertificateSource: aws.String("cloudfront"),
@@ -401,7 +328,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						PriceClass: aws.String("PriceClass_All"),
 						CallerReference: aws.String("devops-deploy"),
 					}
-				} */
+				}
 			}
 
 			// The private S3 Bucket used to persist data for services.

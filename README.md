@@ -34,12 +34,15 @@ SaaS product offerings typically provide two main components: an API and a web a
 valuable software based product to clients ideally from a single code base on a recurring basis delivered over the 
 internet. 
 
-The example project is a complete starter kit for building SasS with GoLang. It provides three example services:
+The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
-direct client interaction. 
-* Web API - REST API with JWT authentication that renders results as JSON. This allows clients to develop deep 
+direct client interaction via their web connected devices. 
+* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-pary companies to develop deep 
 integrations with the project.
-* Schema - Tool for initializing of Postgres database and handles schema migration. 
+
+And these tools:
+* Schema - Initializing of Postgres database and handles schema migration. 
+* Dev Ops - Deploying project to AWS with GitLab CI/CD.
 
 It contains the following features:
 * Minimal web application using standard html/template package.
@@ -59,6 +62,10 @@ It contains the following features:
 * Serverless deployments.
 * CLI with boilerplate templates to reduce repetitive copy/pasting.
 * Integration with GitLab for enterprise-level CI/CD.
+
+Accordingly, the project architecture is illustrated with the following diagram. 
+![alt text](resources/images/saas-stater-kit-diagram.png "SaaS Starter Kit diagram")
+
 
 ### Example project 
 

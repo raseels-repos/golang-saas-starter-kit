@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"geeks-accelerator/oss/saas-starter-kit/tools/devops/internal/retry"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -36,9 +37,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/servicediscovery"
 	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/iancoleman/strcase"
+	"github.com/lib/pq"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
+	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -1317,8 +1321,26 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			if err != nil {
 				return errors.Wrap(err, "Failed to update secret with db credentials")
 			}
-
 			log.Printf("\t\tUpdate Secret\n")
+
+			// Ensure the newly created database is seeded.
+			log.Printf("\t\tOpen database connection")
+			// Register informs the sqlxtrace package of the driver that we will be using in our program.
+			// It uses a default service name, in the below case "postgres.db". To use a custom service
+			// name use RegisterWithServiceName.
+			sqltrace.Register(db.Driver, &pq.Driver{}, sqltrace.WithServiceName("devops:migrate"))
+			masterDb, err := sqlxtrace.Open(db.Driver, db.URL())
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			defer masterDb.Close()
+
+			// Start the database migrations.
+			log.Printf("\t\tStart migrations.")
+			if err = schema.Migrate(masterDb, log); err != nil {
+				return errors.WithStack(err)
+			}
+			log.Printf("\t\tFinished migrations.")
 		}
 
 		log.Printf("\t%s\tUsing DB Instance '%s'.\n", tests.Success, *dbInstance.DBInstanceIdentifier)
@@ -3099,7 +3121,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			// If tags aren't enabled for the account, try the request again without them.
 			// https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2/
-			if err != nil && strings.Contains(err.Error(), "New ARN and resource ID format must be enabled") {
+			if err != nil && strings.Contains(err.Error(), "ARN and resource ID format must be enabled") {
 				serviceInput.Tags = nil
 				createRes, err = svc.CreateService(serviceInput)
 			}

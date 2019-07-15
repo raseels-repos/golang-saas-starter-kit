@@ -3,7 +3,6 @@ package cicd
 import (
 	"encoding/json"
 	"log"
-	"net/url"
 	"path/filepath"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
@@ -166,6 +165,12 @@ func Migrate(log *log.Logger, req *migrateRequest) error {
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
 					return errors.Wrapf(err, "Failed to get value for secret id %s", dbSecretId)
+				} else {
+					// This should only happen when the deploy script first runs and no resources exist in the
+					// AWS account. To create a database, need the VPC and need to come up with a better strategy for
+					// defining resources that can be shared between deployment steps.
+					log.Printf("\t%s\tDatabase credentials not found.", tests.Failed)
+					return nil
 				}
 			} else {
 				err = json.Unmarshal([]byte(*res.SecretString), &db)
@@ -182,34 +187,12 @@ func Migrate(log *log.Logger, req *migrateRequest) error {
 	{
 		log.Println("Proceed with schema migration")
 
-		var dbUrl url.URL
-		{
-			// Query parameters.
-			var q url.Values = make(map[string][]string)
-
-			// Handle SSL Mode
-			if db.DisableTLS {
-				q.Set("sslmode", "disable")
-			} else {
-				q.Set("sslmode", "require")
-			}
-
-			// Construct url.
-			dbUrl = url.URL{
-				Scheme:   db.Driver,
-				User:     url.UserPassword(db.User, db.Pass),
-				Host:     db.Host,
-				Path:     db.Database,
-				RawQuery: q.Encode(),
-			}
-		}
-
 		log.Printf("\t\tOpen database connection")
 		// Register informs the sqlxtrace package of the driver that we will be using in our program.
 		// It uses a default service name, in the below case "postgres.db". To use a custom service
 		// name use RegisterWithServiceName.
 		sqltrace.Register(db.Driver, &pq.Driver{}, sqltrace.WithServiceName("devops:migrate"))
-		masterDb, err := sqlxtrace.Open(db.Driver, dbUrl.String())
+		masterDb, err := sqlxtrace.Open(db.Driver, db.URL())
 		if err != nil {
 			return errors.WithStack(err)
 		}

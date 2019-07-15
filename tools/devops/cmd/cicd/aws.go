@@ -3,19 +3,20 @@ package cicd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"io/ioutil"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -91,6 +92,31 @@ type DB struct {
 	Database   string
 	Driver     string
 	DisableTLS bool
+}
+
+// URL returns the URL to connect to a database.
+func (db DB) URL() string {
+
+	// Query parameters.
+	var q url.Values = make(map[string][]string)
+
+	// Handle SSL Mode
+	if db.DisableTLS {
+		q.Set("sslmode", "disable")
+	} else {
+		q.Set("sslmode", "require")
+	}
+
+	// Construct url.
+	dbUrl := url.URL{
+		Scheme:   db.Driver,
+		User:     url.UserPassword(db.User, db.Pass),
+		Host:     db.Host,
+		Path:     db.Database,
+		RawQuery: q.Encode(),
+	}
+
+	return dbUrl.String()
 }
 
 // GetAwsCredentials loads the AWS Access Keys from env variables unless a role is used.

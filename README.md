@@ -163,13 +163,31 @@ services the project will run are:
 Use the `docker-compose.yaml` to run all of the services, including the 3rd party services. The first time to run this 
 command, Docker will download the required images for the 3rd party services.
 
-```
-$ docker-compose up
+```bash
+$ docker-compose up --build
 ```
 
 Default configuration is set which should be valid for most systems. 
 
 Use the `docker-compose.yaml` file to configure the services differently using environment variables when necessary. 
+
+#### How we run the project
+
+We like to run the project where the services run in the background of our CLI. This can be done by using the -d with 
+the `docker-compose up` command: 
+```bash
+$ docker-compose up --build -d
+```
+
+Then when we want to see the logs, we can use the `docker-compose logs` command:
+```bash
+$ docker-compose logs
+```
+
+Or we can tail the logs using this command:
+```bash
+$ docker-compose logs -f
+```
 
 
 ### Stopping the project
@@ -277,37 +295,79 @@ The web-app will have its own internal API, similar to this external web-api ser
 integrations. It is believed that in the beginning, having to define an additional API for internal purposes is worth 
 the additional effort as the internal API can handle more flexible updates. 
 
+For more details on this service, read [web-api readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-api/README.md)
+
+
 
 ### Making Requests to Web API
 
 Once the web-api service is running it will be available on port 3000. 
-http://localhost:3000
+http://127.0.0.1:3000/
 
 The easiest way to make requests to the web-api service is by using CURL via your CLI.
 
 To make a request to the web-api service you must have an authenticated user. Users can be created with the API but an 
-initial admin user must first be created. The initial admin user can be created with the web-app service. 
+initial admin user must first be created. The initial admin user can easily be created using the Swagger API documentation. 
+
+
+### API Documentation
+
+Documentation for this API service is automatically generated using [swag](https://github.com/swaggo/swag). Once this
+web-api service is running, it can be accessed at /docs
+
+http://127.0.0.1:3001/docs/
 
 
 #### Creating Initial User
 
-Create an initial user using the web-app service first. This pattern is how a user would signup to a SaaS product - a 
-user would create an account on behalf of their organization. The subscription would then be associated with the 
-organization and managed accordingly including billing.
+Create an initial user service first using the signup endpoint documented at /docs
 
-While the web-app service is running, use the signup functionality to create a new user and corresponding account: 
-http://localhost/signup
+Find the endpoint for signup:
+```
+POST    ​/signup        Signup handles new account creation.
+```
 
-The email and password used to create the initial user and corresponding account can be used to make authenticated 
-requests to the web-api service. 
+Click the button to Try it Out. Then adjust the values for the account and user objects accordingly. 
+```json
+{
+  "account": {
+    "address1": "5445 Coolr Way",
+    "address2": "Box #1935",
+    "city": "Valdez",
+    "country": "USA",
+    "name": "Geeks on a Lake",
+    "region": "AK",
+    "timezone": "America/Anchorage",
+    "zipcode": "99686"
+  },
+  "user": {
+    "email": "twin@example.com",
+    "name": "Gabi May",
+    "password": "SecretString",
+    "password_confirm": "SecretString"
+  }
+}
+```
+
+Then click button Execute, which will return the CURL command and execute the call. 
+
+Example CURL command:
+```bash
+curl -X POST "http://127.0.0.1:3001/v1/signup" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"account\": { \"address1\": \"221 Tatitlek Ave\", \"address2\": \"Box #1832\", \"city\": \"Valdez\", \"country\": \"USA\", \"name\": \"Company 78d335d2-62a3-42a2-beff-148c63a2f5cd\", \"region\": \"AK\", \"timezone\": \"America/Anchorage\", \"zipcode\": \"99686\" }, \"user\": { \"email\": \"51088243-7e60-4cdd-b2c8-395c91b0c738@example.com\", \"name\": \"Gabi May\", \"password\": \"SecretString\", \"password_confirm\": \"SecretString\" }}"
+```
+
+If successful, data should be returned for code 201.
+ 
+You will now be able to use the email and password credentials to generate an auth token with the web-api service. 
+
 
 #### Authenticating
 
 Before any authenticated requests can be sent you must acquire an auth token. Make a request using HTTP Basic auth with 
-your email and password to get the token.
+your email and password to get an auth token.
 
 ```bash
-$ curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token
+$ curl --user "admin@example.com:gophers" http://127.0.0.1:3000/v1/users/token
 ```
 
 It is best to put the resulting token in an environment variable like `$TOKEN`.
@@ -322,7 +382,7 @@ dfadsf
 To make authenticated requests put the token in the `Authorization` header with the `Bearer ` prefix.
 
 ```bash
-$ curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
+$ curl -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:3000/v1/users
 ```
 
 
@@ -335,11 +395,13 @@ authentication with HTTP sessions. The web app relies on the Golang business log
 for internal requests. 
 
 Once the web-app service is running it will be available on port 80. 
-http://localhost/ or http://localhost:80/
+http://127.0.0.1:3000/
 
 While the web-api service is rocking, this web-app service is still in development. Only the signup functionality works 
 in order for a user to create the initial user with role of admin and a corresponding account for their organization. 
 If you would like to help, please email twins@geeksinthewoods.com.
+
+For more details on this service, read [web-app readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-app/README.md)
 
 
 ### Functionality of Web App
@@ -437,7 +499,7 @@ shared=# \dt
 
 ## Deployment 
 
-This project includes a complete build pipeline that relies on AWS and GitLab. `.gitlab-ci.yaml` the following build 
+This project includes a complete build pipeline that relies on AWS and GitLab. The `.gitlab-ci.yaml` file includes the following build 
 stages: 
 ```yaml
 stages:
@@ -453,24 +515,26 @@ stages:
 ```
 
 Currently `.gitlab-ci.yaml` only defines jobs for the first three stages. The remaining stages can be chained together 
-so each job is dependant on the previous or run jobs for each target env independently. 
+so each job is dependant on the previous or run jobs for each target environment independently. 
 
 A build tool called [devops](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/devops) has 
-been included apart of this project to handle creating AWS resources and deploying your services with minimal additional
-configuration. You can customizing any of the configuration in the code. When AWS already a core part of the 
+been included apart of this project. Devops handles creating AWS resources and deploying your services with minimal additional
+configuration. You can customizing any of the configuration in the code. While AWS is already a core part of the 
 saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
-project successfully up and running. If you understand GoLang, then you will be a master at devops with this tool.
+project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 
-The project by default includes a postgres database which adds an additional resource dependency when deploying the 
-project. The tasks running schema migration can not run as shared GitLab Runners since they will be outside the 
-deployment AWS VPC. There are two options here: 
-1. Enable the AWS RDS database to be publicly available.
-2. Run our own GitLab runners inside the same AWS VPC and grant access for them to communicate with the database.
+The project includes a Postgres database which adds an additional resource dependency when deploying the 
+project. It is important to know that the tasks running schema migration for the Postgres database can not run as shared 
+GitLab Runners since they will be outside the deployment AWS VPC. There are two options here: 
+1. Enable the AWS RDS database to be publicly available (not recommended).
+2. Run your own GitLab runners inside the same AWS VPC and grant access for them to communicate with the database.
 
-This project has opted for option 2 and thus setting up the deployment pipeline requires a few more additional steps. 
-Using shared runners hosted by GitLab also requires AWS credentials to be input into GitLab for configuration.  
-Hosted our own GitLab runners uses AWS Roles instead of hardcoding the access key ID and secret access key in GitLab and 
-in other configuration files. And since this project is open source, we wanted to avoid sharing our AWS credentials.
+This project has opted to implement option 2 and thus setting up the deployment pipeline requires a few more additional steps. 
+
+Note that using shared runners hosted by GitLab also requires AWS credentials to be input into GitLab for configuration.  
+
+Hosted your own GitLab runners uses AWS Roles instead of hardcoding the access key ID and secret access key in GitLab and 
+in other configuration files. And since this project is open-source, we wanted to avoid sharing our AWS credentials.
 
 If you don't have an AWS account, signup for one now and then proceed with the deployment setup. 
 
@@ -493,7 +557,7 @@ perform the project specific deployment commands.
 `GitLab Runner` will be installed on this instance and will serve as the bastion that spawns new instances. This 
 instance will be a dedicated host since we need it always up and running, thus it will be the standard costs apply. 
 
-    Note: This doesn't have to be a powerful machine since it will not run any jobs itself, a t2.micro instance will do.
+    Note: Since this machine will not run any jobs itself, it does not need to be very powerful. A t2.micro instance will be sufficient.
     ``` 
     Amazon Machine Image (AMI): Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type - ami-0f2176987ee50226e
     Instance Type: t2.micro 
@@ -501,7 +565,7 @@ instance will be a dedicated host since we need it always up and running, thus i
 
 3. Configure Instance Details. 
 
-    Note: Don't forget to select the IAM Role _SaasStarterKitEc2RoleForGitLabRunner_ 
+    Note: Do not forget to select the IAM Role _SaasStarterKitEc2RoleForGitLabRunner_ 
     ```
     Number of instances: 1
     Network: default VPC
@@ -519,7 +583,7 @@ instance will be a dedicated host since we need it always up and running, thus i
     Advanced Details: none 
     ```
     
-4. Add Storage. Increase the volume size for the root device to 100 GiB
+4. Add Storage. Increase the volume size for the root device to 100 GiB.
     ```    
     Volume Type |   Device      | Size (GiB) |  Volume Type 
     Root        |   /dev/xvda   | 100        |  General Purpose SSD (gp2)
@@ -677,7 +741,7 @@ remap the placeholders to the correct database.
 sqlQueryStr = db.Rebind(sqlQueryStr)
 ```
 
-For additional details refer to https://jmoiron.github.io/sqlx/#bindvars
+For additional details refer to [bindvars](https://jmoiron.github.io/sqlx/#bindvars)
 
 
 ## What's Next

@@ -348,6 +348,8 @@ func main() {
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
 	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {
+		panic(primaryServiceHost)
+
 		redirect := mid.DomainNameRedirect(mid.DomainNameRedirectConfig{
 			RedirectConfig: mid.RedirectConfig{
 				Code: http.StatusMovedPermanently,

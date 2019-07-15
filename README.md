@@ -63,10 +63,21 @@ It contains the following features:
 ### Example project 
 
 With SaaS, a client subscribes to an online service you provide them. The example project provides functionality for 
-clients to subscribe and then once subscribed they can interact with your software service. For this example, *projects* 
+clients to subscribe and then once subscribed they can interact with your software service. 
+
+The initial contributors to this project are building this saas-starter-kit based on their years of experience building 
+building enterprise B2B SaaS. Particularily, this saas-starter-kit is based on their most recent experience building the
+B2B SaaS for [standard operating procedure software](https://keeni.space) (100% Golang). Reference the Keeni.Space website,
+its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web app is then available at 
+[app.keeni.space](https://app.keeni.space). They plan on leveraging this experience and build it into a simplified set 
+example services for both a web API and a web app for SaaS businesses. 
+
+For this example, *projects* 
 will be the single business logic package that will be exposed to users for management based on their role. Additional 
 business logic packages can be added to support your project. It’s important at the beginning to minimize the connection 
 between business logic packages on the same horizontal level. 
+
+
 This project provides the following functionality to users:
 
 New clients can sign up which creates an account and a user with role of admin.
@@ -286,6 +297,9 @@ the API key for you Datadog account by setting the environmental variable: DD_AP
 REST API available to clients for supporting deeper integrations. This API is also a foundation for third-party 
 integrations. The API implements JWT authentication that renders results as JSON to clients. 
 
+Once the web-app service is running it will be available on port 3001. 
+http://127.0.0.1:3001/
+
 This web-api service is not directly used by the web-app service to prevent locking the functionally required for 
 internally development of the web-app service to the same functionality exposed to clients via this web-api service. 
 This separate web-api service can be exposed to clients and be maintained in a more rigid/structured process to manage 
@@ -297,103 +311,12 @@ the additional effort as the internal API can handle more flexible updates.
 
 For more details on this service, read [web-api readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-api/README.md)
 
-
-
-### Making Requests to Web API
-
-Once the web-api service is running it will be available on port 3000. 
-http://127.0.0.1:3001/
-
-The easiest way to make requests to the web-api service is by using CURL via your CLI.
-
-To make a request to the web-api service you must have an authenticated user. Users can be created with the API but an 
-initial admin user must first be created. The initial admin user can easily be created using the Swagger API documentation. 
-
-
 ### API Documentation
 
 Documentation for this API service is automatically generated using [swag](https://github.com/swaggo/swag). Once this
 web-api service is running, it can be accessed at /docs
 
 http://127.0.0.1:3001/docs/
-
-
-#### Initalize the database.
-
-The database is created but does not include any schema when first started. 
-```bash
-cd tools/schema/
-source sample.env 
-go run main.go 
-```
-
-#### Creating Initial User
-
-Create an initial user service first using the signup endpoint documented at /docs
-
-Find the endpoint for signup:
-```
-POST    ​/signup        Signup handles new account creation.
-```
-
-Click the button to Try it Out. Then adjust the values for the account and user objects accordingly. 
-```json
-{
-  "account": {
-    "address1": "5445 Coolr Way",
-    "address2": "Box #1935",
-    "city": "Valdez",
-    "country": "USA",
-    "name": "Geeks on a Lake",
-    "region": "AK",
-    "timezone": "America/Anchorage",
-    "zipcode": "99686"
-  },
-  "user": {
-    "email": "twin@example.com",
-    "name": "Gabi May",
-    "password": "SecretString",
-    "password_confirm": "SecretString"
-  }
-}
-```
-
-Then click button Execute, which will return the CURL command and execute the call. 
-
-Example CURL command:
-```bash
-curl -X POST "http://127.0.0.1:3001/v1/signup" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"account\": { \"address1\": \"221 Tatitlek Ave\", \"address2\": \"Box #1832\", \"city\": \"Valdez\", \"country\": \"USA\", \"name\": \"Geeks on a Lake\", \"region\": \"AK\", \"timezone\": \"America/Anchorage\", \"zipcode\": \"99686\" }, \"user\": { \"email\": \"twin@example.com\", \"name\": \"Gabi May\", \"password\": \"SecretString\", \"password_confirm\": \"SecretString\" }}"
-```
-
-If successful, data should be returned for code 201.
- 
-You will now be able to use the email and password credentials to generate an auth token with the web-api service. 
-
-
-#### Authenticating
-
-Before any authenticated requests can be sent you must acquire an auth token. Make a request using HTTP Basic auth with 
-your email and password to get an auth token.
-
-```bash
-curl --user "twin@example.com:SecretString" -X POST http://127.0.0.1:3001/v1/oauth/token
-```
-
-It is best to put the resulting token in an environment variable like `$TOKEN`.
-
-#### Adding Token as Environment Variable
-
-```bash
-export TOKEN="COPY TOKEN STRING FROM LAST CALL"
-```
-
-#### Authenticated Requests
-
-To make authenticated requests put the token in the `Authorization` header with the `Bearer ` prefix.
-
-```bash
-curl -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:3001/v1/users
-```
 
 
 ## Web App
@@ -404,7 +327,7 @@ direct interaction with clients and their users. It allows clients to sign up ne
 authentication with HTTP sessions. The web app relies on the Golang business logic packages developed to provide an API 
 for internal requests. 
 
-Once the web-app service is running it will be available on port 80. 
+Once the web-app service is running it will be available on port 3000. 
 http://127.0.0.1:3000/
 
 While the web-api service is rocking, this web-app service is still in development. Only the signup functionality works 
@@ -412,47 +335,6 @@ in order for a user to create the initial user with role of admin and a correspo
 If you would like to help, please email twins@geeksinthewoods.com.
 
 For more details on this service, read [web-app readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-app/README.md)
-
-
-### Functionality of Web App
-
-The example web-app service is going to allow users to manage checklists. Users with role of admin will be allowed to 
-create new checklists (projects). Each checklist will have tasks (items) associated with it. Tasks can be assigned to 
-users with access to the checklist. Users can then update the status of a task. 
-
-We are referring to "checklists" as "projects" and "tasks" as "items" so this example web-app service will be generic 
-enough for you to leverage and build upon without lots of renaming.
-
-This web-app service eventually will include the following functionality and corresponding web pages:
-- authentication
-    - signup (creates user and account records)
-    - login
-        - with role-based access
-    - logout
-    - forgot password
-    - user management
-        - update user and password
-    - account management
-        - update account
-        - manage user
-            - view user
-            - create and invite user
-            - update user
-- projects (checklists)
-    - index of projects
-        - browse, filter, search
-    - manage projects
-        - view project
-            - with project items
-        - create project
-        - update project
-            - user access
-    - project items (tasks)
-        - view item
-        - create item (adds task to checklist)
-        - update item
-
-
 
 
 ## Schema 

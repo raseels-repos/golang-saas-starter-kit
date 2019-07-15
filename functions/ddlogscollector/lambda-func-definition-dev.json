@@ -1,0 +1,18 @@
+{
+    "FunctionName": "{LAMBDA_FUNC}",
+    "MemorySize": 512,
+    "Role": "arn:aws:iam::074586779200:role/DatadogAWSIntegrationLambdaRole",
+    "Timeout": 300,
+    "Runtime": "python2.7",
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "Description": "Ship logs from cloudwatch to datadog",
+    "Handler": "lambda_function.lambda_handler",
+    "Environment": {
+        "Variables": {
+            "DD_API_KEY": "{DATADOG_APIKEY}",
+            "LAMBDA_FUNC": "{LAMBDA_FUNC}"
+        }
+    }
+}

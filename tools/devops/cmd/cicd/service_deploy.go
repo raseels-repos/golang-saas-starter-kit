@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"geeks-accelerator/oss/saas-starter-kit/tools/devops/internal/retry"
@@ -328,6 +328,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						PriceClass: aws.String("PriceClass_All"),
 						CallerReference: aws.String("devops-deploy"),
 					}
+					req.CloudfrontPublic = nil
 				}
 			}
 
@@ -1065,6 +1066,28 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 		log.Printf("\t%s\tS3 buckets configured successfully.\n", tests.Success)
+	}
+
+	if req.CloudfrontPublic != nil {
+		log.Println("Cloudfront - Setup Distribution")
+
+		svc := cloudfront.New(req.awsSession())
+
+		_, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
+			DistributionConfig: req.CloudfrontPublic,
+		} )
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || (aerr.Code() != cloudfront.ErrCodeDistributionAlreadyExists) {
+				return errors.Wrapf(err, "Failed to create cloudfront distribution '%s'", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+			}
+
+			// If bucket found during create, returns it.
+			log.Printf("\t\tFound: %s.", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+		} else {
+
+			// If no bucket found during create, create new one.
+			log.Printf("\t\tCreated: %s.", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+		}
 	}
 
 	// Find the default VPC and associated subnets.
@@ -3254,7 +3277,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	// When static files are enabled to be to stored on S3, we need to upload all of them.
 	if req.StaticFilesS3Enable {
-		log.Println("\tSync static files to public S3 bucket")
+		log.Println("\tUpload static files to public S3 bucket")
 
 		staticDir := filepath.Join(req.ServiceDir, "static")
 
@@ -3263,7 +3286,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
 		}
 
-		log.Printf("\t%s\tFiles uploaded.\n", tests.Success)
+		log.Printf("\t%s\tFiles uploaded to s3://%s/%s.\n", tests.Success, req.S3BucketPublicName, req.StaticFilesS3Prefix)
 	}
 
 	// Wait for the updated or created service to enter a stable state.

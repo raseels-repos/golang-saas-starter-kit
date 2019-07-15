@@ -535,7 +535,6 @@ func main() {
 				log.Printf("main : Graceful shutdown did not complete in %v : %v", cfg.Service.ShutdownTimeout, err)
 				err = api.Close()
 			}
-
 		}
 
 		// Log the status of this shutdown.

@@ -61,7 +61,7 @@ one `docker-compose.yaml` file that is shared between all services.
     
 4. Open the Swagger UI. 
 
-    Navigate your browser to [http://localhost:3001/docs](http://localhost:3001/docs).
+    Navigate your browser to [http://127.0.0.1:3001/docs](http://127.0.0.1:3001/docs).
     
 5. Signup a new account. 
 

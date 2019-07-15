@@ -302,7 +302,7 @@ For more details on this service, read [web-api readme](https://gitlab.com/geeks
 ### Making Requests to Web API
 
 Once the web-api service is running it will be available on port 3000. 
-http://127.0.0.1:3000/
+http://127.0.0.1:3001/
 
 The easiest way to make requests to the web-api service is by using CURL via your CLI.
 
@@ -317,6 +317,15 @@ web-api service is running, it can be accessed at /docs
 
 http://127.0.0.1:3001/docs/
 
+
+#### Initalize the database.
+
+The database is created but does not include any schema when first started. 
+```bash
+cd tools/schema/
+source sample.env 
+go run main.go 
+```
 
 #### Creating Initial User
 
@@ -353,7 +362,7 @@ Then click button Execute, which will return the CURL command and execute the ca
 
 Example CURL command:
 ```bash
-curl -X POST "http://127.0.0.1:3001/v1/signup" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"account\": { \"address1\": \"221 Tatitlek Ave\", \"address2\": \"Box #1832\", \"city\": \"Valdez\", \"country\": \"USA\", \"name\": \"Company 78d335d2-62a3-42a2-beff-148c63a2f5cd\", \"region\": \"AK\", \"timezone\": \"America/Anchorage\", \"zipcode\": \"99686\" }, \"user\": { \"email\": \"51088243-7e60-4cdd-b2c8-395c91b0c738@example.com\", \"name\": \"Gabi May\", \"password\": \"SecretString\", \"password_confirm\": \"SecretString\" }}"
+curl -X POST "http://127.0.0.1:3001/v1/signup" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"account\": { \"address1\": \"221 Tatitlek Ave\", \"address2\": \"Box #1832\", \"city\": \"Valdez\", \"country\": \"USA\", \"name\": \"Geeks on a Lake\", \"region\": \"AK\", \"timezone\": \"America/Anchorage\", \"zipcode\": \"99686\" }, \"user\": { \"email\": \"twin@example.com\", \"name\": \"Gabi May\", \"password\": \"SecretString\", \"password_confirm\": \"SecretString\" }}"
 ```
 
 If successful, data should be returned for code 201.
@@ -367,22 +376,23 @@ Before any authenticated requests can be sent you must acquire an auth token. Ma
 your email and password to get an auth token.
 
 ```bash
-$ curl --user "admin@example.com:gophers" http://127.0.0.1:3000/v1/users/token
+curl --user "twin@example.com:SecretString" -X POST http://127.0.0.1:3001/v1/oauth/token
 ```
 
 It is best to put the resulting token in an environment variable like `$TOKEN`.
 
 #### Adding Token as Environment Variable
 
-dfadsf
-
+```bash
+export TOKEN="COPY TOKEN STRING FROM LAST CALL"
+```
 
 #### Authenticated Requests
 
 To make authenticated requests put the token in the `Authorization` header with the `Bearer ` prefix.
 
 ```bash
-$ curl -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:3000/v1/users
+curl -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:3001/v1/users
 ```
 
 

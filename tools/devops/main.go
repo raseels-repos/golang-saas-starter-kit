@@ -82,6 +82,9 @@ func main() {
 				cli.StringFlag{Name: "project", Usage: "name of project", Destination: &deployFlags.ProjectName},
 				cli.BoolFlag{Name: "enable_elb", Usage: "enable deployed to use Elastic Load Balancer", Destination: &deployFlags.EnableEcsElb},
 				cli.BoolTFlag{Name: "lambda_vpc", Usage: "deploy lambda behind VPC", Destination: &deployFlags.EnableLambdaVPC},
+				cli.BoolFlag{Name: "static_files_s3", Usage: "service static files from S3", Destination: &deployFlags.StaticFilesS3Enable},
+				cli.BoolFlag{Name: "static_files_cloudfront", Usage: "serve static files from Cloudfront", Destination: &deployFlags.StaticFilesCloudfrontEnable},
+				cli.BoolFlag{Name: "static_files_img_resize", Usage: "enable response images from service", Destination: &deployFlags.StaticFilesImgResizeEnable},
 				cli.BoolFlag{Name: "recreate_service", Usage: "skip docker push after build", Destination: &deployFlags.RecreateService},
 			},
 			Action: func(c *cli.Context) error {

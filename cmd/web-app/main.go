@@ -20,8 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/img-resize"
@@ -80,10 +80,10 @@ func main() {
 			HostNames   []string `envconfig:"HOST_NAMES" example:"www.eproc.tech"`
 			EnableHTTPS bool     `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			StaticDir   string   `default:"./static" envconfig:"STATIC_DIR"`
-			StaticS3    struct {
-				S3Enabled         bool   `envconfig:"ENABLED"`
-				S3KeyPrefix       string `default:"public/web_app/static" envconfig:"KEY_PREFIX"`
+			StaticFiles struct {
+				Dir               string `default:"./static" envconfig:"STATIC_DIR"`
+				S3Enabled         bool   `envconfig:"S3_ENABLED"`
+				S3Prefix          string `default:"public/web_app/static" envconfig:"S3_PREFIX"`
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
@@ -369,8 +369,8 @@ func main() {
 	// s3UrlFormatter is a help function used by to convert an s3 key to
 	// a publicly available image URL.
 	var staticS3UrlFormatter func(string) string
-	if cfg.Service.StaticS3.S3Enabled || cfg.Service.StaticS3.CloudFrontEnabled || cfg.Service.StaticS3.ImgResizeEnabled {
-		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.Aws.S3BucketPublic, cfg.Service.StaticS3.S3KeyPrefix, cfg.Service.StaticS3.CloudFrontEnabled)
+	if cfg.Service.StaticFiles.S3Enabled || cfg.Service.StaticFiles.CloudFrontEnabled || cfg.Service.StaticFiles.ImgResizeEnabled {
+		s3UrlFormatter, err := devops.S3UrlFormatter(awsSession, cfg.Aws.S3BucketPublic, cfg.Service.StaticFiles.S3Prefix, cfg.Service.StaticFiles.CloudFrontEnabled)
 		if err != nil {
 			log.Fatalf("main : S3UrlFormatter failed : %+v", err)
 		}
@@ -379,7 +379,7 @@ func main() {
 			// When the path starts with a forward slash its referencing a local file,
 			// make sure the static file prefix is included
 			if strings.HasPrefix(p, "/") {
-				p = filepath.Join(cfg.Service.StaticS3.S3KeyPrefix, p)
+				p = filepath.Join(cfg.Service.StaticFiles.S3Prefix, p)
 			}
 			return s3UrlFormatter(p)
 		}
@@ -400,7 +400,7 @@ func main() {
 	// templates should be updated to use a fully qualified URL for either the public file on S3
 	// on from the cloudfront distribution.
 	var staticUrlFormatter func(string) string
-	if cfg.Service.StaticS3.S3Enabled || cfg.Service.StaticS3.CloudFrontEnabled {
+	if cfg.Service.StaticFiles.S3Enabled || cfg.Service.StaticFiles.CloudFrontEnabled {
 		staticUrlFormatter = staticS3UrlFormatter
 	} else {
 		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
@@ -508,12 +508,12 @@ func main() {
 
 	// Image Formatter - additional functions exposed to templates for resizing images
 	// to support response web applications.
-	imgResizeS3KeyPrefix := filepath.Join(cfg.Service.StaticS3.S3KeyPrefix, "images/responsive")
+	imgResizeS3KeyPrefix := filepath.Join(cfg.Service.StaticFiles.S3Prefix, "images/responsive")
 
 	imgSrcAttr := func(ctx context.Context, p string, sizes []int, includeOrig bool) template.HTMLAttr {
 		u := staticUrlFormatter(p)
 		var srcAttr string
-		if cfg.Service.StaticS3.ImgResizeEnabled {
+		if cfg.Service.StaticFiles.ImgResizeEnabled {
 			srcAttr, _ = img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, u, sizes, includeOrig)
 		} else {
 			srcAttr = fmt.Sprintf("src=\"%s\"", u)
@@ -544,7 +544,7 @@ func main() {
 	}
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
 		imgUrl := staticUrlFormatter(p)
-		if cfg.Service.StaticS3.ImgResizeEnabled {
+		if cfg.Service.StaticFiles.ImgResizeEnabled {
 			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
 		}
 		return imgUrl
@@ -635,7 +635,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticDir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -652,7 +652,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticDir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

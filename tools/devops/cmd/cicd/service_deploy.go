@@ -64,7 +64,12 @@ type ServiceDeployFlags struct {
 	DockerFile      string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
 	EnableLambdaVPC bool   `validate:"omitempty" example:"false"`
 	EnableEcsElb    bool   `validate:"omitempty" example:"false"`
-	RecreateService bool   `validate:"omitempty" example:"false"`
+
+	StaticFilesS3Enable         bool `validate:"omitempty" example:"false"`
+	StaticFilesCloudfrontEnable bool `validate:"omitempty" example:"false"`
+	StaticFilesImgResizeEnable  bool `validate:"omitempty" example:"false"`
+
+	RecreateService bool `validate:"omitempty" example:"false"`
 }
 
 // serviceDeployRequest defines the details needed to execute a service deployment.
@@ -105,10 +110,16 @@ type serviceDeployRequest struct {
 	CloudWatchLogGroupName string `validate:"required"`
 	CloudWatchLogGroup     *cloudwatchlogs.CreateLogGroupInput
 
-	S3BucketTempPrefix  string `validate:"required_with=S3BucketPrivateName S3BucketPublicName"`
-	S3BucketPrivateName string `validate:"omitempty"`
-	S3BucketPublicName  string `validate:"omitempty"`
-	S3Buckets           []S3Bucket
+	S3BucketTempPrefix      string `validate:"required_with=S3BucketPrivateName S3BucketPublicName"`
+	S3BucketPrivateName     string `validate:"omitempty"`
+	S3BucketPublicName      string `validate:"omitempty"`
+	S3BucketPublicKeyPrefix string `validate:"omitempty"`
+	S3Buckets               []S3Bucket
+
+	StaticFilesS3Enable         bool   `validate:"omitempty"`
+	StaticFilesS3Prefix         string `validate:"omitempty"`
+	StaticFilesCloudfrontEnable bool   `validate:"omitempty"`
+	StaticFilesImgResizeEnable  bool   `validate:"omitempty"`
 
 	EnableEcsElb           bool   `validate:"omitempty"`
 	ElbLoadBalancerName    string `validate:"omitempty"`
@@ -169,9 +180,14 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 		req = serviceDeployRequest{
 			serviceRequest: sr,
 
-			EnableHTTPS:         flags.EnableHTTPS,
-			ServiceHostPrimary:  flags.ServiceHostPrimary,
-			ServiceHostNames:    flags.ServiceHostNames,
+			EnableHTTPS:        flags.EnableHTTPS,
+			ServiceHostPrimary: flags.ServiceHostPrimary,
+			ServiceHostNames:   flags.ServiceHostNames,
+
+			StaticFilesS3Enable:         flags.StaticFilesS3Enable,
+			StaticFilesCloudfrontEnable: flags.StaticFilesCloudfrontEnable,
+			StaticFilesImgResizeEnable:  flags.StaticFilesImgResizeEnable,
+
 			S3BucketPrivateName: flags.S3BucketPrivateName,
 			S3BucketPublicName:  flags.S3BucketPublicName,
 			EnableLambdaVPC:     flags.EnableLambdaVPC,
@@ -335,6 +351,16 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						}`, req.S3BucketPrivateName, req.AwsCreds.Region, policyResource, req.AwsCreds.Region)
 						}(),
 					})
+			}
+
+			// The S3 key prefix used as the origin when cloud front is enabled.
+			if req.S3BucketPublicKeyPrefix == "" {
+				req.S3BucketPublicKeyPrefix = "public"
+			}
+
+			// The S3 prefix used to upload static files served to public.
+			if req.StaticFilesS3Prefix == "" {
+				req.StaticFilesS3Prefix = filepath.Join(req.S3BucketPublicKeyPrefix, releaseTag(req.Env, req.ServiceName), "static")
 			}
 
 			// Set default AWS ECR Repository Name.
@@ -988,7 +1014,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 				log.Printf("\t\t\tUpdated bucket policy")
 			}
 		}
-
 		log.Printf("\t%s\tS3 buckets configured successfully.\n", tests.Success)
 	}
 
@@ -2307,6 +2332,11 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			"{HOST_PRIMARY}": req.ServiceHostPrimary,
 			"{HOST_NAMES}":   strings.Join(req.ServiceHostNames, ","),
 
+			"{STATIC_FILES_S3_ENABLED}":         "false",
+			"{STATIC_FILES_S3_PREFIX}":          "",
+			"{STATIC_FILES_CLOUDFRONT_ENABLED}": "false",
+			"{STATIC_FILES_IMG_RESIZE_ENABLED}": "false",
+
 			"{CACHE_HOST}": "", // Not enabled by default
 
 			"{DB_HOST}":        "",
@@ -2357,6 +2387,21 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 
 			placeholders["{APP_BASE_URL}"] = fmt.Sprintf("%s://%s/", appSchema, req.ServiceHostPrimary)
+		}
+
+		// Static files served from S3.
+		if req.StaticFilesS3Enable {
+			placeholders["{STATIC_FILES_S3_ENABLED}"] = "true"
+		}
+
+		// Static files served from CloudFront.
+		if req.StaticFilesCloudfrontEnable {
+			placeholders["{STATIC_FILES_CLOUDFRONT_ENABLED}"] = "true"
+		}
+
+		// Support for resizing static images files to be responsive.
+		if req.StaticFilesImgResizeEnable {
+			placeholders["{STATIC_FILES_IMG_RESIZE_ENABLED}"] = "true"
 		}
 
 		// When db is set, update the placeholders.
@@ -3155,6 +3200,20 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			log.Printf("\t%s\tCreated ECS Service '%s'.\n", tests.Success, *ecsService.ServiceName)
 		}
+	}
+
+	// When static files are enabled to be to stored on S3, we need to upload all of them.
+	if req.StaticFilesS3Enable {
+		log.Println("\tSync static files to public S3 bucket")
+
+		staticDir := filepath.Join(req.ServiceDir, "static")
+
+		err := SyncPublicS3Files(req.awsSession(), req.S3BucketPublicName, req.StaticFilesS3Prefix, staticDir)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s '%s'", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
+		}
+
+		log.Printf("\t%s\tFiles uploaded.\n", tests.Success)
 	}
 
 	// Wait for the updated or created service to enter a stable state.

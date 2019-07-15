@@ -222,7 +222,7 @@ $ docker-compose down
 Running `docker-compose down` will properly stop and terminate the Docker Compose session.
 
 Note: None of the containers are setup by default with volumes and all data will be lost with `docker-compose down`. 
-This is specicaly important to remember regarding the postgres container. If you would like data to be persisted across 
+This is specifically important to remember regarding the postgres container. If you would like data to be persisted across 
 builds locally, update `docker-compose.yaml` to define a volume. 
 
 

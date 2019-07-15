@@ -499,6 +499,10 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						Effect: "Allow",
 						Action: []string{
 							"s3:HeadBucket",
+							"s3:ListObjects",
+							"s3:PutObject",
+							"s3:PutObjectAcl",
+							"cloudfront:ListDistributions",
 							"ec2:DescribeNetworkInterfaces",
 							"ec2:DeleteNetworkInterface",
 							"ecs:ListTasks",

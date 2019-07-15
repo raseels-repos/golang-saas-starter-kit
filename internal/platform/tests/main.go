@@ -3,16 +3,17 @@ package tests
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"io"
 	"log"
 	"os"
 	"runtime/debug"
+	"strings"
 	"testing"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
 )
@@ -79,7 +80,7 @@ func New() *Test {
 			// Make sure the database is ready for queries.
 			_, err = masterDB.Exec("SELECT 1")
 			if err != nil {
-				if err != io.EOF {
+				if err != io.EOF && !strings.Contains(err.Error(), "connection reset by peer") {
 					break
 				}
 				time.Sleep(time.Second)

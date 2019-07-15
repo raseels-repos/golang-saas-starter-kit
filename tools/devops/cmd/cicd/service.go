@@ -148,7 +148,16 @@ func releaseTag(env, serviceName string) string {
 
 	// Generate tags for the release image.
 	var releaseTag string
-	if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
+	if v := os.Getenv("BUILDINFO_CI_COMMIT_SHA"); v != "" {
+		tag2 := tag1 + "-" + v[0:8]
+		releaseTag = tag2
+	} else if v := os.Getenv("CI_COMMIT_SHA"); v != "" {
+		tag2 := tag1 + "-" + v[0:8]
+		releaseTag = tag2
+	} else if v := os.Getenv("BUILDINFO_CI_COMMIT_REF_NAME"); v != "" {
+		tag2 := tag1 + "-" + v
+		releaseTag = tag2
+	} else if v := os.Getenv("CI_COMMIT_REF_NAME"); v != "" {
 		tag2 := tag1 + "-" + v
 		releaseTag = tag2
 	} else {

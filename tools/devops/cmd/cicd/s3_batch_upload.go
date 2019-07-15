@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -14,6 +13,7 @@ import (
 
 // DirectoryIterator represents an iterator of a specified directory
 type DirectoryIterator struct {
+	dir string
 	filePaths []string
 	bucket    string
 	keyPrefix string
@@ -28,14 +28,6 @@ type DirectoryIterator struct {
 // NewDirectoryIterator builds a new DirectoryIterator
 func NewDirectoryIterator(bucket, keyPrefix, dir, acl string) s3manager.BatchUploadIterator {
 
-	// The key prefix could end with the base directory name,
-	// If this is the case, drop the dirname from the key prefix
-	if keyPrefix != "" {
-		dirName := filepath.Base(dir)
-		keyPrefix = strings.TrimRight(keyPrefix, "/")
-		keyPrefix = strings.TrimRight(keyPrefix, dirName)
-	}
-
 	var paths []string
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
@@ -45,6 +37,7 @@ func NewDirectoryIterator(bucket, keyPrefix, dir, acl string) s3manager.BatchUpl
 	})
 
 	return &DirectoryIterator{
+		dir: dir,
 		filePaths: paths,
 		bucket:    bucket,
 		keyPrefix: keyPrefix,
@@ -88,10 +81,12 @@ func (di *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
 	buffer := make([]byte, size)
 	f.Read(buffer)
 
+	nextPath, _ := filepath.Rel(di.dir,  di.next.path)
+
 	return s3manager.BatchUploadObject{
 		Object: &s3manager.UploadInput{
 			Bucket:      aws.String(di.bucket),
-			Key:         aws.String(filepath.Join(di.keyPrefix, di.next.path)),
+			Key:         aws.String(filepath.Join(di.keyPrefix,nextPath)),
 			Body:        bytes.NewReader(buffer),
 			ContentType: aws.String(http.DetectContentType(buffer)),
 			ACL:         acl,

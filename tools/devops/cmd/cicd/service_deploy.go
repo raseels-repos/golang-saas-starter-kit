@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"geeks-accelerator/oss/saas-starter-kit/tools/devops/internal/retry"
@@ -282,70 +282,54 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						},
 					})
 
-				/*if flags.S3BucketPublicCloudfront {
+					if flags.S3BucketPublicCloudfront {
+
+					allowedMethods:= &cloudfront.AllowedMethods{}
+					allowedMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+
+					cacheMethods := &cloudfront.CachedMethods{}
+					cacheMethods.SetItems(aws.StringSlice([]string{ "HEAD", "GET"}))
+					allowedMethods.SetCachedMethods(cacheMethods)
+
+					domainId := "S3"+req.S3BucketPublicName
+					domainName := fmt.Sprintf("%s.s3.%s.amazonaws.com", req.S3BucketPublicName, req.AwsCreds.Region)
+
+					origins := &cloudfront.Origins{}
+					origins.SetItems([]*cloudfront.Origin{
+						&cloudfront.Origin{
+							Id: aws.String(domainId),
+							DomainName: aws.String(domainName),
+							OriginPath: aws.String(req.S3BucketPublicKeyPrefix),
+						},
+					})
+
 					req.CloudfrontPublic = &cloudfront.DistributionConfig{
 						Comment: aws.String(""),
 						Enabled: aws.Bool(true),
 						HttpVersion: aws.String( "http2"),
 						IsIPV6Enabled: aws.Bool(true),
-
-						// A complex type that describes the default cache behavior if you don't specify
-						// a CacheBehavior element or if files don't match any of the values of PathPattern
-						// in CacheBehavior elements. You must create exactly one default cache behavior.
-						//
-						// DefaultCacheBehavior is a required field
 						DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-							// ......................................
+							TargetOriginId: aws.String(domainId),
+							AllowedMethods: allowedMethods,
+							Compress: aws.Bool(true),
+							DefaultTTL: aws.Int64(1209600),
+							MinTTL: aws.Int64(604800),
+							MaxTTL: aws.Int64(31536000),
+							ForwardedValues: &cloudfront.ForwardedValues{
+								QueryString: 	aws.Bool(true),
+							},
 						},
-
-						// A complex type that contains information about origins for this distribution.
-						//
-						// Origins is a required field
-						Origins: &cloudfront.Origins{
-							// ......................................
-						},
-
-						// A complex type that specifies whether you want viewers to use HTTP or HTTPS
-						// to request your objects, whether you're using an alternate domain name with
-						// HTTPS, and if so, if you're using AWS Certificate Manager (ACM) or a third-party
-						// certificate authority.
+						Origins: origins,
 						ViewerCertificate: &cloudfront.ViewerCertificate{
-							// ......................................
+							CertificateSource: aws.String("cloudfront"),
+							MinimumProtocolVersion: aws.String("TLSv1"),
+							CloudFrontDefaultCertificate: aws.Bool(true),
 						},
-
-						// The price class that corresponds with the maximum price that you want to
-						// pay for CloudFront service. If you specify PriceClass_All, CloudFront responds
-						// to requests for your objects from all CloudFront edge locations.
-						//
-						// If you specify a price class other than PriceClass_All, CloudFront serves
-						// your objects from the CloudFront edge location that has the lowest latency
-						// among the edge locations in your price class. Viewers who are in or near
-						// regions that are excluded from your specified price class may encounter slower
-						// performance.
-						//
-						// For more information about price classes, see Choosing the Price Class for
-						// a CloudFront Distribution (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html)
-						// in the Amazon CloudFront Developer Guide. For information about CloudFront
-						// pricing, including how price classes (such as Price Class 100) map to CloudFront
-						// regions, see Amazon CloudFront Pricing (http://aws.amazon.com/cloudfront/pricing/).
-						// For price class information, scroll down to see the table at the bottom of
-						// the page.
 						PriceClass: aws.String("PriceClass_All"),
-
-						// A unique value (for example, a date-time stamp) that ensures that the request
-						// can't be replayed.
-						//
-						// If the value of CallerReference is new (regardless of the content of the
-						// DistributionConfig object), CloudFront creates a new distribution.
-						//
-						// If CallerReference is a value that you already sent in a previous request
-						// to create a distribution, CloudFront returns a DistributionAlreadyExists
-						// error.
-						//
-						// CallerReference is a required field
 						CallerReference: aws.String("devops-deploy"),
 					}
-				}*/
+					req.CloudfrontPublic = nil
+				}
 			}
 
 			// The private S3 Bucket used to persist data for services.
@@ -1082,6 +1066,28 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			}
 		}
 		log.Printf("\t%s\tS3 buckets configured successfully.\n", tests.Success)
+	}
+
+	if req.CloudfrontPublic != nil {
+		log.Println("Cloudfront - Setup Distribution")
+
+		svc := cloudfront.New(req.awsSession())
+
+		_, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
+			DistributionConfig: req.CloudfrontPublic,
+		} )
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); !ok || (aerr.Code() != cloudfront.ErrCodeDistributionAlreadyExists) {
+				return errors.Wrapf(err, "Failed to create cloudfront distribution '%s'", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+			}
+
+			// If bucket found during create, returns it.
+			log.Printf("\t\tFound: %s.", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+		} else {
+
+			// If no bucket found during create, create new one.
+			log.Printf("\t\tCreated: %s.", *req.CloudfrontPublic.DefaultCacheBehavior.TargetOriginId)
+		}
 	}
 
 	// Find the default VPC and associated subnets.
@@ -3271,16 +3277,16 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 	// When static files are enabled to be to stored on S3, we need to upload all of them.
 	if req.StaticFilesS3Enable {
-		log.Println("\tSync static files to public S3 bucket")
+		log.Println("\tUpload static files to public S3 bucket")
 
 		staticDir := filepath.Join(req.ServiceDir, "static")
 
 		err := SyncPublicS3Files(req.awsSession(), req.S3BucketPublicName, req.StaticFilesS3Prefix, staticDir)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s '%s'", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
+			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)
 		}
 
-		log.Printf("\t%s\tFiles uploaded.\n", tests.Success)
+		log.Printf("\t%s\tFiles uploaded to s3://%s/%s.\n", tests.Success, req.S3BucketPublicName, req.StaticFilesS3Prefix)
 	}
 
 	// Wait for the updated or created service to enter a stable state.
@@ -3521,7 +3527,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		if err := <-checkErr; err != nil {
 			log.Printf("\t%s\tFailed to check tasks.\n%+v\n", tests.Failed, err)
-			return nil
+			return err
 		}
 
 		// Wait for one of the methods to finish and then ensure the ticker is stopped.

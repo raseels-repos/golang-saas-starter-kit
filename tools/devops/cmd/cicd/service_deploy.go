@@ -831,7 +831,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 				DBName:                    aws.String("shared"),
 				Engine:                    aws.String("postgres"),
 				MasterUsername:            aws.String("god"),
-				MasterUserPassword:        aws.String("mypassword"), // When empty auto generated.
+				MasterUserPassword:        uuid.NewRandom().String(),
 				Port:                      aws.Int64(5432),
 				DBInstanceClass:           aws.String("db.t2.small"),
 				AllocatedStorage:          aws.Int64(20),

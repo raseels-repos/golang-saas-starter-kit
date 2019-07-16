@@ -109,7 +109,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 
 	// Build select statement for users_accounts table to find all the user accounts for the user
 	f := func() ([]userAccount, error) {
-		query := sqlbuilder.NewSelectBuilder().Select("ua.account_id, ua.roles, ua.status as userStatus, ua.archived_at userArchived, a.status as accountStatus, a.archived_at, a.timezone, u.timezone as accountArchived").
+		query := sqlbuilder.NewSelectBuilder().Select("ua.account_id, ua.roles, ua.status as userStatus, ua.archived_at userArchived, a.status as accountStatus, a.archived_at, a.timezone, u.timezone as userTimezone").
 			From(userAccountTableName+" ua").
 			Join(accountTableName+" a", "a.id = ua.account_id").
 			Join(userTableName+" u", "u.id = ua.user_id")

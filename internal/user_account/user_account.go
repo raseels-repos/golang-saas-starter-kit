@@ -87,10 +87,12 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 	if claims.Subject != "" {
 		or = append(or, subQuery.Equal("user_id", claims.Subject))
 	}
-	subQuery.Where(subQuery.Or(or...))
 
 	// Append sub query
-	query.Where(query.In("id", subQuery))
+	if len(or) > 0 {
+		subQuery.Where(subQuery.Or(or...))
+		query.Where(query.In("id", subQuery))
+	}
 
 	return nil
 }

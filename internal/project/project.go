@@ -95,9 +95,7 @@ func CanModifyProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, 
 
 // applyClaimsSelect applies a sub-query to the provided query to enforce ACL based on the claims provided.
 // 	1. No claims, request is internal, no ACL applied
-
 // 	2. All role types can access their user ID
-
 func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder) error {
 	// Claims are empty, don't apply any ACL
 	if claims.Audience == "" {

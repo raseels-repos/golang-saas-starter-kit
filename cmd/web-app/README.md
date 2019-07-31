@@ -22,6 +22,48 @@ an image and displays resvised versions of it on the index page. See section bel
 If you would like to help, please email twins@geeksinthewoods.com.
 
 
+## Local Installation
+
+### Build 
+```bash
+go build .
+``` 
+
+### Docker 
+
+To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
+
+
+```bash
+docker build -f cmd/web-app/Dockerfile -t saas-web-app .
+```
+
+
+## Getting Started 
+
+### Errors 
+
+- **validation error** - Test by appending `test-validation-error=1` to the request URL.
+http://127.0.0.1:3000/signup?test-validation-error=1
+
+- **web error** - Test by appending `test-web-error=1` to the request URL.
+http://127.0.0.1:3000/signup?test-web-error=1
+
+
+### Localization 
+
+Test a specific language by appending the locale to the request URL.
+127.0.0.1:3000/signup?local=fr
+
+
+[github.com/go-playground/validator](https://github.com/go-playground/validator) supports the following languages.
+- en - English 
+- fr - French
+- id - Indonesian
+- ja - Japanese
+- nl - Dutch
+- zh - Chinese
+
 ### Future Functionality
 
 This example Web App is going to allow users to manage checklists. Users with role of admin will be allowed to 
@@ -65,21 +107,4 @@ This web-app service eventually will include the following:
         - update item
 
 
-
-
-## Local Installation
-
-### Build 
-```bash
-go build .
-``` 
-
-### Docker 
-
-To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
-
-
-```bash
-docker build -f cmd/web-app/Dockerfile -t saas-web-app .
-```
 

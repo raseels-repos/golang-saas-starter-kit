@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net"
 	"net/http"
@@ -359,8 +360,9 @@ func main() {
 
 	// =========================================================================
 	// Load middlewares that need to be configured specific for the service.
-
-	var serviceMiddlewares []web.Middleware
+	var serviceMiddlewares = []web.Middleware{
+		mid.Translator(webcontext.UniversalTranslator()),
+	}
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
 	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {

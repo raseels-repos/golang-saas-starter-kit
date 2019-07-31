@@ -40,7 +40,8 @@ func TestAuthenticate(t *testing.T) {
 			// Create a new user for testing.
 			initPass := uuid.NewRandom().String()
 			user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        initPass,
 				PasswordConfirm: initPass,

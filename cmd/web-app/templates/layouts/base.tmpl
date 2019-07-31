@@ -5,44 +5,126 @@
         <title>
             {{block "title" .}}{{end}} Web App
         </title>
+
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <meta name="description" content="{{block "description" .}}{{end}} ">
         <meta name="author" content="{{block "author" .}}{{end}}">
-        <meta charset="utf-8">
+
         <link rel="icon" type="image/png" sizes="16x16" href="{{ SiteAssetUrl "/assets/images/favicon.png" }}">
 
         <!-- ============================================================== -->
-        <!-- CSS -->
+        <!-- Custom fonts for this template                                 -->
         <!-- ============================================================== -->
-        <link href="{{ SiteAssetUrl "/assets/css/base.css" }}" id="theme" rel="stylesheet">
+        <link href="{{ SiteAssetUrl "/assets/vendor/fontawesome-free/css/all.min.css" }}" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
 
         <!-- ============================================================== -->
-        <!-- Page specific CSS  -->
+        <!-- Base styles for Start Bootstrap template SB Admin 2            -->
+        <!-- ============================================================== -->
+        {{ if eq $._Service.ENV "dev" }}
+            <link href="{{ SiteAssetUrl "/assets/css/sb-admin-2.css" }}" rel="stylesheet">
+        {{ else }}
+            <link href="{{ SiteAssetUrl "/assets/css/sb-admin-2.min.css" }}" rel="stylesheet">
+        {{ end }}
+
+        <!-- ============================================================== -->
+        <!-- Custom styles for this service applied to all pages            -->
+        <!-- ============================================================== -->
+        <link href="{{ SiteAssetUrl "/assets/css/custom.css" }}" id="theme" rel="stylesheet">
+
+        <!-- ============================================================== -->
+        <!-- Page specific CSS                                              -->
         <!-- ============================================================== -->
         {{block "style" .}} {{end}}
     </head>
-    <body>
-        <!-- ============================================================== -->
-        <!-- Page content -->
-        <!-- ============================================================== -->
-        {{ template "content" . }}
+    <body id="page-top">
+
+        {{ template "partials/page-wrapper" . }}
 
         <!-- ============================================================== -->
-        <!-- footer -->
+        <!--  Logout Modal                                                  -->
         <!-- ============================================================== -->
-        <footer class="footer">
-            © 2019 Geeks Accelerator<br/>
-            {{ template "partials/buildinfo" . }}
-        </footer>
+        {{ if HasAuth $._Ctx }}
+        <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="logoutModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="logoutModalLabel">Ready to Leave?</h5>
+                        <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                        <a class="btn btn-primary" href="/logout">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{ end }}
 
         <!-- ============================================================== -->
-        <!-- Javascript -->
+        <!-- Javascript Bootstrap core JavaScript                           -->
         <!-- ============================================================== -->
-        <script src="{{ SiteAssetUrl "/js/base.js" }}"></script>
+        <script src="{{ SiteAssetUrl "/assets/vendor/jquery/jquery.min.js" }}"></script>
+        <script src="{{ SiteAssetUrl "/assets/vendor/bootstrap/js/bootstrap.bundle.min.js" }}"></script>
 
         <!-- ============================================================== -->
-        <!-- Page specific Javascript  -->
+        <!-- Core plugin JavaScript                                         -->
+        <!-- ============================================================== -->
+        <script src="{{ SiteAssetUrl "/assets/vendor/jquery-easing/jquery.easing.min.js" }}"></script>
+
+        <!-- ============================================================== -->
+        <!-- Javascript for Start Bootstrap template SB Admin 2             -->
+        <!-- ============================================================== -->
+        {{ if eq $._Service.ENV "dev" }}
+            <script src="{{ SiteAssetUrl "/assets/js/sb-admin-2.js" }}"></script>
+        {{ else }}
+            <script src="{{ SiteAssetUrl "/assets/js/sb-admin-2.min.js" }}"></script>
+        {{ end }}
+
+        <!-- ============================================================== -->
+        <!-- Custom Javascript for this service applied to all pages        -->
+        <!-- ============================================================== -->
+        <script src="{{ SiteAssetUrl "/assets/js/custom.js" }}"></script>
+
+        <!-- ============================================================== -->
+        <!-- Page specific Javascript                                       -->
         <!-- ============================================================== -->
         {{block "js" .}} {{end}}
     </body>
 </html>
 {{end}}
+{{ define "invalid-feedback" }}
+    <div class="invalid-feedback">
+        {{ if ValidationErrorHasField .validationErrors .fieldName }}
+            {{ range $verr := (ValidationFieldErrors .validationErrors .fieldName) }}{{ $verr.Display }}<br/>{{ end }}
+        {{ else }}
+            {{ range $verr := (ValidationFieldErrors .validationDefaults .fieldName) }}{{ $verr.Display }}<br/>{{ end }}
+        {{ end }}
+    </div>
+{{ end }}
+{{ define "top-error" }}
+    {{ if .error }}
+        {{ $errMsg := (ErrorMessage $._Ctx .error) }}
+        {{ $errDetails := (ErrorDetails $._Ctx .error) }}
+        {{ if or ($errMsg) ($errDetails) }}
+            <div class="alert alert-danger" role="alert">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"> <span aria-hidden="true">×</span> </button> {{ if $errMsg }}<h3>{{ $errMsg }}</h3> {{end}}
+                {{ if .error.Fields }}
+                    <ul>
+                        {{ range $i := .error.Fields }}
+                            <li>{{ if $i.Display }}{{ $i.Display }}{{ else }}{{ $i.Error }}{{ end }}</li>
+                        {{end}}
+                    </ul>
+                {{ end }}
+                {{ if $errDetails }}
+                    <p><small>{{ $errDetails }}</small></p>
+                {{ end }}
+            </div>
+        {{ end }}
+    {{ end }}
+{{ end }}

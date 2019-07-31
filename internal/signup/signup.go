@@ -2,16 +2,15 @@ package signup
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
-	"time"
-
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/go-playground/validator.v9"
+	"time"
 )
 
 // Signup performs the steps needed to create a new account, new user and then associate
@@ -48,7 +47,7 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 		return uniq
 	}
 
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	v.RegisterValidation("unique", f)
 
 	// Validate the request.
@@ -61,7 +60,8 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 
 	// UserCreateRequest contains information needed to create a new User.
 	userReq := user.UserCreateRequest{
-		Name:            req.User.Name,
+		FirstName:       req.User.FirstName,
+		LastName:        req.User.LastName,
 		Email:           req.User.Email,
 		Password:        req.User.Password,
 		PasswordConfirm: req.User.PasswordConfirm,

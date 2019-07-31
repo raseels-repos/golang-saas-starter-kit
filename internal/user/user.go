@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -38,7 +38,7 @@ var (
 )
 
 // userMapColumns is the list of columns needed for mapRowsToUser
-var userMapColumns = "id,name,email,password_salt,password_hash,password_reset,timezone,created_at,updated_at,archived_at"
+var userMapColumns = "id,first_name,last_name,email,password_salt,password_hash,password_reset,timezone,created_at,updated_at,archived_at"
 
 // mapRowsToUser takes the SQL rows and maps it to the UserAccount struct
 // with the columns defined by userMapColumns
@@ -47,7 +47,7 @@ func mapRowsToUser(rows *sql.Rows) (*User, error) {
 		u   User
 		err error
 	)
-	err = rows.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordSalt, &u.PasswordHash, &u.PasswordReset, &u.Timezone, &u.CreatedAt, &u.UpdatedAt, &u.ArchivedAt)
+	err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.PasswordSalt, &u.PasswordHash, &u.PasswordReset, &u.Timezone, &u.CreatedAt, &u.UpdatedAt, &u.ArchivedAt)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -290,7 +290,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 		return uniq
 	}
 
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	v.RegisterValidation("unique", f)
 
 	// Validate the request.
@@ -331,7 +331,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 
 	u := User{
 		ID:           uuid.NewRandom().String(),
-		Name:         req.Name,
+		FirstName:    req.FirstName,
+		LastName:     req.LastName,
 		Email:        req.Email,
 		PasswordHash: passwordHash,
 		PasswordSalt: passwordSalt,
@@ -347,8 +348,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
 	query.InsertInto(userTableName)
-	query.Cols("id", "name", "email", "password_hash", "password_salt", "timezone", "created_at", "updated_at")
-	query.Values(u.ID, u.Name, u.Email, u.PasswordHash, u.PasswordSalt, u.Timezone, u.CreatedAt, u.UpdatedAt)
+	query.Cols("id", "first_name", "last_name", "email", "password_hash", "password_salt", "timezone", "created_at", "updated_at")
+	query.Values(u.ID, u.FirstName, u.LastName, u.Email, u.PasswordHash, u.PasswordSalt, u.Timezone, u.CreatedAt, u.UpdatedAt)
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
@@ -389,7 +390,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
 	defer span.Finish()
 
-	v := web.NewValidator()
+	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
 	if req.Email != nil {
@@ -435,8 +436,11 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	query.Update(userTableName)
 
 	var fields []string
-	if req.Name != nil {
-		fields = append(fields, query.Assign("name", req.Name))
+	if req.FirstName != nil {
+		fields = append(fields, query.Assign("name", req.FirstName))
+	}
+	if req.LastName != nil {
+		fields = append(fields, query.Assign("name", req.LastName))
 	}
 	if req.Email != nil {
 		fields = append(fields, query.Assign("email", req.Email))
@@ -475,7 +479,7 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 	defer span.Finish()
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -544,7 +548,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	defer span.Finish()
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -623,7 +627,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID str
 	}
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err

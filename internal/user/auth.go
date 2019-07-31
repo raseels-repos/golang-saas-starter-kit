@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/dgrijalva/jwt-go"
 	"strings"
 	"time"
@@ -80,7 +80,7 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	}
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return Token{}, err

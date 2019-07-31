@@ -3,7 +3,7 @@ package account
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -274,7 +274,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 		return uniq
 	}
 
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	v.RegisterValidation("unique", f)
 
 	// Validate the request.
@@ -369,7 +369,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Update")
 	defer span.Finish()
 
-	v := web.NewValidator()
+	v := webcontext.Validator()
 
 	// Validation name is unique in the database.
 	if req.Name != nil {
@@ -497,7 +497,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 	defer span.Finish()
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -576,7 +576,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 	}
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err

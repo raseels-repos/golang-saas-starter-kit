@@ -1,0 +1,116 @@
+{{define "title"}}Crean an Account{{end}}
+{{define "style"}}
+
+{{end}}
+{{ define "partials/page-wrapper" }}
+    <div class="container">
+
+        <div class="card o-hidden border-0 shadow-lg my-5">
+            <div class="card-body p-0">
+                <!-- Nested Row within Card Body -->
+                <div class="row">
+                    <div class="col-lg-5 d-none d-lg-block bg-register-image"></div>
+                    <div class="col-lg-7">
+                        <div class="p-5">
+                            <div class="text-center">
+                                <h1 class="h4 text-gray-900 mb-4">Create an Account!</h1>
+                            </div>
+                            {{ template "top-error" . }}
+                            <form class="user" method="post" novalidate>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Name" }}" name="Account.Name" value="{{ $.form.Account.Name }}" placeholder="Company Name" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Name" }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address1" }}" name="Account.Address1" value="{{ $.form.Account.Address1 }}" placeholder="Address Line 1" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Address1" }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address2" }}" name="Account.Address2" value="{{ $.form.Account.Address2 }}" placeholder="Address Line 2">
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Address2" }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" name="Account.Zipcode" value="{{ $.form.Account.Zipcode }}" placeholder="Zipcode" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Zipcode" }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Country" }}" name="Account.Country" value="{{ $.form.Account.Country }}" placeholder="Country" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Country" }}
+                                    </div>
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Region" }}" name="Account.Region" value="{{ $.form.Account.Region }}" placeholder="Region" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Region" }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}" name="Account.City" value="{{ $.form.Account.City }}" placeholder="City" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.City" }}
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.FirstName" }}" name="User.FirstName" value="{{ $.form.User.FirstName }}" placeholder="First Name" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.FirstName" }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.LastName" }}" name="User.LastName" value="{{ $.form.User.LastName }}" placeholder="Last Name" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.LastName" }}
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <input type="email" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Email" }}" name="User.Email" value="{{ $.form.User.Email }}" placeholder="Email Address" required>
+                                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.Email" }}
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Password" }}" name="User.Password" value="{{ $.form.User.Password }}" placeholder="Password" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.Password" }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.PasswordConfirm" }}" name="User.PasswordConfirm" value="{{ $.form.User.PasswordConfirm }}" placeholder="Repeat Password" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.PasswordConfirm" }}
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-primary btn-user btn-block">
+                                    Register Account
+                                </button>
+
+                            </form>
+                            <hr>
+                            <div class="text-center">
+                                <a class="small" href="/user/forgot-password">Forgot Password?</a>
+                            </div>
+                            <div class="text-center">
+                                <a class="small" href="/user/login">Already have an account? Login!</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+    <script>
+        $(document).ready(function() {
+            $(document).find('body').addClass('bg-gradient-primary');
+
+
+
+           // console.log(($('input[name=\'Account\.Name\']').parent().find('.invalid-feedback').show()));
+
+        });
+    </script>
+{{end}}

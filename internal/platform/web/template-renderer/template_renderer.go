@@ -3,12 +3,15 @@ package template_renderer
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"html/template"
 	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
@@ -104,6 +107,49 @@ func NewTemplate(templateFuncs template.FuncMap) *Template {
 		},
 		"html": func(value interface{}) template.HTML {
 			return template.HTML(fmt.Sprint(value))
+		},
+		"HasAuth": func(ctx context.Context) bool {
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil {
+				return false
+			}
+			return claims.HasAuth()
+		},
+		"HasRole": func(ctx context.Context, roles ...string) bool {
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil {
+				return false
+			}
+			return claims.HasRole(roles...)
+		},
+		"dict": func(values ...interface{}) (map[string]interface{}, error) {
+			if len(values) == 0 {
+				return nil, errors.New("invalid dict call")
+			}
+
+			dict := make(map[string]interface{})
+
+			for i := 0; i < len(values); i++ {
+				key, isset := values[i].(string)
+				if !isset {
+					if reflect.TypeOf(values[i]).Kind() == reflect.Map {
+						m := values[i].(map[string]interface{})
+						for i, v := range m {
+							dict[i] = v
+						}
+					} else {
+						return nil, errors.New("dict values must be maps")
+					}
+				} else {
+					i++
+					if i == len(values) {
+						return nil, errors.New("specify the key for non array values")
+					}
+					dict[key] = values[i]
+				}
+
+			}
+			return dict, nil
 		},
 	}
 	for fn, f := range templateFuncs {
@@ -279,6 +325,24 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// Add context to render data, this supports template functions having the ability
 	// to define context.Context as an argument
 	renderData["_Ctx"] = ctx
+
+	if qv := req.URL.Query().Get("test-validation-error"); qv != "" {
+		data["validationErrors"] = data["validationDefaults"]
+	}
+
+	if qv := req.URL.Query().Get("test-web-error"); qv != "" {
+		terr := errors.New("Some random error")
+		terr = errors.WithMessage(terr, "Actual error message")
+		rerr := weberror.NewError(ctx, terr, http.StatusBadRequest).(*weberror.Error)
+		rerr.Message = "Test Web Error Message"
+		data["error"] = rerr
+	}
+
+	if qv := req.URL.Query().Get("test-error"); qv != "" {
+		terr := errors.New("Test error")
+		terr = errors.WithMessage(terr, "Error message")
+		data["error"] = terr
+	}
 
 	// Append request data map to render data last so any previous value can be overwritten.
 	if data != nil {

@@ -32,7 +32,7 @@ func testMain(m *testing.M) int {
 
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
-	where := "name = ? or email = ?"
+	where := "first_name = ? or email = ?"
 	var (
 		limit  uint = 12
 		offset uint = 34
@@ -41,7 +41,7 @@ func TestFindRequestQuery(t *testing.T) {
 	req := UserFindRequest{
 		Where: &where,
 		Args: []interface{}{
-			"lee brown",
+			"lee",
 			"lee@geeksinthewoods.com",
 		},
 		Order: []string{
@@ -51,7 +51,7 @@ func TestFindRequestQuery(t *testing.T) {
 		Limit:  &limit,
 		Offset: &offset,
 	}
-	expected := "SELECT " + userMapColumns + " FROM " + userTableName + " WHERE (name = ? or email = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+	expected := "SELECT " + userMapColumns + " FROM " + userTableName + " WHERE (first_name = ? or email = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 
 	res, args := findRequestQuery(req)
 
@@ -149,13 +149,15 @@ func TestCreateValidation(t *testing.T) {
 			func(req UserCreateRequest, res *User) *User {
 				return nil
 			},
-			errors.New("Key: 'UserCreateRequest.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
+			errors.New("Key: 'UserCreateRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
 				"Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
 				"Key: 'UserCreateRequest.password' Error:Field validation for 'password' failed on the 'required' tag"),
 		},
 		{"Valid Email",
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           "xxxxxxxxxx",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
@@ -167,7 +169,8 @@ func TestCreateValidation(t *testing.T) {
 		},
 		{"Passwords Match",
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "W0rkL1fe#",
@@ -179,16 +182,18 @@ func TestCreateValidation(t *testing.T) {
 		},
 		{"Default Timezone",
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
 			},
 			func(req UserCreateRequest, res *User) *User {
 				return &User{
-					Name:     req.Name,
-					Email:    req.Email,
-					Timezone: "America/Anchorage",
+					FirstName: "Lee",
+					LastName:  "Brown",
+					Email:     req.Email,
+					Timezone:  "America/Anchorage",
 
 					// Copy this fields from the result.
 					ID:            res.ID,
@@ -259,7 +264,8 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 		ctx := tests.Context()
 
 		req1 := UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -271,7 +277,8 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 		}
 
 		req2 := UserCreateRequest{
-			Name:            "Lucas Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           user1.Email,
 			Password:        "W0rkL1fe#",
 			PasswordConfirm: "W0rkL1fe#",
@@ -307,7 +314,8 @@ func TestCreateClaims(t *testing.T) {
 		{"EmptyClaims",
 			auth.Claims{},
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
@@ -324,7 +332,8 @@ func TestCreateClaims(t *testing.T) {
 				},
 			},
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
@@ -341,7 +350,8 @@ func TestCreateClaims(t *testing.T) {
 				},
 			},
 			UserCreateRequest{
-				Name:            "Lee Brown",
+				FirstName:       "Lee",
+				LastName:        "Brown",
 				Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 				Password:        "akTechFr0n!ier",
 				PasswordConfirm: "akTechFr0n!ier",
@@ -441,7 +451,8 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 		ctx := tests.Context()
 
 		req1 := UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -453,7 +464,8 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 		}
 
 		req2 := UserCreateRequest{
-			Name:            "Lucas Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "W0rkL1fe#",
 			PasswordConfirm: "W0rkL1fe#",
@@ -500,7 +512,8 @@ func TestUpdatePassword(t *testing.T) {
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
 		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        initPass,
 			PasswordConfirm: initPass,
@@ -591,7 +604,8 @@ func TestCrud(t *testing.T) {
 			return auth.Claims{}
 		},
 		UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -609,7 +623,8 @@ func TestCrud(t *testing.T) {
 				Email: *req.Email,
 				// Copy this fields from the created user.
 				ID:            user.ID,
-				Name:          user.Name,
+				FirstName:     user.FirstName,
+				LastName:      user.LastName,
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
@@ -634,7 +649,8 @@ func TestCrud(t *testing.T) {
 			}
 		},
 		UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -665,7 +681,8 @@ func TestCrud(t *testing.T) {
 			}
 		},
 		UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -683,7 +700,8 @@ func TestCrud(t *testing.T) {
 				Email: *req.Email,
 				// Copy this fields from the created user.
 				ID:            user.ID,
-				Name:          user.Name,
+				FirstName:     user.FirstName,
+				LastName:      user.LastName,
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
@@ -708,7 +726,8 @@ func TestCrud(t *testing.T) {
 			}
 		},
 		UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -739,7 +758,8 @@ func TestCrud(t *testing.T) {
 			}
 		},
 		UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -757,7 +777,8 @@ func TestCrud(t *testing.T) {
 				Email: *req.Email,
 				// Copy this fields from the created user.
 				ID:            user.ID,
-				Name:          user.Name,
+				FirstName:     user.FirstName,
+				LastName:      user.LastName,
 				PasswordSalt:  user.PasswordSalt,
 				PasswordHash:  user.PasswordHash,
 				PasswordReset: user.PasswordReset,
@@ -882,7 +903,8 @@ func TestFind(t *testing.T) {
 	var users []*User
 	for i := 0; i <= 4; i++ {
 		user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, UserCreateRequest{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",

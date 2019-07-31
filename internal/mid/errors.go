@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
@@ -40,7 +41,7 @@ func Errors(log *log.Logger) web.Middleware {
 
 				// If we receive the shutdown err we need to return it
 				// back to the base handler to shutdown the service.
-				if ok := web.IsShutdown(err); ok {
+				if ok := weberror.IsShutdown(err); ok {
 					return err
 				}
 			}

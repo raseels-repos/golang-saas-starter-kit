@@ -26,10 +26,11 @@ type SignupAccount struct {
 
 // SignupUser defined the details needed for user.
 type SignupUser struct {
-	Name            string `json:"name" validate:"required" example:"Gabi May"`
+	FirstName       string `json:"first_name" validate:"required" example:"Gabi"`
+	LastName        string `json:"last_name" validate:"required" example:"May"`
 	Email           string `json:"email" validate:"required,email,unique" example:"{RANDOM_EMAIL}"`
 	Password        string `json:"password" validate:"required" example:"SecretString"`
-	PasswordConfirm string `json:"password_confirm" validate:"eqfield=Password" example:"SecretString"`
+	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
 }
 
 // SignupResult response signup with created account and user.

@@ -2,6 +2,7 @@ package mid
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net/http"
 	"time"
@@ -22,14 +23,12 @@ func Logger(log *log.Logger) web.Middleware {
 			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Logger")
 			defer span.Finish()
 
-			// If the context is missing this value, request the service
-			// to be shutdown gracefully.
-			v, ok := ctx.Value(web.KeyValues).(*web.Values)
-			if !ok {
-				return web.NewShutdownError("web value missing from context")
+			v, err := webcontext.ContextValues(ctx)
+			if err != nil {
+				return err
 			}
 
-			err := before(ctx, w, r, params)
+			err = before(ctx, w, r, params)
 
 			log.Printf("%d : (%d) : %s %s -> %s (%s)\n",
 				span.Context().TraceID(),

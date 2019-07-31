@@ -38,7 +38,7 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		"Status": "ok",
 	}
 
-	return c.Renderer.Render(ctx, w, r, baseLayoutTmpl, "health.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return web.RespondJson(ctx, w, data, http.StatusOK)
 }
 
 // Ping validates the service is ready to accept requests.

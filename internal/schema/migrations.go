@@ -14,7 +14,7 @@ import (
 // migration already exists in the migrations table it will be skipped.
 func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 	return []*sqlxmigrate.Migration{
-		// create table users
+		// Create table users.
 		{
 			ID: "20190522-01a",
 			Migrate: func(tx *sql.Tx) error {
@@ -45,7 +45,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 				return nil
 			},
 		},
-		// create new table accounts
+		// Create new table accounts.
 		{
 			ID: "20190522-01b",
 			Migrate: func(tx *sql.Tx) error {
@@ -91,7 +91,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 				return nil
 			},
 		},
-		// create new table user_accounts
+		// Create new table user_accounts.
 		{
 			ID: "20190522-01d",
 			Migrate: func(tx *sql.Tx) error {
@@ -142,7 +142,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 				return nil
 			},
 		},
-		// create new table projects
+		// Create new table projects.
 		{
 			ID: "20190622-01",
 			Migrate: func(tx *sql.Tx) error {
@@ -175,6 +175,32 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 				q2 := `DROP TABLE IF EXISTS projects`
 				if _, err := tx.Exec(q2); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q2)
+				}
+				return nil
+			},
+		},
+		// Split users.name into first_name and last_name columns.
+		{
+			ID: "201907-29-01a",
+			Migrate: func(tx *sql.Tx) error {
+				q1 := `ALTER TABLE users 
+					  RENAME COLUMN name to first_name;`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
+				}
+
+				q2 := `ALTER TABLE users 
+					  ADD last_name varchar(200) NOT NULL DEFAULT '';`
+				if _, err := tx.Exec(q2); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q2)
+				}
+
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				q1 := `DROP TABLE IF EXISTS users`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 				return nil
 			},

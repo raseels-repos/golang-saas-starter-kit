@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -66,6 +67,14 @@ func (c Claims) Valid() error {
 	return nil
 }
 
+// HasAuth returns true the user is authenticated.
+func (c Claims) HasAuth() bool {
+	if c.Subject != "" {
+		return true
+	}
+	return false
+}
+
 // HasRole returns true if the claims has at least one of the provided roles.
 func (c Claims) HasRole(roles ...string) bool {
 	for _, has := range c.Roles {
@@ -78,9 +87,21 @@ func (c Claims) HasRole(roles ...string) bool {
 	return false
 }
 
+// TimeLocation returns the timezone used to format datetimes for the user.
 func (c Claims) TimeLocation() *time.Location {
 	if c.tz == nil && c.Timezone != "" {
 		c.tz, _ = time.LoadLocation(c.Timezone)
 	}
 	return c.tz
+}
+
+// ClaimsFromContext loads the claims from context.
+func ClaimsFromContext(ctx context.Context) (Claims, error) {
+	claims, ok := ctx.Value(Key).(Claims)
+	if !ok {
+		// TODO(jlw) should this be a web.Shutdown?
+		return Claims{}, errors.New("claims missing from context: HasRole called without/before Authenticate")
+	}
+
+	return claims, nil
 }

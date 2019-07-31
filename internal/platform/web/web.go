@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"log"
 	"net/http"
 	"os"
@@ -10,20 +12,6 @@ import (
 
 	"github.com/dimfeld/httptreemux"
 )
-
-// ctxKey represents the type of value for the context key.
-type ctxKey int
-
-// KeyValues is how request values or stored/retrieved.
-const KeyValues ctxKey = 1
-
-// Values represent state for each request.
-type Values struct {
-	Now        time.Time
-	TraceID    uint64
-	SpanID     uint64
-	StatusCode int
-}
 
 // A Handler is a type that handles an http request within our own little mini
 // framework.
@@ -36,15 +24,17 @@ type App struct {
 	*httptreemux.TreeMux
 	shutdown chan os.Signal
 	log      *log.Logger
+	env      webcontext.Env
 	mw       []Middleware
 }
 
 // NewApp creates an App value that handle a set of routes for the application.
-func NewApp(shutdown chan os.Signal, log *log.Logger, mw ...Middleware) *App {
+func NewApp(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, mw ...Middleware) *App {
 	app := App{
 		TreeMux:  httptreemux.New(),
 		shutdown: shutdown,
 		log:      log,
+		env:      env,
 		mw:       mw,
 	}
 
@@ -76,17 +66,18 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 	h := func(w http.ResponseWriter, r *http.Request, params map[string]string) {
 		// Set the context with the required values to
 		// process the request.
-		v := Values{
+		v := webcontext.Values{
 			Now: time.Now(),
+			Env: a.env,
 		}
-		ctx := context.WithValue(r.Context(), KeyValues, &v)
+		ctx := context.WithValue(r.Context(), webcontext.KeyValues, &v)
 
 		// Call the wrapped handler functions.
 		err := handler(ctx, w, r, params)
 		if err != nil {
 			// If we have specifically handled the error, then no need
 			// to initiate a shutdown.
-			if webErr, ok := err.(*Error); ok {
+			if webErr, ok := err.(*weberror.Error); ok {
 				// Render an error response.
 				if rerr := RespondErrorStatus(ctx, w, webErr.Err, webErr.Status); rerr == nil {
 					// If there was not error rending the error, then no need to continue.

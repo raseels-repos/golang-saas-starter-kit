@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"html/template"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 )
 
 const (
@@ -30,32 +33,20 @@ const (
 // RespondJsonError sends an error formatted as JSON response back to the client.
 func RespondJsonError(ctx context.Context, w http.ResponseWriter, err error) error {
 
-	// If the error was of the type *Error, the handler has
-	// a specific status code and error to return.
-	webErr, ok := errors.Cause(err).(*Error)
-	if !ok {
-		webErr, ok = err.(*Error)
-	}
-
-	if ok {
-		er := ErrorResponse{
-			Error:  webErr.Err.Error(),
-			Fields: webErr.Fields,
-		}
-		if err := RespondJson(ctx, w, er, webErr.Status); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	// If not, the handler sent any arbitrary error value so use 500.
-	er := ErrorResponse{
-		Error: http.StatusText(http.StatusInternalServerError),
-	}
-	if err := RespondJson(ctx, w, er, http.StatusInternalServerError); err != nil {
+	// Set the status code for the request logger middleware.
+	// If the context is missing this value, request the service
+	// to be shutdown gracefully.
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// If the error was of the type *Error, the handler has
+	// a specific status code and error to return.
+	webErr := weberror.NewError(ctx, err, v.StatusCode).(*weberror.Error)
+	v.StatusCode = webErr.Status
+
+	return RespondJson(ctx, w, webErr.Display(ctx), webErr.Status)
 }
 
 // RespondJson converts a Go value to JSON and sends it to the client.
@@ -65,9 +56,9 @@ func RespondJson(ctx context.Context, w http.ResponseWriter, data interface{}, s
 	// Set the status code for the request logger middleware.
 	// If the context is missing this value, request the service
 	// to be shutdown gracefully.
-	v, ok := ctx.Value(KeyValues).(*Values)
-	if !ok {
-		return NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 	v.StatusCode = statusCode
 
@@ -105,25 +96,39 @@ func RespondJson(ctx context.Context, w http.ResponseWriter, data interface{}, s
 // RespondError sends an error back to the client as plain text with
 // the status code 500 Internal Service Error
 func RespondError(ctx context.Context, w http.ResponseWriter, er error) error {
-	return RespondErrorStatus(ctx, w, er, http.StatusInternalServerError)
+	return RespondErrorStatus(ctx, w, er, 0)
 }
 
 // RespondErrorStatus sends an error back to the client as plain text with
 // the specified HTTP status code.
 func RespondErrorStatus(ctx context.Context, w http.ResponseWriter, er error, statusCode int) error {
-	msg := fmt.Sprintf("%s", er)
-	if err := Respond(ctx, w, []byte(msg), statusCode, MIMETextPlainCharsetUTF8); err != nil {
+
+	// Set the status code for the request logger middleware.
+	// If the context is missing this value, request the service
+	// to be shutdown gracefully.
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// If the error was of the type *Error, the handler has
+	// a specific status code and error to return.
+	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
+	v.StatusCode = webErr.Status
+
+	respErr := webErr.Display(ctx).String()
+
+	switch webcontext.ContextEnv(ctx) {
+	case webcontext.Env_Dev, webcontext.Env_Stage:
+		respErr = respErr + fmt.Sprintf("\n%s\n%+v", webErr.Error(), webErr.Cause)
+	}
+
+	return RespondText(ctx, w, respErr, statusCode)
 }
 
 // RespondText sends text back to the client as plain text with the specified HTTP status code.
 func RespondText(ctx context.Context, w http.ResponseWriter, text string, statusCode int) error {
-	if err := Respond(ctx, w, []byte(text), statusCode, MIMETextPlainCharsetUTF8); err != nil {
-		return err
-	}
-	return nil
+	return Respond(ctx, w, []byte(text), statusCode, MIMETextPlainCharsetUTF8)
 }
 
 // Respond writes the data to the client with the specified HTTP status code and
@@ -133,9 +138,9 @@ func Respond(ctx context.Context, w http.ResponseWriter, data []byte, statusCode
 	// Set the status code for the request logger middleware.
 	// If the context is missing this value, request the service
 	// to be shutdown gracefully.
-	v, ok := ctx.Value(KeyValues).(*Values)
-	if !ok {
-		return NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 	v.StatusCode = statusCode
 
@@ -157,6 +162,46 @@ func Respond(ctx context.Context, w http.ResponseWriter, data []byte, statusCode
 	}
 
 	return nil
+}
+
+// RenderError sends an error back to the client as html with
+// the specified HTTP status code.
+func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er error, renderer Renderer, templateLayoutName, templateContentName, contentType string) error {
+
+	// Set the status code for the request logger middleware.
+	// If the context is missing this value, request the service
+	// to be shutdown gracefully.
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	// If the error was of the type *Error, the handler has
+	// a specific status code and error to return.
+	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
+	v.StatusCode = webErr.Status
+
+	respErr := webErr.Display(ctx)
+
+	var fullError string
+	switch webcontext.ContextEnv(ctx) {
+	case webcontext.Env_Dev, webcontext.Env_Stage:
+		if webErr.Cause != nil && webErr.Cause.Error() != webErr.Err.Error() {
+			fullError = fmt.Sprintf("\n%s\n%+v", webErr.Error(), webErr.Cause)
+		} else {
+			fullError = fmt.Sprintf("%+v", webErr.Err)
+		}
+
+		fullError = strings.Replace(fullError, "\n", "<br/>", -1)
+	}
+
+	data := map[string]interface{}{
+		"statusCode":   webErr.Status,
+		"errorMessage": respErr.Error,
+		"fullError":    template.HTML(fullError),
+	}
+
+	return renderer.Render(ctx, w, r, templateLayoutName, templateContentName, contentType, webErr.Status, data)
 }
 
 // Static registers a new route with path prefix to serve static files from the

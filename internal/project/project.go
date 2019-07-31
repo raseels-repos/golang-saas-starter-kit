@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"
@@ -231,7 +231,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	}
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	defer span.Finish()
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -372,7 +372,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 	defer span.Finish()
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string)
 	}
 
 	// Validate the request.
-	v := web.NewValidator()
+	v := webcontext.Validator()
 	err := v.Struct(req)
 	if err != nil {
 		return err

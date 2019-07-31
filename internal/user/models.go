@@ -13,7 +13,8 @@ import (
 // User represents someone with access to our system.
 type User struct {
 	ID            string          `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	Name          string          `json:"name" validate:"required" example:"Gabi May"`
+	FirstName     string          `json:"first_name" validate:"required" example:"Gabi"`
+	LastName      string          `json:"last_name" validate:"required" example:"May"`
 	Email         string          `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
 	PasswordSalt  string          `json:"-" validate:"required"`
 	PasswordHash  []byte          `json:"-" validate:"required"`
@@ -27,7 +28,8 @@ type User struct {
 // UserResponse represents someone with access to our system that is returned for display.
 type UserResponse struct {
 	ID         string            `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	Name       string            `json:"name" example:"Gabi May"`
+	FirstName  string            `json:"first_name" example:"Gabi"`
+	LastName   string            `json:"last_name" example:"May"`
 	Email      string            `json:"email" example:"gabi@geeksinthewoods.com"`
 	Timezone   string            `json:"timezone" example:"America/Anchorage"`
 	CreatedAt  web.TimeResponse  `json:"created_at"`            // CreatedAt contains multiple format options for display.
@@ -44,7 +46,8 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 
 	r := &UserResponse{
 		ID:        m.ID,
-		Name:      m.Name,
+		FirstName: m.FirstName,
+		LastName:  m.LastName,
 		Email:     m.Email,
 		Timezone:  m.Timezone,
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
@@ -61,10 +64,11 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 
 // UserCreateRequest contains information needed to create a new User.
 type UserCreateRequest struct {
-	Name            string  `json:"name" validate:"required" example:"Gabi May"`
+	FirstName       string  `json:"first_name" validate:"required" example:"Gabi"`
+	LastName        string  `json:"last_name" validate:"required" example:"May"`
 	Email           string  `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
 	Password        string  `json:"password" validate:"required" example:"SecretString"`
-	PasswordConfirm string  `json:"password_confirm" validate:"eqfield=Password" example:"SecretString"`
+	PasswordConfirm string  `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
 	Timezone        *string `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
 }
 
@@ -75,17 +79,18 @@ type UserCreateRequest struct {
 // we do not want to use pointers to basic types but we make exceptions around
 // marshalling/unmarshalling.
 type UserUpdateRequest struct {
-	ID       string  `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	Name     *string `json:"name,omitempty" validate:"omitempty" example:"Gabi May Not"`
-	Email    *string `json:"email,omitempty" validate:"omitempty,email,unique" example:"gabi.may@geeksinthewoods.com"`
-	Timezone *string `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
+	ID        string  `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	FirstName *string `json:"first_name,omitempty" validate:"omitempty" example:"Gabi May Not"`
+	LastName  *string `json:"last_name,omitempty" validate:"omitempty" example:"Gabi May Not"`
+	Email     *string `json:"email,omitempty" validate:"omitempty,email,unique" example:"gabi.may@geeksinthewoods.com"`
+	Timezone  *string `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
 }
 
 // UserUpdatePasswordRequest defines what information is required to update a user password.
 type UserUpdatePasswordRequest struct {
 	ID              string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	Password        string `json:"password" validate:"required" example:"NeverTellSecret"`
-	PasswordConfirm string `json:"password_confirm" validate:"omitempty,eqfield=Password" example:"NeverTellSecret"`
+	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"NeverTellSecret"`
 }
 
 // UserArchiveRequest defines the information needed to archive an user. This will archive (soft-delete) the

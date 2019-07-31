@@ -2,6 +2,7 @@ package mid
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strings"
 
@@ -11,12 +12,14 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-// ErrForbidden is returned when an authenticated user does not have a
+// ErrorForbidden is returned when an authenticated user does not have a
 // sufficient role for an action.
-var ErrForbidden = web.NewRequestError(
-	errors.New("you are not authorized for that action"),
-	http.StatusForbidden,
-)
+func ErrorForbidden(ctx context.Context) error {
+	return weberror.NewError(ctx,
+		errors.New("you are not authorized for that action"),
+		http.StatusForbidden,
+	)
+}
 
 // Authenticate validates a JWT from the `Authorization` header.
 func Authenticate(authenticator *auth.Authenticator) web.Middleware {
@@ -33,21 +36,60 @@ func Authenticate(authenticator *auth.Authenticator) web.Middleware {
 				authHdr := r.Header.Get("Authorization")
 				if authHdr == "" {
 					err := errors.New("missing Authorization header")
-					return web.NewRequestError(err, http.StatusUnauthorized)
+					return weberror.NewError(ctx, err, http.StatusUnauthorized)
 				}
 
 				tknStr, err := parseAuthHeader(authHdr)
 				if err != nil {
-					return web.NewRequestError(err, http.StatusUnauthorized)
+					return weberror.NewError(ctx, err, http.StatusUnauthorized)
 				}
 
 				claims, err := authenticator.ParseClaims(tknStr)
 				if err != nil {
-					return web.NewRequestError(err, http.StatusUnauthorized)
+					return weberror.NewError(ctx, err, http.StatusUnauthorized)
 				}
 
 				// Add claims to the context so they can be retrieved later.
 				ctx = context.WithValue(ctx, auth.Key, claims)
+
+				return nil
+			}
+
+			if err := m(); err != nil {
+				if web.RequestIsJson(r) {
+					return web.RespondJsonError(ctx, w, err)
+				}
+				return err
+			}
+
+			return after(ctx, w, r, params)
+		}
+
+		return h
+	}
+
+	return f
+}
+
+// HasAuth validates the current user is an authenticated user,
+func HasAuth() web.Middleware {
+
+	// This is the actual middleware function to be executed.
+	f := func(after web.Handler) web.Handler {
+
+		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.HasAuth")
+			defer span.Finish()
+
+			m := func() error {
+				claims, err := auth.ClaimsFromContext(ctx)
+				if err != nil {
+					return err
+				}
+
+				if !claims.HasAuth() {
+					return ErrorForbidden(ctx)
+				}
 
 				return nil
 			}
@@ -80,14 +122,13 @@ func HasRole(roles ...string) web.Middleware {
 			defer span.Finish()
 
 			m := func() error {
-				claims, ok := ctx.Value(auth.Key).(auth.Claims)
-				if !ok {
-					// TODO(jlw) should this be a web.Shutdown?
-					return errors.New("claims missing from context: HasRole called without/before Authenticate")
+				claims, err := auth.ClaimsFromContext(ctx)
+				if err != nil {
+					return err
 				}
 
 				if !claims.HasRole(roles...) {
-					return ErrForbidden
+					return ErrorForbidden(ctx)
 				}
 
 				return nil

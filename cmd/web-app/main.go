@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"html/template"
 	"log"
 	"net"
@@ -342,9 +345,24 @@ func main() {
 	defer masterDb.Close()
 
 	// =========================================================================
+	// Init new Authenticator
+	var authenticator *auth.Authenticator
+	if cfg.Auth.UseAwsSecretManager {
+		secretName := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "authenticator")
+		authenticator, err = auth.NewAuthenticatorAws(awsSession, secretName, time.Now().UTC(), cfg.Auth.KeyExpiration)
+	} else {
+		authenticator, err = auth.NewAuthenticatorFile("", time.Now().UTC(), cfg.Auth.KeyExpiration)
+	}
+	if err != nil {
+		log.Fatalf("main : Constructing authenticator : %+v", err)
+	}
+
+	// =========================================================================
 	// Load middlewares that need to be configured specific for the service.
 
-	var serviceMiddlewares []web.Middleware
+	var serviceMiddlewares = []web.Middleware{
+		mid.Translator(webcontext.UniversalTranslator()),
+	}
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
 	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {
@@ -402,16 +420,6 @@ func main() {
 	var staticUrlFormatter func(string) string
 	if cfg.Service.StaticFiles.S3Enabled || cfg.Service.StaticFiles.CloudFrontEnabled {
 		staticUrlFormatter = staticS3UrlFormatter
-	} else {
-		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
-		if err != nil {
-			log.Fatalf("main : url Parse(%s) : %+v", cfg.Service.BaseUrl, err)
-		}
-
-		staticUrlFormatter = func(p string) string {
-			baseUrl.Path = p
-			return baseUrl.String()
-		}
 	}
 
 	// =========================================================================
@@ -504,6 +512,98 @@ func main() {
 			}
 			return u
 		},
+		"ValidationErrorHasField": func(err interface{}, fieldName string) bool {
+			if err == nil {
+				return false
+			}
+			verr, ok := err.(*weberror.Error)
+			if !ok {
+				return false
+			}
+			for _, e := range verr.Fields {
+				if e.Field == fieldName || e.FormField == fieldName {
+					return true
+				}
+			}
+			return false
+		},
+		"ValidationFieldErrors": func(err interface{}, fieldName string) []weberror.FieldError {
+			if err == nil {
+				return []weberror.FieldError{}
+			}
+			verr, ok := err.(*weberror.Error)
+			if !ok {
+				return []weberror.FieldError{}
+			}
+			var l []weberror.FieldError
+			for _, e := range verr.Fields {
+				if e.Field == fieldName || e.FormField == fieldName {
+					l = append(l, e)
+				}
+			}
+			return l
+		},
+		"ValidationFieldClass": func(err interface{}, fieldName string) string {
+			if err == nil {
+				return ""
+			}
+			verr, ok := err.(*weberror.Error)
+			if !ok || len(verr.Fields) == 0 {
+				return ""
+			}
+
+			for _, e := range verr.Fields {
+				if e.Field == fieldName || e.FormField == fieldName {
+					return "is-invalid"
+				}
+			}
+			return "is-valid"
+		},
+		"ErrorMessage": func(ctx context.Context, err error) string {
+			werr, ok := err.(*weberror.Error)
+			if ok {
+				if werr.Message != "" {
+					return werr.Message
+				}
+				return werr.Error()
+			}
+			return fmt.Sprintf("%s", err)
+		},
+		"ErrorDetails": func(ctx context.Context, err error) string {
+			var displayFullError bool
+			switch webcontext.ContextEnv(ctx) {
+			case webcontext.Env_Dev, webcontext.Env_Stage:
+				displayFullError = true
+			}
+
+			if !displayFullError {
+				return ""
+			}
+
+			werr, ok := err.(*weberror.Error)
+			if ok {
+				if werr.Cause != nil {
+					return fmt.Sprintf("%s\n%+v", werr.Error(), werr.Cause)
+				}
+
+				return fmt.Sprintf("%+v", werr.Error())
+			}
+
+			return fmt.Sprintf("%+v", err)
+		},
+	}
+
+	imgUrlFormatter := staticUrlFormatter
+	if imgUrlFormatter == nil {
+		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
+		if err != nil {
+			log.Fatalf("main : url Parse(%s) : %+v", cfg.Service.BaseUrl, err)
+		}
+
+		imgUrlFormatter = func(p string) string {
+			baseUrl.Path = p
+			return baseUrl.String()
+		}
 	}
 
 	// Image Formatter - additional functions exposed to templates for resizing images
@@ -511,7 +611,7 @@ func main() {
 	imgResizeS3KeyPrefix := filepath.Join(cfg.Service.StaticFiles.S3Prefix, "images/responsive")
 
 	imgSrcAttr := func(ctx context.Context, p string, sizes []int, includeOrig bool) template.HTMLAttr {
-		u := staticUrlFormatter(p)
+		u := imgUrlFormatter(p)
 		var srcAttr string
 		if cfg.Service.StaticFiles.ImgResizeEnabled {
 			srcAttr, _ = img_resize.S3ImgSrc(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, u, sizes, includeOrig)
@@ -543,7 +643,7 @@ func main() {
 		return imgSrcAttr(ctx, p, sizes, true)
 	}
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
-		imgUrl := staticUrlFormatter(p)
+		imgUrl := imgUrlFormatter(p)
 		if cfg.Service.StaticFiles.ImgResizeEnabled {
 			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
 		}
@@ -635,7 +735,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -652,7 +752,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

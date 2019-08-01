@@ -70,11 +70,14 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register geo
 	g := Geo{
-		MasterDB:      masterDB,
-		Redis:      redis,
+		MasterDB: masterDB,
+		Redis:    redis,
 	}
 	// These routes are not authenticated
 	app.Handle("GET", "/geo/regions/autocomplete", g.RegionsAutocomplete)
+	app.Handle("GET", "/geo/postal_codes/autocomplete", g.PostalCodesAutocomplete)
+	app.Handle("GET", "/geo/geonames/postal_code/:postalCode", g.GeonameByPostalCode)
+	app.Handle("GET", "/geo/country/:countryCode/timezones", g.CountryTimezones)
 
 	// Register root
 	r := Root{

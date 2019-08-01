@@ -9,21 +9,21 @@ import (
 )
 
 const (
-	// The database table for Country
-	countriesTableName = "countries"
+	// The database table for CountryTimezone
+	countrieTimezonesTableName = "country_timezones"
 )
 
-// FindCountries ....
-func FindCountries(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*Country, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindCountries")
+// FindCountryTimezones ....
+func FindCountryTimezones(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*CountryTimezone, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindCountryTimezones")
 	defer span.Finish()
 
 	query := sqlbuilder.NewSelectBuilder()
-	query.Select("code,iso_alpha3,name,capital,currency_code,currency_name,phone,postal_code_format,postal_code_regex")
-	query.From(countriesTableName)
+	query.Select("country_code,timezone_id")
+	query.From(countrieTimezonesTableName)
 
 	if orderBy == "" {
-		orderBy = "name"
+		orderBy = "timezone_id"
 	}
 	query.OrderBy(orderBy)
 
@@ -35,26 +35,26 @@ func FindCountries(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, 
 	queryStr = dbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
-	// fetch all places from the db
+	// Fetch all country timezones from the db.
 	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessage(err, "find countries failed")
+		err = errors.WithMessage(err, "find country timezones failed")
 		return nil, err
 	}
 
 	// iterate over each row
-	resp := []*Country{}
+	resp := []*CountryTimezone{}
 	for rows.Next() {
 		var (
-			v   Country
+			v   CountryTimezone
 			err error
 		)
-		err = rows.Scan(&v.Code, &v.IsoAlpha3, &v.Name, &v.Capital, &v.CurrencyCode, &v.CurrencyName, &v.Phone, &v.PostalCodeFormat, &v.PostalCodeRegex)
+		err = rows.Scan(&v.CountryCode, &v.TimezoneId)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			return nil, err
-		} else if v.Code == "" {
+		} else if v.CountryCode == "" || v.TimezoneId == "" {
 			continue
 		}
 

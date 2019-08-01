@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
-	"github.com/sethgrid/pester"
 	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
+	"github.com/sethgrid/pester"
 )
 
 // migrationList returns a list of migrations to be executed. If the id of the
@@ -255,11 +255,11 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 				for r := range resChan {
 					switch v := r.(type) {
 					case geonames.Geoname:
-						_, err = stmt.Exec(v.CountryCode,v.PostalCode,v.PlaceName,v.StateName,v.StateCode,v.CountyName,v.CountyCode,v.CommunityName,v.CommunityCode,v.Latitude,v.Longitude,v.Accuracy)
+						_, err = stmt.Exec(v.CountryCode, v.PostalCode, v.PlaceName, v.StateName, v.StateCode, v.CountyName, v.CountyCode, v.CommunityName, v.CommunityCode, v.Latitude, v.Longitude, v.Accuracy)
 						if err != nil {
 							return errors.WithStack(err)
 						}
-					case error :
+					case error:
 						return v
 					}
 				}
@@ -338,7 +338,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					}
 
 					// Pull the last comment to load the fields.
-					if stmt == nil  {
+					if stmt == nil {
 						prevLine = strings.TrimPrefix(prevLine, "#")
 						r := csv.NewReader(strings.NewReader(prevLine))
 						r.Comma = '\t' // Use tab-delimited instead of comma <---- here!
@@ -391,7 +391,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 								cn = "neighbours"
 							case "EquivalentFipsCode":
 								cn = "equivalent_fips_code"
-							default :
+							default:
 								return errors.Errorf("Failed to map column %s", fn)
 							}
 							columns = append(columns, cn)
@@ -402,7 +402,7 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 							placeholders = append(placeholders, "?")
 						}
 
-						q := "insert into countryinfo ("+strings.Join(columns, ",")+") values("+strings.Join(placeholders, ",")+")"
+						q := "insert into countryinfo (" + strings.Join(columns, ",") + ") values(" + strings.Join(placeholders, ",") + ")"
 						q = db.Rebind(q)
 						stmt, err = db.Prepare(q)
 						if err != nil {
@@ -460,6 +460,76 @@ func migrationList(db *sqlx.DB, log *log.Logger) []*sqlxmigrate.Migration {
 					if err != nil {
 						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
 					}
+				}
+
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				return nil
+			},
+		},
+		// Load new country_timezones table.
+		{
+			ID: "20190731-03d",
+			Migrate: func(tx *sql.Tx) error {
+
+				queries := []string{
+					`DROP TABLE IF EXISTS country_timezones`,
+					`CREATE TABLE country_timezones(
+						country_code           char(2) not null,
+						timezone_id    character varying(50) not null,
+						CONSTRAINT country_timezones_pkey UNIQUE (country_code, timezone_id))`,
+				}
+
+				for _, q := range queries {
+					_, err := db.Exec(q)
+					if err != nil {
+						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+					}
+				}
+
+				u := "http://download.geonames.org/export/dump/timeZones.txt"
+				resp, err := pester.Get(u)
+				if err != nil {
+					return errors.WithMessagef(err, "Failed to read timezones info from '%s'", u)
+				}
+				defer resp.Body.Close()
+
+				q := "insert into country_timezones (country_code,timezone_id) values(?, ?)"
+				q = db.Rebind(q)
+				stmt, err := db.Prepare(q)
+				if err != nil {
+					return errors.WithMessagef(err, "Failed to prepare sql query '%s'", q)
+				}
+
+				scanner := bufio.NewScanner(resp.Body)
+				for scanner.Scan() {
+					line := scanner.Text()
+
+					// Skip comments.
+					if strings.HasPrefix(line, "CountryCode") {
+						continue
+					}
+
+					r := csv.NewReader(strings.NewReader(line))
+					r.Comma = '\t' // Use tab-delimited instead of comma <---- here!
+					r.FieldsPerRecord = -1
+
+					lines, err := r.ReadAll()
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					for _, row := range lines {
+						_, err = stmt.Exec(row[0], row[1])
+						if err != nil {
+							return errors.WithStack(err)
+						}
+					}
+				}
+
+				if err := scanner.Err(); err != nil {
+					return errors.WithStack(err)
 				}
 
 				return nil

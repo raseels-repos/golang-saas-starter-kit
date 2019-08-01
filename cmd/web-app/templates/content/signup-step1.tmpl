@@ -35,17 +35,21 @@
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" name="Account.Zipcode" value="{{ $.form.Account.Zipcode }}" placeholder="Zipcode" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Zipcode" }}
+                                        <select class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Country" }}" id="selectAccountCountry" name="Account.Country" placeholder="Country" required>
+                                            {{ range $i := $.countries }}
+                                                <option value="{{ $i.Code }}" {{ if eq $.form.Account.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
+                                            {{ end }}
+                                        </select>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Country" }}
                                     </div>
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Country" }}" name="Account.Country" value="{{ $.form.Account.Country }}" placeholder="Country" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Country" }}
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Account.Zipcode" value="{{ $.form.Account.Zipcode }}" placeholder="Zipcode" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Zipcode" }}
                                     </div>
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Region" }}" name="Account.Region" value="{{ $.form.Account.Region }}" placeholder="Region" required>
+                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Region" }}" id="inputAccountRegion" name="Account.Region" value="{{ $.form.Account.Region }}" placeholder="Region" required>
                                         {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Region" }}
                                     </div>
                                 </div>
@@ -103,13 +107,71 @@
     </div>
 {{end}}
 {{define "js"}}
+    <script src="https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.2.2/dist/latest/bootstrap-autocomplete.min.js"></script>
+
     <script>
         $(document).ready(function() {
             $(document).find('body').addClass('bg-gradient-primary');
 
+            var regionAutocompleteParams = null;
+            var countryAutocompleteParams = null;
 
+            $('#inputAccountZipcode').on('change', function () {
+               console.log($(this).val());
 
-           // console.log(($('input[name=\'Account\.Name\']').parent().find('.invalid-feedback').show()));
+                regionAutocompleteParams = {postal_code: $(this).val()};
+                $('#inputAccountRegion').keyup();
+
+                countryAutocompleteParams = {postal_code: $(this).val()};
+                $('#inputAccountCountry').keyup();
+            });
+
+            $('#inputAccountRegion').on('keydown', function () {
+                regionAutocompleteParams = null;
+            });
+
+            $('#inputAccountCountry').on('keydown', function () {
+                countryAutocompleteParams = null;
+            });
+
+            $('#inputAccountRegion').autoComplete({
+                events: {
+                    search: function (qry, callback) {
+                        if (regionAutocompleteParams === null) {
+                            regionAutocompleteParams = {query: qry};
+                        }
+
+                        $.ajax(
+                            '/geo/regions/autocomplete',
+                            {
+                                data: regionAutocompleteParams
+                            }
+                        ).done(function (res) {
+                            callback(res)
+                        });
+                    }
+                }
+            });
+
+            $('#inputAccountCountry').autoComplete({
+                events: {
+                    search: function (qry, callback) {
+                        if (countryAutocompleteParams === null) {
+                            countryAutocompleteParams = {query: qry};
+                        }
+
+                        $.ajax(
+                            '/geo/countries/autocomplete',
+                            {
+                                data: countryAutocompleteParams
+                            }
+                        ).done(function (res) {
+                            callback(res)
+                        });
+                    }
+                }
+            });
+
 
         });
     </script>

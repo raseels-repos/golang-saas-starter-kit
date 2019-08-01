@@ -68,6 +68,14 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("POST", "/signup", s.Step1)
 	app.Handle("GET", "/signup", s.Step1)
 
+	// Register geo
+	g := Geo{
+		MasterDB:      masterDB,
+		Redis:      redis,
+	}
+	// These routes are not authenticated
+	app.Handle("GET", "/geo/regions/autocomplete", g.RegionsAutocomplete)
+
 	// Register root
 	r := Root{
 		MasterDB:      masterDB,

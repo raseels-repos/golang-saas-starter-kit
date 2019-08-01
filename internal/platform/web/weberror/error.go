@@ -68,7 +68,12 @@ func NewError(ctx context.Context, er error, status int) error {
 // Error implements the error interface. It uses the default message of the
 // wrapped error. This is what will be shown in the services' logs.
 func (err *Error) Error() string {
-	return err.Err.Error()
+	if err.Err != nil {
+		return err.Err.Error()
+	} else if err.Cause != nil {
+		return err.Cause.Error()
+	}
+	return err.Message
 }
 
 // Display renders an error that can be returned as ErrorResponse to the user via the API.

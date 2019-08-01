@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"net/http"
 	"time"
 
@@ -80,6 +81,14 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
+			return nil
+		}
+
+		data["geonameCountries"] = geonames.ValidGeonameCountries
+
+		data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
+		if err != nil {
+			return err
 		}
 
 		return nil

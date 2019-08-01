@@ -39,6 +39,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/sergi/go-diff v1.0.0
 	github.com/sethgrid/pester v0.0.0-20190127155807-68a33a018ad0
+	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	github.com/stretchr/testify v1.3.0
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/swag v1.6.2

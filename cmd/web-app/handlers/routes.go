@@ -12,6 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
@@ -22,7 +23,7 @@ const (
 )
 
 // API returns a handler for a set of routes.
-func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
+func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, projectRoutes project_routes.ProjectRoutes, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
@@ -42,7 +43,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		MasterDB: masterDB,
 		Renderer: renderer,
 	}
-	app.Handle("GET", "/projects", p.Index, mid.HasAuth())
+	app.Handle("GET", "/projects", p.Index, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
 
 	// Register user management and authentication endpoints.
 	u := User{
@@ -69,12 +70,14 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register root
 	r := Root{
-		MasterDB: masterDB,
-		Renderer: renderer,
+		MasterDB:      masterDB,
+		Renderer:      renderer,
+		ProjectRoutes: projectRoutes,
 	}
 	// This route is not authenticated
-	app.Handle("GET", "/index.html", r.Index)
-	app.Handle("GET", "/", r.Index)
+	app.Handle("GET", "/", r.Index, mid.AuthenticateSessionOptional(authenticator))
+	app.Handle("GET", "/index.html", r.IndexHtml)
+	app.Handle("GET", "/robots.txt", r.RobotTxt)
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
@@ -84,6 +87,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 
+	// Handle static files/pages. Render a custom 404 page when file not found.
 	static := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 		err := web.StaticHandler(ctx, w, r, params, staticDir, "")
 		if err != nil {

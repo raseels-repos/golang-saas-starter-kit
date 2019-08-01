@@ -20,6 +20,8 @@ require (
 	github.com/google/go-cmp v0.3.0
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/schema v1.1.0
+	github.com/gorilla/securecookie v1.1.1
+	github.com/gorilla/sessions v1.2.0
 	github.com/huandu/go-sqlbuilder v1.4.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/jmoiron/sqlx v1.2.0

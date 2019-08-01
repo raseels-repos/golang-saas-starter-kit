@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/pkg/errors"
@@ -46,25 +45,20 @@ func (c *SecretManagerAutocertCache) Get(ctx context.Context, key string) ([]byt
 		}
 	}
 
-	svc := secretsmanager.New(c.awsSession)
-
 	secretID := filepath.Join(c.secretPrefix, key)
 
 	// Load the secret by ID from Secrets Manager.
-	res, err := svc.GetSecretValue(&secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretID),
-	})
+	res, err := SecretManagerGetString(c.awsSession, secretID)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && (aerr.Code() == secretsmanager.ErrCodeResourceNotFoundException || aerr.Code() == secretsmanager.ErrCodeInvalidRequestException) {
+		if err == ErrSecreteNotFound {
 			return nil, autocert.ErrCacheMiss
 		}
-
-		return nil, errors.Wrapf(err, "failed to get value for secret id %s", secretID)
+		return nil, err
 	}
 
 	log.Printf("AWS Secrets Manager : Secret %s found", secretID)
 
-	return []byte(*res.SecretString), nil
+	return []byte(res), nil
 }
 
 // Put stores the data in the cache under the specified key.
@@ -72,47 +66,14 @@ func (c *SecretManagerAutocertCache) Get(ctx context.Context, key string) ([]byt
 // as long as the reverse operation, Get, results in the original data.
 func (c *SecretManagerAutocertCache) Put(ctx context.Context, key string, data []byte) error {
 
-	svc := secretsmanager.New(c.awsSession)
-
 	secretID := filepath.Join(c.secretPrefix, key)
 
-	// Create the new entry in AWS Secret Manager for the file.
-	_, err := svc.CreateSecret(&secretsmanager.CreateSecretInput{
-		Name:         aws.String(secretID),
-		SecretString: aws.String(string(data)),
-	})
+	err := SecretManagerPutString(c.awsSession, secretID, string(data))
 	if err != nil {
-		aerr, ok := err.(awserr.Error)
-
-		if ok && aerr.Code() == secretsmanager.ErrCodeInvalidRequestException {
-			// InvalidRequestException: You can't create this secret because a secret with this
-			// 							 name is already scheduled for deletion.
-
-			// Restore secret after it was already previously deleted.
-			_, err = svc.RestoreSecret(&secretsmanager.RestoreSecretInput{
-				SecretId: aws.String(secretID),
-			})
-			if err != nil {
-				return errors.Wrapf(err, "autocert failed to restore secret %s", secretID)
-			}
-
-		} else if !ok || aerr.Code() != secretsmanager.ErrCodeResourceExistsException {
-			return errors.Wrapf(err, "autocert failed to create secret %s", secretID)
-		}
-
-		// If where was a resource exists error for create, then need to update the secret instead.
-		_, err = svc.UpdateSecret(&secretsmanager.UpdateSecretInput{
-			SecretId:     aws.String(secretID),
-			SecretString: aws.String(string(data)),
-		})
-		if err != nil {
-			return errors.Wrapf(err, "autocert failed to update secret %s", secretID)
-		}
-
-		log.Printf("AWS Secrets Manager : Secret %s updated", secretID)
-	} else {
-		log.Printf("AWS Secrets Manager : Secret %s created", secretID)
+		return err
 	}
+
+	log.Printf("AWS Secrets Manager : Secret %s updated", secretID)
 
 	if c.cache != nil {
 		err = c.cache.Put(ctx, key, data)

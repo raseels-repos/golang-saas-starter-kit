@@ -218,7 +218,7 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 
 	// Main template used to render execute all templates against.
 	r.mainTemplate = template.New("main")
-	r.mainTemplate, _ = r.mainTemplate.Parse(`{{define "main" }} {{ template "base" . }} {{ end }}`)
+	r.mainTemplate, _ = r.mainTemplate.Parse(`{{define "main" }}{{ template "base" . }}{{ end }}`)
 	r.mainTemplate.Funcs(tmpl.Funcs)
 
 	// Ensure all layout files render successfully with no errors.

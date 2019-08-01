@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ import (
 )
 
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, log *log.Logger, env web.Env, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, globalMids ...web.Middleware) http.Handler {
+func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, globalMids ...web.Middleware) http.Handler {
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
@@ -43,14 +44,14 @@ func API(shutdown chan os.Signal, log *log.Logger, env web.Env, masterDB *sqlx.D
 		MasterDB:       masterDB,
 		TokenGenerator: authenticator,
 	}
-	app.Handle("GET", "/v1/users", u.Find, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/users", u.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/users/:id", u.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users", u.Update, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.Authenticate(authenticator))
+	app.Handle("GET", "/v1/users", u.Find, mid.AuthenticateHeader(authenticator))
+	app.Handle("POST", "/v1/users", u.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/users/:id", u.Read, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/users", u.Update, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.AuthenticateHeader(authenticator))
 
 	// This route is not authenticated
 	app.Handle("POST", "/v1/oauth/token", u.Token)
@@ -59,19 +60,19 @@ func API(shutdown chan os.Signal, log *log.Logger, env web.Env, masterDB *sqlx.D
 	ua := UserAccount{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/user_accounts/:id", ua.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.AuthenticateHeader(authenticator))
+	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/user_accounts/:id", ua.Read, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register account endpoints.
 	a := Account{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/accounts", a.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/accounts", a.Update, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register signup endpoints.
 	s := Signup{
@@ -83,12 +84,12 @@ func API(shutdown chan os.Signal, log *log.Logger, env web.Env, masterDB *sqlx.D
 	p := Project{
 		MasterDB: masterDB,
 	}
-	app.Handle("GET", "/v1/projects", p.Find, mid.Authenticate(authenticator))
-	app.Handle("POST", "/v1/projects", p.Create, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/projects/:id", p.Read, mid.Authenticate(authenticator))
-	app.Handle("PATCH", "/v1/projects", p.Update, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.Authenticate(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/projects", p.Find, mid.AuthenticateHeader(authenticator))
+	app.Handle("POST", "/v1/projects", p.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/projects/:id", p.Read, mid.AuthenticateHeader(authenticator))
+	app.Handle("PATCH", "/v1/projects", p.Update, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register swagger documentation.
 	// TODO: Add authentication. Current authenticator requires an Authorization header

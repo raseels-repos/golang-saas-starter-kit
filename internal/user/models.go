@@ -110,6 +110,12 @@ type UserFindRequest struct {
 	IncludedArchived bool          `json:"included-archived" example:"false"`
 }
 
+// AuthenticateRequest defines what information is required to authenticate a user.
+type AuthenticateRequest struct {
+	Email    string `json:"email" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
+	Password string `json:"password" validate:"required" example:"NeverTellSecret"`
+}
+
 // Token is the payload we deliver to users when they authenticate.
 type Token struct {
 	// AccessToken is the token that authorizes and authenticates
@@ -123,7 +129,8 @@ type Token struct {
 	// If zero, TokenSource implementations will reuse the same
 	// token forever and RefreshToken or equivalent
 	// mechanisms for that TokenSource will not be used.
-	Expiry time.Time `json:"expiry,omitempty"`
+	Expiry time.Time     `json:"expiry,omitempty"`
+	TTL    time.Duration `json:"ttl,omitempty"`
 	// contains filtered or unexported fields
 	claims auth.Claims `json:"-"`
 }

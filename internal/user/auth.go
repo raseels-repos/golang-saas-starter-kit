@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rsa"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"github.com/dgrijalva/jwt-go"
 	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -291,6 +291,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 
 	if expires.Seconds() > 0 {
 		tkn.Expiry = now.Add(expires)
+		tkn.TTL = expires
 	}
 
 	return tkn, nil

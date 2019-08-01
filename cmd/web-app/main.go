@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"html/template"
 	"log"
 	"net"
@@ -25,18 +22,25 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/img-resize"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	template_renderer "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/template-renderer"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/securecookie"
+	"github.com/gorilla/sessions"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
@@ -90,6 +94,9 @@ func main() {
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
+			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.eproc.tech"`
+			SessionKey      string        `default:"" envconfig:"SESSION_KEY"`
+			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
@@ -382,8 +389,50 @@ func main() {
 		serviceMiddlewares = append(serviceMiddlewares, redirect)
 	}
 
+	// Init session store
+	if cfg.Service.SessionName == "" {
+		cfg.Service.SessionName = fmt.Sprintf("%s-session", cfg.Service.Name)
+	}
+
+	// Set the session key if not provided in the config.
+	if cfg.Service.SessionKey == "" {
+
+		// AWS secrets manager ID for storing the session key. This is optional and only will be used
+		// if a valid AWS session is provided.
+		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "session")
+
+		// If AWS is enabled, check the Secrets Manager for the session key.
+		if awsSession != nil {
+			cfg.Service.SessionKey, err = devops.SecretManagerGetString(awsSession, secretID)
+			if err != nil && errors.Cause(err) != devops.ErrSecreteNotFound {
+				log.Fatalf("main : Session : %+v", err)
+			}
+		}
+
+		// If the session key is still empty, generate a new key.
+		if cfg.Service.SessionKey == "" {
+			cfg.Service.SessionKey = string(securecookie.GenerateRandomKey(32))
+
+			if awsSession != nil {
+				err = devops.SecretManagerPutString(awsSession, secretID, cfg.Service.SessionKey)
+				if err != nil {
+					log.Fatalf("main : Session : %+v", err)
+				}
+			}
+		}
+	}
+
+	// Generate the new session store and append it to the global list of middlewares.
+	sessionStore := sessions.NewCookieStore([]byte(cfg.Service.SessionKey))
+	serviceMiddlewares = append(serviceMiddlewares, mid.Session(sessionStore, cfg.Service.SessionName))
+
 	// =========================================================================
 	// URL Formatter
+	projectRoutes, err := project_routes.New(cfg.Service.WebApiBaseUrl, cfg.Service.BaseUrl)
+	if err != nil {
+		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
+	}
+
 	// s3UrlFormatter is a help function used by to convert an s3 key to
 	// a publicly available image URL.
 	var staticS3UrlFormatter func(string) string
@@ -402,15 +451,7 @@ func main() {
 			return s3UrlFormatter(p)
 		}
 	} else {
-		baseUrl, err := url.Parse(cfg.Service.BaseUrl)
-		if err != nil {
-			log.Fatalf("main : url Parse(%s) : %+v", cfg.Service.BaseUrl, err)
-		}
-
-		staticS3UrlFormatter = func(p string) string {
-			baseUrl.Path = p
-			return baseUrl.String()
-		}
+		staticS3UrlFormatter = projectRoutes.WebAppUrl
 	}
 
 	// staticUrlFormatter is a help function used by template functions defined below.
@@ -735,7 +776,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -752,7 +793,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

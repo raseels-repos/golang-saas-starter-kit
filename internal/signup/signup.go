@@ -2,6 +2,9 @@ package signup
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -10,7 +13,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/go-playground/validator.v9"
-	"time"
 )
 
 // Signup performs the steps needed to create a new account, new user and then associate
@@ -36,12 +38,15 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 			return false
 		}
 
+		fieldName := strings.Trim(fl.FieldName(), "{}")
+
 		var uniq bool
-		switch fl.FieldName() {
+		switch fieldName {
 		case "Name", "name":
 			uniq = uniqName
 		case "Email", "email":
 			uniq = uniqEmail
+
 		}
 
 		return uniq

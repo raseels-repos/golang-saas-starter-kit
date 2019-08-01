@@ -2,12 +2,13 @@ package mid
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -22,17 +23,18 @@ func ErrorForbidden(ctx context.Context) error {
 }
 
 // Authenticate validates a JWT from the `Authorization` header.
-func Authenticate(authenticator *auth.Authenticator) web.Middleware {
+func AuthenticateHeader(authenticator *auth.Authenticator) web.Middleware {
 
 	// This is the actual middleware function to be executed.
 	f := func(after web.Handler) web.Handler {
 
 		// Wrap this handler around the next one provided.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Authenticate")
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.AuthenticateHeader")
 			defer span.Finish()
 
 			m := func() error {
+
 				authHdr := r.Header.Get("Authorization")
 				if authHdr == "" {
 					err := errors.New("missing Authorization header")
@@ -42,6 +44,65 @@ func Authenticate(authenticator *auth.Authenticator) web.Middleware {
 				tknStr, err := parseAuthHeader(authHdr)
 				if err != nil {
 					return weberror.NewError(ctx, err, http.StatusUnauthorized)
+				}
+
+				claims, err := authenticator.ParseClaims(tknStr)
+				if err != nil {
+					return weberror.NewError(ctx, err, http.StatusUnauthorized)
+				}
+
+				// Add claims to the context so they can be retrieved later.
+				ctx = context.WithValue(ctx, auth.Key, claims)
+
+				return nil
+			}
+
+			if err := m(); err != nil {
+				if web.RequestIsJson(r) {
+					return web.RespondJsonError(ctx, w, err)
+				}
+				return err
+			}
+
+			return after(ctx, w, r, params)
+		}
+
+		return h
+	}
+
+	return f
+}
+
+// AuthenticateSessionRequired requires a JWT access token to be loaded from the session.
+func AuthenticateSessionRequired(authenticator *auth.Authenticator) web.Middleware {
+	return authenticateSession(authenticator, true)
+}
+
+// AuthenticateSessionOptional loads a JWT access token from the session if it exists.
+func AuthenticateSessionOptional(authenticator *auth.Authenticator) web.Middleware {
+	return authenticateSession(authenticator, false)
+}
+
+// authenticateSession validates a JWT by the loading the access token from the session.
+func authenticateSession(authenticator *auth.Authenticator, required bool) web.Middleware {
+
+	// This is the actual middleware function to be executed.
+	f := func(after web.Handler) web.Handler {
+
+		// Wrap this handler around the next one provided.
+		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.AuthenticateSession")
+			defer span.Finish()
+
+			m := func() error {
+				tknStr, ok := webcontext.ContextAccessToken(ctx)
+				if !ok || tknStr == "" {
+					if required {
+						err := errors.New("missing AccessToken from session")
+						return weberror.NewError(ctx, err, http.StatusUnauthorized)
+					} else {
+						return nil
+					}
 				}
 
 				claims, err := authenticator.ParseClaims(tknStr)

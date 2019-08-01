@@ -27,6 +27,11 @@ type Signup struct {
 // Step1 handles collecting the first detailed needed to create a new account.
 func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
 	//
 	req := new(signup.SignupRequest)
 	data := make(map[string]interface{})
@@ -46,7 +51,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Execute the account / user signup.
-			res, err := signup.Signup(ctx, claims, h.MasterDB, *req, time.Now())
+			_, err = signup.Signup(ctx, claims, h.MasterDB, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case account.ErrForbidden:
@@ -54,21 +59,27 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
+						return nil
 					} else {
 						return err
 					}
 				}
-			} else {
-				// Authenticated the new user.
-				userAuth, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, res.User.Email, req.User.Password, time.Hour, time.Now())
-				if err != nil {
-					return err
-				}
-
-				_ = userAuth.Expiry
-				_ = userAuth.AccessToken
 			}
 
+			// Authenticated the new user.
+			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, req.User.Email, req.User.Password, time.Hour, ctxValues.Now)
+			if err != nil {
+				return err
+			}
+
+			// Add the token to the users session.
+			err = handleSessionToken(ctx, w, r, token)
+			if err != nil {
+				return err
+			}
+
+			// Redirect the user to the dashboard.
+			http.Redirect(w, r, "/", http.StatusFound)
 		}
 
 		return nil

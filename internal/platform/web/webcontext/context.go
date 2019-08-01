@@ -8,10 +8,10 @@ import (
 )
 
 // ctxKey represents the type of value for the context key.
-type ctxKey int
+type ctxKeyValues int
 
 // KeyValues is how request values or stored/retrieved.
-const KeyValues ctxKey = 1
+const KeyValues ctxKeyValues = 1
 
 var ErrContextRequired = errors.New("web value missing from context")
 

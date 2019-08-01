@@ -96,7 +96,7 @@ func RespondJson(ctx context.Context, w http.ResponseWriter, data interface{}, s
 // RespondError sends an error back to the client as plain text with
 // the status code 500 Internal Service Error
 func RespondError(ctx context.Context, w http.ResponseWriter, er error) error {
-	return RespondErrorStatus(ctx, w, er, 0)
+	return RespondErrorStatus(ctx, w, er, http.StatusInternalServerError)
 }
 
 // RespondErrorStatus sends an error back to the client as plain text with

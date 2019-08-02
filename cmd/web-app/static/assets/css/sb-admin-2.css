@@ -11641,20 +11641,20 @@ a:focus {
 }
 
 .bg-login-image {
-  background: url("https://source.unsplash.com/K4mSJ7kc0As/600x800");
-  background-position: center;
+  background: url("https://dzuyel7n94hma.cloudfront.net/accelerator/img/saas-starter-kit-go-lang-login-600x800.png");
+  background-position: top center;
   background-size: cover;
 }
 
 .bg-register-image {
-  background: url("https://source.unsplash.com/Mv9hjnEUHR4/600x800");
-  background-position: center;
+  background: url("https://dzuyel7n94hma.cloudfront.net/accelerator/img/saas-starter-kit-go-lang-join-600x1000.png");
+  background-position: top center;
   background-size: cover;
 }
 
 .bg-password-image {
-  background: url("https://source.unsplash.com/oWTW-jNGl9I/600x800");
-  background-position: center;
+  background: url("https://dzuyel7n94hma.cloudfront.net/accelerator/img/saas-starter-kit-go-lang-green-600x800.png");
+  background-position: top center;
   background-size: cover;
 }
 
@@ -11673,6 +11673,19 @@ form.user .btn-user {
   border-radius: 10rem;
   padding: 0.75rem 1rem;
 }
+
+.form-control-select-wrapper {
+  font-size: 0.8rem;
+  border-radius: 10rem;
+  padding: .55rem 1rem;
+  border: 1px solid #d1d3e2;
+}
+.form-control-select-box {
+  font-size: 0.8rem;
+  padding: 0;
+  border: 0px;
+}
+
 
 .btn-google {
   color: #fff;

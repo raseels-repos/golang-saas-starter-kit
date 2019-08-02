@@ -7,15 +7,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func Migrate(masterDb *sqlx.DB, log *log.Logger) error {
+func Migrate(masterDb *sqlx.DB, log *log.Logger, isUnittest bool) error {
 	// Load list of Schema migrations and init new sqlxmigrate client
-	migrations := migrationList(masterDb, log)
+	migrations := migrationList(masterDb, log, isUnittest)
 	m := sqlxmigrate.New(masterDb, sqlxmigrate.DefaultOptions, migrations)
 	m.SetLogger(log)
 
 	// Append any schema that need to be applied if this is a fresh migration
 	// ie. the migrations database table does not exist.
-	m.InitSchema(initSchema(masterDb, log))
+	m.InitSchema(initSchema(masterDb, log, isUnittest))
 
 	// Execute the migrations
 	return m.Migrate()

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	tmplLayoutBase          = "base.tmpl"
+	tmplLayoutBase          = "base.gohtml"
 	tmplContentErrorGeneric = "error-generic.gohtml"
 )
 

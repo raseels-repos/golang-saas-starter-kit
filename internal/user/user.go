@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 const (
@@ -278,23 +277,17 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Create")
 	defer span.Finish()
 
+	v := webcontext.Validator()
+
 	// Validation email address is unique in the database.
 	uniq, err := UniqueEmail(ctx, dbConn, req.Email, "")
 	if err != nil {
 		return nil, err
 	}
-	f := func(fl validator.FieldLevel) bool {
-		if fl.Field().String() == "invalid" {
-			return false
-		}
-		return uniq
-	}
-
-	v := webcontext.Validator()
-	v.RegisterValidation("unique", f)
+	ctx = context.WithValue(ctx, webcontext.KeyTagUnique, uniq)
 
 	// Validate the request.
-	err = v.Struct(req)
+	err = v.StructCtx(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -394,21 +387,18 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 
 	// Validation email address is unique in the database.
 	if req.Email != nil {
+		// Validation email address is unique in the database.
 		uniq, err := UniqueEmail(ctx, dbConn, *req.Email, req.ID)
 		if err != nil {
 			return err
 		}
-		f := func(fl validator.FieldLevel) bool {
-			if fl.Field().String() == "invalid" {
-				return false
-			}
-			return uniq
-		}
-		v.RegisterValidation("unique", f)
+		ctx = context.WithValue(ctx, webcontext.KeyTagUnique, uniq)
+	} else {
+		ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
 	}
 
 	// Validate the request.
-	err := v.Struct(req)
+	err := v.StructCtx(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -437,10 +427,10 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 
 	var fields []string
 	if req.FirstName != nil {
-		fields = append(fields, query.Assign("name", req.FirstName))
+		fields = append(fields, query.Assign("first_name", req.FirstName))
 	}
 	if req.LastName != nil {
-		fields = append(fields, query.Assign("name", req.LastName))
+		fields = append(fields, query.Assign("last_name", req.LastName))
 	}
 	if req.Email != nil {
 		fields = append(fields, query.Assign("email", req.Email))

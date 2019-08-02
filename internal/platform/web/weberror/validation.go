@@ -2,7 +2,6 @@ package weberror
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -44,7 +43,7 @@ func NewValidationError(ctx context.Context, err error) (error, bool) {
 		fieldErr = strings.Replace(fieldErr, "}}", "", -1)
 
 		field := FieldError{
-			Field:     verror.Field(),
+			Field:     fieldName,
 			Value:     verror.Value(),
 			Tag:       verror.Tag(),
 			Error:     fieldErr,
@@ -52,12 +51,12 @@ func NewValidationError(ctx context.Context, err error) (error, bool) {
 			Display:   fieldErr,
 		}
 
-		switch verror.Tag() {
-		case "required":
-			field.Display = fmt.Sprintf("%s is required.", localName)
-		case "unique":
-			field.Display = fmt.Sprintf("%s must be unique.", localName)
-		}
+		//switch verror.Tag() {
+		//case "required":
+		//	field.Display = fmt.Sprintf("%s is required.", localName)
+		//case "unique":
+		//	field.Display = fmt.Sprintf("%s must be unique.", localName)
+		//}
 
 		/*
 			fmt.Println("field", field.Error)

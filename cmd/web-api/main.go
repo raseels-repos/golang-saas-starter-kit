@@ -443,7 +443,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, serviceMiddlewares...),
+			Handler:        handlers.API(shutdown, log, cfg.Env, masterDb, redisClient, authenticator, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -460,7 +460,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.API(shutdown, log, masterDb, redisClient, authenticator, serviceMiddlewares...),
+			Handler:        handlers.API(shutdown, log, cfg.Env, masterDb, redisClient, authenticator, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

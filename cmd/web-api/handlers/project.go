@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,7 +53,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if v := r.URL.Query().Get("where"); v != "" {
 		where, args, err := web.ExtractWhereArgs(v)
 		if err != nil {
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		req.Where = &where
 		req.Args = args
@@ -72,7 +74,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for limit param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
@@ -83,7 +85,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for offset param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
@@ -94,14 +96,14 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		b, err := strconv.ParseBool(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		req.IncludedArchived = b
 	}
 
 	//if err := web.Decode(r, &req); err != nil {
 	//	if _, ok := errors.Cause(err).(*web.Error); !ok {
-	//		err = web.NewRequestError(err, http.StatusBadRequest)
+	//		err = weberror.NewError(ctx, err, http.StatusBadRequest)
 	//	}
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
@@ -144,7 +146,7 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		b, err := strconv.ParseBool(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
@@ -154,7 +156,7 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		cause := errors.Cause(err)
 		switch cause {
 		case project.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
 		}
@@ -178,20 +180,20 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects [post]
 func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req project.ProjectCreateRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
@@ -201,11 +203,11 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 		cause := errors.Cause(err)
 		switch cause {
 		case project.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 			return errors.Wrapf(err, "Project: %+v", &req)
 		}
@@ -228,34 +230,34 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects [patch]
 func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req project.ProjectUpdateRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err := project.Update(ctx, claims, p.MasterDB, req, v.Now)
+	err = project.Update(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case project.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "ID: %s Update: %+v", req.ID, req)
@@ -279,34 +281,34 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects/archive [patch]
 func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req project.ProjectArchiveRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err := project.Archive(ctx, claims, p.MasterDB, req, v.Now)
+	err = project.Archive(ctx, claims, p.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case project.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "Id: %s", req.ID)
@@ -330,21 +332,21 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Failure 500 {object} web.ErrorResponse
 // @Router /projects/{id} [delete]
 func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
-	err := project.Delete(ctx, claims, p.MasterDB, params["id"])
+	err = project.Delete(ctx, claims, p.MasterDB, params["id"])
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case project.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "Id: %s", params["id"])

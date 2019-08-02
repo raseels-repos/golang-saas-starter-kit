@@ -31,7 +31,7 @@ const (
 )
 
 // RespondJsonError sends an error formatted as JSON response back to the client.
-func RespondJsonError(ctx context.Context, w http.ResponseWriter, err error) error {
+func RespondJsonError(ctx context.Context, w http.ResponseWriter, er error) error {
 
 	// Set the status code for the request logger middleware.
 	// If the context is missing this value, request the service
@@ -41,9 +41,13 @@ func RespondJsonError(ctx context.Context, w http.ResponseWriter, err error) err
 		return err
 	}
 
-	// If the error was of the type *Error, the handler has
-	// a specific status code and error to return.
-	webErr := weberror.NewError(ctx, err, v.StatusCode).(*weberror.Error)
+	webErr, ok := er.(*weberror.Error)
+	if !ok {
+		// If the error was of the type *Error, the handler has
+		// a specific status code and error to return.
+		webErr = weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
+	}
+
 	v.StatusCode = webErr.Status
 
 	return RespondJson(ctx, w, webErr.Display(ctx), webErr.Status)

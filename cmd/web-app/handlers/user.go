@@ -107,7 +107,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "user-login.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "user-login.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
 // handleSessionToken persists the access token to the session for request authentication.

@@ -12,6 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"github.com/pborman/uuid"
 )
@@ -90,7 +91,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			if len(expectedMap) == 0 {
 				printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
 			}
@@ -156,17 +157,17 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -195,17 +196,17 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -340,17 +341,15 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -416,17 +415,17 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -455,17 +454,17 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -497,17 +496,15 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -537,17 +534,15 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -575,17 +570,15 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -626,20 +619,27 @@ func TestProjectCreate(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "status", Error: "Key: 'ProjectCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "status", Error: "Key: 'ProjectCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+				{
+					Field:   "status",
+					Value:   invalidStatus.String(),
+					Tag:     "oneof",
+					Error:   "status must be one of [active disabled]",
+					Display: "status must be one of [active disabled]",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -681,20 +681,27 @@ func TestProjectUpdate(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "status", Error: "Key: 'ProjectUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "status", Error: "Key: 'ProjectUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+				{
+					Field:   "status",
+					Value:   invalidStatus.String(),
+					Tag:     "oneof",
+					Error:   "status must be one of [active disabled]",
+					Display: "status must be one of [active disabled]",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -716,12 +723,14 @@ func TestProjectArchive(t *testing.T) {
 	{
 		expectedStatus := http.StatusBadRequest
 
+		invalidId := "a"
+
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
 			"/v1/projects/archive",
 			project.ProjectArchiveRequest{
-				ID: "a",
+				ID: invalidId,
 			},
 			tr.Token,
 			tr.Claims,
@@ -736,20 +745,27 @@ func TestProjectArchive(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'ProjectArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "id", Error: "Key: 'ProjectArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				{
+					Field:   "id",
+					Value:   invalidId,
+					Tag:     "uuid",
+					Error:   "id must be a valid UUID",
+					Display: "id must be a valid UUID",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -779,17 +795,17 @@ func TestProjectArchive(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: project.ErrForbidden.Error(),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -811,10 +827,12 @@ func TestProjectDelete(t *testing.T) {
 	{
 		expectedStatus := http.StatusBadRequest
 
+		invalidId := "a"
+
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodDelete,
-			"/v1/projects/a",
+			"/v1/projects/" + invalidId,
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -829,20 +847,27 @@ func TestProjectDelete(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				{
+					Field:   "id",
+					Value:   invalidId,
+					Tag:     "uuid",
+					Error:   "id must be a valid UUID",
+					Display: "id must be a valid UUID",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -870,17 +895,17 @@ func TestProjectDelete(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: project.ErrForbidden.Error(),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)

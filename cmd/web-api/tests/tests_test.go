@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -81,7 +83,7 @@ func testMain(m *testing.M) int {
 
 	log := test.Log
 	log.SetOutput(ioutil.Discard)
-	a = handlers.API(shutdown, log, test.MasterDB, nil, authenticator)
+	a = handlers.API(shutdown, log, webcontext.Env_Dev, test.MasterDB, nil, authenticator)
 
 	// Create a new account directly business logic. This creates an
 	// initial account and user that we will use for admin validated endpoints.
@@ -122,7 +124,8 @@ func testMain(m *testing.M) int {
 
 	// Create a regular user to use when calling regular validated endpoints.
 	userReq := user.UserCreateRequest{
-		Name:            "Lucas Brown",
+		FirstName:       "Lucas",
+		LastName:        "Brown",
 		Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 		Password:        "akTechFr0n!ier",
 		PasswordConfirm: "akTechFr0n!ier",
@@ -204,7 +207,7 @@ func executeRequestTest(t *testing.T, tt requestTest, ctx context.Context) (*htt
 	}
 
 	if tt.error != nil {
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tBody : %s\n", w.Body.String())
 			t.Logf("\t\tGot error : %+v", err)

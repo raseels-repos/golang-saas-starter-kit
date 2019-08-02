@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"testing"
 
@@ -115,7 +116,7 @@ func TestAccountCRUDAdmin(t *testing.T) {
 			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected result.", tests.Success)
@@ -144,17 +145,17 @@ func TestAccountCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("account %s not found: Entity not found", randID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -182,17 +183,17 @@ func TestAccountCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -329,7 +330,7 @@ func TestAccountCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected result.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected result.", tests.Success)
@@ -358,17 +359,17 @@ func TestAccountCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("account %s not found: Entity not found", randID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -396,17 +397,17 @@ func TestAccountCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -438,17 +439,14 @@ func TestAccountCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
-
-		if diff := cmpDiff(t, actual, expected); diff {
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -490,20 +488,27 @@ func TestAccountUpdate(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "status", Error: "Key: 'AccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "status", Error: "Key: 'AccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+				{
+					Field:   "status",
+					Value:   invalidStatus.String(),
+					Tag:     "oneof",
+					Error:   "status must be one of [active pending disabled]",
+					Display: "status must be one of [active pending disabled]",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)

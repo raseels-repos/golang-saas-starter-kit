@@ -12,6 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"github.com/pborman/uuid"
@@ -37,7 +38,8 @@ func mockSignupRequest() signup.SignupRequest {
 			Zipcode:  "99686",
 		},
 		User: signup.SignupUser{
-			Name:            "Lee Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -114,7 +116,8 @@ func TestSignup(t *testing.T) {
 		expectedMap := map[string]interface{}{
 			"user": map[string]interface{}{
 				"id":         actual.User.ID,
-				"name":       req.User.Name,
+				"first_name": req.User.FirstName,
+				"last_name":  req.User.LastName,
 				"email":      req.User.Email,
 				"timezone":   actual.User.Timezone,
 				"created_at": web.NewTimeResponse(ctx, actual.User.CreatedAt.Value),
@@ -149,7 +152,7 @@ func TestSignup(t *testing.T) {
 			t.Fatalf("\t%s\tDecode expected failed.", tests.Failed)
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			if len(expectedMap) == 0 {
 				printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
 			}
@@ -180,17 +183,17 @@ func TestSignup(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "decode request body failed: EOF",
+		expected := weberror.ErrorResponse{
+			Error: "decode request body failed",
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -221,21 +224,36 @@ func TestSignup(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "name", Error: "Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag"},
-				{Field: "email", Error: "Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "name", Error: "Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag"},
+				//{Field: "email", Error: "Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag"},
+
+				{
+					Field:   "name",
+					Value:   "",
+					Tag:     "required",
+					Error:   "Name is a required field",
+					Display: "Name is a required field",
+				},
+				{
+					Field:   "email",
+					Value:   "",
+					Tag:     "required",
+					Error:   "email is a required field",
+					Display: "email is a required field",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -50,7 +52,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 	if v := r.URL.Query().Get("where"); v != "" {
 		where, args, err := web.ExtractWhereArgs(v)
 		if err != nil {
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		req.Where = &where
 		req.Args = args
@@ -71,7 +73,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for limit param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
@@ -82,7 +84,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as int for offset param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		ul := uint(l)
 		req.Limit = &ul
@@ -93,14 +95,14 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 		b, err := strconv.ParseBool(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		req.IncludedArchived = b
 	}
 
 	//if err := web.Decode(r, &req); err != nil {
 	//	if _, ok := errors.Cause(err).(*web.Error); !ok {
-	//		err = web.NewRequestError(err, http.StatusBadRequest)
+	//		err = weberror.NewError(ctx, err, http.StatusBadRequest)
 	//	}
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
@@ -143,7 +145,7 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 		b, err := strconv.ParseBool(v)
 		if err != nil {
 			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
@@ -153,7 +155,7 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 		cause := errors.Cause(err)
 		switch cause {
 		case user_account.ErrNotFound:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusNotFound))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
 		}
@@ -177,20 +179,20 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts [post]
 func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req user_account.UserAccountCreateRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
@@ -200,11 +202,11 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 		cause := errors.Cause(err)
 		switch cause {
 		case user_account.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "User Account: %+v", &req)
@@ -228,34 +230,34 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts [patch]
 func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req user_account.UserAccountUpdateRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err := user_account.Update(ctx, claims, u.MasterDB, req, v.Now)
+	err = user_account.Update(ctx, claims, u.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case user_account.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "UserID: %s AccountID: %s  User Account: %+v", req.UserID, req.AccountID, &req)
@@ -279,34 +281,34 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts/archive [patch]
 func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req user_account.UserAccountArchiveRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err := user_account.Archive(ctx, claims, u.MasterDB, req, v.Now)
+	err = user_account.Archive(ctx, claims, u.MasterDB, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case user_account.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "UserID: %s AccountID: %s  User Account: %+v", req.UserID, req.AccountID, &req)
@@ -330,29 +332,29 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 // @Failure 500 {object} web.ErrorResponse
 // @Router /user_accounts [delete]
 func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	claims, ok := ctx.Value(auth.Key).(auth.Claims)
-	if !ok {
-		return errors.New("claims missing from context")
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
 	}
 
 	var req user_account.UserAccountDeleteRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err := user_account.Delete(ctx, claims, u.MasterDB, req)
+	err = user_account.Delete(ctx, claims, u.MasterDB, req)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case user_account.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "UserID: %s, AccountID: %s", req.UserID, req.AccountID)

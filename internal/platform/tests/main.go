@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"io"
 	"log"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
@@ -94,7 +94,7 @@ func New() *Test {
 		}
 
 		// Execute the migrations
-		if err = schema.Migrate(masterDB, log); err != nil {
+		if err = schema.Migrate(masterDB, log, true); err != nil {
 			log.Fatalf("main : Migrate : %v", err)
 		}
 		log.Printf("main : Migrate : Completed")
@@ -126,10 +126,10 @@ func Recover(t *testing.T) {
 
 // Context returns an app level context for testing.
 func Context() context.Context {
-	values := web.Values{
+	values := webcontext.Values{
 		TraceID: uint64(time.Now().UnixNano()),
 		Now:     time.Now(),
 	}
 
-	return context.WithValue(context.Background(), web.KeyValues, &values)
+	return context.WithValue(context.Background(), webcontext.KeyValues, &values)
 }

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
@@ -32,18 +34,18 @@ type Signup struct {
 // @Failure 500 {object} web.ErrorResponse
 // @Router /signup [post]
 func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
-	if !ok {
-		return web.NewShutdownError("web value missing from context")
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
 	}
 
 	// Claims are optional as authentication is not required ATM for this method.
-	claims, _ := ctx.Value(auth.Key).(auth.Claims)
+	claims, _ := auth.ClaimsFromContext(ctx)
 
 	var req signup.SignupRequest
-	if err := web.Decode(r, &req); err != nil {
-		if _, ok := errors.Cause(err).(*web.Error); !ok {
-			err = web.NewRequestError(err, http.StatusBadRequest)
+	if err := web.Decode(ctx, r, &req); err != nil {
+		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+			err = weberror.NewError(ctx, err, http.StatusBadRequest)
 		}
 		return web.RespondJsonError(ctx, w, err)
 	}
@@ -52,11 +54,11 @@ func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		switch errors.Cause(err) {
 		case account.ErrForbidden:
-			return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusForbidden))
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := err.(validator.ValidationErrors)
 			if ok {
-				return web.RespondJsonError(ctx, w, web.NewRequestError(err, http.StatusBadRequest))
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
 
 			return errors.Wrapf(err, "Signup: %+v", &req)

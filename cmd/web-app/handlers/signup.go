@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"net/http"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -104,5 +104,5 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "signup-step1.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "signup-step1.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

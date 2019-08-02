@@ -34,7 +34,10 @@ func ContextWithTranslator(ctx context.Context, translator ut.Translator) contex
 
 // ContextTranslator returns the universal context from a context.
 func ContextTranslator(ctx context.Context) ut.Translator {
-	return ctx.Value(KeyTranslate).(ut.Translator)
+	if t, ok := ctx.Value(KeyTranslate).(ut.Translator); ok {
+		return t
+	}
+	return uniTrans.GetFallback()
 }
 
 // validate holds the settings and caches for validating request struct values.
@@ -122,6 +125,10 @@ func init() {
 
 }
 
+type ctxKeyTagUnique int
+
+const KeyTagUnique ctxKeyTagUnique = 1
+
 // newValidator inits a new validator with custom settings.
 func newValidator() *validator.Validate {
 	var v = validator.New()
@@ -139,9 +146,17 @@ func newValidator() *validator.Validate {
 
 	// Empty method that can be overwritten in business logic packages to prevent web.Decode from failing.
 	f := func(fl validator.FieldLevel) bool {
-		return true
+		return false
 	}
 	v.RegisterValidation("unique", f)
+
+	fctx := func(ctx context.Context, fl validator.FieldLevel) bool {
+		if fl.Field().String() == "invalid" {
+			return false
+		}
+		return ctx.Value(KeyTagUnique).(bool)
+	}
+	v.RegisterValidationCtx("unique", fctx)
 
 	return v
 }

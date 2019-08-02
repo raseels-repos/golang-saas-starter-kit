@@ -126,7 +126,7 @@ func main() {
 	// Start Migrations
 
 	// Execute the migrations
-	if err = schema.Migrate(masterDb, log); err != nil {
+	if err = schema.Migrate(masterDb, log, false); err != nil {
 		log.Fatalf("main : Migrate : %v", err)
 	}
 	log.Printf("main : Migrate : Completed")

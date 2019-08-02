@@ -13,6 +13,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/pborman/uuid"
@@ -25,7 +26,8 @@ type mockUser struct {
 
 func mockUserCreateRequest() user.UserCreateRequest {
 	return user.UserCreateRequest{
-		Name:            "Lee Brown",
+		FirstName:       "Lee",
+		LastName:        "Brown",
 		Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 		Password:        "akTechFr0n!ier",
 		PasswordConfirm: "akTechFr0n!ier",
@@ -101,7 +103,8 @@ func TestUserCRUDAdmin(t *testing.T) {
 			"email":      req.Email,
 			"timezone":   actual.Timezone,
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
-			"name":       req.Name,
+			"first_name": req.FirstName,
+			"last_name":  req.LastName,
 		}
 
 		var expected user.UserResponse
@@ -187,13 +190,13 @@ func TestUserCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
 		}
 
@@ -225,13 +228,13 @@ func TestUserCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
 		}
 
@@ -251,8 +254,8 @@ func TestUserCRUDAdmin(t *testing.T) {
 			http.MethodPatch,
 			"/v1/users",
 			user.UserUpdateRequest{
-				ID:   created.ID,
-				Name: &newName,
+				ID:        created.ID,
+				FirstName: &newName,
 			},
 			tr.Token,
 			tr.Claims,
@@ -415,6 +418,7 @@ func TestUserCRUDAdmin(t *testing.T) {
 			"access_token": actual["access_token"],
 			"token_type":   actual["token_type"],
 			"expiry":       actual["expiry"],
+			"ttl":          actual["ttl"],
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -471,15 +475,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -547,13 +549,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
 		}
 
@@ -585,13 +587,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
 		}
 
@@ -611,8 +613,8 @@ func TestUserCRUDUser(t *testing.T) {
 			http.MethodPatch,
 			"/v1/users",
 			user.UserUpdateRequest{
-				ID:   created.ID,
-				Name: &newName,
+				ID:        created.ID,
+				FirstName: &newName,
 			},
 			tr.Token,
 			tr.Claims,
@@ -627,13 +629,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrForbidden.Error(),
 		}
 
@@ -670,13 +672,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrForbidden.Error(),
 		}
 
@@ -710,15 +712,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -748,15 +748,13 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: mid.ErrForbidden.Error(),
-		}
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -807,6 +805,7 @@ func TestUserCRUDUser(t *testing.T) {
 			"access_token": actual["access_token"],
 			"token_type":   actual["token_type"],
 			"expiry":       actual["expiry"],
+			"ttl":          actual["ttl"],
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -864,16 +863,23 @@ func TestUserCreate(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "email", Error: "Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "email", Error: "Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
+				{
+					Field:   "email",
+					Value:   req.Email,
+					Tag:     "email",
+					Error:   "email must be a valid email address",
+					Display: "email must be a valid email address",
+				},
 			},
 		}
 
@@ -919,16 +925,23 @@ func TestUserUpdate(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "email", Error: "Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "email", Error: "Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
+				{
+					Field:   "email",
+					Value:   invalidEmail,
+					Tag:     "email",
+					Error:   "email must be a valid email address",
+					Display: "email must be a valid email address",
+				},
 			},
 		}
 
@@ -956,6 +969,8 @@ func TestUserUpdatePassword(t *testing.T) {
 		expectedStatus := http.StatusBadRequest
 
 		newPass := uuid.NewRandom().String()
+		diffPass := "different"
+
 		rt := requestTest{
 			fmt.Sprintf("Update password %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
@@ -963,7 +978,7 @@ func TestUserUpdatePassword(t *testing.T) {
 			user.UserUpdatePasswordRequest{
 				ID:              created.ID,
 				Password:        newPass,
-				PasswordConfirm: "different",
+				PasswordConfirm: diffPass,
 			},
 			tr.Token,
 			tr.Claims,
@@ -978,16 +993,23 @@ func TestUserUpdatePassword(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "password_confirm", Error: "Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'eqfield' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "password_confirm", Error: "Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'eqfield' tag"},
+				{
+					Field:   "password_confirm",
+					Value:   diffPass,
+					Tag:     "eqfield",
+					Error:   "password_confirm must be equal to Password",
+					Display: "password_confirm must be equal to Password",
+				},
 			},
 		}
 
@@ -1011,12 +1033,14 @@ func TestUserArchive(t *testing.T) {
 	{
 		expectedStatus := http.StatusBadRequest
 
+		invalidId := "a"
+
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
 			"/v1/users/archive",
 			user.UserArchiveRequest{
-				ID: "a",
+				ID: invalidId,
 			},
 			tr.Token,
 			tr.Claims,
@@ -1031,16 +1055,23 @@ func TestUserArchive(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'UserArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "id", Error: "Key: 'UserArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				{
+					Field:   "id",
+					Value:   invalidId,
+					Tag:     "uuid",
+					Error:   "id must be a valid UUID",
+					Display: "id must be a valid UUID",
+				},
 			},
 		}
 
@@ -1074,13 +1105,13 @@ func TestUserArchive(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrForbidden.Error(),
 		}
 
@@ -1104,10 +1135,12 @@ func TestUserDelete(t *testing.T) {
 	{
 		expectedStatus := http.StatusBadRequest
 
+		invalidId := "345345"
+
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodDelete,
-			"/v1/users/345345",
+			fmt.Sprintf("/v1/users/%s", invalidId),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -1122,16 +1155,23 @@ func TestUserDelete(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				//{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				{
+					Field:   "id",
+					Value:   invalidId,
+					Tag:     "uuid",
+					Error:   "id must be a valid UUID",
+					Display: "id must be a valid UUID",
+				},
 			},
 		}
 
@@ -1163,13 +1203,13 @@ func TestUserDelete(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrForbidden.Error(),
 		}
 
@@ -1193,10 +1233,12 @@ func TestUserSwitchAccount(t *testing.T) {
 	{
 		expectedStatus := http.StatusBadRequest
 
+		invalidAccountId := "sf"
+
 		rt := requestTest{
 			fmt.Sprintf("Switch account %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/users/switch-account/sf",
+			"/v1/users/switch-account/" + invalidAccountId,
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -1211,20 +1253,26 @@ func TestUserSwitchAccount(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
-			Error: "field validation error",
-			Fields: []web.FieldError{
-				{Field: "account_id", Error: "Key: 'account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
+		expected := weberror.ErrorResponse{
+			Error: "Field validation error",
+			Fields: []weberror.FieldError{
+				{
+					Field:   "account_id",
+					Value:   invalidAccountId,
+					Tag:     "uuid",
+					Error:   "account_id must be a valid UUID",
+					Display: "account_id must be a valid UUID",
+				},
 			},
 		}
 
-		if diff := cmpDiff(t, actual, expected); diff {
+		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
 		t.Logf("\t%s\tReceived expected error.", tests.Success)
@@ -1252,13 +1300,13 @@ func TestUserSwitchAccount(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrAuthenticationFailure.Error(),
 		}
 
@@ -1295,13 +1343,13 @@ func TestUserToken(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: "must provide email and password in Basic auth",
 		}
 
@@ -1342,13 +1390,13 @@ func TestUserToken(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual web.ErrorResponse
+		var actual weberror.ErrorResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := web.ErrorResponse{
+		expected := weberror.ErrorResponse{
 			Error: user.ErrAuthenticationFailure.Error(),
 		}
 
@@ -1390,13 +1438,13 @@ func TestUserToken(t *testing.T) {
 			}
 			t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-			var actual web.ErrorResponse
+			var actual weberror.ErrorResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 				t.Logf("\t\tGot error : %+v", err)
 				t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 			}
 
-			expected := web.ErrorResponse{
+			expected := weberror.ErrorResponse{
 				Error: user.ErrAuthenticationFailure.Error(),
 			}
 
@@ -1450,6 +1498,7 @@ func TestUserToken(t *testing.T) {
 				"access_token": actual["access_token"],
 				"token_type":   actual["token_type"],
 				"expiry":       actual["expiry"],
+				"ttl":          actual["ttl"],
 			}
 
 			if diff := cmpDiff(t, actual, expected); diff {

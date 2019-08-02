@@ -152,7 +152,8 @@ func TestCreateValidation(t *testing.T) {
 			errors.New("Key: 'UserCreateRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
 				"Key: 'UserCreateRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
 				"Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
-				"Key: 'UserCreateRequest.password' Error:Field validation for 'password' failed on the 'required' tag"),
+				"Key: 'UserCreateRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
+				"Key: 'UserCreateRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag"),
 		},
 		{"Valid Email",
 			UserCreateRequest{
@@ -224,15 +225,16 @@ func TestCreateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
 						expectStr = tt.error.Error()
 					}
 					if errStr != expectStr {
-						t.Logf("\t\tGot : %+v", err)
-						t.Logf("\t\tWant: %+v", tt.error)
+						t.Logf("\t\tGot : %+v", errStr)
+						t.Logf("\t\tWant: %+v", expectStr)
 						t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 					}
 				}
@@ -290,8 +292,11 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		if err.Error() != expectedErr.Error() {
-			t.Logf("\t\tGot : %+v", err)
+		errStr := strings.Replace(err.Error(), "{{", "", -1)
+		errStr = strings.Replace(errStr, "}}", "", -1)
+
+		if errStr != expectedErr.Error() {
+			t.Logf("\t\tGot : %+v", errStr)
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
@@ -422,15 +427,16 @@ func TestUpdateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
 						expectStr = tt.error.Error()
 					}
 					if errStr != expectStr {
-						t.Logf("\t\tGot : %+v", err)
-						t.Logf("\t\tWant: %+v", tt.error)
+						t.Logf("\t\tGot : %+v", errStr)
+						t.Logf("\t\tWant: %+v", expectStr)
 						t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 					}
 				}
@@ -488,8 +494,11 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 		}
 
-		if err.Error() != expectedErr.Error() {
-			t.Logf("\t\tGot : %+v", err)
+		errStr := strings.Replace(err.Error(), "{{", "", -1)
+		errStr = strings.Replace(errStr, "}}", "", -1)
+
+		if errStr != expectedErr.Error() {
+			t.Logf("\t\tGot : %+v", errStr)
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 		}
@@ -547,13 +556,19 @@ func TestUpdatePassword(t *testing.T) {
 
 		// Ensure validation is working by trying UpdatePassword with an empty request.
 		expectedErr := errors.New("Key: 'UserUpdatePasswordRequest.id' Error:Field validation for 'id' failed on the 'required' tag\n" +
-			"Key: 'UserUpdatePasswordRequest.password' Error:Field validation for 'password' failed on the 'required' tag")
+			"Key: 'UserUpdatePasswordRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
+			"Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
 		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{}, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
-		} else if err.Error() != expectedErr.Error() {
-			t.Logf("\t\tGot : %+v", err)
+		}
+
+		errStr := strings.Replace(err.Error(), "{{", "", -1)
+		errStr = strings.Replace(errStr, "}}", "", -1)
+
+		if errStr != expectedErr.Error() {
+			t.Logf("\t\tGot : %+v", errStr)
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tValidation failed.", tests.Failed)
 		}

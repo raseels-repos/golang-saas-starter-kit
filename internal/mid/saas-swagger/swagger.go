@@ -3,6 +3,7 @@ package saasSwagger
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/pborman/uuid"
 	"html/template"
 	"net/http"
@@ -74,7 +75,7 @@ func SaasWrapHandler(confs ...func(c *Config)) web.Handler {
 			prefix = matches[1]
 		} else if len(matches) > 0 {
 			err := errors.WithMessagef(ErrNotFound, "page %s not found", r.RequestURI)
-			return web.NewRequestError(err, http.StatusNotFound)
+			return weberror.NewError(ctx, err, http.StatusNotFound)
 		}
 
 		// Default to index page.
@@ -92,7 +93,7 @@ func SaasWrapHandler(confs ...func(c *Config)) web.Handler {
 		case "doc.json":
 			doc, err := swag.ReadDoc()
 			if err != nil {
-				return web.NewRequestError(err, http.StatusInternalServerError)
+				return weberror.NewError(ctx, err, http.StatusInternalServerError)
 			}
 
 			// Replace the dynamic placeholder {RANDOM_UUID}

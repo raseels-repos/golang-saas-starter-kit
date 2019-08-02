@@ -12,7 +12,6 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 const (
@@ -262,23 +261,17 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Create")
 	defer span.Finish()
 
-	// Validation email address is unique in the database.
+	v := webcontext.Validator()
+
+	// Validation account name is unique in the database.
 	uniq, err := UniqueName(ctx, dbConn, req.Name, "")
 	if err != nil {
 		return nil, err
 	}
-	f := func(fl validator.FieldLevel) bool {
-		if fl.Field().String() == "invalid" {
-			return false
-		}
-		return uniq
-	}
-
-	v := webcontext.Validator()
-	v.RegisterValidation("unique", f)
+	ctx = context.WithValue(ctx, webcontext.KeyTagUnique, uniq)
 
 	// Validate the request.
-	err = v.Struct(req)
+	err = v.StructCtx(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -371,24 +364,19 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	v := webcontext.Validator()
 
-	// Validation name is unique in the database.
 	if req.Name != nil {
+		// Validation account name is unique in the database.
 		uniq, err := UniqueName(ctx, dbConn, *req.Name, req.ID)
 		if err != nil {
 			return err
 		}
-		f := func(fl validator.FieldLevel) bool {
-			if fl.Field().String() == "invalid" {
-				return false
-			}
-
-			return uniq
-		}
-		v.RegisterValidation("unique", f)
+		ctx = context.WithValue(ctx, webcontext.KeyTagUnique, uniq)
+	} else {
+		ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
 	}
 
 	// Validate the request.
-	err := v.Struct(req)
+	err := v.StructCtx(ctx, req)
 	if err != nil {
 		return err
 	}

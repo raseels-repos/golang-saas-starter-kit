@@ -232,15 +232,16 @@ func TestCreateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
 						expectStr = tt.error.Error()
 					}
 					if errStr != expectStr {
-						t.Logf("\t\tGot : %+v", err)
-						t.Logf("\t\tWant: %+v", tt.error)
+						t.Logf("\t\tGot : %+v", errStr)
+						t.Logf("\t\tWant: %+v", expectStr)
 						t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 					}
 				}
@@ -411,15 +412,16 @@ func TestUpdateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
 						expectStr = tt.error.Error()
 					}
 					if errStr != expectStr {
-						t.Logf("\t\tGot : %+v", err)
-						t.Logf("\t\tWant: %+v", tt.error)
+						t.Logf("\t\tGot : %+v", errStr)
+						t.Logf("\t\tWant: %+v", expectStr)
 						t.Fatalf("\t%s\tUpdate user account failed.", tests.Failed)
 					}
 				}

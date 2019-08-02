@@ -32,7 +32,7 @@ func testMain(m *testing.M) int {
 
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
-	where := "name = ? or address1 = ?"
+	where := "first_name = ? or address1 = ?"
 	var (
 		limit  uint = 12
 		offset uint = 34
@@ -41,7 +41,7 @@ func TestFindRequestQuery(t *testing.T) {
 	req := AccountFindRequest{
 		Where: &where,
 		Args: []interface{}{
-			"lee brown",
+			"lee",
 			"103 East Main St.",
 		},
 		Order: []string{
@@ -51,7 +51,7 @@ func TestFindRequestQuery(t *testing.T) {
 		Limit:  &limit,
 		Offset: &offset,
 	}
-	expected := "SELECT " + accountMapColumns + " FROM " + accountTableName + " WHERE (name = ? or address1 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+	expected := "SELECT " + accountMapColumns + " FROM " + accountTableName + " WHERE (first_name = ? or address1 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 
 	res, args := findRequestQuery(req)
 
@@ -223,7 +223,8 @@ func TestCreateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
@@ -293,8 +294,11 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
 
-		if err.Error() != expectedErr.Error() {
-			t.Logf("\t\tGot : %+v", err)
+		errStr := strings.Replace(err.Error(), "{{", "", -1)
+		errStr = strings.Replace(errStr, "}}", "", -1)
+
+		if errStr != expectedErr.Error() {
+			t.Logf("\t\tGot : %+v", errStr)
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
 		}
@@ -431,7 +435,8 @@ func TestUpdateValidation(t *testing.T) {
 					// 		 of type interface validator.ValidationErrorsTranslations
 					var errStr string
 					if err != nil {
-						errStr = err.Error()
+						errStr = strings.Replace(err.Error(), "{{", "", -1)
+						errStr = strings.Replace(errStr, "}}", "", -1)
 					}
 					var expectStr string
 					if tt.error != nil {
@@ -501,8 +506,11 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 		}
 
-		if err.Error() != expectedErr.Error() {
-			t.Logf("\t\tGot : %+v", err)
+		errStr := strings.Replace(err.Error(), "{{", "", -1)
+		errStr = strings.Replace(errStr, "}}", "", -1)
+
+		if errStr != expectedErr.Error() {
+			t.Logf("\t\tGot : %+v", errStr)
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 		}

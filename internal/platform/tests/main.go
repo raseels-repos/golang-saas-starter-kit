@@ -127,8 +127,9 @@ func Recover(t *testing.T) {
 // Context returns an app level context for testing.
 func Context() context.Context {
 	values := webcontext.Values{
-		TraceID: uint64(time.Now().UnixNano()),
-		Now:     time.Now(),
+		TraceID:   uint64(time.Now().UnixNano()),
+		Now:       time.Now(),
+		RequestIP: "68.69.35.104",
 	}
 
 	return context.WithValue(context.Background(), webcontext.KeyValues, &values)

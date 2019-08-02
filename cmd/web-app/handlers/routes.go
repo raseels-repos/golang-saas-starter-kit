@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"log"
 	"net/http"
 	"os"
@@ -23,7 +24,7 @@ const (
 )
 
 // API returns a handler for a set of routes.
-func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, projectRoutes project_routes.ProjectRoutes, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
+func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, projectRoutes project_routes.ProjectRoutes, secretKey string, notifyEmail notify.Email, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
@@ -50,13 +51,18 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		MasterDB:      masterDB,
 		Renderer:      renderer,
 		Authenticator: authenticator,
+		ProjectRoutes: projectRoutes,
+		NotifyEmail:   notifyEmail,
+		SecretKey:     secretKey,
 	}
 	// This route is not authenticated
 	app.Handle("POST", "/user/login", u.Login)
 	app.Handle("GET", "/user/login", u.Login)
 	app.Handle("GET", "/user/logout", u.Logout)
-	app.Handle("POST", "/user/forgot-password", u.ForgotPassword)
-	app.Handle("GET", "/user/forgot-password", u.ForgotPassword)
+	app.Handle("POST", "/user/reset-password/:hash", u.ResetConfirm)
+	app.Handle("GET", "/user/reset-password/:hash", u.ResetConfirm)
+	app.Handle("POST", "/user/reset-password", u.ResetPassword)
+	app.Handle("GET", "/user/reset-password", u.ResetPassword)
 
 	// Register user management and authentication endpoints.
 	s := Signup{

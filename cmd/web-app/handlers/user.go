@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"net/http"
 	"time"
 
@@ -23,6 +25,9 @@ type User struct {
 	MasterDB      *sqlx.DB
 	Renderer      web.Renderer
 	Authenticator *auth.Authenticator
+	ProjectRoutes project_routes.ProjectRoutes
+	NotifyEmail   notify.Email
+	SecretKey     string
 }
 
 type UserLoginRequest struct {
@@ -156,7 +161,156 @@ func (h *User) Logout(ctx context.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // List returns all the existing users in the system.
-func (h *User) ForgotPassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "user-forgot-password.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(user.UserResetPasswordRequest)
+	data := make(map[string]interface{})
+	f := func() error {
+
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return err
+			}
+
+			decoder := schema.NewDecoder()
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return err
+			}
+
+			if err := webcontext.Validator().Struct(req); err != nil {
+				if ne, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = ne.(*weberror.Error)
+					return nil
+				} else {
+					return err
+				}
+			}
+
+			_, err = user.ResetPassword(ctx, h.MasterDB, h.ProjectRoutes.UserResetPassword, h.NotifyEmail, *req, h.SecretKey, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return nil
+					} else {
+						return err
+					}
+				}
+			}
+
+			// Display a flash message!!!
+		}
+
+		return nil
+	}
+
+	if err := f(); err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, tmplLayoutBase, tmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	}
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user.UserResetPasswordRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "user-reset-password.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// List returns all the existing users in the system.
+func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(user.UserResetConfirmRequest)
+	data := make(map[string]interface{})
+	f := func() error {
+
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return err
+			}
+
+			decoder := schema.NewDecoder()
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return err
+			}
+
+			if err := webcontext.Validator().Struct(req); err != nil {
+				if ne, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = ne.(*weberror.Error)
+					return nil
+				} else {
+					return err
+				}
+			}
+
+			u, err := user.ResetConfirm(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return nil
+					} else {
+						return err
+					}
+				}
+			}
+
+			// Authenticated the user. Probably should use the default session TTL from UserLogin.
+			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				case account.ErrForbidden:
+					return web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return nil
+					} else {
+						return err
+					}
+				}
+			}
+
+			// Add the token to the users session.
+			err = handleSessionToken(ctx, w, r, token)
+			if err != nil {
+				return err
+			}
+
+			// Redirect the user to the dashboard.
+			http.Redirect(w, r, "/", http.StatusFound)
+		} else {
+			req.ResetHash = params["hash"]
+		}
+
+		return nil
+	}
+
+	if err := f(); err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, tmplLayoutBase, tmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	}
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user.UserResetConfirmRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "user-reset-confirm.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

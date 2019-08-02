@@ -42,6 +42,7 @@
         {"name": "WEB_APP_SERVICE_STATICFILES_S3_PREFIX", "value": "{STATIC_FILES_S3_PREFIX}"},
         {"name": "WEB_APP_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", "value": "{STATIC_FILES_CLOUDFRONT_ENABLED}"},
         {"name": "WEB_APP_SERVICE_STATICFILES_IMG_RESIZE_ENABLED", "value": "{STATIC_FILES_IMG_RESIZE_ENABLED}"},
+        {"name": "WEB_APP_EMAIL_SENDER", "value": "{EMAIL_SENDER}"},
         {"name": "WEB_APP_REDIS_HOST", "value": "{CACHE_HOST}"},
         {"name": "WEB_APP_DB_HOST", "value": "{DB_HOST}"},
         {"name": "WEB_APP_DB_USER", "value": "{DB_USER}"},

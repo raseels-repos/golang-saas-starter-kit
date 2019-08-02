@@ -24,6 +24,9 @@ COPY cmd/web-app ./cmd/web-app
 COPY cmd/web-app/templates /templates
 COPY cmd/web-app/static /static
 
+# Copy the global templates.
+ADD resources/templates/shared /templates/shared
+
 WORKDIR ./cmd/web-app
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /gosrv .
@@ -38,6 +41,7 @@ COPY --from=builder /static /static
 COPY --from=builder /templates /templates
 
 ENV TEMPLATE_DIR=/templates
+ENV SHARED_TEMPLATE_DIR=/templates/shared
 ENV STATIC_DIR=/static
 
 ARG service

@@ -1,0 +1,19 @@
+<link href="https://fonts.googleapis.com/css?family=Poppins|Roboto" rel="stylesheet">
+<style>
+    body {
+        font-family: 'Roboto', monospace;
+        font-size: 12px;
+        background: #ccc;
+        color: #333;
+        padding: 0 0 0 0;
+        margin: 0 0 0 0;
+    }
+</style>
+<div style="padding: 0% 10% 10% 10%">
+    <div style="padding: 10% 10% 10% 10%; background: white; word-wrap: break-word; border-radius: 10px 10px 10px 10px; ">
+        <p>{{ .FromUser.FirstName }} has invited you to join {{ .Account.Name }}.</p>
+        <p>To accept the invite, follow this link (or paste into your browser) within the next {{ .Minutes }} minutes.</p>
+        <p><a href="{{ .Url }}" target="_blank">{{ .Url }}</a></p>
+        <p>&nbsp;<br/>- Support </p>
+    </div>
+</div>

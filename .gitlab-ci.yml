@@ -92,6 +92,7 @@ webapp:deploy:dev:
     STATIC_FILES_S3: 'true'
     STATIC_FILES_IMG_RESIZE: 'true'
     AWS_USE_ROLE: 'true'
+    EMAIL_SENDER: 'lee@geeksinthewoods.com'
 
 webapi:build:dev:
   <<: *build_tmpl
@@ -131,6 +132,7 @@ webapi:deploy:dev:
     STATIC_FILES_S3: 'false'
     STATIC_FILES_IMG_RESIZE: 'false'
     AWS_USE_ROLE: 'true'
+    EMAIL_SENDER: 'lee@geeksinthewoods.com'
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

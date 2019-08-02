@@ -3,9 +3,13 @@ package user
 import (
 	"context"
 	"database/sql"
+	"github.com/sudo-suhas/symcrypto"
+	"strconv"
+	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -34,6 +38,9 @@ var (
 	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
 	// anything goes wrong.
 	ErrAuthenticationFailure = errors.New("Authentication failed")
+
+	// ErrResetExpired occurs when the the reset hash exceeds the expiration.
+	ErrResetExpired = errors.New("Reset expired")
 )
 
 // userMapColumns is the list of columns needed for mapRowsToUser
@@ -357,6 +364,74 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 	return &u, nil
 }
 
+// Create invite inserts a new user into the database.
+func CreateInvite(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCreateInviteRequest, now time.Time) (*User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.CreateInvite")
+	defer span.Finish()
+
+	v := webcontext.Validator()
+
+	// Validation email address is unique in the database.
+	uniq, err := UniqueEmail(ctx, dbConn, req.Email, "")
+	if err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, webcontext.KeyTagUnique, uniq)
+
+	// Validate the request.
+	err = v.StructCtx(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the request has claims from a specific user, ensure that the user
+	// has the correct role for creating a new user.
+	if claims.Subject != "" {
+		// Users with the role of admin are ony allows to create users.
+		if !claims.HasRole(auth.RoleAdmin) {
+			err = errors.WithStack(ErrForbidden)
+			return nil, err
+		}
+	}
+
+	// If now empty set it to the current time.
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// Always store the time as UTC.
+	now = now.UTC()
+
+	// Postgres truncates times to milliseconds when storing. We and do the same
+	// here so the value we return is consistent with what we store.
+	now = now.Truncate(time.Millisecond)
+
+	u := User{
+		ID:        uuid.NewRandom().String(),
+		Email:     req.Email,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Build the insert SQL statement.
+	query := sqlbuilder.NewInsertBuilder()
+	query.InsertInto(userTableName)
+	query.Cols("id", "email", "password_hash", "password_salt", "created_at", "updated_at")
+	query.Values(u.ID, u.Email, "", "", u.CreatedAt, u.UpdatedAt)
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = dbConn.Rebind(sql)
+	_, err = dbConn.ExecContext(ctx, sql, args...)
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "create user failed")
+		return nil, err
+	}
+
+	return &u, nil
+}
+
 // Read gets the specified user from the database.
 func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Read")
@@ -367,10 +442,10 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, i
 	query.Where(query.Equal("id", id))
 
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "user %s not found", id)
+	if err != nil {
 		return nil, err
-	} else if err != nil {
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "user %s not found", id)
 		return nil, err
 	}
 	u := res[0]
@@ -604,6 +679,57 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	return nil
 }
 
+// Unarchive undeletes the user from the database.
+func Unarchive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUnarchiveRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Unarchive")
+	defer span.Finish()
+
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the claims can modify the user specified in the request.
+	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	if err != nil {
+		return err
+	}
+
+	// If now empty set it to the current time.
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// Always store the time as UTC.
+	now = now.UTC()
+
+	// Postgres truncates times to milliseconds when storing. We and do the same
+	// here so the value we return is consistent with what we store.
+	now = now.Truncate(time.Millisecond)
+
+	// Build the update SQL statement.
+	query := sqlbuilder.NewUpdateBuilder()
+	query.Update(userTableName)
+	query.Set(
+		query.Assign("archived_at", nil),
+	)
+	query.Where(query.Equal("id", req.ID))
+
+	// Execute the query with the provided context.
+	sql, args := query.Build()
+	sql = dbConn.Rebind(sql)
+	_, err = dbConn.ExecContext(ctx, sql, args...)
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessagef(err, "unarchive user %s failed", req.ID)
+		return err
+	}
+
+	return nil
+}
+
 // Delete removes a user from the database.
 func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Delete")
@@ -681,4 +807,207 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID str
 	}
 
 	return nil
+}
+
+// ResetPassword sends en email to the user to allow them to reset their password.
+func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) string, notify notify.Email, req UserResetPasswordRequest, secretKey string, now time.Time) (string, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ResetPassword")
+	defer span.Finish()
+
+	v := webcontext.Validator()
+
+	// Validate the request.
+	err := v.StructCtx(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	// Find user by email address.
+	var u *User
+	{
+		query := selectQuery()
+		query.Where(query.Equal("email", req.Email))
+
+		res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
+		if err != nil {
+			return "", err
+		} else if res == nil || len(res) == 0 {
+			err = errors.WithMessagef(ErrNotFound, "No user found using '%s'.", req.Email)
+			return "", err
+		}
+		u = res[0]
+	}
+
+	// Update the user with a random string used to confirm the password reset.
+	resetId := uuid.NewRandom().String()
+	{
+		// Always store the time as UTC.
+		now = now.UTC()
+
+		// Postgres truncates times to milliseconds when storing. We and do the same
+		// here so the value we return is consistent with what we store.
+		now = now.Truncate(time.Millisecond)
+
+		// Build the update SQL statement.
+		query := sqlbuilder.NewUpdateBuilder()
+		query.Update(userTableName)
+		query.Set(
+			query.Assign("password_reset", resetId),
+			query.Assign("updated_at", now),
+		)
+		query.Where(query.Equal("id", u.ID))
+
+		// Execute the query with the provided context.
+		sql, args := query.Build()
+		sql = dbConn.Rebind(sql)
+		_, err = dbConn.ExecContext(ctx, sql, args...)
+		if err != nil {
+			err = errors.Wrapf(err, "query - %s", query.String())
+			err = errors.WithMessagef(err, "Update user %s failed.", u.ID)
+			return "", err
+		}
+	}
+
+	if req.TTL.Seconds() == 0 {
+		req.TTL = time.Minute * 90
+	}
+
+	// Load the current IP makings the request.
+	var requestIp string
+	if vals, _ := webcontext.ContextValues(ctx); vals != nil {
+		requestIp = vals.RequestIP
+	}
+
+	// Generate a string that embeds additional information.
+	hashPts := []string{
+		resetId,
+		strconv.Itoa(int(now.UTC().Unix())),
+		strconv.Itoa(int(now.UTC().Add(req.TTL).Unix())),
+		requestIp,
+	}
+	hashStr := strings.Join(hashPts, "|")
+
+	// This returns the nonce appended with the encrypted string for "hello world".
+	crypto, err := symcrypto.New(secretKey)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	encrypted, err := crypto.Encrypt(hashStr)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	data := map[string]interface{}{
+		"Name":    u.FirstName,
+		"Url":     resetUrl(encrypted),
+		"Minutes": req.TTL.Minutes(),
+	}
+
+	err = notify.Send(ctx, u.Email, "Reset your Password", "user_reset_password", data)
+	if err != nil {
+		err = errors.WithMessagef(err, "Send password reset email to %s failed.", u.Email)
+		return "", err
+	}
+
+	return encrypted, nil
+}
+
+// ResetConfirm updates the password for a user using the provided reset password ID.
+func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequest, secretKey string, now time.Time) (*User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ResetConfirm")
+	defer span.Finish()
+
+	v := webcontext.Validator()
+
+	// Validate the request.
+	err := v.StructCtx(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	crypto, err := symcrypto.New(secretKey)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	hashStr, err := crypto.Decrypt(req.ResetHash)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	hashPts := strings.Split(hashStr, "|")
+
+	var hash ResetHash
+	if len(hashPts) == 4 {
+		hash.ResetID = hashPts[0]
+		hash.CreatedAt, _ = strconv.Atoi(hashPts[1])
+		hash.ExpiresAt, _ = strconv.Atoi(hashPts[2])
+		hash.RequestIP = hashPts[3]
+	}
+
+	// Validate the hash.
+	err = v.StructCtx(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if int64(hash.ExpiresAt) < now.UTC().Unix() {
+		err = errors.WithMessage(ErrResetExpired, "Password reset has expired.")
+		return nil, err
+	}
+
+	// Find user by password_reset.
+	var u *User
+	{
+		query := selectQuery()
+		query.Where(query.Equal("password_reset", hash.ResetID))
+
+		res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
+		if err != nil {
+			return nil, err
+		} else if res == nil || len(res) == 0 {
+			err = errors.WithMessage(ErrNotFound, "Invalid password reset.")
+			return nil, err
+		}
+		u = res[0]
+	}
+
+	// Save the new password for the user.
+	{
+		// Always store the time as UTC.
+		now = now.UTC()
+
+		// Postgres truncates times to milliseconds when storing. We and do the same
+		// here so the value we return is consistent with what we store.
+		now = now.Truncate(time.Millisecond)
+
+		// Generate new password hash for the provided password.
+		passwordSalt := uuid.NewRandom()
+		saltedPassword := req.Password + passwordSalt.String()
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(saltedPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, errors.Wrap(err, "generating password hash")
+		}
+
+		// Build the update SQL statement.
+		query := sqlbuilder.NewUpdateBuilder()
+		query.Update(userTableName)
+		query.Set(
+			query.Assign("password_reset", nil),
+			query.Assign("password_hash", passwordHash),
+			query.Assign("password_salt", passwordSalt),
+			query.Assign("updated_at", now),
+		)
+		query.Where(query.Equal("id", u.ID))
+
+		// Execute the query with the provided context.
+		sql, args := query.Build()
+		sql = dbConn.Rebind(sql)
+		_, err = dbConn.ExecContext(ctx, sql, args...)
+		if err != nil {
+			err = errors.Wrapf(err, "query - %s", query.String())
+			err = errors.WithMessagef(err, "update password for user %s failed", u.ID)
+			return nil, err
+		}
+	}
+
+	return u, nil
 }

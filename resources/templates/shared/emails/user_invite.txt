@@ -1,0 +1,4 @@
+{{ .FromUser.FirstName }} has invited you to join {{ .Account.Name }}.
+
+To accept the invite, follow this link (or paste into your browser) within the next {{ .Minutes }} minutes.
+{{ .Url }}

@@ -23,13 +23,13 @@
 
                 {{ template "top-error" . }}
 
-
-
-
                 <!-- ============================================================== -->
                 <!-- Page Content                                                   -->
                 <!-- ============================================================== -->
-                <div class="container-fluid">
+                <div class="container-fluid" id="page-content">
+
+                    {{ template "validation-error" . }}
+
                     {{ template "content" . }}
                 </div>
                 <!-- End Page Content  -->

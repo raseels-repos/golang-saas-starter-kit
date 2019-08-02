@@ -72,6 +72,11 @@ type UserCreateRequest struct {
 	Timezone        *string `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
 }
 
+// UserCreateInviteRequest contains information needed to create a new User.
+type UserCreateInviteRequest struct {
+	Email string `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
+}
+
 // UserUpdateRequest defines what information may be provided to modify an existing
 // User. All fields are optional so clients can send just the fields they want
 // changed. It uses pointer fields so we can differentiate between a field that
@@ -99,6 +104,11 @@ type UserArchiveRequest struct {
 	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 }
 
+// UserUnarchiveRequest defines the information needed to unarchive an user.
+type UserUnarchiveRequest struct {
+	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+}
+
 // UserFindRequest defines the possible options to search for users. By default
 // archived users will be excluded from response.
 type UserFindRequest struct {
@@ -108,6 +118,27 @@ type UserFindRequest struct {
 	Limit            *uint         `json:"limit" example:"10"`
 	Offset           *uint         `json:"offset" example:"20"`
 	IncludedArchived bool          `json:"included-archived" example:"false"`
+}
+
+// UserResetPasswordRequest defines the fields need to reset a user password.
+type UserResetPasswordRequest struct {
+	Email string        `json:"email" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
+	TTL   time.Duration `json:"ttl,omitempty" `
+}
+
+// ResetHash
+type ResetHash struct {
+	ResetID   string `json:"reset_id" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	CreatedAt int    `json:"created_at" validate:"required"`
+	ExpiresAt int    `json:"expires_at" validate:"required"`
+	RequestIP string `json:"request_ip" validate:"required,ip" example:"69.56.104.36"`
+}
+
+// UserResetConfirmRequest defines the fields need to reset a user password.
+type UserResetConfirmRequest struct {
+	ResetHash       string `json:"reset_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	Password        string `json:"password" validate:"required" example:"SecretString"`
+	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
 }
 
 // AuthenticateRequest defines what information is required to authenticate a user.

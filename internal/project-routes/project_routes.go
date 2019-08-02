@@ -39,3 +39,9 @@ func (r ProjectRoutes) WebApiUrl(urlPath string) string {
 	u.Path = urlPath
 	return u.String()
 }
+
+func (r ProjectRoutes) UserResetPassword(resetId string) string {
+	u := r.webAppUrl
+	u.Path = "/user/reset-password/" + resetId
+	return u.String()
+}

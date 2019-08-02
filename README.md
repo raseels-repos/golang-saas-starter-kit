@@ -381,7 +381,7 @@ schema migrations before running any unit tests.
 To login to the local Postgres container, use the following command:
 ```bash
 docker exec -it saas-starter-kit_postgres_1 /bin/bash
-bash-4.4# psql -U postgres shared
+bash-5.0# psql -U postgres shared
 ```
 
 The example project currently only includes a few tables. As more functionality is built into both the web-app and 

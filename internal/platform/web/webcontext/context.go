@@ -22,6 +22,7 @@ type Values struct {
 	SpanID     uint64
 	StatusCode int
 	Env        Env
+	RequestIP  string
 }
 
 func ContextValues(ctx context.Context) (*Values, error) {

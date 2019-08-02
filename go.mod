@@ -41,6 +41,7 @@ require (
 	github.com/sethgrid/pester v0.0.0-20190127155807-68a33a018ad0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	github.com/stretchr/testify v1.3.0
+	github.com/sudo-suhas/symcrypto v1.0.0
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/swag v1.6.2
 	github.com/tinylib/msgp v1.1.0 // indirect
@@ -55,6 +56,7 @@ require (
 	google.golang.org/appengine v1.6.1 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.16.1
 	gopkg.in/go-playground/validator.v9 v9.29.1
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gotest.tools v2.2.0+incompatible // indirect
 )

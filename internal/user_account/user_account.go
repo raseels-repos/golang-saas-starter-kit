@@ -3,11 +3,11 @@ package user_account
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"
@@ -25,6 +25,9 @@ var (
 
 // The database table for UserAccount
 const userAccountTableName = "users_accounts"
+
+// The database table for User
+const userTableName = "users"
 
 // The list of columns needed for mapRowsToUserAccount
 var userAccountMapColumns = "id,user_id,account_id,roles,status,created_at,updated_at,archived_at"

@@ -99,7 +99,7 @@
 </html>
 {{end}}
 {{ define "invalid-feedback" }}
-    <div class="invalid-feedback">
+    <div class="invalid-feedback" data-field="{{ .fieldName }}">
         {{ if ValidationErrorHasField .validationErrors .fieldName }}
             {{ range $verr := (ValidationFieldErrors .validationErrors .fieldName) }}{{ $verr.Display }}<br/>{{ end }}
         {{ else }}
@@ -123,6 +123,23 @@
                 {{ end }}
                 {{ if $errDetails }}
                     <p><small>{{ $errDetails }}</small></p>
+                {{ end }}
+            </div>
+        {{ end }}
+    {{ end }}
+{{ end }}
+{{ define "validation-error" }}
+    {{ if .validationErrors }}
+        {{ $errMsg := (ErrorMessage $._Ctx .validationErrors) }}
+        {{ if $errMsg }}
+            <div class="alert alert-danger validation-error" role="alert">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"> <span aria-hidden="true">×</span> </button> {{ if $errMsg }}<h3>{{ $errMsg }}</h3> {{end}}
+                {{ if .validationErrors.Fields }}
+                    <ul>
+                        {{ range $i := .validationErrors.Fields }}
+                            <li data-form-field="{{ $i.FormField }}">{{ if $i.Display }}{{ $i.Display }}{{ else }}{{ $i.Error }}{{ end }}</li>
+                        {{end}}
+                    </ul>
                 {{ end }}
             </div>
         {{ end }}

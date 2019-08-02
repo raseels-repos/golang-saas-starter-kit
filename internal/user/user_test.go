@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
@@ -583,7 +584,7 @@ func TestUpdatePassword(t *testing.T) {
 		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
+			t.Fatalf("\t%s\tUpdate password failed.", tests.Failed)
 		}
 		t.Logf("\t%s\tUpdatePassword ok.", tests.Success)
 
@@ -886,6 +887,22 @@ func TestCrud(t *testing.T) {
 				}
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
+				// Unarchive (un-delete) the user.
+				err = Unarchive(ctx, tt.claims(user, accountId), test.MasterDB, UserUnarchiveRequest{ID: user.ID}, now)
+				if err != nil && errors.Cause(err) != tt.updateErr {
+					t.Logf("\t\tGot : %+v", err)
+					t.Logf("\t\tWant: %+v", tt.updateErr)
+					t.Fatalf("\t%s\tUnarchive failed.", tests.Failed)
+				} else if tt.updateErr == nil {
+					// Trying to find the archived user with the includeArchived false should result no error.
+					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, false)
+					if err != nil {
+						t.Log("\t\tGot :", err)
+						t.Fatalf("\t%s\tUnarchive Read failed.", tests.Failed)
+					}
+				}
+				t.Logf("\t%s\tUnarchive ok.", tests.Success)
+
 				// Delete (hard-delete) the user.
 				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
 				if err != nil && errors.Cause(err) != tt.updateErr {
@@ -1049,6 +1066,177 @@ func TestFind(t *testing.T) {
 				}
 				t.Logf("\t%s\tFind ok.", tests.Success)
 			}
+		}
+	}
+}
+
+// TestResetPassword validates that reset password for a user works.
+func TestResetPassword(t *testing.T) {
+
+	t.Log("Given the need ensure a user can reset their password.")
+	{
+		ctx := tests.Context()
+
+		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
+
+		tknGen := &MockTokenGenerator{}
+
+		// Create a new user for testing.
+		initPass := uuid.NewRandom().String()
+		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
+			FirstName:       "Lee",
+			LastName:        "Brown",
+			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
+			Password:        initPass,
+			PasswordConfirm: initPass,
+		}, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
+		}
+
+		// Create a new random account.
+		accountId := uuid.NewRandom().String()
+		err = mockAccount(accountId, user.CreatedAt)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tCreate account failed.", tests.Failed)
+		}
+
+		// Associate new random account with user.
+		err = mockUserAccount(user.ID, accountId, user.CreatedAt, auth.RoleUser)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
+		}
+
+		// Mock the methods needed to make a password reset.
+		resetUrl := func(string) string {
+			return ""
+		}
+		notify := &notify.MockEmail{}
+
+		secretKey := "6368616e676520746869732070617373"
+
+		// Ensure validation is working by trying ResetPassword with an empty request.
+		{
+			expectedErr := errors.New("Key: 'UserResetPasswordRequest.email' Error:Field validation for 'email' failed on the 'required' tag")
+			_, err = ResetPassword(ctx, test.MasterDB, resetUrl, notify, UserResetPasswordRequest{}, secretKey, now)
+			if err == nil {
+				t.Logf("\t\tWant: %+v", expectedErr)
+				t.Fatalf("\t%s\tResetPassword failed.", tests.Failed)
+			}
+
+			errStr := strings.Replace(err.Error(), "{{", "", -1)
+			errStr = strings.Replace(errStr, "}}", "", -1)
+
+			if errStr != expectedErr.Error() {
+				t.Logf("\t\tGot : %+v", errStr)
+				t.Logf("\t\tWant: %+v", expectedErr)
+				t.Fatalf("\t%s\tResetPassword Validation failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tResetPassword Validation ok.", tests.Success)
+		}
+
+		ttl := time.Hour
+
+		// Make the reset password request.
+		resetHash, err := ResetPassword(ctx, test.MasterDB, resetUrl, notify, UserResetPasswordRequest{
+			Email: user.Email,
+			TTL:   ttl,
+		}, secretKey, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tResetPassword failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tResetPassword ok.", tests.Success)
+
+		// Read the user to ensure the password_reset field was set.
+		user, err = Read(ctx, auth.Claims{}, test.MasterDB, user.ID, false)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tRead failed.", tests.Failed)
+		} else if user.PasswordReset == nil || user.PasswordReset.String == "" {
+			t.Fatalf("\t%s\tUser field password_reset is empty.", tests.Failed)
+		}
+
+		// Ensure validation is working by trying ResetConfirm with an empty request.
+		{
+			expectedErr := errors.New("Key: 'UserResetConfirmRequest.reset_hash' Error:Field validation for 'reset_hash' failed on the 'required' tag\n" +
+				"Key: 'UserResetConfirmRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
+				"Key: 'UserResetConfirmRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
+			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{}, secretKey, now)
+			if err == nil {
+				t.Logf("\t\tWant: %+v", expectedErr)
+				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
+			}
+
+			errStr := strings.Replace(err.Error(), "{{", "", -1)
+			errStr = strings.Replace(errStr, "}}", "", -1)
+
+			if errStr != expectedErr.Error() {
+				t.Logf("\t\tGot : %+v", errStr)
+				t.Logf("\t\tWant: %+v", expectedErr)
+				t.Fatalf("\t%s\tResetConfirm Validation failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tResetConfirm Validation ok.", tests.Success)
+		}
+
+		// Ensure the TTL is enforced.
+		{
+			newPass := uuid.NewRandom().String()
+			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+				ResetHash:       resetHash,
+				Password:        newPass,
+				PasswordConfirm: newPass,
+			}, secretKey, now.UTC().Add(ttl*2))
+			if errors.Cause(err) != ErrResetExpired {
+				t.Logf("\t\tGot : %+v", errors.Cause(err))
+				t.Logf("\t\tWant: %+v", ErrResetExpired)
+				t.Fatalf("\t%s\tResetConfirm enforce TTL failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tResetConfirm enforce TTL ok.", tests.Success)
+		}
+
+		// Assuming we have received the email and clicked the link, we now can ensure confirm works.
+		newPass := uuid.NewRandom().String()
+		reset, err := ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+			ResetHash:       resetHash,
+			Password:        newPass,
+			PasswordConfirm: newPass,
+		}, secretKey, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
+		} else if reset.ID != user.ID {
+			t.Logf("\t\tGot : %+v", reset.ID)
+			t.Logf("\t\tWant: %+v", user.ID)
+			t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tResetConfirm ok.", tests.Success)
+
+		// Verify that the user can be authenticated with the updated password.
+		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, newPass, time.Hour, now)
+		if err != nil {
+			t.Log("\t\tGot :", err)
+			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
+		}
+		t.Logf("\t%s\tAuthenticate ok.", tests.Success)
+
+		// Ensure the reset hash does not work after its used.
+		{
+			newPass := uuid.NewRandom().String()
+			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+				ResetHash:       resetHash,
+				Password:        newPass,
+				PasswordConfirm: newPass,
+			}, secretKey, now)
+			if errors.Cause(err) != ErrNotFound {
+				t.Logf("\t\tGot : %+v", errors.Cause(err))
+				t.Logf("\t\tWant: %+v", ErrNotFound)
+				t.Fatalf("\t%s\tResetConfirm enforce TTL failed.", tests.Failed)
+			}
+			t.Logf("\t%s\tResetConfirm reuse disabled ok.", tests.Success)
 		}
 	}
 }

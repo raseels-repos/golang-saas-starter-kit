@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"gopkg.in/gomail.v2"
 	"html/template"
 	"log"
 	"net"
@@ -81,13 +83,14 @@ func main() {
 			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
 		Service struct {
-			Name        string   `default:"web-app" envconfig:"NAME"`
-			Project     string   `default:"" envconfig:"PROJECT"`
-			BaseUrl     string   `default:"" envconfig:"BASE_URL"  example:"http://eproc.tech"`
-			HostNames   []string `envconfig:"HOST_NAMES" example:"www.eproc.tech"`
-			EnableHTTPS bool     `default:"false" envconfig:"ENABLE_HTTPS"`
-			TemplateDir string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			StaticFiles struct {
+			Name              string   `default:"web-app" envconfig:"NAME"`
+			Project           string   `default:"" envconfig:"PROJECT"`
+			BaseUrl           string   `default:"" envconfig:"BASE_URL"  example:"http://eproc.tech"`
+			HostNames         []string `envconfig:"HOST_NAMES" example:"www.eproc.tech"`
+			EnableHTTPS       bool     `default:"false" envconfig:"ENABLE_HTTPS"`
+			TemplateDir       string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
+			SharedTemplateDir string   `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
+			StaticFiles       struct {
 				Dir               string `default:"./static" envconfig:"STATIC_DIR"`
 				S3Enabled         bool   `envconfig:"S3_ENABLED"`
 				S3Prefix          string `default:"public/web_app/static" envconfig:"S3_PREFIX"`
@@ -97,6 +100,7 @@ func main() {
 			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.eproc.tech"`
 			SessionKey      string        `default:"" envconfig:"SESSION_KEY"`
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
+			EmailSender     string        `default:"" envconfig:"EMAIL_SENDER"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
@@ -136,6 +140,12 @@ func main() {
 		Auth struct {
 			UseAwsSecretManager bool          `default:"false" envconfig:"USE_AWS_SECRET_MANAGER"`
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
+		}
+		STMP struct {
+			Host string `default:"localhost" envconfig:"HOST"`
+			Port int    `default:"25" envconfig:"PORT"`
+			User string `default:"" envconfig:"USER"`
+			Pass string `default:"" envconfig:"PASS" json:"-"` // don't print
 		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
@@ -350,6 +360,38 @@ func main() {
 		log.Fatalf("main : Register DB : %s : %+v", cfg.DB.Driver, err)
 	}
 	defer masterDb.Close()
+
+	// =========================================================================
+	// Notify Email
+	var notifyEmail notify.Email
+	if awsSession != nil {
+		notifyEmail, err = notify.NewEmailAws(awsSession, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
+		if err != nil {
+			log.Fatalf("main : Notify Email : %+v", err)
+		}
+
+		err = notifyEmail.Verify()
+		if err != nil {
+			switch errors.Cause(err) {
+			case notify.ErrAwsSesIdentityNotVerified:
+				log.Printf("main : Notify Email : %s\n", err)
+			case notify.ErrAwsSesSendingDisabled:
+				log.Printf("main : Notify Email : %s\n", err)
+			default:
+				log.Fatalf("main : Notify Email Verify : %+v", err)
+			}
+		}
+	} else {
+		d := gomail.Dialer{
+			Host:     cfg.STMP.Host,
+			Port:     cfg.STMP.Port,
+			Username: cfg.STMP.User,
+			Password: cfg.STMP.Pass}
+		notifyEmail, err = notify.NewEmailSmtp(d, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
+		if err != nil {
+			log.Fatalf("main : Notify Email : %+v", err)
+		}
+	}
 
 	// =========================================================================
 	// Init new Authenticator
@@ -776,7 +818,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SessionKey, notifyEmail, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -793,7 +835,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SessionKey, notifyEmail, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

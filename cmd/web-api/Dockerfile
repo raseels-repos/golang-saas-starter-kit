@@ -37,6 +37,9 @@ COPY cmd/web-api ./cmd/web-api
 COPY cmd/web-api/templates /templates
 #COPY cmd/web-api/static /static
 
+# Copy the global templates.
+ADD resources/templates/shared /templates/shared
+
 WORKDIR ./cmd/web-api
 
 # Update the API documentation.
@@ -54,6 +57,8 @@ COPY --from=builder /gosrv /
 COPY --from=builder /templates /templates
 
 ENV TEMPLATE_DIR=/templates
+ENV SHARED_TEMPLATE_DIR=/templates/shared
+#ENV STATIC_DIR=/static
 
 ARG service
 ENV SERVICE_NAME $service

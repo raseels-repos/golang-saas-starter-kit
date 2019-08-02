@@ -67,8 +67,9 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 		// Set the context with the required values to
 		// process the request.
 		v := webcontext.Values{
-			Now: time.Now(),
-			Env: a.env,
+			Now:       time.Now(),
+			Env:       a.env,
+			RequestIP: RequestRealIP(r),
 		}
 		ctx := context.WithValue(r.Context(), webcontext.KeyValues, &v)
 

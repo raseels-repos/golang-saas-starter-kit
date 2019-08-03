@@ -15,7 +15,10 @@
                             <div class="text-center">
                                 <h1 class="h4 text-gray-900 mb-4">Create an Account!</h1>
                             </div>
+
                             {{ template "top-error" . }}
+                            {{ template "validation-error" . }}
+
                             <form class="user" method="post" novalidate>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
@@ -52,7 +55,7 @@
                                         <div id="divAccountZipcode"></div>
                                         {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Zipcode" }}
                                     </div>
-                                    <div class="col-sm-6 mb-3 mb-sm-0" id="divAccountRegion">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
                                         <div id="divAccountRegion"></div>
                                         {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Region" }}
                                     </div>
@@ -210,6 +213,9 @@
 
                 }
             }).change();
+
+            hideDuplicateValidationFieldErrors();
+
         });
     </script>
 {{end}}

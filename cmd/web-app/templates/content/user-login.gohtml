@@ -20,6 +20,10 @@
                                     <div class="text-center">
                                         <h1 class="h4 text-gray-900 mb-4">Welcome Back!</h1>
                                     </div>
+
+                                    {{ template "top-error" . }}
+                                    {{ template "validation-error" . }}
+
                                     <form class="user" method="post" novalidate>
                                         <div class="form-group">
                                             <input type="email" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "AuthenticateRequest.Email" }}" name="Email" value="{{ $.form.Email }}" placeholder="Enter Email Address...">

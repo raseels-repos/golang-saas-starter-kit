@@ -99,7 +99,7 @@
 </html>
 {{end}}
 {{ define "invalid-feedback" }}
-    <div class="invalid-feedback" data-field="{{ .fieldName }}">
+    <div class="invalid-feedback" style="{{ if ValidationErrorHasField .validationErrors .fieldName }}display: block;{{ end }}" data-field="{{ .fieldName }}">
         {{ if ValidationErrorHasField .validationErrors .fieldName }}
             {{ range $verr := (ValidationFieldErrors .validationErrors .fieldName) }}{{ $verr.Display }}<br/>{{ end }}
         {{ else }}

@@ -154,7 +154,17 @@ func newValidator() *validator.Validate {
 		if fl.Field().String() == "invalid" {
 			return false
 		}
-		return ctx.Value(KeyTagUnique).(bool)
+
+		cv := ctx.Value(KeyTagUnique)
+		if cv == nil {
+			return false
+		}
+
+		if v, ok := cv.(bool); ok {
+			return v
+		}
+
+		return false
 	}
 	v.RegisterValidationCtx("unique", fctx)
 

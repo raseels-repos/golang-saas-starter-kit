@@ -2,8 +2,10 @@ package weberror
 
 import (
 	"context"
+	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -11,11 +13,12 @@ import (
 // Error is used to pass an error during the request through the
 // application with web specific context.
 type Error struct {
-	Err     error
-	Status  int
-	Fields  []FieldError
-	Cause   error
-	Message string
+	Err               error
+	Status            int
+	Fields            []FieldError
+	Cause             error
+	Message           string
+	isValidationError bool
 }
 
 // FieldError is used to indicate an error with a specific request field.
@@ -62,7 +65,7 @@ func NewError(ctx context.Context, er error, status int) error {
 		cause = er
 	}
 
-	return &Error{er, status, nil, cause, ""}
+	return &Error{er, status, nil, cause, "", false}
 }
 
 // Error implements the error interface. It uses the default message of the
@@ -77,17 +80,33 @@ func (err *Error) Error() string {
 }
 
 // Display renders an error that can be returned as ErrorResponse to the user via the API.
-func (er *Error) Display(ctx context.Context) ErrorResponse {
+func (er *Error) Response(ctx context.Context, htmlEntities bool) ErrorResponse {
 	var r ErrorResponse
 
 	if er.Message != "" {
 		r.Error = er.Message
 	} else {
-		r.Error = er.Error()
+		r.Error = http.StatusText(er.Status)
 	}
 
 	if len(er.Fields) > 0 {
 		r.Fields = er.Fields
+	}
+
+	switch webcontext.ContextEnv(ctx) {
+	case webcontext.Env_Dev, webcontext.Env_Stage:
+		r.Details = fmt.Sprintf("%v", er.Err)
+
+		if er.Cause != nil && er.Cause.Error() != er.Err.Error() {
+			r.StackTrace = fmt.Sprintf("%+v", er.Cause)
+		} else {
+			r.StackTrace = fmt.Sprintf("%+v", er.Err)
+		}
+	}
+
+	if htmlEntities {
+		r.Details = strings.Replace(r.Details, "\n", "<br/>", -1)
+		r.StackTrace = strings.Replace(r.StackTrace, "\n", "<br/>", -1)
 	}
 
 	return r
@@ -95,8 +114,11 @@ func (er *Error) Display(ctx context.Context) ErrorResponse {
 
 // ErrorResponse is the form used for API responses from failures in the API.
 type ErrorResponse struct {
-	Error  string       `json:"error"`
-	Fields []FieldError `json:"fields,omitempty"`
+	StatusCode int          `json:"status_code"`
+	Error      string       `json:"error"`
+	Details    string       `json:"details,omitempty"`
+	StackTrace string       `json:"stack_trace,omitempty"`
+	Fields     []FieldError `json:"fields,omitempty"`
 }
 
 // String returns the ErrorResponse formatted as a string.
@@ -123,4 +145,32 @@ func WithMessage(ctx context.Context, er error, msg string) error {
 	weberr := NewError(ctx, er, 0).(*Error)
 	weberr.Message = msg
 	return weberr
+}
+
+// SessionFlashError
+func SessionFlashError(ctx context.Context, er error) {
+
+	webErr := NewError(ctx, er, 0).(*Error)
+
+	resp := webErr.Response(ctx, true)
+
+	msg := webcontext.FlashMsg{
+		Type:  webcontext.FlashType_Error,
+		Title: resp.Error,
+	}
+
+	if webErr.isValidationError {
+		for _, f := range resp.Fields {
+			msg.Items = append(msg.Items, f.Display)
+		}
+	} else {
+		msg.Text = resp.Details
+		msg.Details = resp.StackTrace
+	}
+
+	if pts := strings.Split(msg.Details, "<br/>"); len(pts) > 3 {
+		msg.Details = strings.Join(pts[0:3], "<br/>")
+	}
+
+	webcontext.SessionAddFlash(ctx, msg)
 }

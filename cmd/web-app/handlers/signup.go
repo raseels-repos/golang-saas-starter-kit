@@ -79,6 +79,11 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				return err
 			}
 
+			// Display a welcome message to the user.
+			webcontext.SessionFlashSuccess(ctx,
+				"Thank you for Joining",
+				"You workflow will be a breeze starting today.")
+
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
 			return nil

@@ -10,47 +10,73 @@
             <div class="sidebar-brand-text mx-3">Example Project</div>
         </a>
 
-        <!-- Divider -->
-        <hr class="sidebar-divider my-0">
+        {{ if HasAuth $._Ctx }}
 
-        <!-- Nav Item - Dashboard -->
-        <li class="nav-item">
-            <a class="nav-link" href="/">
-                <i class="fas fa-fw fa-tachometer-alt"></i>
-                <span>Dashboard</span></a>
-        </li>
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+            <div class="sidebar-heading">
+                Interface
+            </div>
+
+            <!-- Nav Item - Pages Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionProjects" aria-expanded="true" aria-controls="navSectionProjects">
+                    <i class="fas fa-fw fa-cog"></i>
+                    <span>Projects</span>
+                </a>
+                <div id="navSectionProjects" class="collapse" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="buttons.html">Buttons</a>
+                        <a class="collapse-item" href="cards.html">Cards</a>
+                    </div>
+                </div>
+            </li>
+
+            <!-- Nav Item - Utilities Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionUsers" aria-expanded="true" aria-controls="navSectionUsers">
+                    <i class="fas fa-fw fa-wrench"></i>
+                    <span>Users</span>
+                </a>
+                <div id="navSectionUsers" class="collapse" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="/users">Users</a>
+                    </div>
+                </div>
+            </li>
+        {{ end }}
 
         <!-- Divider -->
         <hr class="sidebar-divider">
 
         <!-- Heading -->
         <div class="sidebar-heading">
-            Interface
+            Examples
         </div>
 
         <!-- Nav Item - Pages Collapse Menu -->
         <li class="nav-item">
-            <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionProjects" aria-expanded="true" aria-controls="navSectionProjects">
+            <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionComponents" aria-expanded="true" aria-controls="navSectionComponents">
                 <i class="fas fa-fw fa-cog"></i>
-                <span>Projects</span>
+                <span>Components</span>
             </a>
-            <div id="navSectionProjects" class="collapse" data-parent="#accordionSidebar">
+            <div id="navSectionComponents" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
                 <div class="bg-white py-2 collapse-inner rounded">
-                    <a class="collapse-item" href="buttons.html">Buttons</a>
-                    <a class="collapse-item" href="cards.html">Cards</a>
-                </div>
-            </div>
-        </li>
-
-        <!-- Nav Item - Utilities Collapse Menu -->
-        <li class="nav-item">
-            <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionUsers" aria-expanded="true" aria-controls="navSectionUsers">
-                <i class="fas fa-fw fa-wrench"></i>
-                <span>Users</span>
-            </a>
-            <div id="navSectionUsers" class="collapse" data-parent="#accordionSidebar">
-                <div class="bg-white py-2 collapse-inner rounded">
-                    <a class="collapse-item" href="/users">Users</a>
+                    <h6 class="collapse-header">Custom Components:</h6>
+                    <a class="collapse-item" href="/examples/flash-messages">Flash Messages</a>
+                    <a class="collapse-item" href="/examples/images">Responsive Images</a>
                 </div>
             </div>
         </li>

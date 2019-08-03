@@ -17,12 +17,13 @@
                             <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
                             <div class="col-lg-6">
                                 <div class="p-5">
+                                    {{ template "app-flashes" . }}
+
                                     <div class="text-center">
                                         <h1 class="h4 text-gray-900 mb-2">Reset Your Password</h1>
                                         <p class="mb-4">.....</p>
                                     </div>
 
-                                    {{ template "top-error" . }}
                                     {{ template "validation-error" . }}
 
                                     <form class="user" method="post" novalidate>

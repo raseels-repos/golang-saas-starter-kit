@@ -1,4 +1,4 @@
-{{define "title"}}Error {{ .statusCode }}{{end}}
+{{define "title"}}Error {{ .StatusCode }}{{end}}
 {{define "style"}}
 
 {{end}}
@@ -7,10 +7,10 @@
 
         <!-- Error Text -->
         <div class="text-center mt-5">
-            <div class="error mx-auto" data-text="{{ .statusCode }}">{{ .statusCode }}</div>
-            <p class="lead text-gray-800 mb-5">{{ .errorMessage }}</p>
-            {{ if .fullError }}
-                <p class="text-gray-500 mb-0">{{ .fullError }}</p>
+            <div class="error mx-auto" data-text="{{ .StatusCode }}">{{ .StatusCode }}</div>
+            <p class="lead text-gray-800 mb-5">{{ .Error }}</p>
+            {{ if .Details }}
+                <p class="text-gray-500 mb-0">{{ .Details }}</p>
             {{ end }}
         </div>
 

@@ -107,7 +107,26 @@
         {{ end }}
     </div>
 {{ end }}
-{{ define "top-error" }}
+{{ define "app-flashes" }}
+    {{ if .flashes }}
+        {{ range $f := .flashes }}
+            <div class="alert alert-{{ $f.Type }}" role="alert">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"> <span aria-hidden="true">×</span> </button>
+                {{ if $f.Title }}<h3>{{ $f.Title }}</h3>{{end}}
+                {{ if $f.Text }}<p>{{ $f.Text }}</p>{{end}}
+                {{ if $f.Items }}
+                    <ul>
+                        {{ range $i := $f.Items }}
+                            <li>{{ $i }}</li>
+                        {{end}}
+                    </ul>
+                {{ end }}
+                {{ if $f.Details }}
+                    <p><small>{{ $f.Details }}</small></p>
+                {{ end }}
+            </div>
+        {{ end }}
+    {{ end }}
     {{ if .error }}
         {{ $errMsg := (ErrorMessage $._Ctx .error) }}
         {{ $errDetails := (ErrorDetails $._Ctx .error) }}

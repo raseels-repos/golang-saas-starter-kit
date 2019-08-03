@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"html/template"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 )
 
@@ -50,7 +49,7 @@ func RespondJsonError(ctx context.Context, w http.ResponseWriter, er error) erro
 
 	v.StatusCode = webErr.Status
 
-	return RespondJson(ctx, w, webErr.Display(ctx), webErr.Status)
+	return RespondJson(ctx, w, webErr.Response(ctx, false), webErr.Status)
 }
 
 // RespondJson converts a Go value to JSON and sends it to the client.
@@ -120,7 +119,7 @@ func RespondErrorStatus(ctx context.Context, w http.ResponseWriter, er error, st
 	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
 	v.StatusCode = webErr.Status
 
-	respErr := webErr.Display(ctx).String()
+	respErr := webErr.Response(ctx, false).String()
 
 	switch webcontext.ContextEnv(ctx) {
 	case webcontext.Env_Dev, webcontext.Env_Stage:
@@ -182,30 +181,17 @@ func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er
 
 	// If the error was of the type *Error, the handler has
 	// a specific status code and error to return.
-	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
-	v.StatusCode = webErr.Status
-
-	respErr := webErr.Display(ctx)
-
-	var fullError string
-	switch webcontext.ContextEnv(ctx) {
-	case webcontext.Env_Dev, webcontext.Env_Stage:
-		if webErr.Cause != nil && webErr.Cause.Error() != webErr.Err.Error() {
-			fullError = fmt.Sprintf("\n%s\n%+v", webErr.Error(), webErr.Cause)
-		} else {
-			fullError = fmt.Sprintf("%+v", webErr.Err)
-		}
-
-		fullError = strings.Replace(fullError, "\n", "<br/>", -1)
-	}
+	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error).Response(ctx, true)
+	v.StatusCode = webErr.StatusCode
 
 	data := map[string]interface{}{
-		"statusCode":   webErr.Status,
-		"errorMessage": respErr.Error,
-		"fullError":    template.HTML(fullError),
+		"StatusCode": webErr.StatusCode,
+		"Error":      webErr.Error,
+		"Details":    webErr.Details,
+		"Fields":     webErr.Fields,
 	}
 
-	return renderer.Render(ctx, w, r, templateLayoutName, templateContentName, contentType, webErr.Status, data)
+	return renderer.Render(ctx, w, r, templateLayoutName, templateContentName, contentType, webErr.StatusCode, data)
 }
 
 // Static registers a new route with path prefix to serve static files from the

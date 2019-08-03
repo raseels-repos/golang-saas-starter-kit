@@ -72,7 +72,6 @@ func init() {
 	transNl, _ := uniTrans.GetTranslator(nl.Locale())
 	transZh, _ := uniTrans.GetTranslator(zh.Locale())
 
-
 	transEn.Add("{{name}}", "Name", false)
 	transFr.Add("{{name}}", "Nom", false)
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"net/http"
@@ -206,7 +207,11 @@ func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http
 				}
 			}
 
-			// Display a flash message!!!
+			// Display a success message to the user to check their email.
+			webcontext.SessionFlashSuccess(ctx,
+				"Check your email",
+				fmt.Sprintf("An email was sent to '%s'. Click on the link in the email to finish resetting your password.", req.Email))
+
 		}
 
 		return nil

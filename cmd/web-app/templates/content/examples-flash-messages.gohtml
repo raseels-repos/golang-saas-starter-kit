@@ -1,0 +1,25 @@
+{{define "title"}}Example - Flash Messages{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+
+    <h3>Inline Validation Example</h3>
+    <p>Any field error that is not displayed inline will still be displayed as apart of the the validation at the top of the page.</p>
+    <form class="user" method="post" novalidate>
+        <div class="form-group">
+            <input type="email" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Email" }}" name="Email" value="{{ $.form.Email }}" placeholder="Enter Email Address...">
+            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Email" }}
+        </div>
+
+        <button class="btn btn-primary btn-user btn-block">
+            Submit Form
+        </button>
+        <hr>
+    </form>
+
+
+{{end}}
+{{define "js"}}
+
+{{end}}

@@ -78,11 +78,12 @@ func NewValidationError(ctx context.Context, err error) (error, bool) {
 	}
 
 	return &Error{
-		Err:     err,
-		Status:  http.StatusBadRequest,
-		Fields:  fields,
-		Cause:   err,
-		Message: "Field validation error",
+		Err:               err,
+		Status:            http.StatusBadRequest,
+		Fields:            fields,
+		Cause:             err,
+		Message:           "Field validation error",
+		isValidationError: true,
 	}, true
 }
 

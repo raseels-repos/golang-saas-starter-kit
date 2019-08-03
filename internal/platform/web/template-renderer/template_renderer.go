@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"html/template"
 	"math"
@@ -351,10 +352,23 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 		}
 	}
 
+	// If there is a session, check for flashes and ensure the session is saved.
+	sess := webcontext.ContextSession(ctx)
+	if sess != nil {
+		// Load any flash messages and append to response data to be included in the rendered template.
+		if flashes := sess.Flashes(); len(flashes) > 0 {
+			renderData["flashes"] = flashes
+		}
+
+		// Save the session before writing to the response for the session cookie to be sent to the client.
+		if err := sess.Save(req, w); err != nil {
+			return err
+		}
+	}
+
 	// Render template with data.
-	err := t.Execute(w, renderData)
-	if err != nil {
-		return err
+	if err := t.Execute(w, renderData); err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil

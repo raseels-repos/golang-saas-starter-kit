@@ -12,6 +12,9 @@ type ctxKeySession int
 // KeySession is used to store/retrieve a Session from a context.Context.
 const KeySession ctxKeySession = 1
 
+// KeyAccessToken is used to store the access token for the user in their session.
+const KeyAccessToken = "AccessToken"
+
 // ContextWithSession appends a universal translator to a context.
 func ContextWithSession(ctx context.Context, session *sessions.Session) context.Context {
 	return context.WithValue(ctx, KeySession, session)
@@ -29,7 +32,7 @@ func ContextAccessToken(ctx context.Context) (string, bool) {
 }
 
 func SessionAccessToken(session *sessions.Session) (string, bool) {
-	if sv, ok := session.Values["AccessToken"].(string); ok {
+	if sv, ok := session.Values[KeyAccessToken].(string); ok {
 		return sv, true
 	}
 
@@ -39,9 +42,9 @@ func SessionAccessToken(session *sessions.Session) (string, bool) {
 func SessionWithAccessToken(session *sessions.Session, accessToken string) *sessions.Session {
 
 	if accessToken != "" {
-		session.Values["AccessToken"] = accessToken
+		session.Values[KeyAccessToken] = accessToken
 	} else {
-		delete(session.Values, "AccessToken")
+		delete(session.Values, KeyAccessToken)
 	}
 
 	return session

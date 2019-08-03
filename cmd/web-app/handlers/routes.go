@@ -3,13 +3,13 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"log"
 	"net/http"
 	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
@@ -73,6 +73,15 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	// This route is not authenticated
 	app.Handle("POST", "/signup", s.Step1)
 	app.Handle("GET", "/signup", s.Step1)
+
+	// Register example endpoints.
+	ex := Examples{
+		Renderer: renderer,
+	}
+	// This route is not authenticated
+	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages)
+	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages)
+	app.Handle("GET", "/examples/images", ex.Images)
 
 	// Register geo
 	g := Geo{

@@ -37,6 +37,7 @@ func ContextTranslator(ctx context.Context) ut.Translator {
 	if t, ok := ctx.Value(KeyTranslate).(ut.Translator); ok {
 		return t
 	}
+
 	return uniTrans.GetFallback()
 }
 
@@ -70,6 +71,7 @@ func init() {
 	transJa, _ := uniTrans.GetTranslator(ja.Locale())
 	transNl, _ := uniTrans.GetTranslator(nl.Locale())
 	transZh, _ := uniTrans.GetTranslator(zh.Locale())
+
 
 	transEn.Add("{{name}}", "Name", false)
 	transFr.Add("{{name}}", "Nom", false)

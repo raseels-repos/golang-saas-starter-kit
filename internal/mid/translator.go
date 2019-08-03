@@ -24,8 +24,6 @@ func Translator(utrans *ut.UniversalTranslator) web.Middleware {
 			m := func() error {
 				locale, _ := params["locale"]
 
-				locale = "fr"
-
 				var t ut.Translator
 				if len(locale) > 0 {
 

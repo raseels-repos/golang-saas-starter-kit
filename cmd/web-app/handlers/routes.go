@@ -20,6 +20,7 @@ import (
 
 const (
 	tmplLayoutBase          = "base.gohtml"
+	tmplLayoutSite          = "site.gohtml"
 	tmplContentErrorGeneric = "error-generic.gohtml"
 )
 
@@ -91,7 +92,13 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		Renderer:      renderer,
 		ProjectRoutes: projectRoutes,
 	}
-	// This route is not authenticated
+
+	// These routes is not authenticated
+	app.Handle("GET", "/api", r.SitePage)
+	app.Handle("GET", "/features", r.SitePage)
+	app.Handle("GET", "/support", r.SitePage)
+	app.Handle("GET", "/legal/privacy", r.SitePage)
+	app.Handle("GET", "/legal/terms", r.SitePage)
 	app.Handle("GET", "/", r.Index, mid.AuthenticateSessionOptional(authenticator))
 	app.Handle("GET", "/index.html", r.IndexHtml)
 	app.Handle("GET", "/robots.txt", r.RobotTxt)

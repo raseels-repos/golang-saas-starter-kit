@@ -19,15 +19,22 @@ function hideDuplicateValidationFieldErrors() {
             vnode = $(this).parent().parent().find('div.invalid-feedback');
         }
 
+        var feedback_count = 0;
         var formField = $(vnode).attr('data-field');
         $(document).find('div.validation-error').find('li').each(function(){
             if ($(this).attr('data-form-field') == formField) {
                 if ($(vnode).is(":visible") || $(vnode).css('display') === 'none') {
                     $(this).hide();
+
+                    feedback_count++;
                 } else {
                     console.log('form validation feedback for '+fname+' is not visable, display main.');
                 }
             }
         });
+
+        if (feedback_count == 0) {
+            $(document).find('div.validation-error').find('ul').hide();
+        }
     });
 }

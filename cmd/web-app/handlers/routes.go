@@ -95,7 +95,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// These routes is not authenticated
 	app.Handle("GET", "/api", r.SitePage)
-	app.Handle("GET", "/features", r.SitePage)
+	app.Handle("GET", "/pricing", r.SitePage)
 	app.Handle("GET", "/support", r.SitePage)
 	app.Handle("GET", "/legal/privacy", r.SitePage)
 	app.Handle("GET", "/legal/terms", r.SitePage)

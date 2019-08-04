@@ -20,14 +20,14 @@
   --yellow: #f6c23e;
   --green: #1cc88a;
   --teal: #20c9a6;
-  --cyan: #36b9cc;
+  --cyan: #2EC57B;
   --white: #fff;
   --gray: #858796;
   --gray-dark: #5a5c69;
   --primary: #4e73df;
   --secondary: #858796;
   --success: #1cc88a;
-  --info: #36b9cc;
+  --info: #2EC57B;
   --warning: #f6c23e;
   --danger: #e74a3b;
   --light: #f8f9fc;
@@ -2722,8 +2722,8 @@ fieldset:disabled a.btn {
 
 .btn-info {
   color: #fff;
-  background-color: #36b9cc;
-  border-color: #36b9cc;
+  background-color: #2EC57B;
+  border-color: #2EC57B;
 }
 
 .btn-info:hover {
@@ -2739,8 +2739,8 @@ fieldset:disabled a.btn {
 
 .btn-info.disabled, .btn-info:disabled {
   color: #fff;
-  background-color: #36b9cc;
-  border-color: #36b9cc;
+  background-color: #2EC57B;
+  border-color: #2EC57B;
 }
 
 .btn-info:not(:disabled):not(.disabled):active, .btn-info:not(:disabled):not(.disabled).active,
@@ -2900,6 +2900,26 @@ fieldset:disabled a.btn {
   box-shadow: 0 0 0 0.2rem rgba(115, 116, 128, 0.5);
 }
 
+
+.btn-purple {
+  color: #fff;
+  background-color: #52489C;
+  border-color: #52489C;
+}
+
+.btn-purple:hover {
+  color: #fff;
+  background-color: #1cc88a;
+  border-color: #1cc88a;
+}
+
+.btn-purple:focus, .btn-purple.focus {
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(82, 72, 156, 0.5);
+  box-shadow: 0 0 0 0.2rem rgba(82, 72, 156, 0.5);
+}
+
+
+
 .btn-outline-primary {
   color: #4e73df;
   border-color: #4e73df;
@@ -3003,14 +3023,14 @@ fieldset:disabled a.btn {
 }
 
 .btn-outline-info {
-  color: #36b9cc;
-  border-color: #36b9cc;
+  color: #2EC57B;
+  border-color: #2EC57B;
 }
 
 .btn-outline-info:hover {
   color: #fff;
-  background-color: #36b9cc;
-  border-color: #36b9cc;
+  background-color: #2EC57B;
+  border-color: #2EC57B;
 }
 
 .btn-outline-info:focus, .btn-outline-info.focus {
@@ -3019,15 +3039,15 @@ fieldset:disabled a.btn {
 }
 
 .btn-outline-info.disabled, .btn-outline-info:disabled {
-  color: #36b9cc;
+  color: #2EC57B;
   background-color: transparent;
 }
 
 .btn-outline-info:not(:disabled):not(.disabled):active, .btn-outline-info:not(:disabled):not(.disabled).active,
 .show > .btn-outline-info.dropdown-toggle {
   color: #fff;
-  background-color: #36b9cc;
-  border-color: #36b9cc;
+  background-color: #2EC57B;
+  border-color: #2EC57B;
 }
 
 .btn-outline-info:not(:disabled):not(.disabled):active:focus, .btn-outline-info:not(:disabled):not(.disabled).active:focus,
@@ -5352,7 +5372,7 @@ a.badge-success:focus, a.badge-success.focus {
 
 .badge-info {
   color: #fff;
-  background-color: #36b9cc;
+  background-color: #2EC57B;
 }
 
 a.badge-info:hover, a.badge-info:focus {
@@ -6945,7 +6965,7 @@ button.bg-success:focus {
 }
 
 .bg-info {
-  background-color: #36b9cc !important;
+  background-color: #2EC57B !important;
 }
 
 a.bg-info:hover, a.bg-info:focus,
@@ -7055,7 +7075,7 @@ button.bg-dark:focus {
 }
 
 .border-info {
-  border-color: #36b9cc !important;
+  border-color: #2EC57B !important;
 }
 
 .border-warning {
@@ -10396,7 +10416,7 @@ a.text-success:hover, a.text-success:focus {
 }
 
 .text-info {
-  color: #36b9cc !important;
+  color: #2EC57B !important;
 }
 
 a.text-info:hover, a.text-info:focus {
@@ -10434,6 +10454,15 @@ a.text-light:hover, a.text-light:focus {
 a.text-dark:hover, a.text-dark:focus {
   color: #373840 !important;
 }
+
+.text-purple {
+  color: #52489C !important;
+}
+
+a.text-purple:hover, a.text-purple:focus {
+  color: #52489C !important;
+}
+
 
 .text-body {
   color: #858796 !important;
@@ -10577,6 +10606,7 @@ a:focus {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
+  padding-top: 70px;
 }
 
 #wrapper #content-wrapper {
@@ -10706,9 +10736,9 @@ a:focus {
 }
 
 .bg-gradient-info {
-  background-color: #36b9cc;
-  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(10%, #36b9cc), to(#258391));
-  background-image: linear-gradient(180deg, #36b9cc 10%, #258391 100%);
+  background-color: #2EC57B;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(10%, #2EC57B), to(#258391));
+  background-image: linear-gradient(180deg, #2EC57B 10%, #258391 100%);
   background-size: cover;
 }
 
@@ -10864,11 +10894,11 @@ a:focus {
 }
 
 .border-left-info {
-  border-left: 0.25rem solid #36b9cc !important;
+  border-left: 0.25rem solid #2EC57B !important;
 }
 
 .border-bottom-info {
-  border-bottom: 0.25rem solid #36b9cc !important;
+  border-bottom: 0.25rem solid #2EC57B !important;
 }
 
 .border-left-warning {

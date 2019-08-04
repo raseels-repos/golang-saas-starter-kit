@@ -1,4 +1,5 @@
 {{define "title"}}API{{end}}
+{{define "description"}}Learn how to programmatically communicate with our SaaS solution using our API.{{end}}
 {{define "style"}}
 
 {{end}}
@@ -7,6 +8,75 @@
 
 
         <h1 class="h1 mt-5 mb-3 text-dark">API</h1>
+
+        <p>Automate your business process via a simple and powerful API. Our API allows you to integrate complex services with our SaaS to go beyond the integrations we provide out of the box.</p>
+
+        <p>API access is only available to clients with the Enterprise plan. If you do not have the Enterprise plan, upgrade your account.</p>
+
+
+        <div class="row mt-5">
+            <div class="col">
+                <h2>API Documentation</h2>
+                <p>The documentation for the API is available here:</p>
+                <p class="h4"><i class="far fa-window-maximize"></i> <a href="http://127.0.0.1:3001/docs/" target="_blank">http://127.0.0.1:3001/docs/</a></p>
+            </div>
+        </div>
+
+
+        <div class="row mt-5 ">
+            <div class="col">
+
+                <h2>Base API URI</h2>
+
+                <p>The API is currently version 1. Thus, the endpoint for the API is:</p>
+                <code>http://127.0.0.1:3001/v1/
+                </code>
+
+            </div>
+        </div>
+
+
+        <div class="row mt-5 ">
+            <div class="col">
+
+                <h2>Authenticating with the API</h2>
+
+                <p>The API uses OAuth2 for authentication. To generate an auth token that can be used in proceeding API requests, follow the steps below. </p>
+
+                <h3 class="h5 mt-4">1. Generate an Auth Token</h3>
+
+                <p>At the top of the <a href="http://127.0.0.1:3001/docs/" target="_blank">API Documentation</a> UI, locate the button `Authorize` and click it.</p>
+
+                <p>Find the section `OAuth2Password (OAuth2, password)`.</p>
+
+                <p>Enter the user email and password.</p>
+
+                <p>Change the type to `basic auth`.
+
+                <p>Click the button `Authorize` to generate a token that will be used by the App Documentation UI for all future requests.</p>
+
+
+                <h3 class="h5 mt-5">2. Test Auth Token</h3>
+
+                <p>Now that the API Documentation UI is authorized, try running endpoint using the OAuth token.</p>
+
+                <p>Find the endpoint GET `/account` endpoint in the API Documentation UI. This endpoint should return the account by your ID.</p>
+
+                <p>Click `Try it out` .</p>
+
+                <p>Click `Execute`. The response should an Account object with your organization's account details.</p>
+
+                <h3 class="h5 mt-5">3. Query the API</h3>
+
+                <p>Now that you have an auth token, you can make any number of additional API requests until your auth token expires.</p>
+
+
+            </div>
+        </div>
+
+
+
+
 
 
 

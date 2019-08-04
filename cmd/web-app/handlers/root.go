@@ -54,8 +54,8 @@ func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 			tmpName = "site-index.gohtml"
 		case "/api":
 			tmpName = "site-api.gohtml"
-		case "/features":
-			tmpName = "site-features.gohtml"
+		case "/pricing":
+			tmpName = "site-pricing.gohtml"
 		case "/support":
 			tmpName = "site-support.gohtml"
 		case "/legal/privacy":

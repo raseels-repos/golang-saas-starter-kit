@@ -27,9 +27,9 @@ var (
 	ErrInviteUserPasswordSet = errors.New("User password set")
 )
 
-// InviteUsers sends emails to the users inviting them to join an account.
-func InviteUsers(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, resetUrl func(string) string, notify notify.Email, req InviteUsersRequest, secretKey string, now time.Time) ([]string, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.InviteUsers")
+// SendUserInvites sends emails to the users inviting them to join an account.
+func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, resetUrl func(string) string, notify notify.Email, req SendUserInvitesRequest, secretKey string, now time.Time) ([]string, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.SendUserInvites")
 	defer span.Finish()
 
 	v := webcontext.Validator()
@@ -131,12 +131,12 @@ func InviteUsers(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, reset
 		req.TTL = time.Minute * 90
 	}
 
-	fromUser, err := user.Read(ctx, claims, dbConn, req.UserID, false)
+	fromUser, err := user.ReadByID(ctx, claims, dbConn, req.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := account.Read(ctx, claims, dbConn, req.AccountID, false)
+	account, err := account.ReadByID(ctx, claims, dbConn, req.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +190,9 @@ func InviteUsers(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, reset
 	return inviteHashes, nil
 }
 
-// InviteAccept updates the password for a user using the provided reset password ID.
-func InviteAccept(ctx context.Context, dbConn *sqlx.DB, req InviteAcceptRequest, secretKey string, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.InviteAccept")
+// AcceptInvite updates the user using the provided invite hash.
+func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInvite")
 	defer span.Finish()
 
 	v := webcontext.Validator()
@@ -232,13 +232,14 @@ func InviteAccept(ctx context.Context, dbConn *sqlx.DB, req InviteAcceptRequest,
 		return err
 	}
 
-	u, err := user.Read(ctx, auth.Claims{}, dbConn, hash.UserID, true)
+	u, err := user.Read(ctx, auth.Claims{}, dbConn,
+		user.UserReadRequest{ID: hash.UserID, IncludeArchived: true})
 	if err != nil {
 		return err
 	}
 
 	if u.ArchivedAt != nil && !u.ArchivedAt.Time.IsZero() {
-		err = user.Unarchive(ctx, auth.Claims{}, dbConn, user.UserUnarchiveRequest{ID: hash.UserID}, now)
+		err = user.Restore(ctx, auth.Claims{}, dbConn, user.UserRestoreRequest{ID: hash.UserID}, now)
 		if err != nil {
 			return err
 		}

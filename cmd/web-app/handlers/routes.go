@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	tmplLayoutBase          = "base.gohtml"
+	TmplLayoutBase          = "base.gohtml"
 	tmplLayoutSite          = "site.gohtml"
-	tmplContentErrorGeneric = "error-generic.gohtml"
+	TmplContentErrorGeneric = "error-generic.gohtml"
 )
 
 // API returns a handler for a set of routes.
@@ -29,7 +29,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
-		mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics(),
+		mid.Trace(), mid.Logger(log), mid.Errors(log, renderer), mid.Metrics(), mid.Panics(),
 	}
 
 	// Append any global middlewares if they were included.
@@ -56,7 +56,6 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		NotifyEmail:   notifyEmail,
 		SecretKey:     secretKey,
 	}
-	// This route is not authenticated
 	app.Handle("POST", "/user/login", u.Login)
 	app.Handle("GET", "/user/login", u.Login)
 	app.Handle("GET", "/user/logout", u.Logout)
@@ -64,6 +63,21 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/user/reset-password/:hash", u.ResetConfirm)
 	app.Handle("POST", "/user/reset-password", u.ResetPassword)
 	app.Handle("GET", "/user/reset-password", u.ResetPassword)
+	app.Handle("POST", "/user/update", u.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/update", u.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/account", u.Account, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("POST", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("GET", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+
+	// Register account management endpoints.
+	acc := Account{
+		MasterDB: masterDB,
+		Renderer: renderer,
+	}
+	app.Handle("POST", "/account/update", acc.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/account/update", acc.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register user management and authentication endpoints.
 	s := Signup{
@@ -79,7 +93,6 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	ex := Examples{
 		Renderer: renderer,
 	}
-	// This route is not authenticated
 	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages)
 	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages)
 	app.Handle("GET", "/examples/images", ex.Images)
@@ -89,7 +102,6 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		MasterDB: masterDB,
 		Redis:    redis,
 	}
-	// These routes are not authenticated
 	app.Handle("GET", "/geo/regions/autocomplete", g.RegionsAutocomplete)
 	app.Handle("GET", "/geo/postal_codes/autocomplete", g.PostalCodesAutocomplete)
 	app.Handle("GET", "/geo/geonames/postal_code/:postalCode", g.GeonameByPostalCode)
@@ -101,8 +113,6 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		Renderer:      renderer,
 		ProjectRoutes: projectRoutes,
 	}
-
-	// These routes is not authenticated
 	app.Handle("GET", "/api", r.SitePage)
 	app.Handle("GET", "/features", r.SitePage)
 	app.Handle("GET", "/support", r.SitePage)
@@ -131,7 +141,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 				err = weberror.NewError(ctx, err, http.StatusInternalServerError)
 			}
 
-			return web.RenderError(ctx, w, r, err, renderer, tmplLayoutBase, tmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+			return web.RenderError(ctx, w, r, err, renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 		}
 
 		return nil

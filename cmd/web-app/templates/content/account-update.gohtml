@@ -1,0 +1,303 @@
+{{define "title"}}Update Account{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <form class="user" method="post" novalidate>
+        <div class="row">
+            <div class="col-md-6">
+
+                <h3>Account Details</h3>
+                <div class="spacer-15"></div>
+
+                <div class="form-group row">
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Name" }}" name="Name" value="{{ $.form.Name }}" placeholder="Company Name" required>
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Address1" }}" name="Address1" value="{{ $.form.Address1 }}" placeholder="Address Line 1" required>
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address1" }}
+                    </div>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Address2" }}" name="Address2" value="{{ $.form.Address2 }}" placeholder="Address Line 2">
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address2" }}
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <div class="form-control-select-wrapper">
+                            <select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Country" }}" id="selectAccountCountry" name="Country" placeholder="Country" required>
+                                {{ range $i := $.countries }}
+                                    {{ $hasGeonames := false }}
+                                    {{ range $c := $.geonameCountries }}
+                                        {{ if eq $c $i.Code }}{{ $hasGeonames = true }}{{ end }}
+                                    {{ end }}
+                                    <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if CmpString $.form.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
+                                {{ end }}
+                            </select>
+                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Country" }}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <div id="divAccountZipcode"></div>
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Zipcode" }}
+                    </div>
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <div id="divAccountRegion"></div>
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Region" }}
+                    </div>
+                </div>
+                <div class="form-group row mb-4">
+                    <div class="col-sm-6 mb-3 mb-sm-0">
+                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}" id="inputAccountCity" name="City" value="{{ $.form.City }}" placeholder="City" required>
+                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "City" }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+
+                <h3>Account Settings</h3>
+                <div class="spacer-15"></div>
+
+                <div class="form-group">
+                    <label for="inputTimezone">Timezone</label>
+                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}" name="Timezone">
+                        <option value="">Not set</option>
+                        {{ range $idx, $t := .timezones }}
+                            <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
+                        {{ end }}
+                    </select>
+                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Timezone" }}
+                </div>
+                <div class="form-group">
+                    <label for="inputDatetimeFormat">Datetime Format</label>
+                    <select style="display: none;" id="selectDatetimeFormat">
+                        <option>2006-01-02 at 3:04PM MST</option>
+                        <option>Mon Jan _2 15:04:05 2006</option>
+                        <option>Mon Jan _2 15:04:05 MST 2006</option>
+                        <option>Mon Jan 02 15:04:05 -0700 2006</option>
+                        <option>02 Jan 06 15:04 MST</option>
+                        <option>02 Jan 06 15:04 -0700</option>
+                        <option>Monday, 02-Jan-06 15:04:05 MST</option>
+                        <option>Mon, 02 Jan 2006 15:04:05 MST</option>
+                        <option>Mon, 02 Jan 2006 15:04:05 -0700</option>
+                        <option>Jan _2 15:04:05</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <input type="text" class="form-control" id="inputDatetimeFormat" placeholder="enter datetime format" name="PreferenceDatetimeFormat" value="{{ .form.PreferenceDatetimeFormat }}">
+                    <label class="form-check-label" for="inputDatetimeFormat"><small>Current Datetime {{ .exampleDisplayTime.Local }}</small></label>
+                </div>
+                <div class="form-group">
+                    <label for="inputDateFormat">Date Format</label>
+                    <select style="display: none;" id="selectDateFormat">
+                        <option>2006-01-02</option>
+                        <option>Mon Jan _2 2006</option>
+                        <option>Mon Jan 02 2006</option>
+                        <option>02 Jan 06</option>
+                        <option>02 Jan 06</option>
+                        <option>Monday, 02-Jan-06</option>
+                        <option>Mon, 02 Jan 2006</option>
+                        <option>Mon, 02 Jan 2006</option>
+                        <option>Jan _2</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <input type="text" class="form-control" id="inputDateFormat" placeholder="enter date format" name="PreferenceDateFormat" value="{{ .form.PreferenceDateFormat }}">
+                    <label class="form-check-label" for="inputDateFormat"><small>Current Date {{ .exampleDisplayTime.LocalDate }}</small></label>
+                </div>
+                <div class="form-group">
+                    <label for="inputTimeFormat">Time Format</label>
+                    <select style="display: none;" id="selectTimeFormat">
+                        <option>3:04PM</option>
+                        <option>3:04PM MST</option>
+                        <option>3:04PM -0700</option>
+                        <option>15:04:05</option>
+                        <option>15:04:05 MST</option>
+                        <option>15:04:05 -0700</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <input type="text" class="form-control" id="inputTimeFormat" placeholder="enter time format" name="PreferenceTimeFormat" value="{{ .form.PreferenceTimeFormat }}">
+                    <label class="form-check-label" for="inputDatetimeFormat"><small>Current Time {{ .exampleDisplayTime.LocalTime }}</small></label>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="spacer-30"></div>
+        <div class="row">
+            <div class="col">
+                <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+            </div>
+        </div>
+    </form>
+{{end}}
+{{define "js"}}
+    <script src="https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.2.2/dist/latest/bootstrap-autocomplete.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+
+            var selectInit = false;
+            $('#selectAccountCountry').on('change', function () {
+
+                // When a country has data-geonames, then we can perform autocomplete on zipcode and
+                // populate a list of valid regions.
+                if ($(this).find('option:selected').attr('data-geonames') == 1) {
+
+                    // Replace the existing region with an empty dropdown.
+                    $('#divAccountRegion').html('<div class="form-control-select-wrapper"><select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" placeholder="Region" required></select></div>');
+
+                    // Query the API for a list of regions for the selected
+                    // country and populate the region dropdown.
+                    $.ajax({
+                        type: 'GET',
+                        contentType: 'application/json',
+                        url: '/geo/regions/autocomplete',
+                        data: {country_code: $(this).val(), select: true},
+                        dataType: 'json'
+                    }).done(function (res) {
+                        if (res !== undefined && res !== null) {
+                            for (var c in res) {
+                                var optSelected = '';
+                                if (res[c].value == '{{ $.form.Region }}') {
+                                    optSelected = ' selected="selected"';
+                                }
+                                $('#inputAccountRegion').append('<option value="'+res[c].value+'"'+optSelected+'>'+res[c].text+'</option>');
+                            }
+                        }
+                    });
+
+                    // Replace the existing zipcode text input with a new one that will supports autocomplete.
+                    $('#divAccountZipcode').html('<input class="form-control  form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
+                    $('#inputAccountZipcode').autoComplete({
+                        minLength: 2,
+                        events: {
+                            search: function (qry, callback) {
+                                $.ajax({
+                                    type: 'GET',
+                                    contentType: 'application/json',
+                                    url: '/geo/postal_codes/autocomplete',
+                                    data: {query: qry, country_code: $('#selectAccountCountry').val()},
+                                    dataType: 'json'
+                                }).done(function (res) {
+                                    callback(res)
+                                });
+                            }
+                        }
+                    });
+
+                    // When the value of zipcode changes, try to find an exact match for the zipcode and
+                    // can therefore set the correct region and city.
+                    $('#inputAccountZipcode').on('change', function() {
+                        $.ajax({
+                            type: 'GET',
+                            contentType: 'application/json',
+                            url: '/geo/geonames/postal_code/'+$(this).val(),
+                            data: {country_code: $('#selectAccountCountry').val()},
+                            dataType: 'json'
+                        }).done(function (res) {
+                            if (res !== undefined && res !== null && res.PostalCode !== undefined) {
+                                $('#inputAccountCity').val(res.PlaceName);
+                                $('#inputAccountRegion').val(res.StateCode);
+                            }
+                        });
+                    });
+
+                } else {
+
+                    // Replace the existing zipcode input with no autocomplete.
+                    $('#divAccountZipcode').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
+
+                    // Replace the existing region select with a text input.
+                    $('#divAccountRegion').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" value="{{ $.form.Region }}" placeholder="Region" required>');
+
+                }
+
+                // Init the form defaults based on the current settings.
+                if (!selectInit) {
+                    hideDuplicateValidationFieldErrors();
+                    selectInit = true
+                }
+            }).change();
+
+
+            var selectedDatetimeFormat = false;
+            $('#selectDatetimeFormat > option').each(function() {
+                var curValue = $('#inputDatetimeFormat').val();
+                if (this.text == curValue ||  this.value == curValue) {
+                    $(this).attr('selected','selected');
+                    selectedDatetimeFormat = true;
+                    $('#selectDatetimeFormat').show();
+                    $('#inputDatetimeFormat').hide();
+                }
+            });
+
+            if (!selectedDatetimeFormat) {
+                $('#selectDatetimeFormat').val('custom');
+                $('#selectDatetimeFormat').show();
+                $('#inputDatetimeFormat').show();
+            }
+
+            $('#selectDatetimeFormat').on('change', function() {
+                if ($(this).val() == 'custom') {
+                    $('#inputDatetimeFormat').show();
+                } else {
+                    $('#inputDatetimeFormat').hide();
+                    $('#inputDatetimeFormat').val($(this).val());
+                }
+            })
+
+            var selectedDateFormat = false;
+            $('#selectDateFormat > option').each(function() {
+                var curValue = $('#inputDateFormat').val();
+                if (this.text == curValue ||  this.value == curValue) {
+                    $(this).attr('selected','selected');
+                    selectedDateFormat = true;
+                    $('#selectDateFormat').show();
+                    $('#inputDateFormat').hide();
+                }
+            });
+            if (!selectedDateFormat) {
+                $('#selectDateFormat').val('custom');
+                $('#selectDateFormat').show();
+                $('#inputDateFormat').show();
+            }
+            $('#selectDateFormat').on('change', function() {
+                if ($(this).val() == 'custom') {
+                    $('#inputDateFormat').show();
+                } else {
+                    $('#inputDateFormat').hide();
+                    $('#inputDateFormat').val($(this).val());
+                }
+            })
+
+            var selectedTimeFormat = false;
+            $('#selectTimeFormat > option').each(function() {
+                var curValue = $('#inputTimeFormat').val();
+                if (this.text == curValue ||  this.value == curValue) {
+                    $(this).attr('selected','selected');
+                    selectedTimeFormat = true;
+                    $('#selectTimeFormat').show();
+                    $('#inputTimeFormat').hide();
+                }
+            });
+            if (!selectedTimeFormat) {
+                $('#selectTimeFormat').val('custom');
+                $('#selectTimeFormat').show();
+                $('#inputTimeFormat').show();
+            }
+            $('#selectTimeFormat').on('change', function() {
+                if ($(this).val() == 'custom') {
+                    $('#inputTimeFormat').show();
+                } else {
+                    $('#inputTimeFormat').hide();
+                    $('#inputTimeFormat').val($(this).val());
+                }
+            })
+        });
+    </script>
+{{end}}

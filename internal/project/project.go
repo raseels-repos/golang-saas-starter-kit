@@ -26,25 +26,6 @@ var (
 	ErrForbidden = errors.New("Attempted action is not allowed")
 )
 
-// projectMapColumns is the list of columns needed for mapRowsToProject
-var projectMapColumns = "id,account_id,name,status,created_at,updated_at,archived_at"
-
-// mapRowsToProject takes the SQL rows and maps it to the Project struct
-// with the columns defined by projectMapColumns
-func mapRowsToProject(rows *sql.Rows) (*Project, error) {
-	var (
-		m   Project
-		err error
-	)
-
-	err = rows.Scan(&m.ID, &m.AccountID, &m.Name, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.ArchivedAt)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return &m, nil
-}
-
 // CanReadProject determines if claims has the authority to access the specified project by id.
 func CanReadProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) error {
 
@@ -106,7 +87,10 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 	return nil
 }
 
-// selectQuery constructs a base select query for Project
+// projectMapColumns is the list of columns needed for find.
+var projectMapColumns = "id,account_id,name,status,created_at,updated_at,archived_at"
+
+// selectQuery constructs a base select query for Project.
 func selectQuery() *sqlbuilder.SelectBuilder {
 	query := sqlbuilder.NewSelectBuilder()
 	query.Select(projectMapColumns)
@@ -119,6 +103,7 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 // 			to the query.
 func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := selectQuery()
+
 	if req.Where != nil {
 		query.Where(query.And(*req.Where))
 	}
@@ -141,13 +126,14 @@ func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []inte
 // Find gets all the projects from the database based on the request params.
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectFindRequest) ([]*Project, error) {
 	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
+	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the projects from the database using a select query.
 func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*Project, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Find")
 	defer span.Finish()
+
 	query.Select(projectMapColumns)
 	query.From(projectTableName)
 	if !includedArchived {
@@ -174,32 +160,51 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	// Iterate over each row.
 	resp := []*Project{}
 	for rows.Next() {
-		u, err := mapRowsToProject(rows)
+		var (
+			m   Project
+			err error
+		)
+		err = rows.Scan(&m.ID, &m.AccountID, &m.Name, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.ArchivedAt)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			return nil, err
 		}
 
-		resp = append(resp, u)
+		resp = append(resp, &m)
 	}
 
 	return resp, nil
 }
 
+// ReadByID gets the specified project by ID from the database.
+func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*Project, error) {
+	return Read(ctx, claims, dbConn, ProjectReadRequest{
+		ID:              id,
+		IncludeArchived: false,
+	})
+}
+
 // Read gets the specified project from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*Project, error) {
+func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectReadRequest) (*Project, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Read")
 	defer span.Finish()
 
-	// Filter base select query by id
-	query := selectQuery()
-	query.Where(query.Equal("id", id))
-
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "project %s not found", id)
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
 		return nil, err
-	} else if err != nil {
+	}
+
+	// Filter base select query by id
+	query := sqlbuilder.NewSelectBuilder()
+	query.Where(query.Equal("id", req.ID))
+
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	if err != nil {
+		return nil, err
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "project %s not found", req.ID)
 		return nil, err
 	}
 
@@ -358,14 +363,6 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	return nil
 }
 
-// Archive soft deleted the project by ID from the database.
-func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, now time.Time) error {
-	req := ProjectArchiveRequest{
-		ID: id,
-	}
-	return Archive(ctx, claims, dbConn, req, now)
-}
-
 // Archive soft deleted the project from the database.
 func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Archive")
@@ -416,16 +413,9 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 }
 
 // Delete removes an project from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) error {
+func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
 	defer span.Finish()
-
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `json:"id" validate:"required,uuid"`
-	}{
-		ID: id,
-	}
 
 	// Validate the request.
 	v := webcontext.Validator()

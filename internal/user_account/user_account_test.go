@@ -193,7 +193,7 @@ func TestCreateValidation(t *testing.T) {
 					Status:    UserAccountStatus_Active,
 
 					// Copy this fields from the result.
-					ID:        res.ID,
+					//ID:        res.ID,
 					CreatedAt: res.CreatedAt,
 					UpdatedAt: res.UpdatedAt,
 					//ArchivedAt: nil,
@@ -326,7 +326,8 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Find the archived user account
-		arcRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB, ua2.ID, true)
+		arcRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB,
+			UserAccountReadRequest{UserID: req1.UserID, AccountID: req1.AccountID, IncludeArchived: true})
 		if err != nil || arcRes == nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
@@ -349,7 +350,8 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Ensure the user account has archived_at empty
-		findRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB, ua3.ID, false)
+		findRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB,
+			UserAccountReadRequest{UserID: req1.UserID, AccountID: req1.AccountID})
 		if err != nil || arcRes == nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tFind user account failed.", tests.Failed)
@@ -609,7 +611,7 @@ func TestCrud(t *testing.T) {
 				} else if tt.findErr == nil {
 					expected := []*UserAccount{
 						&UserAccount{
-							ID:        ua.ID,
+							//ID:        ua.ID,
 							UserID:    ua.UserID,
 							AccountID: ua.AccountID,
 							Roles:     ua.Roles,
@@ -651,7 +653,7 @@ func TestCrud(t *testing.T) {
 
 					expected := []*UserAccount{
 						&UserAccount{
-							ID:         ua.ID,
+							//ID:         ua.ID,
 							UserID:     ua.UserID,
 							AccountID:  ua.AccountID,
 							Roles:      *updateReq.Roles,
@@ -806,8 +808,9 @@ func TestFind(t *testing.T) {
 		}
 		ua := *userAccounts[i]
 
-		whereParts = append(whereParts, "id = ?")
-		whereArgs = append(whereArgs, ua.ID)
+		whereParts = append(whereParts, "(user_id = ? and account_id = ?)")
+		whereArgs = append(whereArgs, ua.UserID)
+		whereArgs = append(whereArgs, ua.AccountID)
 		expected = append(expected, &ua)
 	}
 	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"

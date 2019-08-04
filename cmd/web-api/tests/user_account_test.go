@@ -91,7 +91,7 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 
 		expectedMap := map[string]interface{}{
 			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
-			"id":         actual.ID,
+			//"id":         actual.ID,
 			"account_id": req.AccountID,
 			"user_id":    req.UserID,
 			"status":     web.NewEnumResponse(ctx, "active", user_account.UserAccountStatus_Values),
@@ -122,7 +122,7 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", created.ID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", created.UserID, created.AccountID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -157,7 +157,7 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", randID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", randID, randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -179,7 +179,10 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user account %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("entry for user %s account %s not found: Entity not found", randID, randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -196,7 +199,7 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", forbiddenUserAccount.ID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", forbiddenUserAccount.UserID, forbiddenUserAccount.AccountID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -218,7 +221,10 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user account %s not found: Entity not found", forbiddenUserAccount.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("entry for user %s account %s not found: Entity not found", forbiddenUserAccount.UserID, forbiddenUserAccount.AccountID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -370,7 +376,8 @@ func TestUserAccountCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -388,7 +395,7 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", created.ID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", created.UserID, created.AccountID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -423,7 +430,7 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", randID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", randID, randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -445,7 +452,10 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user account %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("entry for user %s account %s not found: Entity not found", randID, randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -462,7 +472,7 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/user_accounts/%s", forbiddenUserAccount.ID),
+			fmt.Sprintf("/v1/user_accounts/%s/%s", forbiddenUserAccount.UserID, forbiddenUserAccount.AccountID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -484,7 +494,10 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user account %s not found: Entity not found", forbiddenUserAccount.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("entry for user %s account %s not found: Entity not found", forbiddenUserAccount.UserID, forbiddenUserAccount.AccountID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -527,7 +540,10 @@ func TestUserAccountCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: account.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    account.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -567,7 +583,8 @@ func TestUserAccountCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -606,7 +623,8 @@ func TestUserAccountCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -659,7 +677,8 @@ func TestUserAccountCreate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "status", Error: "Key: 'UserAccountCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
@@ -670,6 +689,8 @@ func TestUserAccountCreate(t *testing.T) {
 					Display: "status must be one of [active invited disabled]",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -722,7 +743,8 @@ func TestUserAccountUpdate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "status", Error: "Key: 'UserAccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
@@ -733,6 +755,8 @@ func TestUserAccountUpdate(t *testing.T) {
 					Display: "status must be one of [active invited disabled]",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -783,7 +807,8 @@ func TestUserAccountArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "user_id", Error: "Key: 'UserAccountArchiveRequest.user_id' Error:Field validation for 'user_id' failed on the 'uuid' tag"},
 				//{Field: "account_id", Error: "Key: 'UserAccountArchiveRequest.account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
@@ -802,6 +827,8 @@ func TestUserAccountArchive(t *testing.T) {
 					Display: "account_id must be a valid UUID",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -843,7 +870,10 @@ func TestUserAccountArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user_account.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user_account.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -896,7 +926,8 @@ func TestUserAccountDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "user_id", Error: "Key: 'UserAccountDeleteRequest.user_id' Error:Field validation for 'user_id' failed on the 'uuid' tag"},
 				//{Field: "account_id", Error: "Key: 'UserAccountDeleteRequest.account_id' Error:Field validation for 'account_id' failed on the 'uuid' tag"},
@@ -915,6 +946,8 @@ func TestUserAccountDelete(t *testing.T) {
 					Display: "account_id must be a valid UUID",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -956,7 +989,10 @@ func TestUserAccountDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user_account.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user_account.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {

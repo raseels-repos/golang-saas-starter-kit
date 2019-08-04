@@ -179,19 +179,28 @@ func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er
 		return err
 	}
 
-	// If the error was of the type *Error, the handler has
-	// a specific status code and error to return.
-	webErr := weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error).Response(ctx, true)
-	v.StatusCode = webErr.StatusCode
+	webErr, ok := er.(*weberror.Error)
+	if !ok {
+		if v.StatusCode == 0 {
+			v.StatusCode = http.StatusInternalServerError
+		}
+
+		// If the error was of the type *Error, the handler has
+		// a specific status code and error to return.
+		webErr = weberror.NewError(ctx, er, v.StatusCode).(*weberror.Error)
+	}
+	v.StatusCode = webErr.Status
+
+	resp := webErr.Response(ctx, true)
 
 	data := map[string]interface{}{
-		"StatusCode": webErr.StatusCode,
-		"Error":      webErr.Error,
-		"Details":    webErr.Details,
-		"Fields":     webErr.Fields,
+		"StatusCode": resp.StatusCode,
+		"Error":      resp.Error,
+		"Details":    resp.Details,
+		"Fields":     resp.Fields,
 	}
 
-	return renderer.Render(ctx, w, r, templateLayoutName, templateContentName, contentType, webErr.StatusCode, data)
+	return renderer.Render(ctx, w, r, templateLayoutName, templateContentName, contentType, webErr.Status, data)
 }
 
 // Static registers a new route with path prefix to serve static files from the

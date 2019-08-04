@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -105,6 +106,8 @@ func TestUserCRUDAdmin(t *testing.T) {
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
 			"first_name": req.FirstName,
 			"last_name":  req.LastName,
+			"name":       req.FirstName + " " + req.LastName,
+			"gravatar":   web.NewGravatarResponse(ctx, actual.Email),
 		}
 
 		var expected user.UserResponse
@@ -197,7 +200,10 @@ func TestUserCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("user %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -235,7 +241,10 @@ func TestUserCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -419,6 +428,8 @@ func TestUserCRUDAdmin(t *testing.T) {
 			"token_type":   actual["token_type"],
 			"expiry":       actual["expiry"],
 			"ttl":          actual["ttl"],
+			"user_id":      tr.User.ID,
+			"account_id":   newAccount.ID,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -481,7 +492,8 @@ func TestUserCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -556,7 +568,10 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("user %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -594,7 +609,10 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("user %s not found: Entity not found", tr.ForbiddenUser.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -636,7 +654,10 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -679,7 +700,10 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -718,7 +742,8 @@ func TestUserCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -754,7 +779,8 @@ func TestUserCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, actual, expected); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -806,6 +832,8 @@ func TestUserCRUDUser(t *testing.T) {
 			"token_type":   actual["token_type"],
 			"expiry":       actual["expiry"],
 			"ttl":          actual["ttl"],
+			"user_id":      tr.User.ID,
+			"account_id":   newAccount.ID,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -870,7 +898,8 @@ func TestUserCreate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "email", Error: "Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
 				{
@@ -881,6 +910,8 @@ func TestUserCreate(t *testing.T) {
 					Display: "email must be a valid email address",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -932,7 +963,8 @@ func TestUserUpdate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "email", Error: "Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'email' tag"},
 				{
@@ -943,6 +975,8 @@ func TestUserUpdate(t *testing.T) {
 					Display: "email must be a valid email address",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1000,7 +1034,8 @@ func TestUserUpdatePassword(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "password_confirm", Error: "Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'eqfield' tag"},
 				{
@@ -1011,6 +1046,8 @@ func TestUserUpdatePassword(t *testing.T) {
 					Display: "password_confirm must be equal to Password",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1062,7 +1099,8 @@ func TestUserArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "id", Error: "Key: 'UserArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
 				{
@@ -1073,6 +1111,8 @@ func TestUserArchive(t *testing.T) {
 					Display: "id must be a valid UUID",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1112,7 +1152,10 @@ func TestUserArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1162,7 +1205,8 @@ func TestUserDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
 				{
@@ -1173,6 +1217,8 @@ func TestUserDelete(t *testing.T) {
 					Display: "id must be a valid UUID",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1210,7 +1256,10 @@ func TestUserDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1260,7 +1309,8 @@ func TestUserSwitchAccount(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				{
 					Field:   "account_id",
@@ -1270,6 +1320,8 @@ func TestUserSwitchAccount(t *testing.T) {
 					Display: "account_id must be a valid UUID",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -1307,7 +1359,10 @@ func TestUserSwitchAccount(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrAuthenticationFailure.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user_auth.ErrAuthenticationFailure.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1330,7 +1385,7 @@ func TestUserToken(t *testing.T) {
 			http.MethodPost,
 			"/v1/oauth/token",
 			nil,
-			user.Token{},
+			user_auth.Token{},
 			auth.Claims{},
 			expectedStatus,
 			nil,
@@ -1350,7 +1405,10 @@ func TestUserToken(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "must provide email and password in Basic auth",
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    "must provide email and password in Basic auth",
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1368,7 +1426,7 @@ func TestUserToken(t *testing.T) {
 			http.MethodPost,
 			"/v1/oauth/token",
 			nil,
-			user.Token{},
+			user_auth.Token{},
 			auth.Claims{},
 			expectedStatus,
 			nil,
@@ -1397,7 +1455,10 @@ func TestUserToken(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: user.ErrAuthenticationFailure.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    user_auth.ErrAuthenticationFailure.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, actual, expected); diff {
@@ -1416,7 +1477,7 @@ func TestUserToken(t *testing.T) {
 				http.MethodPost,
 				"/v1/oauth/token",
 				nil,
-				user.Token{},
+				user_auth.Token{},
 				auth.Claims{},
 				expectedStatus,
 				nil,
@@ -1445,7 +1506,10 @@ func TestUserToken(t *testing.T) {
 			}
 
 			expected := weberror.ErrorResponse{
-				Error: user.ErrAuthenticationFailure.Error(),
+				StatusCode: expectedStatus,
+				Error:      http.StatusText(expectedStatus),
+				Details:    user_auth.ErrAuthenticationFailure.Error(),
+				StackTrace: actual.StackTrace,
 			}
 
 			if diff := cmpDiff(t, actual, expected); diff {
@@ -1463,9 +1527,9 @@ func TestUserToken(t *testing.T) {
 			rt := requestTest{
 				fmt.Sprintf("Token %d w/role %s using valid credentials", expectedStatus, tr.Role),
 				http.MethodPost,
-				"/v1/oauth/token",
+				"/v1/oauth/token?account_id=" + tr.Account.ID,
 				nil,
-				user.Token{},
+				user_auth.Token{},
 				auth.Claims{},
 				expectedStatus,
 				nil,
@@ -1499,6 +1563,8 @@ func TestUserToken(t *testing.T) {
 				"token_type":   actual["token_type"],
 				"expiry":       actual["expiry"],
 				"ttl":          actual["ttl"],
+				"user_id":      tr.User.ID,
+				"account_id":   tr.Account.ID,
 			}
 
 			if diff := cmpDiff(t, actual, expected); diff {

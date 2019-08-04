@@ -30,39 +30,6 @@ func testMain(m *testing.M) int {
 	return m.Run()
 }
 
-// TestFindRequestQuery validates findRequestQuery
-func TestFindRequestQuery(t *testing.T) {
-	where := "first_name = ? or address1 = ?"
-	var (
-		limit  uint = 12
-		offset uint = 34
-	)
-
-	req := AccountFindRequest{
-		Where: &where,
-		Args: []interface{}{
-			"lee",
-			"103 East Main St.",
-		},
-		Order: []string{
-			"id asc",
-			"created_at desc",
-		},
-		Limit:  &limit,
-		Offset: &offset,
-	}
-	expected := "SELECT " + accountMapColumns + " FROM " + accountTableName + " WHERE (first_name = ? or address1 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
-
-	res, args := findRequestQuery(req)
-
-	if diff := cmp.Diff(res.String(), expected); diff != "" {
-		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
-	}
-	if diff := cmp.Diff(args, req.Args); diff != "" {
-		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
-	}
-}
-
 // TestApplyClaimsSelect validates applyClaimsSelect
 func TestApplyClaimsSelect(t *testing.T) {
 	var claimTests = []struct {
@@ -786,7 +753,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUpdate ok.", tests.Success)
 
 				// Find the account and make sure the updates where made.
-				findRes, err := Read(ctx, tt.claims(account, userId), test.MasterDB, account.ID, false)
+				findRes, err := ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
 				if err != nil && errors.Cause(err) != tt.findErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.findErr)
@@ -800,14 +767,14 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the account.
-				err = ArchiveById(ctx, tt.claims(account, userId), test.MasterDB, account.ID, now)
+				err = Archive(ctx, tt.claims(account, userId), test.MasterDB, AccountArchiveRequest{ID: account.ID}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived account with the includeArchived false should result in not found.
-					_, err = Read(ctx, tt.claims(account, userId), test.MasterDB, account.ID, false)
+					_, err = ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
 					if err != nil && errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -815,7 +782,8 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived account with the includeArchived true should result no error.
-					_, err = Read(ctx, tt.claims(account, userId), test.MasterDB, account.ID, true)
+					_, err = Read(ctx, tt.claims(account, userId), test.MasterDB,
+						AccountReadRequest{ID: account.ID, IncludeArchived: true})
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tArchive Read failed.", tests.Failed)
@@ -824,14 +792,14 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
 				// Delete (hard-delete) the account.
-				err = Delete(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
+				err = Delete(ctx, tt.claims(account, userId), test.MasterDB, AccountDeleteRequest{ID: account.ID})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted account with the includeArchived true should result in not found.
-					_, err = Read(ctx, tt.claims(account, userId), test.MasterDB, account.ID, true)
+					_, err = ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)

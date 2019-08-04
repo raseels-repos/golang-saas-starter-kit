@@ -63,3 +63,27 @@ func FindCountryTimezones(ctx context.Context, dbConn *sqlx.DB, orderBy, where s
 
 	return resp, nil
 }
+
+func ListTimezones(ctx context.Context, dbConn *sqlx.DB) ([]string, error) {
+	res, err := FindCountryTimezones(ctx, dbConn, "timezone_id", "")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := []string{}
+	for _, ct := range res {
+		var exists bool
+		for _, t := range resp {
+			if ct.TimezoneId == t {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			resp = append(resp, ct.TimezoneId)
+		}
+	}
+
+	return resp, nil
+}

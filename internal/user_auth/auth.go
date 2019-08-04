@@ -1,15 +1,15 @@
-package user
+package user_auth
 
 import (
 	"context"
-	"crypto/rsa"
 	"database/sql"
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"github.com/dgrijalva/jwt-go"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -18,35 +18,37 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-// TokenGenerator is the behavior we need in our Authenticate to generate tokens for
-// authenticated users.
-type TokenGenerator interface {
-	GenerateToken(auth.Claims) (string, error)
-	ParseClaims(string) (auth.Claims, error)
-}
+var (
+	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
+	// anything goes wrong.
+	ErrAuthenticationFailure = errors.New("Authentication failed")
+)
+
+const (
+	// The database table for User
+	userTableName = "users"
+	// The database table for Account
+	accountTableName = "accounts"
+	// The database table for User Account
+	userAccountTableName = "users_accounts"
+)
 
 // Authenticate finds a user by their email and verifies their password. On success
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
 func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, email, password string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Authenticate")
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.Authenticate")
 	defer span.Finish()
 
-	// Generate sql query to select user by email address.
-	query := sqlbuilder.NewSelectBuilder()
-	query.Where(query.Equal("email", email))
-
-	// Run the find, use empty claims to bypass ACLs since this in an internal request
-	// and the current user is not authenticated at this point. If the email is
-	// invalid, return the same error as when an invalid password is supplied.
-	res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
+	u, err := user.ReadByEmail(ctx, auth.Claims{}, dbConn, email, false)
 	if err != nil {
-		return Token{}, err
-	} else if res == nil || len(res) == 0 {
-		err = errors.WithStack(ErrAuthenticationFailure)
-		return Token{}, err
+		if errors.Cause(err) == user.ErrNotFound {
+			err = errors.WithStack(ErrAuthenticationFailure)
+			return Token{}, err
+		} else {
+			return Token{}, err
+		}
 	}
-	u := res[0]
 
 	// Append the salt from the user record to the supplied password.
 	saltedPassword := password + u.PasswordSalt
@@ -67,7 +69,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, e
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
 func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.SwitchAccount")
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.SwitchAccount")
 	defer span.Finish()
 
 	// Defines struct to apply validation for the supplied claims and account ID.
@@ -221,61 +223,102 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	// Allow the scope to be defined for the claims. This enables testing via the API when a user has the role of admin
 	// and would like to limit their role to user.
 	var roles []string
-	if len(scopes) > 0 && scopes[0] != "" {
-		// Parse scopes, handle when one value has a list of scopes
-		// separated by a space.
-		var scopeList []string
-		for _, vs := range scopes {
-			for _, v := range strings.Split(vs, " ") {
-				v = strings.TrimSpace(v)
-				if v == "" {
-					continue
-				}
-				scopeList = append(scopeList, v)
-			}
-		}
-
-		for _, s := range scopeList {
-			var scopeValid bool
-			for _, r := range account.Roles {
-				if r == s || (s == auth.RoleUser && r == auth.RoleAdmin) {
-					scopeValid = true
-					break
+	{
+		if len(scopes) > 0 && scopes[0] != "" {
+			// Parse scopes, handle when one value has a list of scopes
+			// separated by a space.
+			var scopeList []string
+			for _, vs := range scopes {
+				for _, v := range strings.Split(vs, " ") {
+					v = strings.TrimSpace(v)
+					if v == "" {
+						continue
+					}
+					scopeList = append(scopeList, v)
 				}
 			}
 
-			if scopeValid {
-				roles = append(roles, s)
-			} else {
-				err := errors.Errorf("invalid scope '%s'", s)
-				return Token{}, err
+			for _, s := range scopeList {
+				var scopeValid bool
+				for _, r := range account.Roles {
+					if r == s || (s == auth.RoleUser && r == auth.RoleAdmin) {
+						scopeValid = true
+						break
+					}
+				}
+
+				if scopeValid {
+					roles = append(roles, s)
+				} else {
+					err := errors.Errorf("invalid scope '%s'", s)
+					return Token{}, err
+				}
+			}
+		} else {
+			roles = account.Roles
+		}
+
+		if len(roles) == 0 {
+			err := errors.New("no roles defined for user")
+			return Token{}, err
+		}
+	}
+
+	var claimPref auth.ClaimPreferences
+	{
+		// Set the timezone if one is specifically set on the user.
+		var tz *time.Location
+		if account.UserTimezone.Valid && account.UserTimezone.String != "" {
+			tz, _ = time.LoadLocation(account.UserTimezone.String)
+		}
+
+		// If user timezone failed to parse or none is set, check the timezone set on the account.
+		if tz == nil && account.AccountTimezone.Valid && account.AccountTimezone.String != "" {
+			tz, _ = time.LoadLocation(account.AccountTimezone.String)
+		}
+
+		prefs, err := account_preference.FindByAccountID(ctx, auth.Claims{}, dbConn, account_preference.AccountPreferenceFindByAccountIDRequest{
+			AccountID: accountID,
+		})
+		if err != nil {
+			return Token{}, err
+		}
+
+		var (
+			preferenceDatetimeFormat string
+			preferenceDateFormat     string
+			preferenceTimeFormat     string
+		)
+
+		for _, pref := range prefs {
+			switch pref.Name {
+			case account_preference.AccountPreference_Datetime_Format:
+				preferenceDatetimeFormat = pref.Value
+			case account_preference.AccountPreference_Date_Format:
+				preferenceDateFormat = pref.Value
+			case account_preference.AccountPreference_Time_Format:
+				preferenceTimeFormat = pref.Value
 			}
 		}
-	} else {
-		roles = account.Roles
-	}
 
-	if len(roles) == 0 {
-		err := errors.New("no roles defined for user")
-		return Token{}, err
-	}
+		if preferenceDatetimeFormat == "" {
+			preferenceDatetimeFormat = account_preference.AccountPreference_Datetime_Format_Default
+		}
+		if preferenceDateFormat == "" {
+			preferenceDateFormat = account_preference.AccountPreference_Date_Format_Default
+		}
+		if preferenceTimeFormat == "" {
+			preferenceTimeFormat = account_preference.AccountPreference_Time_Format_Default
+		}
 
-	// Set the timezone if one is specifically set on the user.
-	var tz *time.Location
-	if account.UserTimezone.Valid && account.UserTimezone.String != "" {
-		tz, _ = time.LoadLocation(account.UserTimezone.String)
-	}
-
-	// If user timezone failed to parse or none is set, check the timezone set on the account.
-	if tz == nil && account.AccountTimezone.Valid && account.AccountTimezone.String != "" {
-		tz, _ = time.LoadLocation(account.AccountTimezone.String)
+		claimPref = auth.NewClaimPreferences(tz, preferenceDatetimeFormat, preferenceDateFormat, preferenceTimeFormat)
 	}
 
 	// JWT claims requires both an audience and a subject. For this application:
 	// 	Subject: The ID of the user authenticated.
 	// 	Audience: The ID of the account the user is accessing. A list of account IDs
 	// 			  will also be included to support the user switching between them.
-	claims = auth.NewClaims(userID, accountID, accountIds, roles, tz, now, expires)
+	claims = auth.NewClaims(userID, accountID, accountIds, roles, claimPref, now, expires)
 
 	// Generate a token for the user with the defined claims.
 	tknStr, err := tknGen.GenerateToken(claims)
@@ -287,8 +330,8 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		AccessToken: tknStr,
 		TokenType:   "Bearer",
 		claims:      claims,
-		UserID: claims.Subject,
-		AccountID: claims.Audience,
+		UserID:      claims.Subject,
+		AccountID:   claims.Audience,
 	}
 
 	if expires.Seconds() > 0 {
@@ -297,73 +340,4 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	}
 
 	return tkn, nil
-}
-
-// AuthorizationHeader returns the header authorization value.
-func (t Token) AuthorizationHeader() string {
-	return "Bearer " + t.AccessToken
-}
-
-// mockTokenGenerator is used for testing that Authenticate calls its provided
-// token generator in a specific way.
-type MockTokenGenerator struct {
-	// Private key generated by GenerateToken that is need for ParseClaims
-	key *rsa.PrivateKey
-	// algorithm is the method used to generate the private key.
-	algorithm string
-}
-
-// GenerateToken implements the TokenGenerator interface. It returns a "token"
-// that includes some information about the claims it was passed.
-func (g *MockTokenGenerator) GenerateToken(claims auth.Claims) (string, error) {
-	privateKey, err := auth.KeyGen()
-	if err != nil {
-		return "", err
-	}
-
-	g.key, err = jwt.ParseRSAPrivateKeyFromPEM(privateKey)
-	if err != nil {
-		return "", err
-	}
-
-	g.algorithm = "RS256"
-	method := jwt.GetSigningMethod(g.algorithm)
-
-	tkn := jwt.NewWithClaims(method, claims)
-	tkn.Header["kid"] = "1"
-
-	str, err := tkn.SignedString(g.key)
-	if err != nil {
-		return "", err
-	}
-
-	return str, nil
-}
-
-// ParseClaims recreates the Claims that were used to generate a token. It
-// verifies that the token was signed using our key.
-func (g *MockTokenGenerator) ParseClaims(tknStr string) (auth.Claims, error) {
-	parser := jwt.Parser{
-		ValidMethods: []string{g.algorithm},
-	}
-
-	if g.key == nil {
-		return auth.Claims{}, errors.New("Private key is empty.")
-	}
-
-	f := func(t *jwt.Token) (interface{}, error) {
-		return g.key.Public().(*rsa.PublicKey), nil
-	}
-
-	var claims auth.Claims
-	tkn, err := parser.ParseWithClaims(tknStr, &claims, f)
-	if err != nil {
-		return auth.Claims{}, errors.Wrap(err, "parsing token")
-	}
-
-	if !tkn.Valid {
-		return auth.Claims{}, errors.New("Invalid token")
-	}
-
-	return claims, nil
 }

@@ -2,14 +2,14 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -35,7 +35,7 @@ type Project struct {
 // @Param order				query string   	false 	"Order columns separated by comma, example: created_at desc"
 // @Param limit				query integer  	false 	"Limit, example: 10"
 // @Param offset			query integer  	false 	"Offset, example: 20"
-// @Param included-archived query boolean 	false 	"Included Archived, example: false"
+// @Param include-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} project.ProjectResponse
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
@@ -92,13 +92,13 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	// Handle include-archive query value if set.
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
-		req.IncludedArchived = b
+		req.IncludeArchived = b
 	}
 
 	//if err := web.Decode(r, &req); err != nil {
@@ -140,18 +140,21 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return errors.New("claims missing from context")
 	}
 
-	// Handle included-archived query value if set.
+	// Handle include-archived query value if set.
 	var includeArchived bool
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
 
-	res, err := project.Read(ctx, claims, p.MasterDB, params["id"], includeArchived)
+	res, err := project.Read(ctx, claims, p.MasterDB, project.ProjectReadRequest{
+		ID:              params["id"],
+		IncludeArchived: includeArchived,
+	})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -337,7 +340,8 @@ func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return err
 	}
 
-	err = project.Delete(ctx, claims, p.MasterDB, params["id"])
+	err = project.Delete(ctx, claims, p.MasterDB,
+		project.ProjectDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

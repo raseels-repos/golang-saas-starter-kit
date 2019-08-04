@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/pborman/uuid"
 )
 
@@ -152,7 +152,10 @@ func TestAccountCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("account %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("account %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -190,7 +193,10 @@ func TestAccountCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -366,7 +372,10 @@ func TestAccountCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("account %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("account %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -404,7 +413,10 @@ func TestAccountCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("account %s not found: Entity not found", tr.ForbiddenAccount.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -445,7 +457,8 @@ func TestAccountCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
 		}
@@ -495,7 +508,8 @@ func TestAccountUpdate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: http.StatusBadRequest,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "status", Error: "Key: 'AccountUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
@@ -506,6 +520,8 @@ func TestAccountUpdate(t *testing.T) {
 					Display: "status must be one of [active pending disabled]",
 				},
 			},
+			Details:    actual.Details,
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {

@@ -561,5 +561,29 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 				return nil
 			},
 		},
+		// Create new table account_preferences.
+		{
+			ID: "20190801-01",
+			Migrate: func(tx *sql.Tx) error {
+
+				q := `CREATE TABLE IF NOT EXISTS account_preferences (
+					  account_id char(36) NOT NULL  REFERENCES accounts(id) ON DELETE NO ACTION,
+					  name varchar(200) NOT NULL DEFAULT '',
+					  value varchar(200) NOT NULL DEFAULT '',
+					  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+					  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+					  CONSTRAINT account_preferences_pkey UNIQUE (account_id,name) 
+					)`
+				if _, err := tx.Exec(q); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q)
+				}
+
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				return nil
+			},
+		},
 	}
 }

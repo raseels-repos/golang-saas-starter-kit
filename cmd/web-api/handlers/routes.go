@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +9,7 @@ import (
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -20,7 +20,7 @@ func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB 
 
 	// Define base middlewares applied to all requests.
 	middlewares := []web.Middleware{
-		mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics(),
+		mid.Trace(), mid.Logger(log), mid.Errors(log, nil), mid.Metrics(), mid.Panics(),
 	}
 
 	// Append any global middlewares if they were included.
@@ -62,7 +62,7 @@ func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB 
 	}
 	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.AuthenticateHeader(authenticator))
 	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/user_accounts/:id", ua.Read, mid.AuthenticateHeader(authenticator))
+	app.Handle("GET", "/v1/user_accounts/:user_id/:account_id", ua.Read, mid.AuthenticateHeader(authenticator))
 	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.AuthenticateHeader(authenticator))
 	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))

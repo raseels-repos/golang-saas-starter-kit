@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,7 +9,10 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -23,7 +24,7 @@ var sessionTtl = time.Hour * 24
 // User represents the User API method handler set.
 type User struct {
 	MasterDB       *sqlx.DB
-	TokenGenerator user.TokenGenerator
+	TokenGenerator user_auth.TokenGenerator
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
@@ -40,7 +41,7 @@ type User struct {
 // @Param order				query string   	false 	"Order columns separated by comma, example: created_at desc"
 // @Param limit				query integer  	false 	"Limit, example: 10"
 // @Param offset			query integer  	false 	"Offset, example: 20"
-// @Param included-archived query boolean 	false 	"Included Archived, example: false"
+// @Param include-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} user.UserResponse
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
@@ -95,14 +96,14 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		req.Limit = &ul
 	}
 
-	// Handle included-archived query value if set.
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	// Handle include-archived query value if set.
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
-		req.IncludedArchived = b
+		req.IncludeArchived = b
 	}
 
 	//if err := web.Decode(r, &req); err != nil {
@@ -144,18 +145,21 @@ func (u *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		return errors.New("claims missing from context")
 	}
 
-	// Handle included-archived query value if set.
+	// Handle include-archived query value if set.
 	var includeArchived bool
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
 
-	res, err := user.Read(ctx, claims, u.MasterDB, params["id"], includeArchived)
+	res, err := user.Read(ctx, claims, u.MasterDB, user.UserReadRequest{
+		ID:              params["id"],
+		IncludeArchived: includeArchived,
+	})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -394,7 +398,8 @@ func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
-	err = user.Delete(ctx, claims, u.MasterDB, params["id"])
+	err = user.Delete(ctx, claims, u.MasterDB,
+		user.UserDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -437,11 +442,11 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		return err
 	}
 
-	tkn, err := user.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, params["account_id"], sessionTtl, v.Now)
+	tkn, err := user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, params["account_id"], sessionTtl, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user.ErrAuthenticationFailure:
+		case user_auth.ErrAuthenticationFailure:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
@@ -484,11 +489,11 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 	// Optional to include scope.
 	scope := r.URL.Query().Get("scope")
 
-	tkn, err := user.Authenticate(ctx, u.MasterDB, u.TokenGenerator, email, pass, sessionTtl, v.Now, scope)
+	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, email, pass, sessionTtl, v.Now, scope)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case user.ErrAuthenticationFailure:
+		case user_auth.ErrAuthenticationFailure:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
@@ -497,6 +502,31 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			return errors.Wrap(err, "authenticating")
+		}
+	}
+
+	accountID := r.URL.Query().Get("account_id")
+	if accountID != "" && accountID != tkn.AccountID {
+
+		claims, err := u.TokenGenerator.ParseClaims(tkn.AccessToken)
+		if err != nil {
+			return err
+		}
+
+		tkn, err = user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, accountID, sessionTtl, v.Now)
+		if err != nil {
+			cause := errors.Cause(err)
+			switch cause {
+			case user_auth.ErrAuthenticationFailure:
+				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
+			default:
+				_, ok := cause.(validator.ValidationErrors)
+				if ok {
+					return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
+				}
+
+				return errors.Wrap(err, "switch account")
+			}
 		}
 	}
 

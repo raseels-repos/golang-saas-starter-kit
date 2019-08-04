@@ -12,6 +12,7 @@ import (
 
 const DatetimeFormatLocal = "Mon Jan _2 3:04PM"
 const DateFormatLocal = "Mon Jan _2"
+const TimeFormatLocal = time.Kitchen
 
 // TimeResponse is a response friendly format for displaying the value of a time.
 type TimeResponse struct {
@@ -23,6 +24,7 @@ type TimeResponse struct {
 	RFC1123    string    `json:"rfc1123" example:"Tue, 25 Jun 2019 03:00:53 AKDT"`
 	Local      string    `json:"local" example:"Tue Jun 25 3:00AM"`
 	LocalDate  string    `json:"local_date" example:"Tue Jun 25"`
+	LocalTime  string    `json:"local_time" example:"3:00AM"`
 	NowTime    string    `json:"now_time" example:"5 hours ago"`
 	NowRelTime string    `json:"now_rel_time" example:"15 hours from now"`
 	Timezone   string    `json:"timezone" example:"America/Anchorage"`
@@ -39,6 +41,21 @@ func NewTimeResponse(ctx context.Context, t time.Time) TimeResponse {
 		t = t.In(claims.TimeLocation())
 	}
 
+	var formatDatetime = DatetimeFormatLocal
+	if claims.Preferences.DatetimeFormat != "" {
+		formatDatetime = claims.Preferences.DatetimeFormat
+	}
+
+	var formatDate = DatetimeFormatLocal
+	if claims.Preferences.DateFormat != "" {
+		formatDate = claims.Preferences.DateFormat
+	}
+
+	var formatTime = DatetimeFormatLocal
+	if claims.Preferences.DatetimeFormat != "" {
+		formatTime = claims.Preferences.TimeFormat
+	}
+
 	tr := TimeResponse{
 		Value:      t,
 		ValueUTC:   t.UTC(),
@@ -46,8 +63,9 @@ func NewTimeResponse(ctx context.Context, t time.Time) TimeResponse {
 		Time:       t.Format("15:04:05"),
 		Kitchen:    t.Format(time.Kitchen),
 		RFC1123:    t.Format(time.RFC1123),
-		Local:      t.Format(DatetimeFormatLocal),
-		LocalDate:  t.Format(DateFormatLocal),
+		Local:      t.Format(formatDatetime),
+		LocalDate:  t.Format(formatDate),
+		LocalTime:  t.Format(formatTime),
 		NowTime:    humanize.Time(t.UTC()),
 		NowRelTime: humanize.RelTime(time.Now().UTC(), t.UTC(), "ago", "from now"),
 	}
@@ -100,15 +118,15 @@ func EnumValueTitle(v string) string {
 }
 
 type GravatarResponse struct {
-	Small string `json:"small" example:"https://www.gravatar.com/avatar/xy7.jpg?s=30"`
-	Medium string  `json:"medium" example:"https://www.gravatar.com/avatar/xy7.jpg?s=80"`
+	Small  string `json:"small" example:"https://www.gravatar.com/avatar/xy7.jpg?s=30"`
+	Medium string `json:"medium" example:"https://www.gravatar.com/avatar/xy7.jpg?s=80"`
 }
 
 func NewGravatarResponse(ctx context.Context, email string) GravatarResponse {
-	 u := fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=", md5.Sum([]byte(strings.ToLower(email))))
+	u := fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=", md5.Sum([]byte(strings.ToLower(email))))
 
-	 return GravatarResponse{
-	 	Small: u+"30",
-	 	Medium: u+"80",
-	 }
+	return GravatarResponse{
+		Small:  u + "30",
+		Medium: u + "80",
+	}
 }

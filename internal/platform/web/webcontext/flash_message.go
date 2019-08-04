@@ -3,6 +3,7 @@ package webcontext
 import (
 	"context"
 	"encoding/gob"
+	"encoding/json"
 	"html/template"
 )
 
@@ -23,18 +24,26 @@ type FlashMsg struct {
 	Details string    `json:"details"`
 }
 
-func (r FlashMsg) Response(ctx context.Context) map[string]interface{} {
+type FlashMsgResponse struct {
+	Type    FlashType       `json:"type"`
+	Title   template.HTML   `json:"title"`
+	Text    template.HTML   `json:"text"`
+	Items   []template.HTML `json:"items"`
+	Details template.HTML   `json:"details"`
+}
+
+func (r FlashMsg) Response(ctx context.Context) FlashMsgResponse {
 	var items []template.HTML
 	for _, i := range r.Items {
 		items = append(items, template.HTML(i))
 	}
 
-	return map[string]interface{}{
-		"Type":    r.Type,
-		"Title":   r.Title,
-		"Text":    template.HTML(r.Text),
-		"Items":   items,
-		"Details": template.HTML(r.Details),
+	return FlashMsgResponse{
+		Type:    r.Type,
+		Title:   template.HTML(r.Title),
+		Text:    template.HTML(r.Text),
+		Items:   items,
+		Details: template.HTML(r.Details),
 	}
 }
 
@@ -46,7 +55,8 @@ func init() {
 // adds the message to the session. The renderer should save the session before writing the response
 // to the client or save be directly invoked.
 func SessionAddFlash(ctx context.Context, msg FlashMsg) {
-	ContextSession(ctx).AddFlash(msg.Response(ctx))
+	dat, _ := json.Marshal(msg.Response(ctx))
+	ContextSession(ctx).AddFlash(dat)
 }
 
 // SessionFlashSuccess add a message with type Success.

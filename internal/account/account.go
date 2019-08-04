@@ -3,10 +3,10 @@ package account
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pborman/uuid"
@@ -19,6 +19,8 @@ const (
 	accountTableName = "accounts"
 	// The database table for User Account
 	userAccountTableName = "users_accounts"
+	// The database table for AccountPreference
+	accountPreferenceTableName = "account_preferences"
 )
 
 var (
@@ -28,24 +30,6 @@ var (
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
 )
-
-// accountMapColumns is the list of columns needed for mapRowsToAccount
-var accountMapColumns = "id,name,address1,address2,city,region,country,zipcode,status,timezone,signup_user_id,billing_user_id,created_at,updated_at,archived_at"
-
-// mapRowsToAccount takes the SQL rows and maps it to the Account struct
-// with the columns defined by accountMapColumns
-func mapRowsToAccount(rows *sql.Rows) (*Account, error) {
-	var (
-		a   Account
-		err error
-	)
-	err = rows.Scan(&a.ID, &a.Name, &a.Address1, &a.Address2, &a.City, &a.Region, &a.Country, &a.Zipcode, &a.Status, &a.Timezone, &a.SignupUserID, &a.BillingUserID, &a.CreatedAt, &a.UpdatedAt, &a.ArchivedAt)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return &a, nil
-}
 
 // CanReadAccount determines if claims has the authority to access the specified account ID.
 func CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
@@ -152,7 +136,10 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 	return nil
 }
 
-// selectQuery constructs a base select query for Account
+// accountMapColumns is the list of columns needed for find.
+var accountMapColumns = "id,name,address1,address2,city,region,country,zipcode,status,timezone,signup_user_id,billing_user_id,created_at,updated_at,archived_at"
+
+// selectQuery constructs a base select query for Account.
 func selectQuery() *sqlbuilder.SelectBuilder {
 	query := sqlbuilder.NewSelectBuilder()
 	query.Select(accountMapColumns)
@@ -160,11 +147,12 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 	return query
 }
 
-// findRequestQuery generates the select query for the given find request.
+// Find gets all the accounts from the database based on the request params.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func findRequestQuery(req AccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
+func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) ([]*Account, error) {
 	query := selectQuery()
+
 	if req.Where != nil {
 		query.Where(query.And(*req.Where))
 	}
@@ -178,13 +166,7 @@ func findRequestQuery(req AccountFindRequest) (*sqlbuilder.SelectBuilder, []inte
 		query.Offset(int(*req.Offset))
 	}
 
-	return query, req.Args
-}
-
-// Find gets all the accounts from the database based on the request params.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) ([]*Account, error) {
-	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
+	return find(ctx, claims, dbConn, query, req.Args, req.IncludeArchived)
 }
 
 // find internal method for getting all the accounts from the database using a select query.
@@ -219,12 +201,15 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	// iterate over each row
 	resp := []*Account{}
 	for rows.Next() {
-		u, err := mapRowsToAccount(rows)
+		var (
+			a   Account
+			err error
+		)
+		err = rows.Scan(&a.ID, &a.Name, &a.Address1, &a.Address2, &a.City, &a.Region, &a.Country, &a.Zipcode, &a.Status, &a.Timezone, &a.SignupUserID, &a.BillingUserID, &a.CreatedAt, &a.UpdatedAt, &a.ArchivedAt)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
-			return nil, err
 		}
-		resp = append(resp, u)
+		resp = append(resp, &a)
 	}
 
 	return resp, nil
@@ -336,20 +321,35 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	return &a, nil
 }
 
+// ReadByID gets the specified user by ID from the database.
+func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*Account, error) {
+	return Read(ctx, claims, dbConn, AccountReadRequest{
+		ID:              id,
+		IncludeArchived: false,
+	})
+}
+
 // Read gets the specified account from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*Account, error) {
+func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountReadRequest) (*Account, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Read")
 	defer span.Finish()
 
-	// Filter base select query by ID
-	query := selectQuery()
-	query.Where(query.Equal("id", id))
-
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "account %s not found", id)
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
 		return nil, err
-	} else if err != nil {
+	}
+
+	// Filter base select query by ID
+	query := sqlbuilder.NewSelectBuilder()
+	query.Where(query.Equal("id", req.ID))
+
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	if err != nil {
+		return nil, err
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "account %s not found", req.ID)
 		return nil, err
 	}
 	u := res[0]
@@ -471,14 +471,6 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	return nil
 }
 
-// Archive soft deleted the account by ID from the database.
-func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string, now time.Time) error {
-	req := AccountArchiveRequest{
-		ID: accountID,
-	}
-	return Archive(ctx, claims, dbConn, req, now)
-}
-
 // Archive soft deleted the account from the database.
 func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Archive")
@@ -552,16 +544,9 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 }
 
 // Delete removes an account from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
+func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Delete")
 	defer span.Finish()
-
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `json:"id" validate:"required,uuid"`
-	}{
-		ID: accountID,
-	}
 
 	// Validate the request.
 	v := webcontext.Validator()
@@ -601,6 +586,29 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID 
 
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "delete users for account %s failed", req.ID)
+			return err
+		}
+	}
+
+	// Delete all the associated account preferences.
+	// Required to execute first to avoid foreign key constraints.
+	{
+		// Build the delete SQL statement.
+		query := sqlbuilder.NewDeleteBuilder()
+		query.DeleteFrom(accountPreferenceTableName)
+		query.Where(query.And(
+			query.Equal("account_id", req.ID),
+		))
+
+		// Execute the query with the provided context.
+		sql, args := query.Build()
+		sql = dbConn.Rebind(sql)
+		_, err = tx.ExecContext(ctx, sql, args...)
+		if err != nil {
+			tx.Rollback()
+
+			err = errors.Wrapf(err, "query - %s", query.String())
+			err = errors.WithMessagef(err, "delete preferences for account %s failed", req.ID)
 			return err
 		}
 	}

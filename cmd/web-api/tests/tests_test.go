@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -20,10 +19,12 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/google/go-cmp/cmp"
 	"github.com/iancoleman/strcase"
 	"github.com/pborman/uuid"
@@ -37,7 +38,7 @@ var authenticator *auth.Authenticator
 // Information about the users we have created for testing.
 type roleTest struct {
 	Role             string
-	Token            user.Token
+	Token            user_auth.Token
 	Claims           auth.Claims
 	User             mockUser
 	Account          *account.Account
@@ -50,7 +51,7 @@ type requestTest struct {
 	method     string
 	url        string
 	request    interface{}
-	token      user.Token
+	token      user_auth.Token
 	claims     auth.Claims
 	statusCode int
 	error      interface{}
@@ -94,7 +95,7 @@ func testMain(m *testing.M) int {
 	}
 
 	expires := time.Now().UTC().Sub(signup1.User.CreatedAt) + time.Hour
-	adminTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq1.User.Email, signupReq1.User.Password, expires, now)
+	adminTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq1.User.Email, signupReq1.User.Password, expires, now)
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +146,7 @@ func testMain(m *testing.M) int {
 		panic(err)
 	}
 
-	userTkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, usr.Email, userReq.Password, expires, now)
+	userTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, usr.Email, userReq.Password, expires, now)
 	if err != nil {
 		panic(err)
 	}

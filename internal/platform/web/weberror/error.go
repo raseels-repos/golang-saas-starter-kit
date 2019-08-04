@@ -83,6 +83,8 @@ func (err *Error) Error() string {
 func (er *Error) Response(ctx context.Context, htmlEntities bool) ErrorResponse {
 	var r ErrorResponse
 
+	r.StatusCode = er.Status
+
 	if er.Message != "" {
 		r.Error = er.Message
 	} else {

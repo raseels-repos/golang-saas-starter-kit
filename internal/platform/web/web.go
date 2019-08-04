@@ -76,6 +76,7 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 		// Call the wrapped handler functions.
 		err := handler(ctx, w, r, params)
 		if err != nil {
+
 			// If we have specifically handled the error, then no need
 			// to initiate a shutdown.
 			if webErr, ok := err.(*weberror.Error); ok {

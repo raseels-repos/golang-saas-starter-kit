@@ -23,20 +23,29 @@ const Key ctxKey = 1
 
 // Claims represents the authorization claims transmitted via a JWT.
 type Claims struct {
-	AccountIds []string `json:"accounts"`
-	Roles      []string `json:"roles"`
-	Timezone   string   `json:"timezone"`
-	tz         *time.Location
+	AccountIds  []string         `json:"accounts"`
+	Roles       []string         `json:"roles"`
+	Preferences ClaimPreferences `json:"prefs"`
 	jwt.StandardClaims
+}
+
+// ClaimPreferences defines preferences for the user.
+type ClaimPreferences struct {
+	Timezone       string `json:"timezone"`
+	DatetimeFormat string `json:"pref_datetime_format"`
+	DateFormat     string `json:"pref_date_format"`
+	TimeFormat     string `json:"pref_time_format"`
+	tz             *time.Location
 }
 
 // NewClaims constructs a Claims value for the identified user. The Claims
 // expire within a specified duration of the provided time. Additional fields
 // of the Claims can be set after calling NewClaims is desired.
-func NewClaims(userId, accountId string, accountIds []string, roles []string, userTimezone *time.Location, now time.Time, expires time.Duration) Claims {
+func NewClaims(userId, accountId string, accountIds []string, roles []string, prefs ClaimPreferences, now time.Time, expires time.Duration) Claims {
 	c := Claims{
-		AccountIds: accountIds,
-		Roles:      roles,
+		AccountIds:  accountIds,
+		Roles:       roles,
+		Preferences: prefs,
 		StandardClaims: jwt.StandardClaims{
 			Subject:   userId,
 			Audience:  accountId,
@@ -45,11 +54,22 @@ func NewClaims(userId, accountId string, accountIds []string, roles []string, us
 		},
 	}
 
-	if userTimezone != nil {
-		c.Timezone = userTimezone.String()
+	return c
+}
+
+// NewClaimPreferences constructs ClaimPreferences for the user/account.
+func NewClaimPreferences(timezone *time.Location, datetimeFormat, dateFormat, timeFormat string) ClaimPreferences {
+	p := ClaimPreferences{
+		DatetimeFormat: datetimeFormat,
+		DateFormat:     dateFormat,
+		TimeFormat:     timeFormat,
 	}
 
-	return c
+	if timezone != nil {
+		p.Timezone = timezone.String()
+	}
+
+	return p
 }
 
 // Valid is called during the parsing of a token.
@@ -88,11 +108,16 @@ func (c Claims) HasRole(roles ...string) bool {
 }
 
 // TimeLocation returns the timezone used to format datetimes for the user.
-func (c Claims) TimeLocation() *time.Location {
+func (c ClaimPreferences) TimeLocation() *time.Location {
 	if c.tz == nil && c.Timezone != "" {
 		c.tz, _ = time.LoadLocation(c.Timezone)
 	}
 	return c.tz
+}
+
+// TimeLocation returns the timezone used to format datetimes for the user.
+func (c Claims) TimeLocation() *time.Location {
+	return c.Preferences.TimeLocation()
 }
 
 // ClaimsFromContext loads the claims from context.

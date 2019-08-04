@@ -1,0 +1,53 @@
+{{define "title"}}Account Settings{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <div class="row">
+        <div class="col-auto">
+            <a href="/account/update" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+        </div>
+    </div>
+    <div class="spacer-30"></div>
+    <div class="row">
+        <div class="col-md-6">
+            <p>
+                <small>Name</small><br/>
+                <b>{{ .account.Name }}</b>
+            </p>
+            {{ if .account.City }}
+                <p>
+                    <small>Address</small><br/>
+                    {{if .account.Address1 }}
+                        <b>{{ .account.Address1 }}{{ if  .account.Address2 }},{{  .account.Address2 }}{{ end }}</b>
+                        <br/>
+                    {{end}}
+                    <b>{{ .account.City }}, {{ .account.Region }}, {{ .account.Zipcode }}</b>
+                </p>
+            {{end}}
+            <p>
+                <small>Timezone</small><br/>
+                <b>{{.account.Timezone }}</b>
+            </p>
+        </div>
+        <div class="col-md-6">
+            <p>
+                <small>Status</small><br/>
+                <b>
+                    {{ if eq .account.Status.Value "active" }}
+                        <span class="text-green"><i class="fas fa-circle"></i>{{ .account.Status.Title }}</span>
+                    {{else}}
+                        <span class="text-orange"><i class="far fa-circle"></i>{{.account.Status.Title }}</span>
+                    {{end}}
+                </b>
+            </p>
+            <p>
+                <small>ID</small><br/>
+                <b>{{ .account.ID }}</b>
+            </p>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+
+{{end}}

@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
-	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net/http"
 	"strconv"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -42,25 +41,25 @@ func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return errors.New("claims missing from context")
 	}
 
-	// Handle included-archived query value if set.
+	// Handle include-archived query value if set.
 	var includeArchived bool
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
 
-	res, err := account.Read(ctx, claims, a.MasterDB, params["id"], includeArchived)
+	res, err := account.Read(ctx, claims, a.MasterDB, account.AccountReadRequest{
+		ID:              params["id"],
+		IncludeArchived: includeArchived,
+	})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
 		case account.ErrNotFound:
-
-			fmt.Println("HERE!!!!! account.ErrNotFound")
-
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])

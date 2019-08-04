@@ -2,7 +2,6 @@ package webcontext
 
 import (
 	"context"
-
 	"github.com/gorilla/sessions"
 )
 
@@ -12,14 +11,23 @@ type ctxKeySession int
 // KeySession is used to store/retrieve a Session from a context.Context.
 const KeySession ctxKeySession = 1
 
-// KeyAccessToken is used to store the access token for the user in their session.
-const KeyAccessToken = "AccessToken"
+// Session keys used to store values.
+const (
+	SessionKeyAccessToken = iota
+	//SessionKeyPreferenceDatetimeFormat
+	//SessionKeyPreferenceDateFormat
+	//SessionKeyPreferenceTimeFormat
+	//SessionKeyTimezone
+)
 
-// KeyUser is used to store the user in the session.
-const KeyUser = "User"
+func init() {
+	//gob.Register(&Session{})
+}
 
-// KeyAccount is used to store the account in the session.
-const KeyAccount = "Account"
+// Session represents a user with authentication.
+type Session struct {
+	*sessions.Session
+}
 
 // ContextWithSession appends a universal translator to a context.
 func ContextWithSession(ctx context.Context, session *sessions.Session) context.Context {
@@ -27,69 +35,83 @@ func ContextWithSession(ctx context.Context, session *sessions.Session) context.
 }
 
 // ContextSession returns the session from a context.
-func ContextSession(ctx context.Context) *sessions.Session {
-	return ctx.Value(KeySession).(*sessions.Session)
+func ContextSession(ctx context.Context) *Session {
+	if s, ok := ctx.Value(KeySession).(*Session); ok {
+		return s
+	}
+	return nil
 }
 
 func ContextAccessToken(ctx context.Context) (string, bool) {
-	session := ContextSession(ctx)
-
-	return SessionAccessToken(session)
+	return ContextSession(ctx).AccessToken()
 }
 
-func SessionAccessToken(session *sessions.Session) (string, bool) {
-	if sv, ok := session.Values[KeyAccessToken].(string); ok {
+func (sess *Session) AccessToken() (string, bool) {
+	if sess == nil {
+		return "", false
+	}
+	if sv, ok := sess.Values[SessionKeyAccessToken].(string); ok {
 		return sv, true
 	}
-
 	return "", false
 }
 
-func SessionUser(session *sessions.Session) ( interface{}, bool) {
-	if sv, ok := session.Values[KeyUser]; ok && sv != nil {
+/*
+func(sess *Session) PreferenceDatetimeFormat() (string, bool) {
+	if sess == nil {
+		return "", false
+	}
+	if sv, ok := sess.Values[SessionKeyPreferenceDatetimeFormat].(string); ok {
 		return sv, true
+	}
+	return "", false
+}
+
+func(sess *Session) PreferenceDateFormat() (string, bool) {
+	if sess == nil {
+		return "", false
+	}
+	if sv, ok := sess.Values[SessionKeyPreferenceDateFormat].(string); ok {
+		return sv, true
+	}
+	return "", false
+}
+
+func(sess *Session) PreferenceTimeFormat() (string, bool) {
+	if sess == nil {
+		return "", false
+	}
+	if sv, ok := sess.Values[SessionKeyPreferenceTimeFormat].(string); ok {
+		return sv, true
+	}
+	return "", false
+}
+
+func(sess *Session) Timezone() (*time.Location, bool) {
+	if sess != nil {
+		if sv, ok := sess.Values[SessionKeyTimezone].(*time.Location); ok {
+			return sv, true
+		}
 	}
 
 	return nil, false
 }
+*/
 
-func SessionAccount(session *sessions.Session) (interface{}, bool) {
-	if sv, ok := session.Values[KeyAccount];  ok && sv != nil {
-		return sv, true
-	}
+func SessionInit(session *Session, accessToken string) *Session {
 
-	return nil, false
-}
-
-func SessionInit(session *sessions.Session, accessToken string, usr interface{}, acc  interface{}) *sessions.Session {
-
-	if accessToken != "" {
-		session.Values[KeyAccessToken] = accessToken
-	} else {
-		delete(session.Values, KeyAccessToken)
-	}
-
-	if usr != nil {
-		session.Values[KeyUser] = usr
-	} else {
-		delete(session.Values, KeyUser)
-	}
-
-	if acc != nil {
-		session.Values[KeyAccount] = acc
-	} else {
-		delete(session.Values, KeyAccount)
-	}
+	session.Values[SessionKeyAccessToken] = accessToken
+	//session.Values[SessionKeyPreferenceDatetimeFormat] = datetimeFormat
+	//session.Values[SessionKeyPreferenceDateFormat] = dateFormat
+	//session.Values[SessionKeyPreferenceTimeFormat] = timeFormat
+	//session.Values[SessionKeyTimezone] = timezone
 
 	return session
 }
 
-func SessionDestroy(session *sessions.Session) *sessions.Session {
+func SessionDestroy(session *Session) *Session {
 
-	delete(session.Values, KeyAccessToken)
-	delete(session.Values, KeyUser)
-	delete(session.Values, KeyAccount)
+	delete(session.Values, SessionKeyAccessToken)
 
 	return session
 }
-

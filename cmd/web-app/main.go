@@ -6,10 +6,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
-	"gopkg.in/gomail.v2"
 	"html/template"
 	"log"
 	"net"
@@ -25,16 +21,19 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/img-resize"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	template_renderer "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/template-renderer"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -52,6 +51,7 @@ import (
 	redistrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+	"gopkg.in/gomail.v2"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
@@ -676,22 +676,75 @@ func main() {
 
 			return fmt.Sprintf("%+v", err)
 		},
+		// Returns the current user from the session.
+		// @TODO: Need to add logging for the errors.
 		"ContextUser": func(ctx context.Context) *user.UserResponse {
 			sess := webcontext.ContextSession(ctx)
-			v, _ := webcontext.SessionUser(sess)
 
-			if u, ok := v.(*user.UserResponse); ok {
+			cacheKey := "ContextUser" + sess.ID
+
+			u := &user.UserResponse{}
+			if err := redisClient.Get(cacheKey).Scan(u); err != nil && err != redis.Nil {
+				return nil
+			}
+
+			// Return if found in cache.
+			if u != nil && u.ID != "" {
 				return u
 			}
-			return nil
+
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil {
+				return nil
+			}
+
+			usr, err := user.Read(ctx, auth.Claims{}, masterDb, claims.Subject, false)
+			if err != nil {
+				return nil
+			}
+			u = usr.Response(ctx)
+
+			err = redisClient.Set(cacheKey, u, time.Hour).Err()
+			if err != nil {
+				return nil
+			}
+
+			return u
 		},
+		// Returns the current account from the session.
+		// @TODO: Need to add logging for the errors.
 		"ContextAccount": func(ctx context.Context) *account.AccountResponse {
 			sess := webcontext.ContextSession(ctx)
-			v, _ := webcontext.SessionAccount(sess)
-			if acc, ok := v.(*account.AccountResponse); ok {
-				return acc
+
+			cacheKey := "ContextAccount" + sess.ID
+
+			a := &account.AccountResponse{}
+			if err := redisClient.Get(cacheKey).Scan(a); err != nil && err != redis.Nil {
+				return nil
 			}
-			return nil
+
+			// Return if found in cache.
+			if a != nil && a.ID != "" {
+				return a
+			}
+
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil {
+				return nil
+			}
+
+			acc, err := account.Read(ctx, auth.Claims{}, masterDb, claims.Audience, false)
+			if err != nil {
+				return nil
+			}
+			a = acc.Response(ctx)
+
+			err = redisClient.Set(cacheKey, a, time.Hour).Err()
+			if err != nil {
+				return nil
+			}
+
+			return a
 		},
 	}
 
@@ -766,15 +819,22 @@ func main() {
 
 	// Custom error handler to support rendering user friendly error page for improved web experience.
 	eh := func(ctx context.Context, w http.ResponseWriter, r *http.Request, renderer web.Renderer, statusCode int, er error) error {
-		data := map[string]interface{}{}
+		if statusCode == 0 {
+			if webErr, ok := er.(*weberror.Error); ok {
+				statusCode = webErr.Status
+			}
+		}
 
-		return renderer.Render(ctx, w, r,
-			"base.tmpl",  // base layout file to be used for rendering of errors
-			"error.tmpl", // generic format for errors, could select based on status code
-			web.MIMETextHTMLCharsetUTF8,
-			http.StatusOK,
-			data,
-		)
+		switch statusCode {
+		case http.StatusUnauthorized:
+			// Handle expired sessions that are returned from the auth middleware.
+			if strings.Contains(errors.Cause(er).Error(), "token is expired") {
+				http.Redirect(w, r, "/user/login", http.StatusFound)
+				return nil
+			}
+		}
+
+		return web.RenderError(ctx, w, r, er, renderer, handlers.TmplLayoutBase, handlers.TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 	}
 
 	// Enable template renderer to reload and parse template files when generating a response of dev

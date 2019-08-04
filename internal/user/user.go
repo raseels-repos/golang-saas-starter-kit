@@ -35,10 +35,6 @@ var (
 	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
 	ErrForbidden = errors.New("Attempted action is not allowed")
 
-	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
-	// anything goes wrong.
-	ErrAuthenticationFailure = errors.New("Authentication failed")
-
 	// ErrResetExpired occurs when the the reset hash exceeds the expiration.
 	ErrResetExpired = errors.New("Reset expired")
 )
@@ -208,7 +204,7 @@ func findRequestQuery(req UserFindRequest) (*sqlbuilder.SelectBuilder, []interfa
 // Find gets all the users from the database based on the request params.
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserFindRequest) ([]*User, error) {
 	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
+	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the users from the database using a select query.
@@ -432,20 +428,56 @@ func CreateInvite(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req 
 	return &u, nil
 }
 
+// ReadByID gets the specified user by ID from the database.
+func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*User, error) {
+	return Read(ctx, claims, dbConn, UserReadRequest{
+		ID:              id,
+		IncludeArchived: false,
+	})
+}
+
 // Read gets the specified user from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*User, error) {
+func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserReadRequest) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Read")
+	defer span.Finish()
+
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter base select query by ID
+	query := selectQuery()
+	query.Where(query.Equal("id", req.ID))
+
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	if err != nil {
+		return nil, err
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "user %s not found", req.ID)
+		return nil, err
+	}
+	u := res[0]
+
+	return u, nil
+}
+
+// ReadByEmail gets the specified user from the database.
+func ReadByEmail(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, email string, includedArchived bool) (*User, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ReadByEmail")
 	defer span.Finish()
 
 	// Filter base select query by ID
 	query := selectQuery()
-	query.Where(query.Equal("id", id))
+	query.Where(query.Equal("email", email))
 
 	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "user %s not found", id)
+		err = errors.WithMessagef(ErrNotFound, "user %s not found", email)
 		return nil, err
 	}
 	u := res[0]
@@ -599,14 +631,6 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 	return nil
 }
 
-// Archive soft deleted the user by ID from the database.
-func ArchiveById(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, now time.Time) error {
-	req := UserArchiveRequest{
-		ID: id,
-	}
-	return Archive(ctx, claims, dbConn, req, now)
-}
-
 // Archive soft deleted the user from the database.
 func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Archive")
@@ -679,9 +703,9 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	return nil
 }
 
-// Unarchive undeletes the user from the database.
-func Unarchive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUnarchiveRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Unarchive")
+// Restore undeletes the user from the database.
+func Restore(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserRestoreRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Restore")
 	defer span.Finish()
 
 	// Validate the request.
@@ -731,16 +755,9 @@ func Unarchive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Use
 }
 
 // Delete removes a user from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
+func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Delete")
 	defer span.Finish()
-
-	// Defines the struct to apply validation
-	req := struct {
-		ID string `json:"id" validate:"required,uuid"`
-	}{
-		ID: userID,
-	}
 
 	// Validate the request.
 	v := webcontext.Validator()
@@ -1010,4 +1027,31 @@ func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequ
 	}
 
 	return u, nil
+}
+
+type MockUserResponse struct {
+	*User
+	Password string
+}
+
+// MockUser returns a fake User for testing.
+func MockUser(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*MockUserResponse, error) {
+	pass := uuid.NewRandom().String()
+
+	req := UserCreateRequest{
+		FirstName:       "Lee",
+		LastName:        "Brown",
+		Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
+		Password:        pass,
+		PasswordConfirm: pass,
+	}
+	u, err := Create(ctx, auth.Claims{}, dbConn, req, now)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MockUserResponse{
+		User:     u,
+		Password: pass,
+	}, nil
 }

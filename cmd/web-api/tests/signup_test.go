@@ -14,14 +14,14 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/pborman/uuid"
 )
 
 type mockSignup struct {
 	account *account.Account
 	user    mockUser
-	token   user.Token
+	token   user_auth.Token
 	claims  auth.Claims
 	context context.Context
 }
@@ -56,7 +56,7 @@ func newMockSignup() mockSignup {
 	}
 
 	expires := time.Now().UTC().Sub(s.User.CreatedAt) + time.Hour
-	tkn, err := user.Authenticate(tests.Context(), test.MasterDB, authenticator, req.User.Email, req.User.Password, expires, now)
+	tkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, req.User.Email, req.User.Password, expires, now)
 	if err != nil {
 		panic(err)
 	}
@@ -94,7 +94,7 @@ func TestSignup(t *testing.T) {
 			http.MethodPost,
 			"/v1/signup",
 			req,
-			user.Token{},
+			user_auth.Token{},
 			auth.Claims{},
 			expectedStatus,
 			nil,
@@ -116,12 +116,14 @@ func TestSignup(t *testing.T) {
 		expectedMap := map[string]interface{}{
 			"user": map[string]interface{}{
 				"id":         actual.User.ID,
+				"name":       req.User.FirstName + " " + req.User.LastName,
 				"first_name": req.User.FirstName,
 				"last_name":  req.User.LastName,
 				"email":      req.User.Email,
 				"timezone":   actual.User.Timezone,
 				"created_at": web.NewTimeResponse(ctx, actual.User.CreatedAt.Value),
 				"updated_at": web.NewTimeResponse(ctx, actual.User.UpdatedAt.Value),
+				"gravatar":   web.NewGravatarResponse(ctx, actual.User.Email),
 			},
 			"account": map[string]interface{}{
 				"updated_at":      web.NewTimeResponse(ctx, actual.Account.UpdatedAt.Value),
@@ -170,7 +172,7 @@ func TestSignup(t *testing.T) {
 			http.MethodPost,
 			"/v1/signup",
 			nil,
-			user.Token{},
+			user_auth.Token{},
 			auth.Claims{},
 			expectedStatus,
 			nil,
@@ -190,7 +192,10 @@ func TestSignup(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "decode request body failed",
+			StatusCode: expectedStatus,
+			Error:      "decode request body failed",
+			Details:    "EOF",
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -211,7 +216,7 @@ func TestSignup(t *testing.T) {
 			http.MethodPost,
 			"/v1/signup",
 			req,
-			user.Token{},
+			user_auth.Token{},
 			auth.Claims{},
 			expectedStatus,
 			nil,
@@ -231,7 +236,9 @@ func TestSignup(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Details:    actual.Details,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "name", Error: "Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag"},
 				//{Field: "email", Error: "Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag"},
@@ -251,6 +258,7 @@ func TestSignup(t *testing.T) {
 					Display: "email is a required field",
 				},
 			},
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {

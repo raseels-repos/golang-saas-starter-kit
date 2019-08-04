@@ -13,7 +13,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
@@ -31,8 +30,8 @@ func testMain(m *testing.M) int {
 	return m.Run()
 }
 
-// TestInviteUsers validates that invite users works.
-func TestInviteUsers(t *testing.T) {
+// TestSendUserInvites validates that invite users works.
+func TestSendUserInvites(t *testing.T) {
 
 	t.Log("Given the need ensure a user an invite users to their account.")
 	{
@@ -101,11 +100,11 @@ func TestInviteUsers(t *testing.T) {
 
 		// Ensure validation is working by trying ResetPassword with an empty request.
 		{
-			expectedErr := errors.New("Key: 'InviteUsersRequest.account_id' Error:Field validation for 'account_id' failed on the 'required' tag\n" +
-				"Key: 'InviteUsersRequest.user_id' Error:Field validation for 'user_id' failed on the 'required' tag\n" +
-				"Key: 'InviteUsersRequest.emails' Error:Field validation for 'emails' failed on the 'required' tag\n" +
-				"Key: 'InviteUsersRequest.roles' Error:Field validation for 'roles' failed on the 'required' tag")
-			_, err = InviteUsers(ctx, claims, test.MasterDB, resetUrl, notify, InviteUsersRequest{}, secretKey, now)
+			expectedErr := errors.New("Key: 'SendUserInvitesRequest.account_id' Error:Field validation for 'account_id' failed on the 'required' tag\n" +
+				"Key: 'SendUserInvitesRequest.user_id' Error:Field validation for 'user_id' failed on the 'required' tag\n" +
+				"Key: 'SendUserInvitesRequest.emails' Error:Field validation for 'emails' failed on the 'required' tag\n" +
+				"Key: 'SendUserInvitesRequest.roles' Error:Field validation for 'roles' failed on the 'required' tag")
+			_, err = SendUserInvites(ctx, claims, test.MasterDB, resetUrl, notify, SendUserInvitesRequest{}, secretKey, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tInviteUsers failed.", tests.Failed)
@@ -129,7 +128,7 @@ func TestInviteUsers(t *testing.T) {
 		}
 
 		// Make the reset password request.
-		inviteHashes, err := InviteUsers(ctx, claims, test.MasterDB, resetUrl, notify, InviteUsersRequest{
+		inviteHashes, err := SendUserInvites(ctx, claims, test.MasterDB, resetUrl, notify, SendUserInvitesRequest{
 			UserID:    u.ID,
 			AccountID: a.ID,
 			Emails:    inviteEmails,
@@ -148,12 +147,12 @@ func TestInviteUsers(t *testing.T) {
 
 		// Ensure validation is working by trying ResetConfirm with an empty request.
 		{
-			expectedErr := errors.New("Key: 'InviteAcceptRequest.invite_hash' Error:Field validation for 'invite_hash' failed on the 'required' tag\n" +
-				"Key: 'InviteAcceptRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
-				"Key: 'InviteAcceptRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
-				"Key: 'InviteAcceptRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
-				"Key: 'InviteAcceptRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-			err = InviteAccept(ctx, test.MasterDB, InviteAcceptRequest{}, secretKey, now)
+			expectedErr := errors.New("Key: 'AcceptInviteRequest.invite_hash' Error:Field validation for 'invite_hash' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
+			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{}, secretKey, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -173,7 +172,7 @@ func TestInviteUsers(t *testing.T) {
 		// Ensure the TTL is enforced.
 		{
 			newPass := uuid.NewRandom().String()
-			err = InviteAccept(ctx, test.MasterDB, InviteAcceptRequest{
+			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHashes[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
@@ -191,7 +190,7 @@ func TestInviteUsers(t *testing.T) {
 		// Assuming we have received the email and clicked the link, we now can ensure accept works.
 		for _, inviteHash := range inviteHashes {
 			newPass := uuid.NewRandom().String()
-			err = InviteAccept(ctx, test.MasterDB, InviteAcceptRequest{
+			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHash,
 				FirstName:       "Foo",
 				LastName:        "Bar",
@@ -208,7 +207,7 @@ func TestInviteUsers(t *testing.T) {
 		// Ensure the reset hash does not work after its used.
 		{
 			newPass := uuid.NewRandom().String()
-			err = InviteAccept(ctx, test.MasterDB, InviteAcceptRequest{
+			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHashes[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
@@ -223,44 +222,4 @@ func TestInviteUsers(t *testing.T) {
 			t.Logf("\t%s\tInviteAccept verify reuse disabled ok.", tests.Success)
 		}
 	}
-}
-
-func mockAccount(accountId string, now time.Time) error {
-
-	// Build the insert SQL statement.
-	query := sqlbuilder.NewInsertBuilder()
-	query.InsertInto("accounts")
-	query.Cols("id", "name", "created_at", "updated_at")
-	query.Values(accountId, uuid.NewRandom().String(), now, now)
-
-	// Execute the query with the provided context.
-	sql, args := query.Build()
-	sql = test.MasterDB.Rebind(sql)
-	_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
-	if err != nil {
-		err = errors.Wrapf(err, "query - %s", query.String())
-		return err
-	}
-
-	return nil
-}
-
-func mockUser(userId string, now time.Time) error {
-
-	// Build the insert SQL statement.
-	query := sqlbuilder.NewInsertBuilder()
-	query.InsertInto("users")
-	query.Cols("id", "email", "password_hash", "password_salt", "created_at", "updated_at")
-	query.Values(userId, uuid.NewRandom().String(), "-", "-", now, now)
-
-	// Execute the query with the provided context.
-	sql, args := query.Build()
-	sql = test.MasterDB.Rebind(sql)
-	_, err := test.MasterDB.ExecContext(tests.Context(), sql, args...)
-	if err != nil {
-		err = errors.Wrapf(err, "query - %s", query.String())
-		return err
-	}
-
-	return nil
 }

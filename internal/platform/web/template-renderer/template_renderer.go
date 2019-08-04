@@ -2,6 +2,7 @@ package template_renderer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"math"
@@ -123,6 +124,18 @@ func NewTemplate(templateFuncs template.FuncMap) *Template {
 			}
 			return claims.HasRole(roles...)
 		},
+
+		"CmpString": func(str1 string, str2Ptr *string) bool {
+			var str2 string
+			if str2Ptr != nil {
+				str2 = *str2Ptr
+			}
+			if str1 == str2 {
+				return true
+			}
+			return false
+		},
+
 		"dict": func(values ...interface{}) (map[string]interface{}, error) {
 			if len(values) == 0 {
 				return nil, errors.New("invalid dict call")
@@ -307,7 +320,7 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// Specific new data map for render to allow values to be overwritten on a request
 	// basis.
 	// append the global key/pairs
-	renderData :=  make(map[string]interface{}, len(r.globalViewData))
+	renderData := make(map[string]interface{}, len(r.globalViewData))
 	for k, v := range r.globalViewData {
 		renderData[k] = v
 	}
@@ -356,7 +369,20 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	sess := webcontext.ContextSession(ctx)
 	if sess != nil {
 		// Load any flash messages and append to response data to be included in the rendered template.
-		if flashes := sess.Flashes(); len(flashes) > 0 {
+		if msgs := sess.Flashes(); len(msgs) > 0 {
+			var flashes []webcontext.FlashMsgResponse
+			for _, mv := range msgs {
+				dat, ok := mv.([]byte)
+				if !ok {
+					continue
+				}
+				var msg webcontext.FlashMsgResponse
+				if err := json.Unmarshal(dat, &msg); err != nil {
+					continue
+				}
+				flashes = append(flashes, msg)
+			}
+
 			renderData["flashes"] = flashes
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
@@ -87,6 +88,17 @@ func (m *Account) Response(ctx context.Context) *AccountResponse {
 	return r
 }
 
+func (m *AccountResponse) UnmarshalBinary(data []byte) error {
+	if data == nil || len(data) == 0 {
+		return nil
+	}
+	return json.Unmarshal(data, m)
+}
+
+func (m *AccountResponse) MarshalBinary() ([]byte, error) {
+	return json.Marshal(m)
+}
+
 // AccountCreateRequest contains information needed to create a new Account.
 type AccountCreateRequest struct {
 	Name          string         `json:"name" validate:"required,unique" example:"Company Name"`
@@ -100,6 +112,12 @@ type AccountCreateRequest struct {
 	Timezone      *string        `json:"timezone,omitempty" validate:"omitempty" example:"America/Anchorage"`
 	SignupUserID  *string        `json:"signup_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	BillingUserID *string        `json:"billing_user_id,omitempty" validate:"omitempty,uuid" swaggertype:"string" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+}
+
+// AccountReadRequest defines the information needed to read an account.
+type AccountReadRequest struct {
+	ID              string `json:"id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	IncludeArchived bool   `json:"include-archived" example:"false"`
 }
 
 // AccountUpdateRequest defines what information may be provided to modify an existing
@@ -129,15 +147,20 @@ type AccountArchiveRequest struct {
 	ID string `json:"id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
+// AccountDeleteRequest defines the information needed to delete a user.
+type AccountDeleteRequest struct {
+	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+}
+
 // AccountFindRequest defines the possible options to search for accounts. By default
 // archived accounts will be excluded from response.
 type AccountFindRequest struct {
-	Where            *string       `json:"where" example:"name = ? and status = ?"`
-	Args             []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,active"`
-	Order            []string      `json:"order" example:"created_at desc"`
-	Limit            *uint         `json:"limit" example:"10"`
-	Offset           *uint         `json:"offset" example:"20"`
-	IncludedArchived bool          `json:"included-archived" example:"false"`
+	Where           *string       `json:"where" example:"name = ? and status = ?"`
+	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,active"`
+	Order           []string      `json:"order" example:"created_at desc"`
+	Limit           *uint         `json:"limit" example:"10"`
+	Offset          *uint         `json:"offset" example:"20"`
+	IncludeArchived bool          `json:"include-archived" example:"false"`
 }
 
 // AccountStatus represents the status of an account.

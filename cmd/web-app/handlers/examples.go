@@ -110,7 +110,7 @@ func (h *Examples) FlashMessages(ctx context.Context, w http.ResponseWriter, r *
 		}
 
 		if err := f(); err != nil {
-			return web.RenderError(ctx, w, r, err, h.Renderer, tmplLayoutBase, tmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+			return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 		}
 
 		data["form"] = req
@@ -120,7 +120,7 @@ func (h *Examples) FlashMessages(ctx context.Context, w http.ResponseWriter, r *
 		}
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "examples-flash-messages.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "examples-flash-messages.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
 // Images provides examples for responsive images that are auto re-sized.
@@ -132,5 +132,5 @@ func (h *Examples) Images(ctx context.Context, w http.ResponseWriter, r *http.Re
 		"imgSizes": []int{100, 200, 300, 400, 500},
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "examples-images.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "examples-images.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

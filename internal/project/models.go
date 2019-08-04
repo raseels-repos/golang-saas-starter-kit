@@ -63,6 +63,12 @@ type ProjectCreateRequest struct {
 	Status    *ProjectStatus `json:"status,omitempty" validate:"omitempty,oneof=active disabled" enums:"active,disabled" swaggertype:"string" example:"active"`
 }
 
+// ProjectReadRequest defines the information needed to read a project.
+type ProjectReadRequest struct {
+	ID              string `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
+	IncludeArchived bool   `json:"include-archived" example:"false"`
+}
+
 // ProjectUpdateRequest defines what information may be provided to modify an existing
 // Project. All fields are optional so clients can send just the fields they want
 // changed. It uses pointer fields so we can differentiate between a field that
@@ -79,15 +85,20 @@ type ProjectArchiveRequest struct {
 	ID string `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
 }
 
+// ProjectDeleteRequest defines the information needed to delete a project.
+type ProjectDeleteRequest struct {
+	ID string `json:"id" validate:"required,uuid" example:"985f1746-1d9f-459f-a2d9-fc53ece5ae86"`
+}
+
 // ProjectFindRequest defines the possible options to search for projects. By default
 // archived project will be excluded from response.
 type ProjectFindRequest struct {
-	Where            *string       `json:"where" example:"name = ? and status = ?"`
-	Args             []interface{} `json:"args" swaggertype:"array,string" example:"Moon Launch,active"`
-	Order            []string      `json:"order" example:"created_at desc"`
-	Limit            *uint         `json:"limit" example:"10"`
-	Offset           *uint         `json:"offset" example:"20"`
-	IncludedArchived bool          `json:"included-archived" example:"false"`
+	Where           *string       `json:"where" example:"name = ? and status = ?"`
+	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Moon Launch,active"`
+	Order           []string      `json:"order" example:"created_at desc"`
+	Limit           *uint         `json:"limit" example:"10"`
+	Offset          *uint         `json:"offset" example:"20"`
+	IncludeArchived bool          `json:"include-archived" example:"false"`
 }
 
 // ProjectStatus represents the status of project.

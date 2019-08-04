@@ -517,8 +517,6 @@ func TestUpdatePassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		tknGen := &MockTokenGenerator{}
-
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
 		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
@@ -546,13 +544,6 @@ func TestUpdatePassword(t *testing.T) {
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
-		}
-
-		// Verify that the user can be authenticated with the created user.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, initPass, time.Hour, now)
-		if err != nil {
-			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
 		}
 
 		// Ensure validation is working by trying UpdatePassword with an empty request.
@@ -587,14 +578,6 @@ func TestUpdatePassword(t *testing.T) {
 			t.Fatalf("\t%s\tUpdate password failed.", tests.Failed)
 		}
 		t.Logf("\t%s\tUpdatePassword ok.", tests.Success)
-
-		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, newPass, time.Hour, now)
-		if err != nil {
-			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tAuthenticate ok.", tests.Success)
 	}
 }
 
@@ -850,7 +833,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUpdate ok.", tests.Success)
 
 				// Find the user and make sure the updates where made.
-				findRes, err := Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, false)
+				findRes, err := ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
 				if err != nil && errors.Cause(err) != tt.findErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.findErr)
@@ -864,14 +847,14 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user.
-				err = ArchiveById(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, now)
+				err = Archive(ctx, tt.claims(user, accountId), test.MasterDB, UserArchiveRequest{ID: user.ID}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result in not found.
-					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, false)
+					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
 					if err != nil && errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -879,7 +862,8 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived user with the includeArchived true should result no error.
-					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, true)
+					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB,
+						UserReadRequest{ID: user.ID, IncludeArchived: true})
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tArchive Read failed.", tests.Failed)
@@ -887,15 +871,15 @@ func TestCrud(t *testing.T) {
 				}
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
-				// Unarchive (un-delete) the user.
-				err = Unarchive(ctx, tt.claims(user, accountId), test.MasterDB, UserUnarchiveRequest{ID: user.ID}, now)
+				// Restore (un-delete) the user.
+				err = Restore(ctx, tt.claims(user, accountId), test.MasterDB, UserRestoreRequest{ID: user.ID}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUnarchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result no error.
-					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, false)
+					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tUnarchive Read failed.", tests.Failed)
@@ -904,14 +888,14 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUnarchive ok.", tests.Success)
 
 				// Delete (hard-delete) the user.
-				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
+				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, UserDeleteRequest{ID: user.ID})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted user with the includeArchived true should result in not found.
-					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB, user.ID, true)
+					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -1079,8 +1063,6 @@ func TestResetPassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		tknGen := &MockTokenGenerator{}
-
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
 		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
@@ -1152,7 +1134,7 @@ func TestResetPassword(t *testing.T) {
 		t.Logf("\t%s\tResetPassword ok.", tests.Success)
 
 		// Read the user to ensure the password_reset field was set.
-		user, err = Read(ctx, auth.Claims{}, test.MasterDB, user.ID, false)
+		user, err = ReadByID(ctx, auth.Claims{}, test.MasterDB, user.ID)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tRead failed.", tests.Failed)
@@ -1214,14 +1196,6 @@ func TestResetPassword(t *testing.T) {
 			t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
 		}
 		t.Logf("\t%s\tResetConfirm ok.", tests.Success)
-
-		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, user.Email, newPass, time.Hour, now)
-		if err != nil {
-			t.Log("\t\tGot :", err)
-			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
-		}
-		t.Logf("\t%s\tAuthenticate ok.", tests.Success)
 
 		// Ensure the reset hash does not work after its used.
 		{

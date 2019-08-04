@@ -2,6 +2,10 @@ package handlers
 
 import (
 	"context"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -10,9 +14,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 // UserAccount represents the UserAccount API method handler set.
@@ -34,7 +35,7 @@ type UserAccount struct {
 // @Param order				query string   	false 	"Order columns separated by comma, example: created_at desc"
 // @Param limit				query integer  	false 	"Limit, example: 10"
 // @Param offset			query integer  	false 	"Offset, example: 20"
-// @Param included-archived query boolean 	false 	"Included Archived, example: false"
+// @Param include-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} user_account.UserAccountResponse
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 403 {object} web.ErrorResponse
@@ -91,13 +92,13 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 	}
 
 	// Handle order query value if set.
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
-		req.IncludedArchived = b
+		req.IncludeArchived = b
 	}
 
 	//if err := web.Decode(r, &req); err != nil {
@@ -132,25 +133,29 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Failure 400 {object} web.ErrorResponse
 // @Failure 404 {object} web.ErrorResponse
 // @Failure 500 {object} web.ErrorResponse
-// @Router /user_accounts/{id} [get]
+// @Router /user_accounts/{user_id}/{account_id} [get]
 func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
 	}
 
-	// Handle included-archived query value if set.
+	// Handle include-archived query value if set.
 	var includeArchived bool
-	if v := r.URL.Query().Get("included-archived"); v != "" {
+	if v := r.URL.Query().Get("include-archived"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			err = errors.WithMessagef(err, "unable to parse %s as boolean for included-archived param", v)
+			err = errors.WithMessagef(err, "unable to parse %s as boolean for include-archived param", v)
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
 		includeArchived = b
 	}
 
-	res, err := user_account.Read(ctx, claims, u.MasterDB, params["id"], includeArchived)
+	res, err := user_account.Read(ctx, claims, u.MasterDB, user_account.UserAccountReadRequest{
+		UserID:          params["user_id"],
+		AccountID:       params["account_id"],
+		IncludeArchived: includeArchived,
+	})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

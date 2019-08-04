@@ -1,0 +1,46 @@
+{{define "title"}}Account{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header card-header-white">
+                    <div class="row">
+                        <div class="col">
+                            <h4 class="card-title">Account Details</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col">
+                            <p>
+                                <small>Name</small><br/>
+                                <b>{{ .account.Name }}</b>
+                            </p>
+
+                            {{ if .account.Address1 }}
+                                <p>
+                                    <small>Address</small><br/>
+                                    <b>{{ .account.Address1 }}{{ if  .account.Address2 }},{{  .account.Address2 }}{{ end }}</b>
+                                    <br/>
+                                    <b>{{ .account.City }}, {{ .account.Region }}, {{ .account.Zipcode }}</b>
+                                </p>
+                            {{end}}
+
+                            <p>
+                                <small>Timezone</small><br/>
+                                <b>{{.account.Timezone }}</b>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+
+{{end}}

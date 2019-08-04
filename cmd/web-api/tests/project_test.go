@@ -164,7 +164,10 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("project %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -203,7 +206,10 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -347,7 +353,8 @@ func TestProjectCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -422,7 +429,10 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", randID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("project %s not found: Entity not found", randID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -461,7 +471,10 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -502,7 +515,8 @@ func TestProjectCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -540,7 +554,8 @@ func TestProjectCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -576,7 +591,8 @@ func TestProjectCRUDUser(t *testing.T) {
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
 		}
 
-		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Display(ctx)
+		expected := mid.ErrorForbidden(ctx).(*weberror.Error).Response(ctx, false)
+		expected.StackTrace = actual.StackTrace
 
 		if diff := cmpDiff(t, expected, actual); diff {
 			t.Fatalf("\t%s\tReceived expected error.", tests.Failed)
@@ -626,7 +642,9 @@ func TestProjectCreate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Details:    actual.Details,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "status", Error: "Key: 'ProjectCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
@@ -637,6 +655,7 @@ func TestProjectCreate(t *testing.T) {
 					Display: "status must be one of [active disabled]",
 				},
 			},
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -688,7 +707,9 @@ func TestProjectUpdate(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Details:    actual.Details,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "status", Error: "Key: 'ProjectUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
@@ -699,6 +720,7 @@ func TestProjectUpdate(t *testing.T) {
 					Display: "status must be one of [active disabled]",
 				},
 			},
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -752,7 +774,9 @@ func TestProjectArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Details:    actual.Details,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "id", Error: "Key: 'ProjectArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
 				{
@@ -763,6 +787,7 @@ func TestProjectArchive(t *testing.T) {
 					Display: "id must be a valid UUID",
 				},
 			},
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -802,7 +827,10 @@ func TestProjectArchive(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: project.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    project.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -854,7 +882,9 @@ func TestProjectDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: "Field validation error",
+			StatusCode: expectedStatus,
+			Details:    actual.Details,
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				//{Field: "id", Error: "Key: 'id' Error:Field validation for 'id' failed on the 'uuid' tag"},
 				{
@@ -865,6 +895,7 @@ func TestProjectDelete(t *testing.T) {
 					Display: "id must be a valid UUID",
 				},
 			},
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {
@@ -902,7 +933,10 @@ func TestProjectDelete(t *testing.T) {
 		}
 
 		expected := weberror.ErrorResponse{
-			Error: project.ErrForbidden.Error(),
+			StatusCode: expectedStatus,
+			Error:      http.StatusText(expectedStatus),
+			Details:    project.ErrForbidden.Error(),
+			StackTrace: actual.StackTrace,
 		}
 
 		if diff := cmpDiff(t, expected, actual); diff {

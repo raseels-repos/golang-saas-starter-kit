@@ -19,7 +19,7 @@ import (
 // application. The status will allow users to be managed on by account with users
 // being global to the application.
 type UserAccount struct {
-	ID         string            `json:"id" validate:"required,uuid" example:"72938896-a998-4258-a17b-6418dcdb80e3"`
+	//ID         string            `json:"id" validate:"required,uuid" example:"72938896-a998-4258-a17b-6418dcdb80e3"`
 	UserID     string            `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID  string            `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
@@ -31,7 +31,7 @@ type UserAccount struct {
 
 // UserAccountResponse defines the one to many relationship of an user to an account that is returned for display.
 type UserAccountResponse struct {
-	ID         string            `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	//ID         string            `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	UserID     string            `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	AccountID  string            `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
@@ -49,7 +49,7 @@ func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
 	}
 
 	r := &UserAccountResponse{
-		ID:        m.ID,
+		//ID:        m.ID,
 		UserID:    m.UserID,
 		AccountID: m.AccountID,
 		Roles:     m.Roles,
@@ -75,6 +75,13 @@ type UserAccountCreateRequest struct {
 	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles     UserAccountRoles   `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 	Status    *UserAccountStatus `json:"status,omitempty" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
+}
+
+// UserAccountReadRequest defines the information needed to read a user account.
+type UserAccountReadRequest struct {
+	UserID          string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID       string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	IncludeArchived bool   `json:"include-archived" example:"false"`
 }
 
 // UserAccountUpdateRequest defines the information needed to update the roles or the
@@ -104,12 +111,12 @@ type UserAccountDeleteRequest struct {
 // UserAccountFindRequest defines the possible options to search for users accounts.
 // By default archived user accounts will be excluded from response.
 type UserAccountFindRequest struct {
-	Where            *string       `json:"where" example:"user_id = ? and account_id = ?"`
-	Args             []interface{} `json:"args" swaggertype:"array,string" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2,c4653bf9-5978-48b7-89c5-95704aebb7e2"`
-	Order            []string      `json:"order" example:"created_at desc"`
-	Limit            *uint         `json:"limit" example:"10"`
-	Offset           *uint         `json:"offset" example:"20"`
-	IncludedArchived bool          `json:"included-archived" example:"false"`
+	Where           *string       `json:"where" example:"user_id = ? and account_id = ?"`
+	Args            []interface{} `json:"args" swaggertype:"array,string" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2,c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Order           []string      `json:"order" example:"created_at desc"`
+	Limit           *uint         `json:"limit" example:"10"`
+	Offset          *uint         `json:"offset" example:"20"`
+	IncludeArchived bool          `json:"include-archived" example:"false"`
 }
 
 // UserAccountStatus represents the status of a user for an account.

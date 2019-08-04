@@ -3,6 +3,7 @@ package user_account
 import (
 	"context"
 	"database/sql"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
@@ -30,7 +31,7 @@ const userAccountTableName = "users_accounts"
 const userTableName = "users"
 
 // The list of columns needed for mapRowsToUserAccount
-var userAccountMapColumns = "id,user_id,account_id,roles,status,created_at,updated_at,archived_at"
+var userAccountMapColumns = "user_id,account_id,roles,status,created_at,updated_at,archived_at"
 
 // mapRowsToUserAccount takes the SQL rows and maps it to the UserAccount struct
 // with the columns defined by userAccountMapColumns
@@ -39,7 +40,7 @@ func mapRowsToUserAccount(rows *sql.Rows) (*UserAccount, error) {
 		ua  UserAccount
 		err error
 	)
-	err = rows.Scan(&ua.ID, &ua.UserID, &ua.AccountID, &ua.Roles, &ua.Status, &ua.CreatedAt, &ua.UpdatedAt, &ua.ArchivedAt)
+	err = rows.Scan(&ua.UserID, &ua.AccountID, &ua.Roles, &ua.Status, &ua.CreatedAt, &ua.UpdatedAt, &ua.ArchivedAt)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -132,7 +133,7 @@ func findRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []
 // Find gets all the user accounts from the database based on the request params.
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountFindRequest) ([]*UserAccount, error) {
 	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludedArchived)
+	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
 }
 
 // Find gets all the user accounts from the database based on the select query
@@ -260,8 +261,10 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 		ua.UpdatedAt = now
 		ua.ArchivedAt = nil
 	} else {
+		uaID := uuid.NewRandom().String()
+
 		ua = UserAccount{
-			ID:        uuid.NewRandom().String(),
+			//ID:        uaID,
 			UserID:    req.UserID,
 			AccountID: req.AccountID,
 			Roles:     req.Roles,
@@ -278,7 +281,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 		query := sqlbuilder.NewInsertBuilder()
 		query.InsertInto(userAccountTableName)
 		query.Cols("id", "user_id", "account_id", "roles", "status", "created_at", "updated_at")
-		query.Values(ua.ID, ua.UserID, ua.AccountID, ua.Roles, ua.Status.String(), ua.CreatedAt, ua.UpdatedAt)
+		query.Values(uaID, ua.UserID, ua.AccountID, ua.Roles, ua.Status.String(), ua.CreatedAt, ua.UpdatedAt)
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
@@ -295,19 +298,28 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 }
 
 // Read gets the specified user account from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string, includedArchived bool) (*UserAccount, error) {
+func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAccountReadRequest) (*UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.Read")
 	defer span.Finish()
 
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
+		return nil, err
+	}
+
 	// Filter base select query by ID
 	query := selectQuery()
-	query.Where(query.Equal("id", id))
+	query.Where(query.And(
+		query.Equal("user_id", req.UserID),
+		query.Equal("account_id", req.AccountID)))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
-	if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "user account %s not found", id)
+	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	if err != nil {
 		return nil, err
-	} else if err != nil {
+	} else if res == nil || len(res) == 0 {
+		err = errors.WithMessagef(ErrNotFound, "entry for user %s account %s not found", req.UserID, req.AccountID)
 		return nil, err
 	}
 	u := res[0]
@@ -477,4 +489,42 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserAc
 	}
 
 	return nil
+}
+
+type MockUserAccountResponse struct {
+	*UserAccount
+	User    *user.MockUserResponse
+	Account *account.Account
+}
+
+// MockUserAccount returns a fake UserAccount for testing.
+func MockUserAccount(ctx context.Context, dbConn *sqlx.DB, now time.Time, roles ...UserAccountRole) (*MockUserAccountResponse, error) {
+	usr, err := user.MockUser(ctx, dbConn, now)
+	if err != nil {
+		return nil, err
+	}
+
+	acc, err := account.MockAccount(ctx, dbConn, now)
+	if err != nil {
+		return nil, err
+	}
+
+	status := UserAccountStatus_Active
+
+	req := UserAccountCreateRequest{
+		UserID:    usr.ID,
+		AccountID: acc.ID,
+		Status:    &status,
+		Roles:     roles,
+	}
+	ua, err := Create(ctx, auth.Claims{}, dbConn, req, now)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MockUserAccountResponse{
+		UserAccount: ua,
+		User:        usr,
+		Account:     acc,
+	}, nil
 }

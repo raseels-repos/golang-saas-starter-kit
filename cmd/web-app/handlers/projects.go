@@ -17,5 +17,5 @@ type Projects struct {
 
 // List returns all the existing users in the system.
 func (p *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	return p.Renderer.Render(ctx, w, r, tmplLayoutBase, "projects-index.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
+	return p.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-index.tmpl", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
 }

@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"encoding/json"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
@@ -27,14 +27,15 @@ type User struct {
 
 // UserResponse represents someone with access to our system that is returned for display.
 type UserResponse struct {
-	ID         string            `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	FirstName  string            `json:"first_name" example:"Gabi"`
-	LastName   string            `json:"last_name" example:"May"`
-	Email      string            `json:"email" example:"gabi@geeksinthewoods.com"`
-	Timezone   string            `json:"timezone" example:"America/Anchorage"`
-	CreatedAt  web.TimeResponse  `json:"created_at"`            // CreatedAt contains multiple format options for display.
-	UpdatedAt  web.TimeResponse  `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
-	ArchivedAt *web.TimeResponse `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
+	ID         string               `json:"id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	Name       string               `json:"name" example:"Gabi"`
+	FirstName  string               `json:"first_name" example:"Gabi"`
+	LastName   string               `json:"last_name" example:"May"`
+	Email      string               `json:"email" example:"gabi@geeksinthewoods.com"`
+	Timezone   string               `json:"timezone" example:"America/Anchorage"`
+	CreatedAt  web.TimeResponse     `json:"created_at"`            // CreatedAt contains multiple format options for display.
+	UpdatedAt  web.TimeResponse     `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
+	ArchivedAt *web.TimeResponse    `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
 	Gravatar   web.GravatarResponse `json:"gravatar"`
 }
 
@@ -47,13 +48,14 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 
 	r := &UserResponse{
 		ID:        m.ID,
+		Name:      m.FirstName + " " + m.LastName,
 		FirstName: m.FirstName,
 		LastName:  m.LastName,
 		Email:     m.Email,
 		Timezone:  m.Timezone,
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
-		Gravatar: web.NewGravatarResponse(ctx, m.Email),
+		Gravatar:  web.NewGravatarResponse(ctx, m.Email),
 	}
 
 	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {
@@ -62,6 +64,18 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 	}
 
 	return r
+}
+
+func (m *UserResponse) UnmarshalBinary(data []byte) error {
+	if data == nil || len(data) == 0 {
+		return nil
+	}
+	// convert data to yours, let's assume its json data
+	return json.Unmarshal(data, m)
+}
+
+func (m *UserResponse) MarshalBinary() ([]byte, error) {
+	return json.Marshal(m)
 }
 
 // UserCreateRequest contains information needed to create a new User.
@@ -77,6 +91,12 @@ type UserCreateRequest struct {
 // UserCreateInviteRequest contains information needed to create a new User.
 type UserCreateInviteRequest struct {
 	Email string `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
+}
+
+// UserReadRequest defines the information needed to read an user.
+type UserReadRequest struct {
+	ID              string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	IncludeArchived bool   `json:"include-archived" example:"false"`
 }
 
 // UserUpdateRequest defines what information may be provided to modify an existing
@@ -106,20 +126,25 @@ type UserArchiveRequest struct {
 	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 }
 
-// UserUnarchiveRequest defines the information needed to unarchive an user.
-type UserUnarchiveRequest struct {
+// UserRestoreRequest defines the information needed to restore an user.
+type UserRestoreRequest struct {
+	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+}
+
+// UserDeleteRequest defines the information needed to delete a user.
+type UserDeleteRequest struct {
 	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 }
 
 // UserFindRequest defines the possible options to search for users. By default
 // archived users will be excluded from response.
 type UserFindRequest struct {
-	Where            *string       `json:"where" example:"name = ? and email = ?"`
-	Args             []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,gabi.may@geeksinthewoods.com"`
-	Order            []string      `json:"order" example:"created_at desc"`
-	Limit            *uint         `json:"limit" example:"10"`
-	Offset           *uint         `json:"offset" example:"20"`
-	IncludedArchived bool          `json:"included-archived" example:"false"`
+	Where           *string       `json:"where" example:"name = ? and email = ?"`
+	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,gabi.may@geeksinthewoods.com"`
+	Order           []string      `json:"order" example:"created_at desc"`
+	Limit           *uint         `json:"limit" example:"10"`
+	Offset          *uint         `json:"offset" example:"20"`
+	IncludeArchived bool          `json:"include-archived" example:"false"`
 }
 
 // UserResetPasswordRequest defines the fields need to reset a user password.
@@ -141,33 +166,4 @@ type UserResetConfirmRequest struct {
 	ResetHash       string `json:"reset_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	Password        string `json:"password" validate:"required" example:"SecretString"`
 	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
-}
-
-// AuthenticateRequest defines what information is required to authenticate a user.
-type AuthenticateRequest struct {
-	Email    string `json:"email" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
-	Password string `json:"password" validate:"required" example:"NeverTellSecret"`
-}
-
-// Token is the payload we deliver to users when they authenticate.
-type Token struct {
-	// AccessToken is the token that authorizes and authenticates
-	// the requests.
-	AccessToken string `json:"access_token"`
-	// TokenType is the type of token.
-	// The Type method returns either this or "Bearer", the default.
-	TokenType string `json:"token_type,omitempty"`
-	// Expiry is the optional expiration time of the access token.
-	//
-	// If zero, TokenSource implementations will reuse the same
-	// token forever and RefreshToken or equivalent
-	// mechanisms for that TokenSource will not be used.
-	Expiry time.Time     `json:"expiry,omitempty"`
-	TTL    time.Duration `json:"ttl,omitempty"`
-	// contains filtered or unexported fields
-	claims auth.Claims `json:"-"`
-	// UserId is the ID of the user authenticated.
-	UserID        string  `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	// AccountID is the ID of the account for the user authenticated.
-	AccountID        string  `json:"account_id"example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }

@@ -83,6 +83,10 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			webcontext.SessionFlashSuccess(ctx,
 				"Thank you for Joining",
 				"You workflow will be a breeze starting today.")
+			err = webcontext.ContextSession(ctx).Save(r, w)
+			if err != nil {
+				return err
+			}
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
@@ -100,7 +104,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := f(); err != nil {
-		return web.RenderError(ctx, w, r, err, h.Renderer, tmplLayoutBase, tmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 	}
 
 	data["form"] = req
@@ -109,5 +113,5 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "signup-step1.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "signup-step1.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

@@ -6,8 +6,8 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 )
 
-// InviteUsersRequest defines the data needed to make an invite request.
-type InviteUsersRequest struct {
+// SendUserInvitesRequest defines the data needed to make an invite request.
+type SendUserInvitesRequest struct {
 	AccountID string                         `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	UserID    string                         `json:"user_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Emails    []string                       `json:"emails" validate:"required,dive,email"`
@@ -23,8 +23,8 @@ type InviteHash struct {
 	RequestIP string `json:"request_ip" validate:"required,ip" example:"69.56.104.36"`
 }
 
-// InviteAcceptRequest defines the fields need to complete an invite request.
-type InviteAcceptRequest struct {
+// AcceptInviteRequest defines the fields need to complete an invite request.
+type AcceptInviteRequest struct {
 	InviteHash      string  `json:"invite_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	FirstName       string  `json:"first_name" validate:"required" example:"Gabi"`
 	LastName        string  `json:"last_name" validate:"required" example:"May"`

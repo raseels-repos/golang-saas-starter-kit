@@ -35,7 +35,7 @@ func (h *Root) indexDashboard(ctx context.Context, w http.ResponseWriter, r *htt
 		"imgSizes": []int{100, 200, 300, 400, 500},
 	}
 
-	return h.Renderer.Render(ctx, w, r, tmplLayoutBase, "root-dashboard.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "root-dashboard.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
 // indexDefault loads the root index page when a user has no authentication.
@@ -50,21 +50,21 @@ func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 	var tmpName string
 	switch r.RequestURI {
-		case "/":
-			tmpName = "site-index.gohtml"
-		case "/api":
-			tmpName = "site-api.gohtml"
-		case "/features":
-			tmpName = "site-features.gohtml"
-		case "/support":
-			tmpName = "site-support.gohtml"
-		case "/legal/privacy":
-			tmpName = "legal-privacy.gohtml"
-		case "/legal/terms":
-			tmpName = "legal-terms.gohtml"
-		default:
-			http.Redirect(w, r, "/", http.StatusFound)
-			return nil
+	case "/":
+		tmpName = "site-index.gohtml"
+	case "/api":
+		tmpName = "site-api.gohtml"
+	case "/features":
+		tmpName = "site-features.gohtml"
+	case "/support":
+		tmpName = "site-support.gohtml"
+	case "/legal/privacy":
+		tmpName = "legal-privacy.gohtml"
+	case "/legal/terms":
+		tmpName = "legal-terms.gohtml"
+	default:
+		http.Redirect(w, r, "/", http.StatusFound)
+		return nil
 	}
 
 	return u.Renderer.Render(ctx, w, r, tmplLayoutSite, tmpName, web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)

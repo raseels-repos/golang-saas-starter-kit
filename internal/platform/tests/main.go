@@ -130,6 +130,7 @@ func Context() context.Context {
 		TraceID:   uint64(time.Now().UnixNano()),
 		Now:       time.Now(),
 		RequestIP: "68.69.35.104",
+		Env:       "dev",
 	}
 
 	return context.WithValue(context.Background(), webcontext.KeyValues, &values)

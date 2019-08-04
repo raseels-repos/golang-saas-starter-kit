@@ -3,9 +3,6 @@ package template_renderer
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"html/template"
 	"math"
 	"net/http"
@@ -15,7 +12,10 @@ import (
 	"reflect"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
@@ -307,9 +307,9 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	// Specific new data map for render to allow values to be overwritten on a request
 	// basis.
 	// append the global key/pairs
-	renderData := r.globalViewData
-	if renderData == nil {
-		renderData = make(map[string]interface{})
+	renderData :=  make(map[string]interface{}, len(r.globalViewData))
+	for k, v := range r.globalViewData {
+		renderData[k] = v
 	}
 
 	// Add Request URL to render data

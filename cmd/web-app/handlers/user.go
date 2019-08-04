@@ -78,7 +78,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, req.Email, req.Password, sessionTTL, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
-				case account.ErrForbidden:
+				case user.ErrForbidden:
 					return web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
@@ -91,7 +91,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, w, r, token)
+			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
 				return err
 			}
@@ -117,9 +117,19 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 }
 
 // handleSessionToken persists the access token to the session for request authentication.
-func handleSessionToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token user.Token) error {
+func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user.Token) error {
 	if token.AccessToken == "" {
 		return errors.New("accessToken is required.")
+	}
+
+	usr, err := user.Read(ctx, auth.Claims{}, db, token.UserID, false )
+	if err != nil {
+		return err
+	}
+
+	acc, err := account.Read(ctx, auth.Claims{},db, token.AccountID, false )
+	if err != nil {
+		return err
 	}
 
 	sess := webcontext.ContextSession(ctx)
@@ -134,7 +144,7 @@ func handleSessionToken(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		HttpOnly: false,
 	}
 
-	sess = webcontext.SessionWithAccessToken(sess, token.AccessToken)
+	sess = webcontext.SessionInit(sess, token.AccessToken, usr.Response(ctx), acc.Response(ctx))
 
 	if err := sess.Save(r, w); err != nil {
 		return err
@@ -149,7 +159,7 @@ func (h *User) Logout(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	sess := webcontext.ContextSession(ctx)
 
 	// Set the access token to empty to logout the user.
-	sess = webcontext.SessionWithAccessToken(sess, "")
+	sess = webcontext.SessionDestroy(sess)
 
 	if err := sess.Save(r, w); err != nil {
 		return err
@@ -293,7 +303,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, w, r, token)
+			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
 				return err
 			}

@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"github.com/dustin/go-humanize"
@@ -96,4 +97,18 @@ func NewEnumResponse(ctx context.Context, value interface{}, options ...interfac
 func EnumValueTitle(v string) string {
 	v = strings.Replace(v, "_", " ", -1)
 	return strings.Title(v)
+}
+
+type GravatarResponse struct {
+	Small string `json:"small" example:"https://www.gravatar.com/avatar/xy7.jpg?s=30"`
+	Medium string  `json:"medium" example:"https://www.gravatar.com/avatar/xy7.jpg?s=80"`
+}
+
+func NewGravatarResponse(ctx context.Context, email string) GravatarResponse {
+	 u := fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=", md5.Sum([]byte(strings.ToLower(email))))
+
+	 return GravatarResponse{
+	 	Small: u+"30",
+	 	Medium: u+"80",
+	 }
 }

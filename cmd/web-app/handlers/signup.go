@@ -74,7 +74,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, w, r, token)
+			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
 				return err
 			}

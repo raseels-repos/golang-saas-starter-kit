@@ -287,6 +287,8 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		AccessToken: tknStr,
 		TokenType:   "Bearer",
 		claims:      claims,
+		UserID: claims.Subject,
+		AccountID: claims.Audience,
 	}
 
 	if expires.Seconds() > 0 {

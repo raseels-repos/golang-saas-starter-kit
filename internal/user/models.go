@@ -35,6 +35,7 @@ type UserResponse struct {
 	CreatedAt  web.TimeResponse  `json:"created_at"`            // CreatedAt contains multiple format options for display.
 	UpdatedAt  web.TimeResponse  `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
 	ArchivedAt *web.TimeResponse `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
+	Gravatar   web.GravatarResponse `json:"gravatar"`
 }
 
 // Response transforms User and UserResponse that is used for display.
@@ -52,6 +53,7 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 		Timezone:  m.Timezone,
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
+		Gravatar: web.NewGravatarResponse(ctx, m.Email),
 	}
 
 	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {
@@ -164,4 +166,8 @@ type Token struct {
 	TTL    time.Duration `json:"ttl,omitempty"`
 	// contains filtered or unexported fields
 	claims auth.Claims `json:"-"`
+	// UserId is the ID of the user authenticated.
+	UserID        string  `json:"user_id" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	// AccountID is the ID of the account for the user authenticated.
+	AccountID        string  `json:"account_id"example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }

@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"gopkg.in/gomail.v2"
 	"html/template"
 	"log"
@@ -673,6 +675,23 @@ func main() {
 			}
 
 			return fmt.Sprintf("%+v", err)
+		},
+		"ContextUser": func(ctx context.Context) *user.UserResponse {
+			sess := webcontext.ContextSession(ctx)
+			v, _ := webcontext.SessionUser(sess)
+
+			if u, ok := v.(*user.UserResponse); ok {
+				return u
+			}
+			return nil
+		},
+		"ContextAccount": func(ctx context.Context) *account.AccountResponse {
+			sess := webcontext.ContextSession(ctx)
+			v, _ := webcontext.SessionAccount(sess)
+			if acc, ok := v.(*account.AccountResponse); ok {
+				return acc
+			}
+			return nil
 		},
 	}
 

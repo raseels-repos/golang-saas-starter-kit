@@ -3,39 +3,27 @@
 
 {{end}}
 {{define "content"}}
-    Welcome to the web app
 
-    <p>S3ImgSrcLarge
-        <img {{ S3ImgSrcLarge $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
 
-    <p>S3ImgThumbSrcLarge
-        <img {{ S3ImgThumbSrcLarge $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
+    </div>
 
-    <p>S3ImgSrcMedium
-        <img {{ S3ImgSrcMedium $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
 
-    <p>S3ImgThumbSrcMedium
-        <img {{ S3ImgThumbSrcMedium $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
+    <div class="row">
+        <div class="col">
 
-    <p>S3ImgSrcSmall
-        <img {{ S3ImgSrcSmall $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
+            <div class="card">
+                <div class="card-body">
 
-    <p>S3ImgThumbSrcSmall
-        <img {{ S3ImgThumbSrcSmall $._ctx "/assets/images/glacier-example-pic.jpg" }}/>
-    </p>
+                    <p>Welcome to the web app</p>
 
-    <p>S3ImgSrc
-        <img {{ S3ImgSrc $._ctx "/assets/images/glacier-example-pic.jpg" $.imgSizes }}/>
-    </p>
+                </div>
+            </div>
 
-    <p>S3ImgUrl
-        <img src="{{ S3ImgUrl $._ctx "/assets/images/glacier-example-pic.jpg" 200 }}" />
-    </p>
+        </div>
+    </div>
+
 
 
 {{end}}

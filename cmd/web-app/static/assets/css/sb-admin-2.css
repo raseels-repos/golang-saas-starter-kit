@@ -3243,6 +3243,28 @@ input[type="button"].btn-block {
   width: 100%;
 }
 
+.text-blue {
+    color: #4e73df;
+}
+.text-green {
+    color: #1cc88a;
+}
+.text-aqua {
+    color: #36b9cc;
+}
+.text-orange {
+    color: #f6c23e;
+}
+.text-red {
+    color: #e74a3b;
+}
+.text-purple {
+    color: #52489C;
+}
+.text-pink {
+    color: #D741A7;
+}
+
 .fade {
   -webkit-transition: opacity 0.15s linear;
   transition: opacity 0.15s linear;
@@ -10606,7 +10628,7 @@ a:focus {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
-  padding-top: 70px;
+  padding-top: 0px;
 }
 
 #wrapper #content-wrapper {
@@ -10619,6 +10641,14 @@ a:focus {
   -webkit-box-flex: 1;
   -ms-flex: 1 0 auto;
   flex: 1 0 auto;
+}
+
+#wrapper.website {
+  padding-top: 70px;
+}
+
+#page-content {
+    padding-bottom: 5em;
 }
 
 .container,
@@ -10970,7 +11000,7 @@ a:focus {
   border: 0;
   font-weight: 900;
   content: '\f105';
-  font-family: 'Font Awesome 5 Free';
+  font-family: 'FontAwesome';
 }
 
 .sidebar .nav-item.dropdown.show .dropdown-toggle::after,
@@ -11247,7 +11277,7 @@ a:focus {
 .sidebar #sidebarToggle::after {
   font-weight: 900;
   content: '\f104';
-  font-family: 'Font Awesome 5 Free';
+  font-family: 'FontAwesome';
   margin-right: 0.1rem;
 }
 
@@ -11266,7 +11296,7 @@ a:focus {
 
 .sidebar.toggled #sidebarToggle::after {
   content: '\f105';
-  font-family: 'Font Awesome 5 Free';
+  font-family: 'FontAwesome';
   margin-left: 0.25rem;
 }
 
@@ -11350,7 +11380,7 @@ a:focus {
     border: 0;
     font-weight: 900;
     content: '\f107';
-    font-family: 'Font Awesome 5 Free';
+    font-family: 'FontAwesome';
   }
   .sidebar .nav-item .nav-link[data-toggle="collapse"].collapsed::after {
     content: '\f105';
@@ -11531,6 +11561,11 @@ a:focus {
   color: rgba(255, 255, 255, 0.5);
 }
 
+#buildinfo {
+    margin-top: 2em;
+    font-size: 12px;
+}
+
 .btn-circle {
   border-radius: 100%;
   height: 2.5rem;
@@ -11622,7 +11657,7 @@ a:focus {
   line-height: 51px;
   font-weight: 900;
   content: '\f107';
-  font-family: 'Font Awesome 5 Free';
+  font-family: 'FontAwesome';
   color: #d1d3e2;
 }
 

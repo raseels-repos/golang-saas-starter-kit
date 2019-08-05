@@ -3,134 +3,156 @@
 
 {{end}}
 {{define "content"}}
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Update Account Settings</h1>
+    </div>
+
     <form class="user" method="post" novalidate>
         <div class="row">
-            <div class="col-md-6">
+            <div class="col">
 
-                <h3>Account Details</h3>
-                <div class="spacer-15"></div>
+                <div class="card shadow mb-4">
+                    <div class="card-body">
 
-                <div class="form-group row">
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Name" }}" name="Name" value="{{ $.form.Name }}" placeholder="Company Name" required>
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Address1" }}" name="Address1" value="{{ $.form.Address1 }}" placeholder="Address Line 1" required>
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address1" }}
-                    </div>
-                    <div class="col-sm-6">
-                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Address2" }}" name="Address2" value="{{ $.form.Address2 }}" placeholder="Address Line 2">
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address2" }}
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <div class="form-control-select-wrapper">
-                            <select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Country" }}" id="selectAccountCountry" name="Country" placeholder="Country" required>
-                                {{ range $i := $.countries }}
-                                    {{ $hasGeonames := false }}
-                                    {{ range $c := $.geonameCountries }}
-                                        {{ if eq $c $i.Code }}{{ $hasGeonames = true }}{{ end }}
+                        <div class="form-group row">
+                            <div class="col-sm-6">
+                                <label for="AccountName">Account Name</label>
+                                <input type="text" id="AccountName" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}" name="Name" value="{{ $.form.Name }}" placeholder="Company Name" required>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-sm-6 mb-sm-0">
+                                <label for="AccountAddress1">Address</label>
+                                <input type="text" id="AccountAddress1" class="form-control  {{ ValidationFieldClass $.validationErrors "Address1" }}" name="Address1" value="{{ $.form.Address1 }}" placeholder="Address Line 1" required>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address1" }}
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="AccountAddress2">&nbsp;</label>
+                                <input type="text" id="AccountAddress2" class="form-control  {{ ValidationFieldClass $.validationErrors "Address2" }}" name="Address2" value="{{ $.form.Address2 }}" placeholder="Address Line 2">
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address2" }}
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-sm-6">
+                                <label for="selectAccountCountry">Country</label>
+                                <div class="">
+                                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Country" }}" id="selectAccountCountry" name="Country" placeholder="Country" required>
+                                        {{ range $i := $.countries }}
+                                            {{ $hasGeonames := false }}
+                                            {{ range $c := $.geonameCountries }}
+                                                {{ if eq $c $i.Code }}{{ $hasGeonames = true }}{{ end }}
+                                            {{ end }}
+                                            <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if CmpString $.form.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
+                                        {{ end }}
+                                    </select>
+                                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Country" }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-sm-4">
+                                <div id="divAccountZipcode"></div>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Zipcode" }}
+                            </div>
+                            <div class="col-sm-4">
+                                <div id="divAccountRegion"></div>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Region" }}
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="inputAccountCity">City</label>
+                                <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Account.City" }}" id="inputAccountCity" name="City" value="{{ $.form.City }}" placeholder="City" required>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "City" }}
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <div class="col-sm-6">
+                                <label for="inputTimezone">Timezone</label>
+                                <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}" name="Timezone">
+                                    <option value="">Not set</option>
+                                    {{ range $idx, $t := .timezones }}
+                                        <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
                                     {{ end }}
-                                    <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if CmpString $.form.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
-                                {{ end }}
-                            </select>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Country" }}
+                                </select>
+                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Timezone" }}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="card shadow mb-4">
+
+                    <a href="#collapseCardDateTime" class="d-block card-header py-3 collapsed" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="collapseCardDateTime">
+                        <h6 class="m-0 font-weight-bold text-primary">Date & Time Formatting</h6>
+                    </a>
+
+                    <div class="collapse" id="collapseCardDateTime" style="">
+                        <div class="card-body">
+
+                            <div class="form-group">
+                                <label for="inputDatetimeFormat">Datetime Format</label>
+                                <select class="form-control" style="display: none;" id="selectDatetimeFormat">
+                                    <option>2006-01-02 at 3:04PM MST</option>
+                                    <option>Mon Jan _2 15:04:05 2006</option>
+                                    <option>Mon Jan _2 15:04:05 MST 2006</option>
+                                    <option>Mon Jan 02 15:04:05 -0700 2006</option>
+                                    <option>02 Jan 06 15:04 MST</option>
+                                    <option>02 Jan 06 15:04 -0700</option>
+                                    <option>Monday, 02-Jan-06 15:04:05 MST</option>
+                                    <option>Mon, 02 Jan 2006 15:04:05 MST</option>
+                                    <option>Mon, 02 Jan 2006 15:04:05 -0700</option>
+                                    <option>Jan _2 15:04:05</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input type="text" class="form-control" id="inputDatetimeFormat" placeholder="enter datetime format" name="PreferenceDatetimeFormat" value="{{ .form.PreferenceDatetimeFormat }}">
+                                <label class="form-check-label" for="inputDatetimeFormat"><small>Current Datetime {{ .exampleDisplayTime.Local }}</small></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputDateFormat">Date Format</label>
+                                <select class="form-control" style="display: none;" id="selectDateFormat">
+                                    <option>2006-01-02</option>
+                                    <option>Mon Jan _2 2006</option>
+                                    <option>Mon Jan 02 2006</option>
+                                    <option>02 Jan 06</option>
+                                    <option>02 Jan 06</option>
+                                    <option>Monday, 02-Jan-06</option>
+                                    <option>Mon, 02 Jan 2006</option>
+                                    <option>Mon, 02 Jan 2006</option>
+                                    <option>Jan _2</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input type="text" class="form-control" id="inputDateFormat" placeholder="enter date format" name="PreferenceDateFormat" value="{{ .form.PreferenceDateFormat }}">
+                                <label class="form-check-label" for="inputDateFormat"><small>Current Date {{ .exampleDisplayTime.LocalDate }}</small></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputTimeFormat">Time Format</label>
+                                <select class="form-control" style="display: none;" id="selectTimeFormat">
+                                    <option>3:04PM</option>
+                                    <option>3:04PM MST</option>
+                                    <option>3:04PM -0700</option>
+                                    <option>15:04:05</option>
+                                    <option>15:04:05 MST</option>
+                                    <option>15:04:05 -0700</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input type="text" class="form-control" id="inputTimeFormat" placeholder="enter time format" name="PreferenceTimeFormat" value="{{ .form.PreferenceTimeFormat }}">
+                                <label class="form-check-label" for="inputDatetimeFormat"><small>Current Time {{ .exampleDisplayTime.LocalTime }}</small></label>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="form-group row">
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <div id="divAccountZipcode"></div>
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Zipcode" }}
-                    </div>
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <div id="divAccountRegion"></div>
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Region" }}
-                    </div>
-                </div>
-                <div class="form-group row mb-4">
-                    <div class="col-sm-6 mb-3 mb-sm-0">
-                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}" id="inputAccountCity" name="City" value="{{ $.form.City }}" placeholder="City" required>
-                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "City" }}
-                    </div>
+
                 </div>
             </div>
-            <div class="col-md-6">
 
-                <h3>Account Settings</h3>
-                <div class="spacer-15"></div>
-
-                <div class="form-group">
-                    <label for="inputTimezone">Timezone</label>
-                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}" name="Timezone">
-                        <option value="">Not set</option>
-                        {{ range $idx, $t := .timezones }}
-                            <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
-                        {{ end }}
-                    </select>
-                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Timezone" }}
-                </div>
-                <div class="form-group">
-                    <label for="inputDatetimeFormat">Datetime Format</label>
-                    <select style="display: none;" id="selectDatetimeFormat">
-                        <option>2006-01-02 at 3:04PM MST</option>
-                        <option>Mon Jan _2 15:04:05 2006</option>
-                        <option>Mon Jan _2 15:04:05 MST 2006</option>
-                        <option>Mon Jan 02 15:04:05 -0700 2006</option>
-                        <option>02 Jan 06 15:04 MST</option>
-                        <option>02 Jan 06 15:04 -0700</option>
-                        <option>Monday, 02-Jan-06 15:04:05 MST</option>
-                        <option>Mon, 02 Jan 2006 15:04:05 MST</option>
-                        <option>Mon, 02 Jan 2006 15:04:05 -0700</option>
-                        <option>Jan _2 15:04:05</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    <input type="text" class="form-control" id="inputDatetimeFormat" placeholder="enter datetime format" name="PreferenceDatetimeFormat" value="{{ .form.PreferenceDatetimeFormat }}">
-                    <label class="form-check-label" for="inputDatetimeFormat"><small>Current Datetime {{ .exampleDisplayTime.Local }}</small></label>
-                </div>
-                <div class="form-group">
-                    <label for="inputDateFormat">Date Format</label>
-                    <select style="display: none;" id="selectDateFormat">
-                        <option>2006-01-02</option>
-                        <option>Mon Jan _2 2006</option>
-                        <option>Mon Jan 02 2006</option>
-                        <option>02 Jan 06</option>
-                        <option>02 Jan 06</option>
-                        <option>Monday, 02-Jan-06</option>
-                        <option>Mon, 02 Jan 2006</option>
-                        <option>Mon, 02 Jan 2006</option>
-                        <option>Jan _2</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    <input type="text" class="form-control" id="inputDateFormat" placeholder="enter date format" name="PreferenceDateFormat" value="{{ .form.PreferenceDateFormat }}">
-                    <label class="form-check-label" for="inputDateFormat"><small>Current Date {{ .exampleDisplayTime.LocalDate }}</small></label>
-                </div>
-                <div class="form-group">
-                    <label for="inputTimeFormat">Time Format</label>
-                    <select style="display: none;" id="selectTimeFormat">
-                        <option>3:04PM</option>
-                        <option>3:04PM MST</option>
-                        <option>3:04PM -0700</option>
-                        <option>15:04:05</option>
-                        <option>15:04:05 MST</option>
-                        <option>15:04:05 -0700</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    <input type="text" class="form-control" id="inputTimeFormat" placeholder="enter time format" name="PreferenceTimeFormat" value="{{ .form.PreferenceTimeFormat }}">
-                    <label class="form-check-label" for="inputDatetimeFormat"><small>Current Time {{ .exampleDisplayTime.LocalTime }}</small></label>
-                </div>
-            </div>
         </div>
 
-
-        <div class="spacer-30"></div>
         <div class="row">
             <div class="col">
                 <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+                <a href="/account" class="ml-2 btn btn-secondary" >Cancel</a>
             </div>
         </div>
     </form>
@@ -149,7 +171,7 @@
                 if ($(this).find('option:selected').attr('data-geonames') == 1) {
 
                     // Replace the existing region with an empty dropdown.
-                    $('#divAccountRegion').html('<div class="form-control-select-wrapper"><select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" placeholder="Region" required></select></div>');
+                    $('#divAccountRegion').html('<label for="inputAccountRegion">Region</label><div class=""><select class="form-control {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" placeholder="Region" required></select></div>');
 
                     // Query the API for a list of regions for the selected
                     // country and populate the region dropdown.
@@ -172,7 +194,7 @@
                     });
 
                     // Replace the existing zipcode text input with a new one that will supports autocomplete.
-                    $('#divAccountZipcode').html('<input class="form-control  form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
+                    $('#divAccountZipcode').html('<label for="inputAccountZipcode">Zipcode</label><input class="form-control  {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
                     $('#inputAccountZipcode').autoComplete({
                         minLength: 2,
                         events: {
@@ -210,10 +232,10 @@
                 } else {
 
                     // Replace the existing zipcode input with no autocomplete.
-                    $('#divAccountZipcode').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
+                    $('#divAccountZipcode').html('<label for="inputAccountZipcode">Zipcode</label><input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
 
                     // Replace the existing region select with a text input.
-                    $('#divAccountRegion').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" value="{{ $.form.Region }}" placeholder="Region" required>');
+                    $('#divAccountRegion').html('<label for="inputAccountRegion">Region</label><input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Region" }}" id="inputAccountRegion" name="Region" value="{{ $.form.Region }}" placeholder="Region" required>');
 
                 }
 

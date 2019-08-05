@@ -1,9 +1,9 @@
-{{ define "partials/page-wrapper" }}
+{{ define "partials/app-wrapper" }}
     <!-- ============================================================== -->
     <!-- Page Wrapper                                                   -->
     <!-- ============================================================== -->
     <div id="wrapper">
-        {{ template "partials/sidebar" . }}
+        {{ template "partials/app-sidebar" . }}
 
         <!-- ============================================================== -->
         <!-- Content Wrapper                                                -->
@@ -18,7 +18,7 @@
                 <!-- ============================================================== -->
                 <!-- Topbar                                                         -->
                 <!-- ============================================================== -->
-                {{ template "partials/topbar" . }}
+                {{ template "partials/app-topbar" . }}
                 <!-- End of Topbar -->
 
                 <!-- ============================================================== -->
@@ -40,13 +40,13 @@
             <!-- Footer                                                         -->
             <!-- ============================================================== -->
             <footer class="sticky-footer bg-white">
-                <div class="container my-auto">
-                    <div class="copyright text-center my-auto">
-                            <span>
-                                &copy; Copyright 2019 Geeks Accelerator<br/>
-                                {{ template "partials/buildinfo" . }}
-                            </span>
+                <div class="container-fluid">
+                    <div class="copyright ">
+                            <span>&copy; Copyright 2019 Geeks Accelerator</span>
                     </div>
+
+                    {{ template "partials/buildinfo" . }}
+
                 </div>
             </footer>
             <!-- End of Footer -->

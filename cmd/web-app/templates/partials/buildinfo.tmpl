@@ -1,5 +1,5 @@
 {{ define "partials/buildinfo" }}
-    <p style="font-size: 12px;{{if eq ._Service.ENV "prod"}}display: none;{{end}}">
+    <p id="buildinfo" style="{{if eq ._Service.ENV "prod"}}display: none;{{end}}">
         {{if ne ._Service.BuildInfo.CiCommitTag ""}}
             Tag: {{ ._Service.BuildInfo.CiCommitRefName }}@{{ ._Service.BuildInfo.CiCommitSha }}<br/>
         {{else}}

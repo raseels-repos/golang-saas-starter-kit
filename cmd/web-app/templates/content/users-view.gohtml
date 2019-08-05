@@ -3,88 +3,102 @@
 
 {{end}}
 {{define "content"}}
-    <div class="row">
-        <div class="col">
-            <div class="row">
-                <div class="col-auto">
+
+
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ .user.Name }}</h1>
+        <!-- a href="/user/update" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a -->
+    </div>
+
+
+    <div class="card shadow">
+
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-dark">User Details</h6>
+            <div class="dropdown no-arrow show">
+                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink" x-placement="bottom-end" style="position: absolute; transform: translate3d(-156px, 19px, 0px); top: 0px; left: 0px; will-change: transform;">
+                    <div class="dropdown-header">Actions</div>
+
+                    <a href="{{ .urlUsersUpdate }}" class="dropdown-item">Update Details</a>
+                    {{ $ctxUser := ContextUser $._Ctx }}
+                    {{ if $ctxUser }}
+                        {{ if ne .user.ID $ctxUser.ID }}
+                            <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive User"  class="dropdown-item"></form>
+                        {{ end }}
+                    {{ end }}
+
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+
+
+            <div class="row mt-2">
+                <div class="col-lg-2 mb-2">
                     <img src="{{ .user.Gravatar.Medium }}" alt="gravatar image" class="rounded">
                 </div>
-                <div class="col">
-                    <h4>Name</h4>
-                    <p class="font-14">
-                        {{ .user.Name }}
+
+                <div class="col-md-5">
+                    <p>
+                        <small>Name</small><br/>
+                        <b>{{ .user.Name }}</b>
+                    </p>
+                    <p>
+                        <small>Email</small><br/>
+                        <b>{{ .user.Email }}</b>
+                    </p>
+                    {{if .user.Timezone }}
+                        <p>
+                            <small>Timezone</small><br/>
+                            <b>{{.user.Timezone }}</b>
+                        </p>
+                    {{end}}
+                </div>
+                <div class="col-md-5">
+                    <p>
+                        <small>Role</small><br/>
+                        {{ if .userAccount }}
+                            <b>
+                                {{ range $r := .userAccount.Roles }}
+                                    {{ if eq $r "admin" }}
+                                        <span class="text-pink"><i class="far fa-kiss-wink-heart mr-1"></i>{{ $r }}</span>
+                                    {{else}}
+                                        <span class="text-purple"><i class="far fa-user-circle mr-1"></i>{{ $r }}</span>
+                                    {{end}}
+                                {{ end }}
+                            </b>
+                        {{ end }}
+                    </p>
+                    <p>
+                        <small>Status</small><br/>
+                        {{ if .userAccount }}
+                            <b>
+                                {{ if eq .userAccount.Status.Value "active" }}
+                                    <span class="text-green"><i class="fas fa-circle mr-1"></i>{{ .userAccount.Status.Title }}</span>
+                                {{ else if eq .userAccount.Status.Value "invited" }}
+                                    <span class="text-aqua"><i class="far fa-dot-circle mr-1"></i>{{ .userAccount.Status.Title }}</span>
+                                {{else}}
+                                    <span class="text-orange"><i class="fas fa-circle-notch mr-1"></i>{{.userAccount.Status.Title }}</span>
+                                {{end}}
+                            </b>
+                        {{ end }}
+                    </p>
+                    <p>
+                        <small>ID</small><br/>
+                        <b>{{ .user.ID }}</b>
                     </p>
                 </div>
             </div>
-            <div class="spacer-10"></div>
-            <p class="font-10"><a href="https://gravatar.com" target="_blank">Update Avatar</a></p>
-        </div>
-        <div class="col-auto">
-            <a href="{{ .urlUsersUpdate }}" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
-            {{ $ctxUser := ContextUser $._Ctx }}
-            {{ if $ctxUser }}
-                {{ if ne .user.ID $ctxUser.ID }}
-                    <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive"></form>
-                {{ end }}
-            {{ end }}
+
         </div>
     </div>
 
-    <div class="spacer-30"></div>
 
-    <div class="row">
-        <div class="col-md-6">
-            <p>
-                <small>Name</small><br/>
-                <b>{{ .user.Name }}</b>
-            </p>
-            <p>
-                <small>Email</small><br/>
-                <b>{{ .user.Email }}</b>
-            </p>
-            {{if .user.Timezone }}
-                <p>
-                    <small>Timezone</small><br/>
-                    <b>{{.user.Timezone }}</b>
-                </p>
-            {{end}}
-            <div class="spacer-15"></div>
-        </div>
-        <div class="col-md-6">
-            <p>
-                <small>Role</small><br/>
-                {{ if .userAccount }}
-                    <b>
-                        {{ range $r := .userAccount.Roles }}
-                            {{ if eq $r "admin" }}
-                                <span class="text-pink-dark"><i class="far fa-user-astronaut"></i>{{ $r }}</span>
-                            {{else}}
-                                <span class="text-purple-dark"><i class="fal fa-user"></i>{{ $r }}</span>
-                            {{end}}
-                        {{ end }}
-                    </b>
-                {{ end }}
-            </p>
-            <p>
-                <small>Status</small><br/>
-                {{ if .userAccount }}
-                    <b>
-                        {{ if eq .userAccount.Status.Value "active" }}
-                            <span class="text-green"><i class="fas fa-circle"></i>{{ .userAccount.Status.Title }}</span>
-                        {{ else if eq .userAccount.Status.Value "invited" }}
-                            <span class="text-blue"><i class="fas fa-unicorn"></i>{{ .userAccount.Status.Title }}</span>
-                        {{else}}
-                            <span class="text-orange"><i class="far fa-circle"></i>{{.userAccount.Status.Title }}</span>
-                        {{end}}
-                    </b>
-                {{ end }}
-            </p>
-            <p>
-                <small>ID</small><br/>
-                <b>{{ .user.ID }}</b>
-            </p>
-        </div>
-    </div>
 {{end}}
 {{define "js"}}
 

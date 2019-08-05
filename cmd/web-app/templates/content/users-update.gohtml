@@ -1,10 +1,27 @@
-{{define "title"}}Update Profile{{end}}
+{{define "title"}}Update User {{end}}
 {{define "style"}}
 
 {{end}}
 {{define "content"}}
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Update User</h1>
+    </div>
+
+
     <form class="user" method="post" novalidate>
-        <div class="row">
+
+        <div class="card shadow">
+            <div class="card-body">
+
+                <div class="row mb-2">
+                    <div class="col-12">
+
+                        <h4 class="card-title">User Details</h4>
+                    </div>
+                </div>
+
+                <div class="row mb-2">
             <div class="col-md-6">
                 <div class="form-group">
                     <label for="inputFirstName">First Name</label>
@@ -34,14 +51,40 @@
             </div>
         </div>
 
-        <div class="row">
+                <div class="row">
+                    <div class="col">
+                        <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+                        <a href="/users/{{ .user.ID }}" class="ml-2 btn btn-secondary" >Cancel</a>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+
+    </form>
+
+    <form class="user" method="post" novalidate>
+
+
+        <div class="card mt-4">
+            <div class="card-body">
+
+                <div class="row mb-2">
+                    <div class="col-12">
+
+                        <h4 class="card-title">Change Password</h4>
+                        <p><small><b>Optional</b>. You can change the users' password by specifying a new one below. Otherwise leave the fields empty.</small></p>
+
+                    </div>
+                </div>
+
+                <div class="row mb-2">
             <div class="col-md-6">
-                <h4 class="card-title">Change Password</h4>
-                <p><small><b>Optional</b>. You can change your password by specifying a new one below. Otherwise leave the fields empty.</small></p>
-                <div class="form-group">
+               <div class="form-group">
                     <label for="inputPassword">Password</label>
                     <input type="password" class="form-control" id="inputPassword" placeholder="" name="Password" value="">
-                    <span class="help-block "><small><a a href="javascript:void(0)" id="btnGeneratePassword"><i class="fal fa-random"></i>Generate random password </a></small></span>
+                    <span class="help-block "><small><a a href="javascript:void(0)" id="btnGeneratePassword"><i class="fas fa-random mr-1"></i>Generate random password </a></small></span>
                     {{template "invalid-feedback" dict "validationDefaults" $.passwordValidationDefaults "validationErrors" $.validationErrors "fieldName" "Password" }}
                 </div>
                 <div class="form-group">
@@ -51,12 +94,14 @@
                 </div>
             </div>
         </div>
-        <div class="spacer-30"></div>
-        <div class="row">
-            <div class="col">
-                <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+                <div class="row">
+                    <div class="col">
+                        <input id="btnSubmit2" type="submit" name="action" value="Change Password" class="btn btn-primary btn-sm"/>
+                    </div>
+                </div>
             </div>
         </div>
+
     </form>
 {{end}}
 {{define "js"}}

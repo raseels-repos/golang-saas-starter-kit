@@ -1,10 +1,15 @@
 {{define "title"}}Users{{end}}
 {{define "content"}}
-    <a href="{{ .urlUsersCreate }}">Create User</a>
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Users</h1>
+        <a href="{{ .urlUsersCreate }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-user-plus fa-sm text-white-50 mr-1"></i>Create User</a>
+    </div>
+
     <div class="row">
         <div class="col">
             <form method="post">
-                <div class="card">
+                <div class="card shadow">
                     <div class="table-responsive dataTable_card">
                         {{ template "partials/datatable/html" . }}
                     </div>

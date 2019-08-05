@@ -6,27 +6,35 @@
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">My Profile</h1>
-        <a href="/user/update" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a>
+        <!-- a href="/user/update" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a -->
     </div>
 
 
-    <div class="row">
-        <div class="col">
-            <div class="row">
-                <div class="col-auto">
-                    <img src="{{ .user.Gravatar.Medium }}" alt="gravatar image" class="rounded">
-                </div>
-                <div class="col">
-                    <h4>{{ .user.Name }}</h4>
-                    <p><small><a href="https://gravatar.com" target="_blank">Update Avatar</a></small></p>
-                </div>
+<div class="card shadow">
+
+    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-dark">User Details</h6>
+        <div class="dropdown no-arrow show">
+            <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink" x-placement="bottom-end" style="position: absolute; transform: translate3d(-156px, 19px, 0px); top: 0px; left: 0px; will-change: transform;">
+                <div class="dropdown-header">Actions</div>
+                <a class="dropdown-item" href="/account/update">Update Details</a>
+                <a class="dropdown-item" href="https://gravatar.com" target="_blank">Update Avatar</a>
             </div>
         </div>
     </div>
 
+    <div class="card-body">
 
-    <div class="row mt-5">
-        <div class="col-md-6">
+
+    <div class="row mt-2">
+        <div class="col-lg-2 mb-2">
+            <img src="{{ .user.Gravatar.Medium }}" alt="gravatar image" class="rounded">
+        </div>
+
+        <div class="col-md-5">
             <p>
                 <small>Name</small><br/>
                 <b>{{ .user.Name }}</b>
@@ -42,7 +50,7 @@
                 </p>
             {{end}}
         </div>
-        <div class="col-md-6">
+        <div class="col-md-5">
             <p>
                 <small>Role</small><br/>
                 {{ if .userAccount }}
@@ -77,6 +85,10 @@
             </p>
         </div>
     </div>
+
+    </div>
+</div>
+
 {{end}}
 {{define "js"}}
 

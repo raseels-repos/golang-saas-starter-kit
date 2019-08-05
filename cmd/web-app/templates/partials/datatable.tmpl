@@ -28,7 +28,11 @@
                 serverSide: true,
                 ordering: true,
                 searching: true,
-                ajax: "{{ .datatable.AjaxUrl }}",
+                ajax: {
+                    "url": "{{ .datatable.AjaxUrl }}",
+                    "contentType": "application/json; charset=utf-8",
+                    "dataType": "json"
+                },
                 scrollY: 300,
                 scroller: {
                     loadingIndicator: true

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -25,7 +25,7 @@ import (
 // Users represents the Users API method handler set.
 type Users struct {
 	MasterDB      *sqlx.DB
-	Redis    *redis.Client
+	Redis         *redis.Client
 	Renderer      web.Renderer
 	Authenticator *auth.Authenticator
 	ProjectRoutes project_routes.ProjectRoutes
@@ -33,8 +33,26 @@ type Users struct {
 	SecretKey     string
 }
 
-func UrlUsersView(userID string) string {
+func urlUsersIndex() string {
+	return fmt.Sprintf("/users")
+}
+
+func urlUsersCreate() string {
+	return fmt.Sprintf("/users/create")
+}
+
+func urlUsersView(userID string) string {
 	return fmt.Sprintf("/users/%s", userID)
+}
+
+func urlUsersUpdate(userID string) string {
+	return fmt.Sprintf("/users/%s/update", userID)
+}
+
+// UserLoginRequest extends the AuthenicateRequest with the RememberMe flag.
+type UserCreateRequest struct {
+	user.UserCreateRequest
+	Roles user_account.UserAccountRoles `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 }
 
 // Index handles listing all the users for the current account.
@@ -77,7 +95,25 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 				v.Value = fmt.Sprintf("%d", q.ID)
 			case "name":
 				v.Value = q.Name
-				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", UrlUsersView(q.ID), v.Value)
+				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlUsersView(q.ID), v.Value)
+			case "status":
+				v.Value = q.Status.String()
+
+				var subStatusClass string
+				var subStatusIcon string
+				switch q.Status {
+				case user_account.UserAccountStatus_Active:
+					subStatusClass = "text-green"
+					subStatusIcon = "far fa-dot-circle"
+				case user_account.UserAccountStatus_Invited:
+					subStatusClass = "text-blue"
+					subStatusIcon = "far fa-unicorn"
+				case user_account.UserAccountStatus_Disabled:
+					subStatusClass = "text-orange"
+					subStatusIcon = "far fa-circle"
+				}
+
+				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))
 			case "created_at":
 				dt := web.NewTimeResponse(ctx, q.CreatedAt)
 				v.Value = dt.Local
@@ -97,7 +133,8 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 
 	loadFunc := func(ctx context.Context, sorting string, fields []datatable.DisplayField) (resp [][]datatable.ColumnValue, err error) {
 		res, err := user_account.UserFindByAccount(ctx, claims, h.MasterDB, user_account.UserFindByAccountRequest{
-			Order:      strings.Split(sorting, ","),
+			AccountID: claims.Audience,
+			Order:     strings.Split(sorting, ","),
 		})
 		if err != nil {
 			return resp, err
@@ -132,54 +169,216 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	}
 
 	data := map[string]interface{}{
-		"datatable":  dt.Response(),
+		"datatable":      dt.Response(),
+		"urlUsersCreate": urlUsersCreate(),
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
-// View handles displaying a user.
-func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Create handles creating a new user for the account.
+func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(UserCreateRequest)
 	data := make(map[string]interface{})
-	f := func() error {
-
-		claims, err := auth.ClaimsFromContext(ctx)
-		if err != nil {
-			return err
-		}
-
-		usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
-		if err != nil {
-			return err
-		}
-
-		data["user"] = usr.Response(ctx)
-
-		usrAccs, err := user_account.FindByUserID(ctx, claims, h.MasterDB, claims.Subject, false)
-		if err != nil {
-			return err
-		}
-
-		for _, usrAcc := range usrAccs {
-			if usrAcc.AccountID == claims.Audience {
-				data["userAccount"] = usrAcc.Response(ctx)
-				break
+	f := func() (bool, error) {
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
 			}
+
+			decoder := schema.NewDecoder()
+			decoder.IgnoreUnknownKeys(true)
+
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return false, err
+			}
+
+			// Bypass the uniq check on email here for the moment, it will be caught before the user_account is
+			// created by user.Create.
+			ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
+
+			// Validate the request.
+			err = webcontext.Validator().StructCtx(ctx, req)
+			if err != nil {
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
+			}
+
+			usr, err := user.Create(ctx, claims, h.MasterDB, req.UserCreateRequest, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+			}
+
+			uaStatus := user_account.UserAccountStatus_Active
+			_, err = user_account.Create(ctx, claims, h.MasterDB, user_account.UserAccountCreateRequest{
+				UserID:    usr.ID,
+				AccountID: claims.Audience,
+				Roles:     req.Roles,
+				Status:    &uaStatus,
+			}, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+			}
+
+			// Display a success message to the user.
+			webcontext.SessionFlashSuccess(ctx,
+				"User Created",
+				"User successfully created.")
+			err = webcontext.ContextSession(ctx).Save(r, w)
+			if err != nil {
+				return false, err
+			}
+
+			http.Redirect(w, r, urlUsersView(usr.ID), http.StatusFound)
+			return true, nil
 		}
 
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
 		return nil
 	}
 
-	if err := f(); err != nil {
-		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	if err != nil {
+		return err
 	}
+
+	var roleValues []interface{}
+	for _, v := range user_account.UserAccountRole_Values {
+		roleValues = append(roleValues, string(v))
+	}
+	data["roles"] = web.NewEnumResponse(ctx, nil, roleValues...)
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(UserCreateRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-create.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// View handles displaying a user.
+func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	userID := params["user_id"]
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	data := make(map[string]interface{})
+	f := func() (bool, error) {
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
+			}
+
+			switch r.PostForm.Get("action") {
+			case "archive":
+				err = user.Archive(ctx, claims, h.MasterDB, user.UserArchiveRequest{
+					ID: userID,
+				}, ctxValues.Now)
+				if err != nil {
+					return false, err
+				}
+
+				webcontext.SessionFlashSuccess(ctx,
+					"User Archive",
+					"User successfully archive.")
+				err = webcontext.ContextSession(ctx).Save(r, w)
+				if err != nil {
+					return false, err
+				}
+
+				http.Redirect(w, r, urlUsersIndex(), http.StatusFound)
+				return true, nil
+			}
+		}
+
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
+	}
+
+	usr, err := user.ReadByID(ctx, claims, h.MasterDB, userID)
+	if err != nil {
+		return err
+	}
+
+	data["user"] = usr.Response(ctx)
+
+	usrAccs, err := user_account.FindByUserID(ctx, claims, h.MasterDB, userID, false)
+	if err != nil {
+		return err
+	}
+
+	for _, usrAcc := range usrAccs {
+		if usrAcc.AccountID == claims.Audience {
+			data["userAccount"] = usrAcc.Response(ctx)
+			break
+		}
+	}
+
+	data["urlUsersUpdate"] = urlUsersUpdate(userID)
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-view.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
 // Update handles updating a user for the account.
 func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	userID := params["user_id"]
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -207,7 +406,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			if err := decoder.Decode(req, r.PostForm); err != nil {
 				return false, err
 			}
-			req.ID = claims.Subject
+			req.ID = userID
 
 			err = user.Update(ctx, claims, h.MasterDB, *req, ctxValues.Now)
 			if err != nil {
@@ -228,7 +427,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				if err := decoder.Decode(pwdReq, r.PostForm); err != nil {
 					return false, err
 				}
-				pwdReq.ID = claims.Subject
+				pwdReq.ID = userID
 
 				err = user.UpdatePassword(ctx, claims, h.MasterDB, *pwdReq, ctxValues.Now)
 				if err != nil {
@@ -253,7 +452,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				return false, err
 			}
 
-			http.Redirect(w, r, "/users/"+req.ID, http.StatusFound)
+			http.Redirect(w, r, urlUsersView(req.ID), http.StatusFound)
 			return true, nil
 		}
 
@@ -267,7 +466,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
+	usr, err := user.ReadByID(ctx, claims, h.MasterDB, userID)
 	if err != nil {
 		return err
 	}
@@ -298,4 +497,3 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-update.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
-

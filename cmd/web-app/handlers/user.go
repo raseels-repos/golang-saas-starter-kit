@@ -53,17 +53,17 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 	//
 	req := new(UserLoginRequest)
 	data := make(map[string]interface{})
-	f := func() error {
+	f := func() (bool, error) {
 
 		if r.Method == http.MethodPost {
 			err := r.ParseForm()
 			if err != nil {
-				return err
+				return false,err
 			}
 
 			decoder := schema.NewDecoder()
 			if err := decoder.Decode(req, r.PostForm); err != nil {
-				return err
+				return false,err
 			}
 
 			sessionTTL := time.Hour
@@ -76,13 +76,16 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrForbidden:
-					return web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+					return false,web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+				case user_auth.ErrAuthenticationFailure:
+					data["error"] = weberror.NewErrorMessage(ctx, err, http.StatusUnauthorized, "Authentication failure. Try again.")
+					return false, nil
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
-						return nil
+						return false,nil
 					} else {
-						return err
+						return false,err
 					}
 				}
 			}
@@ -90,26 +93,30 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			// Add the token to the users session.
 			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
-				return err
+				return false,err
 			}
 
 			redirectUri := "/"
 			if qv := r.URL.Query().Get("redirect"); qv != "" {
 				redirectUri, err = url.QueryUnescape(qv)
 				if err != nil {
-					return err
+					return false,err
 				}
 			}
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, redirectUri, http.StatusFound)
+			return true, nil
 		}
 
-		return nil
+		return false, nil
 	}
 
-	if err := f(); err != nil {
+	end, err := f()
+	if err != nil {
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
 	}
 
 	data["form"] = req

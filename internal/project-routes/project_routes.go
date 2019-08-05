@@ -40,8 +40,14 @@ func (r ProjectRoutes) WebApiUrl(urlPath string) string {
 	return u.String()
 }
 
-func (r ProjectRoutes) UserResetPassword(resetId string) string {
+func (r ProjectRoutes) UserResetPassword(resetHash string) string {
 	u := r.webAppUrl
-	u.Path = "/user/reset-password/" + resetId
+	u.Path = "/user/reset-password/" + resetHash
+	return u.String()
+}
+
+func (r ProjectRoutes) UserInviteAccept(inviteHash string) string {
+	u := r.webAppUrl
+	u.Path = "/users/invite/" + inviteHash
 	return u.String()
 }

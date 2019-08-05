@@ -230,6 +230,9 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 				return err
 			}
 
+			// Append the query param value to the request.
+			req.ResetHash = params["hash"]
+
 			u, err := user.ResetConfirm(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
@@ -267,8 +270,6 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
-		} else {
-			req.ResetHash = params["hash"]
 		}
 
 		return nil

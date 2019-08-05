@@ -3,9 +3,14 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"net/http"
 	"strings"
+	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"github.com/dustin/go-humanize/english"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
@@ -63,12 +68,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
-	var statusValues []interface{}
-	for _, v := range user_account.UserAccountStatus_Values {
-		statusValues = append(statusValues, string(v))
-	}
-
-	statusOpts := web.NewEnumResponse(ctx, nil, statusValues...)
+	statusOpts := web.NewEnumResponse(ctx, nil, user_account.UserAccountStatus_ValuesInterface())
 
 	statusFilterItems := []datatable.FilterOptionItem{}
 	for _, opt := range statusOpts.Options {
@@ -496,4 +496,221 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-update.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// Invite handles sending invites for users to the account.
+func (h *Users) Invite(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(invite.SendUserInvitesRequest)
+	data := make(map[string]interface{})
+	f := func() (bool, error) {
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
+			}
+
+			decoder := schema.NewDecoder()
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return false, err
+			}
+
+			req.UserID = claims.Subject
+			req.AccountID = claims.Audience
+
+			res, err := invite.SendUserInvites(ctx, claims, h.MasterDB, h.ProjectRoutes.UserInviteAccept, h.NotifyEmail, *req, h.SecretKey, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+			}
+
+			// Display a success message to the user.
+			inviteCnt := len(res)
+			if inviteCnt > 0 {
+				webcontext.SessionFlashSuccess(ctx,
+					fmt.Sprintf("%s Invited", english.PluralWord(inviteCnt, "User", "")),
+					fmt.Sprintf("%s successfully invited. %s been sent to them to join your account.",
+						english.Plural(inviteCnt, "user", ""),
+						english.PluralWord(inviteCnt, "An email has", "Emails have")))
+			} else {
+				webcontext.SessionFlashWarning(ctx,
+					"Users not Invited",
+					"No users were invited.")
+			}
+
+
+			err = webcontext.ContextSession(ctx).Save(r, w)
+			if err != nil {
+				return false, err
+			}
+
+			http.Redirect(w, r, urlUsersIndex(), http.StatusFound)
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
+	}
+
+	var selectedRoles []interface{}
+	for _, r := range req.Roles {
+		selectedRoles = append(selectedRoles, r.String())
+	}
+	data["roles"] = web.NewEnumMultiResponse(ctx, selectedRoles, user_account.UserAccountRole_ValuesInterface()...)
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(invite.SendUserInvitesRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-invite.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// Invite handles sending invites for users to the account.
+func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	inviteHash := params["hash"]
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(invite.AcceptInviteRequest)
+	data := make(map[string]interface{})
+	f := func() (bool, error) {
+
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
+			}
+
+			decoder := schema.NewDecoder()
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return false, err
+			}
+
+			// Append the query param value to the request.
+			req.InviteHash = inviteHash
+
+			err = invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+			}
+
+			// Authenticated the user. Probably should use the default session TTL from UserLogin.
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			if err != nil {
+				switch errors.Cause(err) {
+				case account.ErrForbidden:
+					return false,  web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+				default:
+					if verr, ok := weberror.NewValidationError(ctx, err); ok {
+						data["validationErrors"] = verr.(*weberror.Error)
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+			}
+
+			// Add the token to the users session.
+			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
+			if err != nil {
+				return false, err
+			}
+
+			// Redirect the user to the dashboard.
+			http.Redirect(w, r, "/", http.StatusFound)
+			return true, nil
+		}
+
+		hash, err := invite.ParseInviteHash(ctx, h.SecretKey, inviteHash,  ctxValues.Now)
+		if err != nil {
+			switch errors.Cause(err) {
+			case invite.ErrInviteExpired:
+				webcontext.SessionFlashError(ctx,
+					"Invite Expired",
+					"The invite has expired.")
+				return false, nil
+			case invite.ErrInviteUserPasswordSet:
+				webcontext.SessionFlashError(ctx,
+					"Invite already Accepted",
+					"The invite has already been accepted. Try to login or use forgot password.")
+				http.Redirect(w, r, "/user/login", http.StatusFound)
+				return true, nil
+			default:
+				return false, err
+			}
+		}
+
+		// Read user by ID with no claims.
+		usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, hash.UserID)
+		if err != nil {
+			return false, err
+		}
+		data["user"] = usr.Response(ctx)
+
+		if req.Email == "" {
+			req.FirstName = usr.FirstName
+			req.LastName = usr.LastName
+			req.Email = usr.Email
+
+			if usr.Timezone != "" {
+				req.Timezone = &usr.Timezone
+			}
+		}
+
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
+	}
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(invite.AcceptInviteRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-invite-accept.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

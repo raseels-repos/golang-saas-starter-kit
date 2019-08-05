@@ -16,7 +16,7 @@
                     <label for="selectStatus">Status</label>
                     <select class="form-control {{ ValidationFieldClass $.validationErrors "Status" }}"
                             id="selectStatus" name="Status">
-                        {{ range $idx, $t := .project.Status.Options }}
+                        {{ range $t := .project.Status.Options }}
                             <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
                         {{ end }}
                     </select>

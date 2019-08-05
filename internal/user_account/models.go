@@ -328,6 +328,10 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 		Gravatar:  web.NewGravatarResponse(ctx, m.Email),
 	}
 
+	if r.Name == "" {
+		r.Name = r.Email
+	}
+
 	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {
 		at := web.NewTimeResponse(ctx, m.ArchivedAt.Time)
 		r.ArchivedAt = &at

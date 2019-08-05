@@ -1,0 +1,86 @@
+{{define "title"}}Invite Users{{end}}
+{{define "content"}}
+    <form method="POST">
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="inputEmail">Email for Invite 1</label>
+                            <input type="text" class="form-control invite-user-email" placeholder="enter email" name="Emails" value="">
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="selectRoles">Roles</label>
+                            <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}"
+                                    id="selectRoles" name="Roles" multiple="multiple">
+                                {{ range $t := .roles }}
+                                    <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
+                                {{ end }}
+                            </select>
+                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Roles" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="spacer-30"></div>
+
+        <div class="row">
+            <div class="col">
+                <input id="btnSubmit" type="submit" value="Invite Users" class="btn btn-primary"/>
+            </div>
+        </div>
+
+    </form>
+{{end}}
+{{ define "js" }}
+    <script>
+        function addAnotherEmail(el) {
+            if ($(el).val() == '') {
+                return;
+            }
+
+            cnt = 0;
+            $( "input.invite-user-email" ).each(function( index ) {
+                cnt = cnt + 1;
+            });
+            cnt = cnt + 1;
+
+            newId = 'inviteUser'+cnt;
+            newHtml = '';
+            newHtml = newHtml + '<div class="form-group">';
+            newHtml = newHtml + '<label for="inputEmail">Email for Invite '+cnt+'</label>';
+            newHtml = newHtml + '<input type="text" class="form-control invite-user-email" placeholder="enter email" name="Emails" value="">';
+            newHtml = newHtml + '</div>';
+            $(el).closest('div.card-body').append(newHtml);
+            $(el).unbind( "blur" );
+
+            $('#'+newId).on("blur", function() {
+                addAnotherEmail($(this));
+            });
+        }
+
+        $(document).ready(function(){
+            $("#inviteUser1").on("blur", function() {
+                addAnotherEmail($(this));
+            });
+
+            $("#inputRole").on("change", function() {
+                if ($(this).val() == 'admin') {
+                    $('#userProcedures').hide();
+                } else {
+                    $('#userProcedures').show();
+                }
+            }).change();
+        });
+    </script>
+{{ end }}

@@ -1,0 +1,65 @@
+{{define "title"}}Invite Accept{{end}}
+{{define "description"}}{{end}}
+{{define "style"}}
+
+{{end}}
+{{ define "partials/app-wrapper" }}
+    <div class="container" id="page-content">
+
+        <!-- Outer Row -->
+        <div class="row justify-content-center">
+
+            <div class="col-xl-10 col-lg-12 col-md-9">
+
+                <div class="card o-hidden border-0 shadow-lg my-5">
+                    <div class="card-body p-0">
+                        <!-- Nested Row within Card Body -->
+                        <div class="row">
+                            <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
+                            <div class="col-lg-6">
+                                <div class="p-5">
+                                    {{ template "app-flashes" . }}
+
+                                    <div class="text-center">
+                                        <h1 class="h4 text-gray-900 mb-2">Invite Accept</h1>
+                                        <p class="mb-4">.....</p>
+                                    </div>
+
+                                    {{ template "validation-error" . }}
+
+                                    <form class="user" method="post" novalidate>
+                                        <input type="hidden" name="ResetHash" value="{{ $.form.ResetHash }}" />
+                                        <div class="form-group row">
+                                            <div class="col-sm-6 mb-3 mb-sm-0">
+                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Password" }}" name="Password" value="{{ $.form.Password }}" placeholder="Password" required>
+                                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Password" }}
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "PasswordConfirm" }}" name="PasswordConfirm" value="{{ $.form.PasswordConfirm }}" placeholder="Repeat Password" required>
+                                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "PasswordConfirm" }}
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-primary btn-user btn-block">
+                                            Join
+                                        </button>
+                                        <hr>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+{{end}}
+{{define "js"}}
+    <script>
+        $(document).ready(function() {
+            $(document).find('body').addClass('bg-gradient-primary');
+        });
+    </script>
+{{end}}

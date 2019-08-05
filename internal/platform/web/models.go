@@ -116,6 +116,34 @@ func NewEnumResponse(ctx context.Context, value interface{}, options ...interfac
 	return er
 }
 
+// EnumResponse is a response friendly format for displaying a multi select enum.
+type EnumMultiResponse []EnumOption
+
+// NewEnumMultiResponse returns a display friendly format for a multi enum field.
+func NewEnumMultiResponse(ctx context.Context, selected []interface{}, options ...interface{}) EnumMultiResponse {
+	var er  EnumMultiResponse
+
+	for _, opt := range options {
+		optStr := fmt.Sprintf("%s", opt)
+		opt := EnumOption{
+			Value: optStr,
+			Title: EnumValueTitle(optStr),
+		}
+
+		for _, s := range selected {
+			selStr := fmt.Sprintf("%s", s)
+			if optStr == selStr {
+				opt.Selected = true
+			}
+		}
+
+
+		er = append(er, opt)
+	}
+
+	return er
+}
+
 // EnumValueTitle formats a string value for display.
 func EnumValueTitle(v string) string {
 	v = strings.Replace(v, "_", " ", -1)

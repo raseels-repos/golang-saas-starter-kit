@@ -3,7 +3,6 @@ package invite
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sudo-suhas/symcrypto"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
@@ -149,30 +147,15 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 
 	var inviteHashes []string
 	for email, userID := range emailUserIDs {
-
-		// Generate a string that embeds additional information.
-		hashPts := []string{
-			userID,
-			strconv.Itoa(int(now.UTC().Unix())),
-			strconv.Itoa(int(now.UTC().Add(req.TTL).Unix())),
-			requestIp,
-		}
-		hashStr := strings.Join(hashPts, "|")
-
-		// This returns the nonce appended with the encrypted string.
-		crypto, err := symcrypto.New(secretKey)
+		hash, err := NewInviteHash(ctx, secretKey, userID, requestIp, req.TTL, now)
 		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		encrypted, err := crypto.Encrypt(hashStr)
-		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
 
 		data := map[string]interface{}{
 			"FromUser": fromUser.Response(ctx),
 			"Account":  account.Response(ctx),
-			"Url":      resetUrl(encrypted),
+			"Url":      resetUrl(hash),
 			"Minutes":  req.TTL.Minutes(),
 		}
 
@@ -184,7 +167,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 			return nil, err
 		}
 
-		inviteHashes = append(inviteHashes, encrypted)
+		inviteHashes = append(inviteHashes, hash)
 	}
 
 	return inviteHashes, nil
@@ -203,32 +186,8 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		return err
 	}
 
-	crypto, err := symcrypto.New(secretKey)
+	hash, err := ParseInviteHash(ctx, secretKey, req.InviteHash, now)
 	if err != nil {
-		return errors.WithStack(err)
-	}
-	hashStr, err := crypto.Decrypt(req.InviteHash)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	hashPts := strings.Split(hashStr, "|")
-
-	var hash InviteHash
-	if len(hashPts) == 4 {
-		hash.UserID = hashPts[0]
-		hash.CreatedAt, _ = strconv.Atoi(hashPts[1])
-		hash.ExpiresAt, _ = strconv.Atoi(hashPts[2])
-		hash.RequestIP = hashPts[3]
-	}
-
-	// Validate the hash.
-	err = v.StructCtx(ctx, hash)
-	if err != nil {
-		return err
-	}
-
-	if int64(hash.ExpiresAt) < now.UTC().Unix() {
-		err = errors.WithMessage(ErrInviteExpired, "Invite has expired.")
 		return err
 	}
 
@@ -251,6 +210,7 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 
 	err = user.Update(ctx, auth.Claims{}, dbConn, user.UserUpdateRequest{
 		ID:        hash.UserID,
+		Email:    &req.Email,
 		FirstName: &req.FirstName,
 		LastName:  &req.LastName,
 		Timezone:  req.Timezone,

@@ -2,14 +2,15 @@ package invite
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/pkg/errors"
 	"github.com/sudo-suhas/symcrypto"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 )
 
 // SendUserInvitesRequest defines the data needed to make an invite request.
@@ -24,6 +25,7 @@ type SendUserInvitesRequest struct {
 // InviteHash
 type InviteHash struct {
 	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	CreatedAt int    `json:"created_at" validate:"required"`
 	ExpiresAt int    `json:"expires_at" validate:"required"`
 	RequestIP string `json:"request_ip" validate:"required,ip" example:"69.56.104.36"`
@@ -32,7 +34,7 @@ type InviteHash struct {
 // AcceptInviteRequest defines the fields need to complete an invite request.
 type AcceptInviteRequest struct {
 	InviteHash      string  `json:"invite_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	Email      string            `json:"email" validate:"required,email" example:"gabi@geeksinthewoods.com"`
+	Email           string  `json:"email" validate:"required,email" example:"gabi@geeksinthewoods.com"`
 	FirstName       string  `json:"first_name" validate:"required" example:"Gabi"`
 	LastName        string  `json:"last_name" validate:"required" example:"May"`
 	Password        string  `json:"password" validate:"required" example:"SecretString"`
@@ -41,16 +43,16 @@ type AcceptInviteRequest struct {
 }
 
 // NewInviteHash generates a new encrypt invite hash that is web safe for use in URLs.
-func NewInviteHash(ctx context.Context, secretKey string, userID, requestIp string, ttl time.Duration, now time.Time) (string, error) {
+func NewInviteHash(ctx context.Context, secretKey, userID, accountID, requestIp string, ttl time.Duration, now time.Time) (string, error) {
 	// Generate a string that embeds additional information.
 	hashPts := []string{
 		userID,
+		accountID,
 		strconv.Itoa(int(now.UTC().Unix())),
 		strconv.Itoa(int(now.UTC().Add(ttl).Unix())),
 		requestIp,
 	}
 	hashStr := strings.Join(hashPts, "|")
-
 
 	// This returns the nonce appended with the encrypted string.
 	crypto, err := symcrypto.New(secretKey)
@@ -77,12 +79,15 @@ func ParseInviteHash(ctx context.Context, secretKey string, str string, now time
 	}
 	hashPts := strings.Split(hashStr, "|")
 
+	fmt.Println(hashPts)
+
 	var hash InviteHash
-	if len(hashPts) == 4 {
+	if len(hashPts) == 5 {
 		hash.UserID = hashPts[0]
-		hash.CreatedAt, _ = strconv.Atoi(hashPts[1])
-		hash.ExpiresAt, _ = strconv.Atoi(hashPts[2])
-		hash.RequestIP = hashPts[3]
+		hash.AccountID = hashPts[1]
+		hash.CreatedAt, _ = strconv.Atoi(hashPts[2])
+		hash.ExpiresAt, _ = strconv.Atoi(hashPts[3])
+		hash.RequestIP = hashPts[4]
 	}
 
 	// Validate the hash.

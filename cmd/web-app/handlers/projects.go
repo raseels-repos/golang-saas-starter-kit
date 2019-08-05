@@ -49,7 +49,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return err
 	}
 
-	statusOpts := web.NewEnumResponse(ctx, nil,  project.ProjectStatus_ValuesInterface()...)
+	statusOpts := web.NewEnumResponse(ctx, nil, project.ProjectStatus_ValuesInterface()...)
 
 	statusFilterItems := []datatable.FilterOptionItem{}
 	for _, opt := range statusOpts.Options {

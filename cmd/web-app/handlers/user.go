@@ -58,12 +58,12 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 		if r.Method == http.MethodPost {
 			err := r.ParseForm()
 			if err != nil {
-				return false,err
+				return false, err
 			}
 
 			decoder := schema.NewDecoder()
 			if err := decoder.Decode(req, r.PostForm); err != nil {
-				return false,err
+				return false, err
 			}
 
 			sessionTTL := time.Hour
@@ -76,16 +76,16 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrForbidden:
-					return false,web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+					return false, web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 				case user_auth.ErrAuthenticationFailure:
 					data["error"] = weberror.NewErrorMessage(ctx, err, http.StatusUnauthorized, "Authentication failure. Try again.")
 					return false, nil
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
-						return false,nil
+						return false, nil
 					} else {
-						return false,err
+						return false, err
 					}
 				}
 			}
@@ -93,14 +93,14 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			// Add the token to the users session.
 			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
-				return false,err
+				return false, err
 			}
 
 			redirectUri := "/"
 			if qv := r.URL.Query().Get("redirect"); qv != "" {
 				redirectUri, err = url.QueryUnescape(qv)
 				if err != nil {
-					return false,err
+					return false, err
 				}
 			}
 
@@ -426,7 +426,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		req.FirstName = &usr.FirstName
 		req.LastName = &usr.LastName
 		req.Email = &usr.Email
-		req.Timezone = &usr.Timezone
+		req.Timezone = usr.Timezone
 	}
 
 	data["user"] = usr.Response(ctx)

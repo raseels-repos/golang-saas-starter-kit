@@ -280,7 +280,7 @@ type User struct {
 	FirstName  string            `json:"first_name" validate:"required" example:"Gabi"`
 	LastName   string            `json:"last_name" validate:"required" example:"May"`
 	Email      string            `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
-	Timezone   string            `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
+	Timezone   *string           `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
 	AccountID  string            `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 	Status     UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
@@ -319,13 +319,16 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 		FirstName: m.FirstName,
 		LastName:  m.LastName,
 		Email:     m.Email,
-		Timezone:  m.Timezone,
 		AccountID: m.AccountID,
 		Roles:     m.Roles,
 		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountStatus_Values),
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 		Gravatar:  web.NewGravatarResponse(ctx, m.Email),
+	}
+
+	if m.Timezone != nil {
+		r.Timezone = *m.Timezone
 	}
 
 	if r.Name == "" {

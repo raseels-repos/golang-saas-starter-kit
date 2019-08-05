@@ -585,5 +585,25 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 				return nil
 			},
 		},
+		// Remove default value for users.timezone.
+		{
+			ID: "20190805-01",
+			Migrate: func(tx *sql.Tx) error {
+				q1 := `ALTER TABLE users ALTER COLUMN timezone DROP DEFAULT`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
+				}
+
+				q2 := `ALTER TABLE users ALTER COLUMN timezone DROP NOT NULL`
+				if _, err := tx.Exec(q2); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q2)
+				}
+
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				return nil
+			},
+		},
 	}
 }

@@ -21,6 +21,12 @@ var (
 	// ErrInviteExpired occurs when the the reset hash exceeds the expiration.
 	ErrInviteExpired = errors.New("Invite expired")
 
+	// ErrNoPendingInvite occurs when the user does not have an entry in user_accounts with status pending.
+	ErrNoPendingInvite = errors.New("No pending invite.")
+
+	// ErrUserAccountActive occurs when the user already has an active user_account entry.
+	ErrUserAccountActive = errors.New("User already active.")
+
 	// ErrInviteUserPasswordSet occurs when the the reset hash exceeds the expiration.
 	ErrInviteUserPasswordSet = errors.New("User password set")
 )
@@ -147,7 +153,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 
 	var inviteHashes []string
 	for email, userID := range emailUserIDs {
-		hash, err := NewInviteHash(ctx, secretKey, userID, requestIp, req.TTL, now)
+		hash, err := NewInviteHash(ctx, secretKey, userID, req.AccountID, requestIp, req.TTL, now)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +180,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 }
 
 // AcceptInvite updates the user using the provided invite hash.
-func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) error {
+func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) (string, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInvite")
 	defer span.Finish()
 
@@ -183,40 +189,59 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 	// Validate the request.
 	err := v.StructCtx(ctx, req)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	hash, err := ParseInviteHash(ctx, secretKey, req.InviteHash, now)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	u, err := user.Read(ctx, auth.Claims{}, dbConn,
 		user.UserReadRequest{ID: hash.UserID, IncludeArchived: true})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if u.ArchivedAt != nil && !u.ArchivedAt.Time.IsZero() {
 		err = user.Restore(ctx, auth.Claims{}, dbConn, user.UserRestoreRequest{ID: hash.UserID}, now)
 		if err != nil {
-			return err
+			return "", err
 		}
-	} else if len(u.PasswordHash) > 0 {
-		// Do not update the password for a user that already has a password set.
-		err = errors.WithMessage(ErrInviteUserPasswordSet, "Invite user already has a password set.")
-		return err
 	}
 
+	usrAcc, err := user_account.Read(ctx, auth.Claims{}, dbConn, user_account.UserAccountReadRequest{
+		UserID:    hash.UserID,
+		AccountID: hash.AccountID,
+	})
+	if err != nil {
+		return "", nil
+	}
+
+	// Ensure the entry has the status of invited.
+	if usrAcc.Status != user_account.UserAccountStatus_Invited {
+		// If the entry is already active
+		if usrAcc.Status == user_account.UserAccountStatus_Active {
+			return u.ID, errors.WithStack(ErrUserAccountActive)
+		}
+		return "", errors.WithStack(ErrNoPendingInvite)
+	}
+
+	if len(u.PasswordHash) > 0 {
+		// Do not update the password for a user that already has a password set.
+		return "", errors.WithStack(ErrInviteUserPasswordSet)
+	}
+
+	// These two calls, user.Update and user.UpdatePassword should probably be in a transaction!
 	err = user.Update(ctx, auth.Claims{}, dbConn, user.UserUpdateRequest{
 		ID:        hash.UserID,
-		Email:    &req.Email,
+		Email:     &req.Email,
 		FirstName: &req.FirstName,
 		LastName:  &req.LastName,
 		Timezone:  req.Timezone,
 	}, now)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = user.UpdatePassword(ctx, auth.Claims{}, dbConn, user.UserUpdatePasswordRequest{
@@ -225,8 +250,18 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		PasswordConfirm: req.PasswordConfirm,
 	}, now)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	activeStatus := user_account.UserAccountStatus_Active
+	err = user_account.Update(ctx, auth.Claims{}, dbConn, user_account.UserAccountUpdateRequest{
+		UserID:    usrAcc.UserID,
+		AccountID: usrAcc.AccountID,
+		Status:    &activeStatus,
+	}, now)
+	if err != nil {
+		return "", err
+	}
+
+	return hash.UserID, nil
 }

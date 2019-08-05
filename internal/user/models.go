@@ -19,7 +19,7 @@ type User struct {
 	PasswordSalt  string          `json:"-" validate:"required"`
 	PasswordHash  []byte          `json:"-" validate:"required"`
 	PasswordReset *sql.NullString `json:"-"`
-	Timezone      string          `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
+	Timezone      *string         `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
 	CreatedAt     time.Time       `json:"created_at"`
 	UpdatedAt     time.Time       `json:"updated_at"`
 	ArchivedAt    *pq.NullTime    `json:"archived_at,omitempty"`
@@ -52,10 +52,13 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 		FirstName: m.FirstName,
 		LastName:  m.LastName,
 		Email:     m.Email,
-		Timezone:  m.Timezone,
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 		Gravatar:  web.NewGravatarResponse(ctx, m.Email),
+	}
+
+	if m.Timezone != nil {
+		r.Timezone = *m.Timezone
 	}
 
 	if m.ArchivedAt != nil && !m.ArchivedAt.Time.IsZero() {

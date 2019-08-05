@@ -14,6 +14,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/dustin/go-humanize/english"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
@@ -21,6 +22,7 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Users represents the Users API method handler set.
@@ -64,7 +66,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
-	statusOpts := web.NewEnumResponse(ctx, nil, user_account.UserAccountStatus_ValuesInterface())
+	statusOpts := web.NewEnumResponse(ctx, nil, user_account.UserAccountStatus_ValuesInterface()...)
 
 	statusFilterItems := []datatable.FilterOptionItem{}
 	for _, opt := range statusOpts.Options {
@@ -471,7 +473,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		req.FirstName = &usr.FirstName
 		req.LastName = &usr.LastName
 		req.Email = &usr.Email
-		req.Timezone = &usr.Timezone
+		req.Timezone = usr.Timezone
 	}
 
 	data["user"] = usr.Response(ctx)
@@ -552,7 +554,6 @@ func (h *Users) Invite(ctx context.Context, w http.ResponseWriter, r *http.Reque
 					"No users were invited.")
 			}
 
-
 			err = webcontext.ContextSession(ctx).Save(r, w)
 			if err != nil {
 				return false, err
@@ -616,9 +617,30 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			// Append the query param value to the request.
 			req.InviteHash = inviteHash
 
-			err = invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			userID, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
+				case invite.ErrInviteExpired:
+					webcontext.SessionFlashError(ctx,
+						"Invite Expired",
+						"The invite has expired.")
+					return false, nil
+				case invite.ErrUserAccountActive:
+					webcontext.SessionFlashError(ctx,
+						"User already Active",
+						"The user already is already active for the account. Try to login or use forgot password.")
+					http.Redirect(w, r, "/user/login", http.StatusFound)
+					return true, nil
+				case invite.ErrInviteUserPasswordSet:
+					webcontext.SessionFlashError(ctx,
+						"Invite already Accepted",
+						"The invite has already been accepted. Try to login or use forgot password.")
+					http.Redirect(w, r, "/user/login", http.StatusFound)
+					return true, nil
+				case user_account.ErrNotFound:
+					return false, err
+				case invite.ErrNoPendingInvite:
+					return false, err
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
@@ -629,20 +651,20 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 				}
 			}
 
-			/*
-			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			// Load the user without any claims applied.
+			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, userID)
 			if err != nil {
-				switch errors.Cause(err) {
-				case account.ErrForbidden:
-					return false,  web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
-				default:
-					if verr, ok := weberror.NewValidationError(ctx, err); ok {
-						data["validationErrors"] = verr.(*weberror.Error)
-						return false, nil
-					} else {
-						return false, err
-					}
+				return false, err
+			}
+
+			// Authenticated the user. Probably should use the default session TTL from UserLogin.
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, usr.Email, req.Password, time.Hour, ctxValues.Now)
+			if err != nil {
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
 				}
 			}
 
@@ -651,15 +673,13 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			if err != nil {
 				return false, err
 			}
-			
-			 */
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
 			return true, nil
 		}
 
-		hash, err := invite.ParseInviteHash(ctx, h.SecretKey, inviteHash,  ctxValues.Now)
+		hash, err := invite.ParseInviteHash(ctx, h.SecretKey, inviteHash, ctxValues.Now)
 		if err != nil {
 			switch errors.Cause(err) {
 			case invite.ErrInviteExpired:
@@ -674,7 +694,12 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 				http.Redirect(w, r, "/user/login", http.StatusFound)
 				return true, nil
 			default:
-				return false, err
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
 			}
 		}
 
@@ -689,10 +714,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			req.FirstName = usr.FirstName
 			req.LastName = usr.LastName
 			req.Email = usr.Email
-
-			if usr.Timezone != "" {
-				req.Timezone = &usr.Timezone
-			}
+			req.Timezone = usr.Timezone
 		}
 
 		return false, nil
@@ -705,11 +727,16 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
+	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	if err != nil {
+		return err
+	}
+
 	data["form"] = req
 
 	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(invite.AcceptInviteRequest{})); ok {
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-invite-accept.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-invite-accept.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

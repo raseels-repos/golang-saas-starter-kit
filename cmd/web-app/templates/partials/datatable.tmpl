@@ -1,0 +1,136 @@
+{{ define "partials/datatable/html" }}
+    <table id="dataTable" class="display nowrap table table-hover table-striped table-bordered" cellspacing="0" width="100%">
+        <thead>
+        <tr>
+            {{ range $idx, $c := .datatable.DisplayFields }}
+                <th>{{ $c.Title }}</th>
+            {{ end }}
+        </tr>
+        </thead>
+        <tfoot>
+        <tr>
+            {{ range $idx, $c := .datatable.DisplayFields }}
+                <th>{{ $c.Title }}</th>
+            {{ end }}
+        </tr>
+        </tfoot>
+    </table>
+{{ end }}
+{{ define "partials/datatable/style" }}
+    <link href="{{ SiteAssetUrl "/assets/vendor/datatables/dataTables.bootstrap4.min.css" }}" rel="stylesheet">
+{{ end }}
+{{ define "partials/datatable/js" }}
+    <!-- This is data table -->
+    <script src="{{ SiteAssetUrl "/assets/vendor/datatables/jquery.dataTables.min.js" }}"></script>
+    <script>
+        $(document).ready(function() {
+            var dtbl = $('#dataTable').DataTable( {
+                serverSide: true,
+                ordering: true,
+                searching: true,
+                ajax: "{{ .datatable.AjaxUrl }}",
+                scrollY: 300,
+                scroller: {
+                    loadingIndicator: true
+                },
+                scrollX: true,
+                stateSave: false,
+                "columnDefs": [
+                    {{ range $idx, $c := .datatable.DisplayFields }}
+                    { "title": "{{ $c.Title }}",  "name": "{{ $c.Field }}", "visible": {{ $c.Visible }}, "searchable": {{ $c.Searchable }}, "orderable": {{ $c.Orderable }}, "targets": {{ $idx }} },
+                    {{ end }}
+                ],
+                initComplete: function () {
+                    {{ range $idx, $c := .datatable.DisplayFields }}
+                    {{ if or $c.Filterable $c.AutocompletePath }}
+
+                    this.api().columns({{ $idx }}).every( function (colIdx) {
+                        var column = this;
+
+                        {{ if or ($c.AutocompletePath) ($c.FilterItems) }}
+                        var select = $('<select><option value="">{{ $c.FilterPlaceholder }}</option></select>')
+                            .appendTo( $(column.footer()).empty() )
+                            .on( 'change', function () {
+                                var val = $.fn.dataTable.util.escapeRegex(
+                                    $(this).val()
+                                );
+
+                                column
+                                    .search(val ? '^' + val + '$' : '', true, false)
+                                    .draw();
+                            } );
+                        {{ if $c.AutocompletePath }}
+                        $.ajax({
+                            type: "GET",
+                            url: '{{ $c.AutocompletePath }}',
+                            dataType: "json",
+                            success: function (data) {
+                                for (var k in data.suggestions) {
+                                    kv = data.suggestions[k]
+                                    select.append( '<option value="'+kv.value+'">'+kv.data+'</option>' )
+                                }
+                            }
+                        });
+                        {{ else }}
+                        {{ range $idx, $item := $c.FilterItems }}
+                        select.append( '<option value="{{ $item.Value }}">{{ $item.Display }}</option>' )
+                        {{ end }}
+                        {{ end }}
+                        {{ else }}
+                        var input = $('<input type="text" placeholder="{{ $c.FilterPlaceholder }}" />')
+                            .appendTo( $(column.footer()).empty() )
+                            .on( 'change', function () {
+                                if ( column.search() !== this.value ) {
+                                    column
+                                        .search( this.value )
+                                        .draw();
+                                }
+                            } );
+                        {{ end }}
+                    } );
+                    {{ end }}
+                    {{ end }}
+                }
+            } );
+
+            dtbl.on( 'draw', function () {
+                if ( typeof customPageDatatableDraw === "function" ) {
+                    customPageDatatableDraw();
+                }
+            } );
+
+            var vars = [], hash,filter_column,filter_value,filer_column_num;
+            var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+
+            if (hashes.length > 0 ) {
+                for(var i = 0; i < hashes.length; i++)
+                {
+                    hash = hashes[i].split('=');
+                    if (hash[0] == "filter_column") {
+                        filter_column = hash[1].toLowerCase();
+                    }
+                    if (hash[0] == "filter_value") {
+                        filter_value = hash[1].toLowerCase();
+                    }
+                }
+                if (filter_column && filter_value ) {
+                    $( "#dataTable_wrapper thead th" ).each(function( index ) {
+                        //console.log( index + ": " + $( this ).text() );
+                        column_text = $( this ).text().toLowerCase();
+                        column_text = column_text.replace(" ", "_");
+                        if (column_text ==filter_column) {
+                            filer_column_num = index;
+                        }
+                    });
+                    if (filer_column_num ) {
+                        //console.log(filer_column_num);
+                        dtbl.column(filer_column_num).search(filter_value).draw();
+                        //filer_column_num = filer_column_num +1 ;
+                        //console.log($(".dataTables_scrollFootInner tfoot th:nth-child("+filer_column_num+") ").text());
+                        //$(".dataTables_scrollFootInner tfoot th:nth-child("+filer_column_num+") select ").val(filter_value);
+                    }
+                }
+            }
+        });
+    </script>
+{{ end }}

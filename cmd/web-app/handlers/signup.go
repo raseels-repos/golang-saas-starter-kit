@@ -36,19 +36,19 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	//
 	req := new(signup.SignupRequest)
 	data := make(map[string]interface{})
-	f := func() error {
+	f := func() (bool, error) {
 		claims, _ := auth.ClaimsFromContext(ctx)
 
 		if r.Method == http.MethodPost {
 
 			err := r.ParseForm()
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			decoder := schema.NewDecoder()
 			if err := decoder.Decode(req, r.PostForm); err != nil {
-				return err
+				return false, err
 			}
 
 			// Execute the account / user signup.
@@ -56,13 +56,13 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			if err != nil {
 				switch errors.Cause(err) {
 				case account.ErrForbidden:
-					return web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
+					return false, web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
-						return nil
+						return false, nil
 					} else {
-						return err
+						return false, err
 					}
 				}
 			}
@@ -70,13 +70,13 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			// Authenticated the new user.
 			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.User.Email, req.User.Password, time.Hour, ctxValues.Now)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			// Add the token to the users session.
 			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			// Display a welcome message to the user.
@@ -85,19 +85,22 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				"You workflow will be a breeze starting today.")
 			err = webcontext.ContextSession(ctx).Save(r, w)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
-			return nil
+			return true, nil
 		}
 
-		return nil
+		return false, nil
 	}
 
-	if err := f(); err != nil {
+	end, err := f()
+	if err != nil {
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
 	}
 
 	data["geonameCountries"] = geonames.ValidGeonameCountries

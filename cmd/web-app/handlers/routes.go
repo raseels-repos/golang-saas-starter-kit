@@ -47,6 +47,22 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	}
 	app.Handle("GET", "/projects", p.Index, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
 
+
+	// Register user management pages.
+	us := Users{
+		MasterDB: masterDB,
+		Redis: redis,
+		Renderer:      renderer,
+		Authenticator: authenticator,
+		ProjectRoutes: projectRoutes,
+		NotifyEmail:   notifyEmail,
+		SecretKey:     secretKey,
+	}
+	app.Handle("GET", "/users", us.Index, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+
 	// Register user management and authentication endpoints.
 	u := User{
 		MasterDB:      masterDB,

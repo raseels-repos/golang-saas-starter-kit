@@ -2,7 +2,6 @@ package signup
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
@@ -15,6 +14,63 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
+type ctxKeyTagUniqueName int
+
+const KeyTagUniqueName ctxKeyTagUniqueName = 1
+
+
+type ctxKeyTagUniqueEmail int
+
+const KeyTagUniqueEmail ctxKeyTagUniqueEmail = 1
+
+
+
+// validate holds the settings and caches for validating request struct values.
+var validate *validator.Validate
+
+// Validator returns the current init validator.
+func Validator() *validator.Validate {
+	if validate == nil {
+		validate = webcontext.Validator()
+
+		validate.RegisterValidationCtx("unique-name", func(ctx context.Context, fl validator.FieldLevel) bool {
+			if fl.Field().String() == "invalid" {
+				return false
+			}
+
+			cv := ctx.Value(KeyTagUniqueName)
+			if cv == nil {
+				return false
+			}
+
+			if v, ok := cv.(bool); ok {
+				return v
+			}
+
+			return false
+		})
+
+		validate.RegisterValidationCtx("unique-email", func(ctx context.Context, fl validator.FieldLevel) bool {
+			if fl.Field().String() == "invalid" {
+				return false
+			}
+
+			cv := ctx.Value(KeyTagUniqueEmail)
+			if cv == nil {
+				return false
+			}
+
+			if v, ok := cv.(bool); ok {
+				return v
+			}
+
+			return false
+		})
+	}
+	return validate
+}
+
+
 // Signup performs the steps needed to create a new account, new user and then associate
 // both records with a new user_account entry.
 func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req SignupRequest, now time.Time) (*SignupResult, error) {
@@ -26,37 +82,17 @@ func Signup(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Signup
 	if err != nil {
 		return nil, err
 	}
+	ctx = context.WithValue(ctx, KeyTagUniqueEmail, uniqEmail)
 
 	// Validate the account name is unique in the database.
 	uniqName, err := account.UniqueName(ctx, dbConn, req.Account.Name, "")
 	if err != nil {
 		return nil, err
 	}
-
-	f := func(fl validator.FieldLevel) bool {
-		if fl.Field().String() == "invalid" {
-			return false
-		}
-
-		fieldName := strings.Trim(fl.FieldName(), "{}")
-
-		var uniq bool
-		switch fieldName {
-		case "Name", "name":
-			uniq = uniqName
-		case "Email", "email":
-			uniq = uniqEmail
-
-		}
-
-		return uniq
-	}
-
-	v := webcontext.Validator()
-	v.RegisterValidation("unique", f)
+	ctx = context.WithValue(ctx, KeyTagUniqueName, uniqName)
 
 	// Validate the request.
-	err = v.Struct(req)
+	err = Validator().StructCtx(ctx, req)
 	if err != nil {
 		return nil, err
 	}

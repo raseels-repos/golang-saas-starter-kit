@@ -1,0 +1,27 @@
+{{define "title"}}Users{{end}}
+{{define "content"}}
+    <div class="row">
+        <div class="col">
+            <form method="post">
+                <div class="card">
+                    <div class="table-responsive dataTable_card">
+                        {{ template "partials/datatable/html" . }}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{{end}}
+{{define "style"}}
+    {{ template "partials/datatable/style" . }}
+{{ end }}
+{{define "js"}}
+    {{ template "partials/datatable/js" . }}
+
+<script>
+    $(document).ready(function(){
+        //$("#dataTable_filter").hide();
+    });
+</script>
+
+{{end}}

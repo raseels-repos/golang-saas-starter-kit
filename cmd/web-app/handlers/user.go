@@ -36,6 +36,7 @@ type User struct {
 	SecretKey     string
 }
 
+// UserLoginRequest extends the AuthenicateRequest with the RememberMe flag.
 type UserLoginRequest struct {
 	user_auth.AuthenticateRequest
 	RememberMe bool
@@ -118,33 +119,6 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-login.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
-}
-
-// handleSessionToken persists the access token to the session for request authentication.
-func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user_auth.Token) error {
-	if token.AccessToken == "" {
-		return errors.New("accessToken is required.")
-	}
-
-	sess := webcontext.ContextSession(ctx)
-
-	if sess.IsNew {
-		sess.ID = uuid.NewRandom().String()
-	}
-
-	sess.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   int(token.TTL.Seconds()),
-		HttpOnly: false,
-	}
-
-	sess = webcontext.SessionInit(sess,
-		token.AccessToken)
-	if err := sess.Save(r, w); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Logout handles removing authentication for the user.
@@ -826,6 +800,33 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-switch-account.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// handleSessionToken persists the access token to the session for request authentication.
+func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user_auth.Token) error {
+	if token.AccessToken == "" {
+		return errors.New("accessToken is required.")
+	}
+
+	sess := webcontext.ContextSession(ctx)
+
+	if sess.IsNew {
+		sess.ID = uuid.NewRandom().String()
+	}
+
+	sess.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   int(token.TTL.Seconds()),
+		HttpOnly: false,
+	}
+
+	sess = webcontext.SessionInit(sess,
+		token.AccessToken)
+	if err := sess.Save(r, w); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // updateContextClaims updates the claims in the context.

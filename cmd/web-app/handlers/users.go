@@ -3,14 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
-	"net/http"
-	"strings"
-	"time"
-
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
-	"github.com/dustin/go-humanize/english"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
@@ -21,10 +13,14 @@ import (
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"github.com/dustin/go-humanize/english"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
+	"net/http"
+	"strings"
 )
 
 // Users represents the Users API method handler set.
@@ -633,6 +629,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 				}
 			}
 
+			/*
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
 			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
 			if err != nil {
@@ -654,6 +651,8 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			if err != nil {
 				return false, err
 			}
+			
+			 */
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)

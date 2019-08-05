@@ -647,6 +647,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
+	} else if claims.Subject != "" && claims.Subject == req.ID {
+		return errors.WithStack(ErrForbidden)
 	}
 
 	// If now empty set it to the current time.
@@ -770,6 +772,8 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
+	} else if claims.Subject != "" && claims.Subject == req.ID {
+		return errors.WithStack(ErrForbidden)
 	}
 
 	// Start a new transaction to handle rollbacks on error.

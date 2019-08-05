@@ -18,12 +18,9 @@ type ctxKeyTagUniqueName int
 
 const KeyTagUniqueName ctxKeyTagUniqueName = 1
 
-
 type ctxKeyTagUniqueEmail int
 
 const KeyTagUniqueEmail ctxKeyTagUniqueEmail = 1
-
-
 
 // validate holds the settings and caches for validating request struct values.
 var validate *validator.Validate
@@ -69,7 +66,6 @@ func Validator() *validator.Validate {
 	}
 	return validate
 }
-
 
 // Signup performs the steps needed to create a new account, new user and then associate
 // both records with a new user_account entry.

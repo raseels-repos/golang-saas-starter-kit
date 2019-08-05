@@ -30,9 +30,9 @@ var (
 type (
 	Datatable struct {
 		ctx                    context.Context
-		w http.ResponseWriter
-		r *http.Request
-		redis    *redis.Client
+		w                      http.ResponseWriter
+		r                      *http.Request
+		redis                  *redis.Client
 		fields                 []DisplayField
 		loadFunc               func(ctx context.Context, sorting string, fields []DisplayField) (resp [][]ColumnValue, err error)
 		stateId                string
@@ -122,8 +122,8 @@ func (r Request) CacheKey() string {
 func ParseQueryValues(vals url.Values) (Request, error) {
 
 	req := Request{
-		Columns:make(map[int]Column),
-		Order: make(map[int]Order)	,
+		Columns: make(map[int]Column),
+		Order:   make(map[int]Order),
 	}
 
 	var err error
@@ -182,7 +182,7 @@ func ParseQueryValues(vals url.Values) (Request, error) {
 					return req, errors.WithMessagef(ErrInvalidColumn, "Unable to map query Column Search %s for %s", svn, kn)
 				}
 			default:
-				return req, errors.WithMessagef(ErrInvalidColumn,"Unable to map query Column %s for %s", sn, kn)
+				return req, errors.WithMessagef(ErrInvalidColumn, "Unable to map query Column %s for %s", sn, kn)
 			}
 			req.Columns[idx] = curCol
 		case "order":
@@ -235,7 +235,6 @@ func ParseQueryValues(vals url.Values) (Request, error) {
 				}
 			}
 
-
 		case "search":
 			sn := strings.Split(pts[1], "]")[0]
 			switch sn {
@@ -276,11 +275,11 @@ func ParseQueryValues(vals url.Values) (Request, error) {
 	return req, nil
 }
 
-func New(ctx context.Context, w http.ResponseWriter, r *http.Request, redisClient    *redis.Client, fields []DisplayField, loadFunc func(ctx context.Context, sorting string, fields []DisplayField) (resp [][]ColumnValue, err error)) (dt *Datatable, err error) {
+func New(ctx context.Context, w http.ResponseWriter, r *http.Request, redisClient *redis.Client, fields []DisplayField, loadFunc func(ctx context.Context, sorting string, fields []DisplayField) (resp [][]ColumnValue, err error)) (dt *Datatable, err error) {
 	dt = &Datatable{
 		ctx:      ctx,
 		w:        w,
-		r: r,
+		r:        r,
 		redis:    redisClient,
 		fields:   fields,
 		loadFunc: loadFunc,
@@ -296,7 +295,7 @@ func New(ctx context.Context, w http.ResponseWriter, r *http.Request, redisClien
 	}
 	dt.SetAjaxUrl(r.URL)
 
-	if web.RequestIsJson(r)  {
+	if web.RequestIsJson(r) {
 		dt.handleRequest = true
 
 		dt.req, err = ParseQueryValues(r.URL.Query())
@@ -354,7 +353,7 @@ func New(ctx context.Context, w http.ResponseWriter, r *http.Request, redisClien
 			}
 		}
 
-		dt.cacheKey = fmt.Sprintf("%x", md5.Sum([]byte(dt.resp.AjaxUrl + dt.req.CacheKey() + dt.stateId)))
+		dt.cacheKey = fmt.Sprintf("%x", md5.Sum([]byte(dt.resp.AjaxUrl+dt.req.CacheKey()+dt.stateId)))
 
 	} else {
 		//for idx, f := range fields {
@@ -512,7 +511,6 @@ func (dt *Datatable) Render() (rendered bool, err error) {
 					} else {
 						match = strings.Contains(l[i].Value, cn.Search.Value)
 					}
-
 
 					if !match {
 						//fmt.Println("-> no match")

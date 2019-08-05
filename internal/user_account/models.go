@@ -257,18 +257,18 @@ func (s UserAccountRoles) Value() (driver.Value, error) {
 
 // User represents someone with access to our system.
 type User struct {
-	ID            string          `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
-	Name       string               `json:"name"  validate:"required" example:"Gabi May"`
-	FirstName     string          `json:"first_name" validate:"required" example:"Gabi"`
-	LastName      string          `json:"last_name" validate:"required" example:"May"`
-	Email         string          `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
-	Timezone      string          `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
+	ID         string            `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	Name       string            `json:"name"  validate:"required" example:"Gabi May"`
+	FirstName  string            `json:"first_name" validate:"required" example:"Gabi"`
+	LastName   string            `json:"last_name" validate:"required" example:"May"`
+	Email      string            `json:"email" validate:"required,email,unique" example:"gabi@geeksinthewoods.com"`
+	Timezone   string            `json:"timezone" validate:"omitempty" example:"America/Anchorage"`
 	AccountID  string            `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 	Status     UserAccountStatus `json:"status" validate:"omitempty,oneof=active invited disabled" enums:"active,invited,disabled" swaggertype:"string" example:"active"`
-	CreatedAt     time.Time       `json:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at"`
-	ArchivedAt    *pq.NullTime    `json:"archived_at,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	ArchivedAt *pq.NullTime      `json:"archived_at,omitempty"`
 }
 
 // UserResponse represents someone with access to our system that is returned for display.
@@ -279,9 +279,9 @@ type UserResponse struct {
 	LastName   string               `json:"last_name" example:"May"`
 	Email      string               `json:"email" example:"gabi@geeksinthewoods.com"`
 	Timezone   string               `json:"timezone" example:"America/Anchorage"`
-	AccountID  string            `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
-	Roles      UserAccountRoles  `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
-	Status     web.EnumResponse  `json:"status"`                // Status is enum with values [active, invited, disabled].
+	AccountID  string               `json:"account_id" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Roles      UserAccountRoles     `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+	Status     web.EnumResponse     `json:"status"`                // Status is enum with values [active, invited, disabled].
 	CreatedAt  web.TimeResponse     `json:"created_at"`            // CreatedAt contains multiple format options for display.
 	UpdatedAt  web.TimeResponse     `json:"updated_at"`            // UpdatedAt contains multiple format options for display.
 	ArchivedAt *web.TimeResponse    `json:"archived_at,omitempty"` // ArchivedAt contains multiple format options for display.
@@ -336,8 +336,8 @@ func (m *Users) Response(ctx context.Context) []*UserResponse {
 // UserFindByAccountRequest defines the possible options to search for users by account ID.
 // By default archived users will be excluded from response.
 type UserFindByAccountRequest struct {
-	AccountID string             `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
-	Where           string       `json:"where" example:"name = ? and email = ?"`
+	AccountID       string        `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Where           string        `json:"where" example:"name = ? and email = ?"`
 	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,gabi.may@geeksinthewoods.com"`
 	Order           []string      `json:"order" example:"created_at desc"`
 	Limit           *uint         `json:"limit" example:"10"`

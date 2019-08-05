@@ -20,7 +20,13 @@
             <p class="font-10"><a href="https://gravatar.com" target="_blank">Update Avatar</a></p>
         </div>
         <div class="col-auto">
-            <a href="/user/update" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+            <a href="{{ .urlUsersUpdate }}" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+            {{ $ctxUser := ContextUser $._Ctx }}
+            {{ if $ctxUser }}
+                {{ if ne .user.ID $ctxUser.ID }}
+                    <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive"></form>
+                {{ end }}
+            {{ end }}
         </div>
     </div>
 

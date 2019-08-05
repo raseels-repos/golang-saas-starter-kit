@@ -3,23 +3,36 @@
 
 {{end}}
 {{define "content"}}
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Create Project</h1>
+    </div>
+
     <form class="user" method="post" novalidate>
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-group">
-                    <label for="inputName">Name</label>
-                    <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
-                           placeholder="enter name" name="Name" id="inputName" value="{{ .form.Name }}" required>
-                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+
+        <div class="card shadow">
+            <div class="card-body">
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="inputName">Project Name</label>
+                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
+                                   placeholder="Enter name for your project" name="Name" id="inputName" value="{{ .form.Name }}" required>
+                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="spacer-30"></div>
-        <div class="row">
+
+        <div class="row mt-4">
             <div class="col">
                 <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+                <a href="/projects" class="ml-2 btn btn-secondary" >Cancel</a>
             </div>
         </div>
+
     </form>
 {{end}}
 {{define "js"}}

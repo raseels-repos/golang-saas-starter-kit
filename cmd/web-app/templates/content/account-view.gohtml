@@ -56,9 +56,9 @@
                                 <small>Status</small><br/>
                                 <b>
                                     {{ if eq .account.Status.Value "active" }}
-                                        <span class="text-green"><i class="fas fa-circle"></i>{{ .account.Status.Title }}</span>
+                                        <span class="text-green"><i class="fas fa-circle mr-1"></i>{{ .account.Status.Title }}</span>
                                     {{else}}
-                                        <span class="text-orange"><i class="far fa-circle"></i>{{.account.Status.Title }}</span>
+                                        <span class="text-orange"><i class="fas fa-circle-notch mr-1"></i>{{.account.Status.Title }}</span>
                                     {{end}}
                                 </b>
                             </p>

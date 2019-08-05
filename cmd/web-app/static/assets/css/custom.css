@@ -23,6 +23,18 @@ div.dataTables_wrapper div.dataTables_filter label {
     margin-bottom: 0px;
 }
 
+
+div.dataTables_wrapper div.dataTables_filter input {
+    font-size: .8rem;
+    font-weight: 400;
+    border-radius: 0.35rem;
+    font-weight: normal;
+    border: 1px solid rgb(166, 166, 166);
+    color: #858796;
+}
+
+
+
 div.dataTables_wrapper div.dataTables_info {
     flex: 0 0 50%;
     max-width: 50%;
@@ -93,3 +105,7 @@ div.dataTable_card a.paginate_button.current {
     background-color: #007bff;
 }
 
+
+.alert p:last-child {
+    margin-bottom: 0;
+}

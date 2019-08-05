@@ -5,20 +5,32 @@
 {{define "content"}}
 
     {{ if .imgResizeDisabled }}
-        <h3>Image Resize Not enabled</h3>
 
-        AWS credentials must be set and then the following configs be set as well.
+        <h1 class="h3 text-red">Image Resize Not enabled</h1>
+
+        <p>AWS credentials must be set and then the following configs be set as well.</p>
         <pre>
             export WEB_APP_SERVICE_S3_BUCKET_PUBLIC=example-bucket-public
             export WEB_APP_SERVICE_STATICFILES_IMG_RESIZE_ENABLED=1
         </pre>
 
     {{ else }}
-        <h3>S3ImgSrcLarge</h3>
-        <p>320, 480, 800</p>
+
+        <div class="d-sm-flex align-items-center justify-content-between mb-4">
+            <h1 class="h3 mb-0 text-gray-800">Responsive Images</h1>
+            <!-- a href="/user/update" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a -->
+        </div>
+
+        <p>This SaaS Starter Kit includes functions to resize images automatically and render the src of an image tag with an array of source URLs. The functions are custom functions that are rendered with the GO templates.</p>
+
+            <pre class="mb-4">&#x7B;&#x7B; FUNCTION_NAME $._ctx "RELATIVE_PATH_TO_IMAGE_HERE" &#x7D;&#x7D;</pre>
+
+        <h5>S3ImgSrcLarge</h5>
+        <p>Generates an array of three images from the source file with widths of 320, 480 and 800.</p>
         <img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+
+        <p class="mb-0 mt-2">HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre></p>
 
         <h3>S3ImgThumbSrcLarge</h3>
         <p>320, 480, 800</p>

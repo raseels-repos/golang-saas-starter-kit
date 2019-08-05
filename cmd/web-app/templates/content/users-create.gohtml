@@ -13,7 +13,6 @@
         <div class="card shadow">
             <div class="card-body">
 
-
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -55,6 +54,24 @@
 
                         <div class="form-group">
                             <label for="inputRoles">Roles</label>
+                            <span class="help-block "><small>- Select at least one role.</small></span>
+
+                            {{ range $r := .roles.Options }}
+                                {{ $selectRole := false }}
+                                {{ range $fr := $.form.Roles }}
+                                    {{ if eq $r.Value $fr }}{{ $selectRole = true }}{{ end }}
+                                {{ end }}
+
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="{{ $r.Value }}" id="defaultCheck1" {{ if $selectRole  }}checked="checked"{{ end }}>
+                                    <label class="form-check-label" for="defaultCheck1">
+                                        {{ $r.Title }}
+                                    </label>
+                                </div>
+                            {{ end }}
+
+
+
                             <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}" id="inputRoles" name="Roles" multiple="multiple">
                                 {{ range $r := .roles.Options }}
                                     {{ $selectRole := false }}

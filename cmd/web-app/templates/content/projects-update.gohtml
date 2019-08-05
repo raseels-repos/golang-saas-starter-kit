@@ -3,8 +3,25 @@
 
 {{end}}
 {{define "content"}}
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Update Project</h1>
+    </div>
+
     <form class="user" method="post" novalidate>
-        <div class="row">
+
+        <div class="card shadow mb-4">
+            <div class="card-body">
+
+                <div class="row mb-2">
+                    <div class="col-12">
+
+                        <h4 class="card-title">Project Details</h4>
+                    </div>
+                </div>
+
+
+                <div class="row">
             <div class="col-md-6">
                 <div class="form-group">
                     <label for="inputName">Name</label>
@@ -24,7 +41,10 @@
                 </div>
             </div>
         </div>
-        <div class="spacer-30"></div>
+
+            </div>
+        </div>
+
         <div class="row">
             <div class="col">
                 <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>

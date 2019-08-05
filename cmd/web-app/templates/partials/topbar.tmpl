@@ -177,7 +177,6 @@
                                 <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
                                 Account Settings
                             </a>
-
                             <a class="dropdown-item" href="/users">
                                 <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
                                 Manage Users
@@ -197,8 +196,22 @@
                             <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
                             Support
                         </a>
-
                         <div class="dropdown-divider"></div>
+
+                        {{ if ContextCanSwitchAccount $._Ctx }}
+                            <a class="dropdown-item" href="/user/switch-account?modal=1">
+                                <i class="far fa-sign-in fa-sm fa-fw mr-2 text-gray-400"></i>
+                                Switch Account
+                            </a>
+                        {{ end }}
+
+                        {{ if ContextIsVirtualSession $._Ctx }}
+                            <a class="dropdown-item" href="/user/virtual-logout">
+                                <i class="far fa-sign-out fa-sm fa-fw mr-2 text-gray-400"></i>
+                                Switch Back
+                            </a>
+                        {{ end }}
+
                         <a class="dropdown-item" href="/user/logout" data-toggle="modal" data-target="#logoutModal">
                             <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
                             Logout

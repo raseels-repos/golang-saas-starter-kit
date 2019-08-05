@@ -66,6 +66,34 @@ func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
 	return r
 }
 
+// HasRole checks if the entry has a role.
+func (m *UserAccount) HasRole(role UserAccountRole) bool {
+	if m == nil {
+		return false
+	}
+	for _, r := range m.Roles {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+// UserAccounts a list of UserAccounts.
+type UserAccounts []*UserAccount
+
+// Response transforms a list of UserAccounts to a list of UserAccountResponses.
+func (m *UserAccounts) Response(ctx context.Context) []*UserAccountResponse {
+	var l []*UserAccountResponse
+	if m != nil && len(*m) > 0 {
+		for _, n := range *m {
+			l = append(l, n.Response(ctx))
+		}
+	}
+
+	return l
+}
+
 // UserAccountCreateRequest defines the information is needed to associate a user to an
 // account. Users are global to the application and each users access can be managed
 // on an account level. If a current entry exists in the database but is archived,

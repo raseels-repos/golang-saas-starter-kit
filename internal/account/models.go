@@ -99,6 +99,21 @@ func (m *AccountResponse) MarshalBinary() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// Accounts a list of Accounts.
+type Accounts []*Account
+
+// Response transforms a list of Accounts to a list of AccountResponses.
+func (m *Accounts) Response(ctx context.Context) []*AccountResponse {
+	var l []*AccountResponse
+	if m != nil && len(*m) > 0 {
+		for _, n := range *m {
+			l = append(l, n.Response(ctx))
+		}
+	}
+
+	return l
+}
+
 // AccountCreateRequest contains information needed to create a new Account.
 type AccountCreateRequest struct {
 	Name          string         `json:"name" validate:"required,unique" example:"Company Name"`

@@ -3,6 +3,7 @@ package user_auth
 import (
 	"context"
 	"database/sql"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"strings"
 	"time"
 
@@ -22,6 +23,9 @@ var (
 	// ErrAuthenticationFailure occurs when a user attempts to authenticate but
 	// anything goes wrong.
 	ErrAuthenticationFailure = errors.New("Authentication failed")
+
+	// ErrForbidden occurs when a user tries to do something that is forbidden to them according to our access control policies.
+	ErrForbidden = errors.New("Attempted action is not allowed")
 )
 
 const (
@@ -65,21 +69,10 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, e
 	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, "", expires, now, scopes...)
 }
 
-// Authenticate finds a user by their email and verifies their password. On success
-// it returns a Token that can be used to authenticate access to the application in
-// the future.
-func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+// SwitchAccount allows users to switch between multiple accounts, this changes the claim audience.
+func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, req SwitchAccountRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.SwitchAccount")
 	defer span.Finish()
-
-	// Defines struct to apply validation for the supplied claims and account ID.
-	req := struct {
-		UserID    string `json:"user_id"  validate:"required,uuid"`
-		AccountID string `json:"account_id" validate:"required,uuid"`
-	}{
-		UserID:    claims.Subject,
-		AccountID: accountID,
-	}
 
 	// Validate the request.
 	v := webcontext.Validator()
@@ -88,10 +81,72 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		return Token{}, err
 	}
 
+	claims.RootAccountID = req.AccountID
+
+	if claims.RootUserID == "" {
+		claims.RootUserID = claims.Subject
+	}
+
+	// Generate a token for the user ID in supplied in claims as the Subject. Pass
+	// in the supplied claims as well to enforce ACLs when finding the current
+	// list of accounts for the user.
+	return generateToken(ctx, dbConn, tknGen, claims, claims.Subject, req.AccountID, expires, now, scopes...)
+}
+
+// VirtualLogin allows users to mock being logged in as other users.
+func VirtualLogin(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, req VirtualLoginRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.VirtualLogin")
+	defer span.Finish()
+
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
+		return Token{}, err
+	}
+
+	// Find all the accounts that the current user has access to.
+	usrAccs, err := user_account.FindByUserID(ctx, claims, dbConn, claims.Subject, false)
+	if err != nil {
+		return Token{}, err
+	}
+
+	// The user must have the role of admin to login any other user.
+	var hasAccountAdminRole bool
+	for _, usrAcc := range usrAccs {
+		if usrAcc.HasRole(user_account.UserAccountRole_Admin) {
+			if usrAcc.AccountID == req.AccountID {
+				hasAccountAdminRole = true
+				break
+			}
+		}
+	}
+	if !hasAccountAdminRole {
+		return Token{}, errors.WithMessagef(ErrForbidden, "User %s does not have correct access to account %s ", claims.Subject, req.AccountID)
+	}
+
+	if claims.RootAccountID == "" {
+		claims.RootAccountID = claims.Audience
+	}
+	if claims.RootUserID == "" {
+		claims.RootUserID = claims.Subject
+	}
+
 	// Generate a token for the user ID in supplied in claims as the Subject. Pass
 	// in the supplied claims as well to enforce ACLs when finding the current
 	// list of accounts for the user.
 	return generateToken(ctx, dbConn, tknGen, claims, req.UserID, req.AccountID, expires, now, scopes...)
+}
+
+// VirtualLogout allows switch back to their root user/account.
+func VirtualLogout(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.VirtualLogout")
+	defer span.Finish()
+
+	// Generate a token for the user ID in supplied in claims as the Subject. Pass
+	// in the supplied claims as well to enforce ACLs when finding the current
+	// list of accounts for the user.
+	return generateToken(ctx, dbConn, tknGen, claims, claims.RootUserID, claims.RootAccountID, expires, now, scopes...)
 }
 
 // generateToken generates claims for the supplied user ID and account ID and then
@@ -250,7 +305,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 				if scopeValid {
 					roles = append(roles, s)
 				} else {
-					err := errors.Errorf("invalid scope '%s'", s)
+					err := errors.Wrapf(ErrForbidden, "invalid scope '%s'", s)
 					return Token{}, err
 				}
 			}
@@ -259,7 +314,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		}
 
 		if len(roles) == 0 {
-			err := errors.New("no roles defined for user")
+			err := errors.Wrapf(ErrForbidden, "no roles defined for user")
 			return Token{}, err
 		}
 	}
@@ -314,14 +369,24 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 		claimPref = auth.NewClaimPreferences(tz, preferenceDatetimeFormat, preferenceDateFormat, preferenceTimeFormat)
 	}
 
+	// Ensure the current claims has the root values set.
+	if (claims.RootAccountID == "" && claims.Audience != "") || (claims.RootUserID == "" && claims.Subject != "") {
+		claims.RootAccountID = claims.Audience
+		claims.RootUserID = claims.Subject
+	}
+
 	// JWT claims requires both an audience and a subject. For this application:
 	// 	Subject: The ID of the user authenticated.
 	// 	Audience: The ID of the account the user is accessing. A list of account IDs
 	// 			  will also be included to support the user switching between them.
-	claims = auth.NewClaims(userID, accountID, accountIds, roles, claimPref, now, expires)
+	newClaims := auth.NewClaims(userID, accountID, accountIds, roles, claimPref, now, expires)
+
+	// Copy the original root account/user ID.
+	newClaims.RootAccountID = claims.RootAccountID
+	newClaims.RootUserID = claims.RootUserID
 
 	// Generate a token for the user with the defined claims.
-	tknStr, err := tknGen.GenerateToken(claims)
+	tknStr, err := tknGen.GenerateToken(newClaims)
 	if err != nil {
 		return Token{}, errors.Wrap(err, "generating token")
 	}
@@ -329,9 +394,9 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	tkn := Token{
 		AccessToken: tknStr,
 		TokenType:   "Bearer",
-		claims:      claims,
-		UserID:      claims.Subject,
-		AccountID:   claims.Audience,
+		claims:      newClaims,
+		UserID:      newClaims.Subject,
+		AccountID:   newClaims.Audience,
 	}
 
 	if expires.Seconds() > 0 {

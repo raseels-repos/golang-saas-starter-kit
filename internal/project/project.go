@@ -124,13 +124,13 @@ func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []inte
 }
 
 // Find gets all the projects from the database based on the request params.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectFindRequest) ([]*Project, error) {
+func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectFindRequest) (Projects, error) {
 	query, args := findRequestQuery(req)
 	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the projects from the database using a select query.
-func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*Project, error) {
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Projects, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Find")
 	defer span.Finish()
 

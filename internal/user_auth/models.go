@@ -35,6 +35,17 @@ type Token struct {
 	AccountID string `json:"account_id"example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
+// SwitchAccountRequest defines the information for the current user to switch between their accounts
+type SwitchAccountRequest struct {
+	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+}
+
+// VirtualLoginRequest defines the information virtual login to a user / account.
+type VirtualLoginRequest struct {
+	UserID    string `json:"user_id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	AccountID string `json:"account_id" validate:"required,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+}
+
 // AuthorizationHeader returns the header authorization value.
 func (t Token) AuthorizationHeader() string {
 	return "Bearer " + t.AccessToken

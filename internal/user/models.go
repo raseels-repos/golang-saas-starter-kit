@@ -78,6 +78,21 @@ func (m *UserResponse) MarshalBinary() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// Users a list of Users.
+type Users []*User
+
+// Response transforms a list of Users to a list of UserResponses.
+func (m *Users) Response(ctx context.Context) []*UserResponse {
+	var l []*UserResponse
+	if m != nil && len(*m) > 0 {
+		for _, n := range *m {
+			l = append(l, n.Response(ctx))
+		}
+	}
+
+	return l
+}
+
 // UserCreateRequest contains information needed to create a new User.
 type UserCreateRequest struct {
 	FirstName       string  `json:"first_name" validate:"required" example:"Gabi"`

@@ -698,7 +698,7 @@ func main() {
 				return nil
 			}
 
-			usr, err := user.Read(ctx, auth.Claims{}, masterDb, claims.Subject, false)
+			usr, err := user.ReadByID(ctx, auth.Claims{}, masterDb, claims.Subject)
 			if err != nil {
 				return nil
 			}
@@ -733,7 +733,7 @@ func main() {
 				return nil
 			}
 
-			acc, err := account.Read(ctx, auth.Claims{}, masterDb, claims.Audience, false)
+			acc, err := account.ReadByID(ctx, auth.Claims{}, masterDb, claims.Audience)
 			if err != nil {
 				return nil
 			}
@@ -745,6 +745,26 @@ func main() {
 			}
 
 			return a
+		},
+		"ContextCanSwitchAccount": func(ctx context.Context) bool {
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil || len(claims.AccountIDs) < 2 {
+				return false
+			}
+			return true
+		},
+		"ContextIsVirtualSession": func(ctx context.Context) bool {
+			claims, err := auth.ClaimsFromContext(ctx)
+			if err != nil {
+				return false
+			}
+			if claims.RootUserID != "" && claims.RootUserID != claims.Subject {
+				return true
+			}
+			if claims.RootAccountID != "" && claims.RootAccountID != claims.Audience {
+				return true
+			}
+			return false
 		},
 	}
 
@@ -827,11 +847,8 @@ func main() {
 
 		switch statusCode {
 		case http.StatusUnauthorized:
-			// Handle expired sessions that are returned from the auth middleware.
-			if strings.Contains(errors.Cause(er).Error(), "token is expired") {
-				http.Redirect(w, r, "/user/login", http.StatusFound)
-				return nil
-			}
+			http.Redirect(w, r, "/user/login?redirect="+url.QueryEscape(r.RequestURI), http.StatusFound)
+			return nil
 		}
 
 		return web.RenderError(ctx, w, r, er, renderer, handlers.TmplLayoutBase, handlers.TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)

@@ -12,7 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -68,7 +68,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Authenticated the new user.
-			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, req.User.Email, req.User.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.User.Email, req.User.Password, time.Hour, ctxValues.Now)
 			if err != nil {
 				return err
 			}
@@ -93,18 +93,18 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			return nil
 		}
 
-		data["geonameCountries"] = geonames.ValidGeonameCountries
-
-		data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
-		if err != nil {
-			return err
-		}
-
 		return nil
 	}
 
 	if err := f(); err != nil {
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	}
+
+	data["geonameCountries"] = geonames.ValidGeonameCountries
+
+	data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
+	if err != nil {
+		return err
 	}
 
 	data["form"] = req

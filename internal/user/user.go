@@ -202,13 +202,13 @@ func findRequestQuery(req UserFindRequest) (*sqlbuilder.SelectBuilder, []interfa
 }
 
 // Find gets all the users from the database based on the request params.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserFindRequest) ([]*User, error) {
+func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserFindRequest) (Users, error) {
 	query, args := findRequestQuery(req)
 	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the users from the database using a select query.
-func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*User, error) {
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Users, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Find")
 	defer span.Finish()
 

@@ -1,0 +1,60 @@
+{{define "title"}}Switch User{{end}}
+{{define "style"}}
+
+{{end}}
+{{ define "partials/page-wrapper" }}
+    <div class="container" id="page-content">
+
+        <!-- Outer Row -->
+        <div class="row justify-content-center">
+
+            <div class="col-xl-10 col-lg-12 col-md-9">
+
+                <div class="card o-hidden border-0 shadow-lg my-5">
+                    <div class="card-body p-0">
+                        <!-- Nested Row within Card Body -->
+                        <div class="row">
+                            <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
+                            <div class="col-lg-6">
+                                <div class="p-5">
+                                    {{ template "app-flashes" . }}
+
+                                    <div class="text-center">
+                                        <h1 class="h4 text-gray-900 mb-4">Switch User</h1>
+                                    </div>
+
+                                    {{ template "validation-error" . }}
+
+                                    <form class="user" method="post" novalidate>
+                                        <div class="form-group">
+                                            <select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "User" }}" name="UserID" placeholder="UserID" required>
+                                                {{ range $i := $.users }}
+                                                    <option value="{{ $i.ID }}" {{ if eq $.form.UserID $i.ID }}selected="selected"{{ end }}>{{ $i.Name }}</option>
+                                                {{ end }}
+                                            </select>
+                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserID" }}
+                                        </div>
+                                        <button class="btn btn-primary btn-user btn-block">
+                                            Login
+                                        </button>
+                                        <hr>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+{{end}}
+{{define "js"}}
+    <script>
+        $(document).ready(function() {
+            $(document).find('body').addClass('bg-gradient-primary');
+        });
+    </script>
+{{end}}

@@ -150,7 +150,7 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 // Find gets all the accounts from the database based on the request params.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) ([]*Account, error) {
+func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) (Accounts, error) {
 	query := selectQuery()
 
 	if req.Where != nil {
@@ -170,7 +170,7 @@ func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountF
 }
 
 // find internal method for getting all the accounts from the database using a select query.
-func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) ([]*Account, error) {
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Accounts, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Find")
 	defer span.Finish()
 

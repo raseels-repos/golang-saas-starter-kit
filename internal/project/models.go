@@ -56,6 +56,21 @@ func (m *Project) Response(ctx context.Context) *ProjectResponse {
 	return r
 }
 
+// Projects a list of Projects.
+type Projects []*Project
+
+// Response transforms a list of Projects to a list of ProjectResponses.
+func (m *Projects) Response(ctx context.Context) []*ProjectResponse {
+	var l []*ProjectResponse
+	if m != nil && len(*m) > 0 {
+		for _, n := range *m {
+			l = append(l, n.Response(ctx))
+		}
+	}
+
+	return l
+}
+
 // ProjectCreateRequest contains information needed to create a new Project.
 type ProjectCreateRequest struct {
 	AccountID string         `json:"account_id" validate:"required,uuid"  example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`

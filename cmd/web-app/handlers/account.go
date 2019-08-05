@@ -19,8 +19,9 @@ import (
 
 // Account represents the Account API method handler set.
 type Account struct {
-	MasterDB *sqlx.DB
-	Renderer web.Renderer
+	MasterDB      *sqlx.DB
+	Renderer      web.Renderer
+	Authenticator *auth.Authenticator
 }
 
 // View handles displaying the current account profile.
@@ -34,7 +35,7 @@ func (h *Account) View(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			return err
 		}
 
-		acc, err := account.Read(ctx, claims, h.MasterDB, claims.Audience, false)
+		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
 		if err != nil {
 			return err
 		}
@@ -127,7 +128,11 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 				}
 			}
 
-			sess := webcontext.ContextSession(ctx)
+			var updateClaims bool
+			if req.Timezone != nil && claims.Preferences.Timezone != *req.Timezone {
+				claims.Preferences.Timezone = *req.Timezone
+				updateClaims = true
+			}
 
 			if preferenceDatetimeFormat != req.PreferenceDatetimeFormat {
 				err = account_preference.Set(ctx, claims, h.MasterDB, account_preference.AccountPreferenceSetRequest{
@@ -144,7 +149,10 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 					}
 				}
 
-				sess.Values[webcontext.SessionKeyPreferenceDatetimeFormat] = req.PreferenceDatetimeFormat
+				if claims.Preferences.DatetimeFormat != req.PreferenceDatetimeFormat {
+					claims.Preferences.DatetimeFormat = req.PreferenceDatetimeFormat
+					updateClaims = true
+				}
 			}
 
 			if preferenceDateFormat != req.PreferenceDateFormat {
@@ -162,7 +170,10 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 					}
 				}
 
-				sess.Values[webcontext.SessionKeyPreferenceDateFormat] = req.PreferenceDateFormat
+				if claims.Preferences.DateFormat != req.PreferenceDateFormat {
+					claims.Preferences.DateFormat = req.PreferenceDateFormat
+					updateClaims = true
+				}
 			}
 
 			if preferenceTimeFormat != req.PreferenceTimeFormat {
@@ -180,7 +191,18 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 					}
 				}
 
-				sess.Values[webcontext.SessionKeyPreferenceTimeFormat] = req.PreferenceTimeFormat
+				if claims.Preferences.TimeFormat != req.PreferenceTimeFormat {
+					claims.Preferences.TimeFormat = req.PreferenceTimeFormat
+					updateClaims = true
+				}
+			}
+
+			// Update the access token to include the updated claims.
+			if updateClaims {
+				ctx, err = updateContextClaims(ctx, h.Authenticator, claims)
+				if err != nil {
+					return false, err
+				}
 			}
 
 			// Display a success message to the user.
@@ -196,7 +218,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return true, nil
 		}
 
-		acc, err := account.Read(ctx, claims, h.MasterDB, claims.Audience, false)
+		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
 		if err != nil {
 			return false, err
 		}

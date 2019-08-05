@@ -23,9 +23,11 @@ const Key ctxKey = 1
 
 // Claims represents the authorization claims transmitted via a JWT.
 type Claims struct {
-	AccountIds  []string         `json:"accounts"`
-	Roles       []string         `json:"roles"`
-	Preferences ClaimPreferences `json:"prefs"`
+	RootUserID    string           `json:"root_user_id"`
+	RootAccountID string           `json:"root_account_id"`
+	AccountIDs    []string         `json:"accounts"`
+	Roles         []string         `json:"roles"`
+	Preferences   ClaimPreferences `json:"prefs"`
 	jwt.StandardClaims
 }
 
@@ -41,14 +43,16 @@ type ClaimPreferences struct {
 // NewClaims constructs a Claims value for the identified user. The Claims
 // expire within a specified duration of the provided time. Additional fields
 // of the Claims can be set after calling NewClaims is desired.
-func NewClaims(userId, accountId string, accountIds []string, roles []string, prefs ClaimPreferences, now time.Time, expires time.Duration) Claims {
+func NewClaims(userID, accountID string, accountIDs []string, roles []string, prefs ClaimPreferences, now time.Time, expires time.Duration) Claims {
 	c := Claims{
-		AccountIds:  accountIds,
-		Roles:       roles,
-		Preferences: prefs,
+		AccountIDs:    accountIDs,
+		RootAccountID: accountID,
+		RootUserID:    userID,
+		Roles:         roles,
+		Preferences:   prefs,
 		StandardClaims: jwt.StandardClaims{
-			Subject:   userId,
-			Audience:  accountId,
+			Subject:   userID,
+			Audience:  accountID,
 			IssuedAt:  now.Unix(),
 			ExpiresAt: now.Add(expires).Unix(),
 		},

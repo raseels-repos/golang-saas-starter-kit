@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
@@ -16,6 +18,7 @@ import (
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -34,7 +37,7 @@ type User struct {
 }
 
 type UserLoginRequest struct {
-	user.AuthenticateRequest
+	user_auth.AuthenticateRequest
 	RememberMe bool
 }
 
@@ -68,7 +71,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Authenticated the user.
-			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, req.Email, req.Password, sessionTTL, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.Email, req.Password, sessionTTL, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrForbidden:
@@ -89,8 +92,16 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 				return err
 			}
 
+			redirectUri := "/"
+			if qv := r.URL.Query().Get("redirect"); qv != "" {
+				redirectUri, err = url.QueryUnescape(qv)
+				if err != nil {
+					return err
+				}
+			}
+
 			// Redirect the user to the dashboard.
-			http.Redirect(w, r, "/", http.StatusFound)
+			http.Redirect(w, r, redirectUri, http.StatusFound)
 		}
 
 		return nil
@@ -110,7 +121,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 }
 
 // handleSessionToken persists the access token to the session for request authentication.
-func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user.Token) error {
+func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user_auth.Token) error {
 	if token.AccessToken == "" {
 		return errors.New("accessToken is required.")
 	}
@@ -252,7 +263,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case account.ErrForbidden:
@@ -306,7 +317,7 @@ func (h *User) View(ctx context.Context, w http.ResponseWriter, r *http.Request,
 			return err
 		}
 
-		usr, err := user.Read(ctx, claims, h.MasterDB, claims.Subject, false)
+		usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
 		if err != nil {
 			return err
 		}
@@ -343,16 +354,15 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	//
 	req := new(user.UserUpdateRequest)
 	data := make(map[string]interface{})
 	f := func() (bool, error) {
-
-		claims, err := auth.ClaimsFromContext(ctx)
-		if err != nil {
-			return false, err
-		}
-
 		if r.Method == http.MethodPost {
 			err := r.ParseForm()
 			if err != nil {
@@ -415,25 +425,6 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			return true, nil
 		}
 
-		usr, err := user.Read(ctx, claims, h.MasterDB, claims.Subject, false)
-		if err != nil {
-			return false, err
-		}
-
-		if req.ID == "" {
-			req.FirstName = &usr.FirstName
-			req.LastName = &usr.LastName
-			req.Email = &usr.Email
-			req.Timezone = &usr.Timezone
-		}
-
-		data["user"] = usr.Response(ctx)
-
-		data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
-		if err != nil {
-			return false, err
-		}
-
 		return false, nil
 	}
 
@@ -442,6 +433,25 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 	} else if end {
 		return nil
+	}
+
+	usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
+	if err != nil {
+		return err
+	}
+
+	if req.ID == "" {
+		req.FirstName = &usr.FirstName
+		req.LastName = &usr.LastName
+		req.Email = &usr.Email
+		req.Timezone = &usr.Timezone
+	}
+
+	data["user"] = usr.Response(ctx)
+
+	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	if err != nil {
+		return err
 	}
 
 	data["form"] = req
@@ -468,7 +478,7 @@ func (h *User) Account(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			return err
 		}
 
-		acc, err := account.Read(ctx, claims, h.MasterDB, claims.Audience, false)
+		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
 		if err != nil {
 			return err
 		}
@@ -482,4 +492,353 @@ func (h *User) Account(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-account.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// VirtualLogin handles switching the scope of the context to another user.
+func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(user_auth.VirtualLoginRequest)
+	data := make(map[string]interface{})
+	f := func() (bool, error) {
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
+			}
+
+			decoder := schema.NewDecoder()
+			decoder.IgnoreUnknownKeys(true)
+
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return false, err
+			}
+		} else {
+			if pv, ok := params["user_id"]; ok && pv != "" {
+				req.UserID = pv
+			}
+		}
+
+		if qv := r.URL.Query().Get("account_id"); qv != "" {
+			req.AccountID = qv
+		} else {
+			req.AccountID = claims.Audience
+		}
+
+		if req.UserID != "" {
+			sess := webcontext.ContextSession(ctx)
+			var expires time.Duration
+			if sess != nil && sess.Options != nil {
+				expires = time.Second * time.Duration(sess.Options.MaxAge)
+			} else {
+				expires = time.Hour
+			}
+
+			// Perform the account switch.
+			tkn, err := user_auth.VirtualLogin(ctx, h.MasterDB, h.Authenticator, claims, *req, expires, ctxValues.Now)
+			if err != nil {
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
+			}
+
+			// Update the access token in the session.
+			sess = webcontext.SessionUpdateAccessToken(sess, tkn.AccessToken)
+
+			// Read the account for a flash message.
+			usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+			if err != nil {
+				return false, err
+			}
+			webcontext.SessionFlashSuccess(ctx,
+				"User Switched",
+				fmt.Sprintf("You are now virtually logged into user %s.",
+					usr.Response(ctx).Name))
+
+			// Write the session to the client.
+			err = webcontext.ContextSession(ctx).Save(r, w)
+			if err != nil {
+				return false, err
+			}
+
+			// Redirect the user to the dashboard with the new credentials.
+			http.Redirect(w, r, "/", http.StatusFound)
+
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
+	}
+
+	usrAccFilter := "account_id = ?"
+	usrAccs, err := user_account.Find(ctx, claims, h.MasterDB, user_account.UserAccountFindRequest{
+		Where: &usrAccFilter,
+		Args:  []interface{}{claims.Audience},
+	})
+	if err != nil {
+		return err
+	}
+
+	var userIDs []interface{}
+	var userPhs []string
+	for _, usrAcc := range usrAccs {
+		if usrAcc.UserID == claims.Subject {
+			// Skip the current authenticated user.
+			continue
+		}
+		userIDs = append(userIDs, usrAcc.UserID)
+		userPhs = append(userPhs, "?")
+	}
+
+	if len(userIDs) == 0 {
+		userIDs = append(userIDs, "")
+		userPhs = append(userPhs, "?")
+	}
+
+	usrFilter := fmt.Sprintf("id IN (%s)", strings.Join(userPhs, ", "))
+	users, err := user.Find(ctx, claims, h.MasterDB, user.UserFindRequest{
+		Where: &usrFilter,
+		Args:  userIDs,
+	})
+	if err != nil {
+		return err
+	}
+	data["users"] = users.Response(ctx)
+
+	if req.AccountID == "" {
+		req.AccountID = claims.Audience
+	}
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user_auth.VirtualLoginRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-virtual-login.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// VirtualLogout handles switching the scope back to the user who initiated the virtual login.
+func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	sess := webcontext.ContextSession(ctx)
+
+	var expires time.Duration
+	if sess != nil && sess.Options != nil {
+		expires = time.Second * time.Duration(sess.Options.MaxAge)
+	} else {
+		expires = time.Hour
+	}
+
+	tkn, err := user_auth.VirtualLogout(ctx, h.MasterDB, h.Authenticator, claims, expires, ctxValues.Now)
+	if err != nil {
+		return err
+	}
+
+	// Update the access token in the session.
+	sess = webcontext.SessionUpdateAccessToken(sess, tkn.AccessToken)
+
+	// Display a success message to verify the user has switched contexts.
+	if claims.Subject != tkn.UserID && claims.Audience != tkn.AccountID {
+		usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+		if err != nil {
+			return err
+		}
+		acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+		if err != nil {
+			return err
+		}
+		webcontext.SessionFlashSuccess(ctx,
+			"Context Switched",
+			fmt.Sprintf("You are now virtually logged back into account %s user %s.",
+				acc.Response(ctx).Name, usr.Response(ctx).Name))
+	} else if claims.Audience != tkn.AccountID {
+		acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+		if err != nil {
+			return err
+		}
+		webcontext.SessionFlashSuccess(ctx,
+			"Context Switched",
+			fmt.Sprintf("You are now virtually logged back into account %s.",
+				acc.Response(ctx).Name))
+	} else {
+		usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+		if err != nil {
+			return err
+		}
+		webcontext.SessionFlashSuccess(ctx,
+			"Context Switched",
+			fmt.Sprintf("You are now virtually logged back into user %s.",
+				usr.Response(ctx).Name))
+	}
+
+	// Write the session to the client.
+	err = webcontext.ContextSession(ctx).Save(r, w)
+	if err != nil {
+		return err
+	}
+
+	// Redirect the user to the dashboard with the new credentials.
+	http.Redirect(w, r, "/", http.StatusFound)
+
+	return nil
+}
+
+// VirtualLogin handles switching the scope of the context to another user.
+func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	ctxValues, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	claims, err := auth.ClaimsFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	//
+	req := new(user_auth.SwitchAccountRequest)
+	data := make(map[string]interface{})
+	f := func() (bool, error) {
+
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return false, err
+			}
+
+			decoder := schema.NewDecoder()
+			decoder.IgnoreUnknownKeys(true)
+
+			if err := decoder.Decode(req, r.PostForm); err != nil {
+				return false, err
+			}
+		} else {
+			if pv, ok := params["account_id"]; ok && pv != "" {
+				req.AccountID = pv
+			} else if qv := r.URL.Query().Get("account_id"); qv != "" {
+				req.AccountID = qv
+			}
+		}
+
+		if req.AccountID != "" {
+			sess := webcontext.ContextSession(ctx)
+			var expires time.Duration
+			if sess != nil && sess.Options != nil {
+				expires = time.Second * time.Duration(sess.Options.MaxAge)
+			} else {
+				expires = time.Hour
+			}
+
+			// Perform the account switch.
+			tkn, err := user_auth.SwitchAccount(ctx, h.MasterDB, h.Authenticator, claims, *req, expires, ctxValues.Now)
+			if err != nil {
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
+			}
+
+			// Update the access token in the session.
+			sess = webcontext.SessionUpdateAccessToken(sess, tkn.AccessToken)
+
+			// Read the account for a flash message.
+			acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+			if err != nil {
+				return false, err
+			}
+			webcontext.SessionFlashSuccess(ctx,
+				"Account Switched",
+				fmt.Sprintf("You are now logged into account %s.",
+					acc.Response(ctx).Name))
+
+			// Write the session to the client.
+			err = webcontext.ContextSession(ctx).Save(r, w)
+			if err != nil {
+				return false, err
+			}
+
+			// Redirect the user to the dashboard with the new credentials.
+			http.Redirect(w, r, "/", http.StatusFound)
+
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	end, err := f()
+	if err != nil {
+		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
+	}
+
+	accounts, err := account.Find(ctx, claims, h.MasterDB, account.AccountFindRequest{
+		Order: []string{"name"},
+	})
+	if err != nil {
+		return err
+	}
+	data["accounts"] = accounts.Response(ctx)
+
+	if req.AccountID == "" {
+		req.AccountID = claims.Audience
+	}
+
+	data["form"] = req
+
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user_auth.SwitchAccountRequest{})); ok {
+		data["validationDefaults"] = verr.(*weberror.Error)
+	}
+
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "user-switch-account.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+}
+
+// updateContextClaims updates the claims in the context.
+func updateContextClaims(ctx context.Context, authenticator *auth.Authenticator, claims auth.Claims) (context.Context, error) {
+	tkn, err := authenticator.GenerateToken(claims)
+	if err != nil {
+		return ctx, err
+	}
+
+	sess := webcontext.ContextSession(ctx)
+	sess = webcontext.SessionUpdateAccessToken(sess, tkn)
+
+	ctx = context.WithValue(ctx, auth.Key, claims)
+
+	return ctx, nil
 }

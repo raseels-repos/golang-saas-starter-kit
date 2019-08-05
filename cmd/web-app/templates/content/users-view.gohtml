@@ -1,0 +1,85 @@
+{{define "title"}}Profile{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <div class="row">
+        <div class="col">
+            <div class="row">
+                <div class="col-auto">
+                    <img src="{{ .user.Gravatar.Medium }}" alt="gravatar image" class="rounded">
+                </div>
+                <div class="col">
+                    <h4>Name</h4>
+                    <p class="font-14">
+                        {{ .user.Name }}
+                    </p>
+                </div>
+            </div>
+            <div class="spacer-10"></div>
+            <p class="font-10"><a href="https://gravatar.com" target="_blank">Update Avatar</a></p>
+        </div>
+        <div class="col-auto">
+            <a href="/user/update" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+        </div>
+    </div>
+
+    <div class="spacer-30"></div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <p>
+                <small>Name</small><br/>
+                <b>{{ .user.Name }}</b>
+            </p>
+            <p>
+                <small>Email</small><br/>
+                <b>{{ .user.Email }}</b>
+            </p>
+            {{if .user.Timezone }}
+                <p>
+                    <small>Timezone</small><br/>
+                    <b>{{.user.Timezone }}</b>
+                </p>
+            {{end}}
+            <div class="spacer-15"></div>
+        </div>
+        <div class="col-md-6">
+            <p>
+                <small>Role</small><br/>
+                {{ if .userAccount }}
+                    <b>
+                        {{ range $r := .userAccount.Roles }}
+                            {{ if eq $r "admin" }}
+                                <span class="text-pink-dark"><i class="far fa-user-astronaut"></i>{{ $r }}</span>
+                            {{else}}
+                                <span class="text-purple-dark"><i class="fal fa-user"></i>{{ $r }}</span>
+                            {{end}}
+                        {{ end }}
+                    </b>
+                {{ end }}
+            </p>
+            <p>
+                <small>Status</small><br/>
+                {{ if .userAccount }}
+                    <b>
+                        {{ if eq .userAccount.Status.Value "active" }}
+                            <span class="text-green"><i class="fas fa-circle"></i>{{ .userAccount.Status.Title }}</span>
+                        {{ else if eq .userAccount.Status.Value "invited" }}
+                            <span class="text-blue"><i class="fas fa-unicorn"></i>{{ .userAccount.Status.Title }}</span>
+                        {{else}}
+                            <span class="text-orange"><i class="far fa-circle"></i>{{.userAccount.Status.Title }}</span>
+                        {{end}}
+                    </b>
+                {{ end }}
+            </p>
+            <p>
+                <small>ID</small><br/>
+                <b>{{ .user.ID }}</b>
+            </p>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+
+{{end}}

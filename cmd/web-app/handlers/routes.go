@@ -40,6 +40,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	// Construct the web.App which holds all routes as well as common Middleware.
 	app := web.NewApp(shutdown, log, env, middlewares...)
 
+
 	// Register project management pages.
 	p := Projects{
 		MasterDB: masterDB,
@@ -62,6 +63,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("POST", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+
 
 	// Register user management and authentication endpoints.
 	u := User{
@@ -92,6 +94,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("POST", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
 	app.Handle("GET", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
 
+
 	// Register account management endpoints.
 	acc := Account{
 		MasterDB:      masterDB,
@@ -102,6 +105,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/account/update", acc.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("POST", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("GET", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+
 
 	// Register user management and authentication endpoints.
 	s := Signup{
@@ -121,6 +125,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages)
 	app.Handle("GET", "/examples/images", ex.Images)
 
+
 	// Register geo
 	g := Geo{
 		MasterDB: masterDB,
@@ -130,6 +135,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/geo/postal_codes/autocomplete", g.PostalCodesAutocomplete)
 	app.Handle("GET", "/geo/geonames/postal_code/:postalCode", g.GeonameByPostalCode)
 	app.Handle("GET", "/geo/country/:countryCode/timezones", g.CountryTimezones)
+
 
 	// Register root
 	r := Root{
@@ -146,6 +152,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/index.html", r.IndexHtml)
 	app.Handle("GET", "/robots.txt", r.RobotTxt)
 
+
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
 		MasterDB: masterDB,
@@ -153,6 +160,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		Renderer: renderer,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
+
 
 	// Handle static files/pages. Render a custom 404 page when file not found.
 	static := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {

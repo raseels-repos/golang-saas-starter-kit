@@ -3,12 +3,14 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
+	"golang.org/x/net/html"
 )
 
 // Example represents the example pages
@@ -129,8 +131,57 @@ func (h *Examples) Images(ctx context.Context, w http.ResponseWriter, r *http.Re
 	// List of image sizes that will be used to resize the source image into. The resulting images will then be included
 	// as apart of the image src tag for a responsive image tag.
 	data := map[string]interface{}{
-		"imgSizes": []int{100, 200, 300, 400, 500},
+		"imgSizes":          []int{100, 200, 300, 400, 500},
+		"imgResizeDisabled": false,
 	}
 
+	// Render the example page to detect in image resize is enabled, since the config is not passed to handlers and
+	// the custom HTML resize function is init in main.go.
+	rr := httptest.NewRecorder()
+	err := h.Renderer.Render(ctx, rr, r, TmplLayoutBase, "examples-images.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	if err != nil {
+		return err
+	}
+
+	// Parsed the rendered response looking for an example image tag.
+	exampleImgID := "imgVerifyResizeEnabled"
+	var exampleImgAttrs []html.Attribute
+	doc, err := html.Parse(rr.Body)
+	if err != nil {
+		return err
+	}
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "img" {
+			for _, a := range n.Attr {
+				if a.Key == "id" && a.Val == exampleImgID {
+					exampleImgAttrs = n.Attr
+					break
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+
+	// If the example image has the attribute srcset then we know resize is enabled.
+	var exampleImgHasSrcSet bool
+	if len(exampleImgAttrs) > 0 {
+		for _, a := range exampleImgAttrs {
+			if a.Key == "srcset" {
+				exampleImgHasSrcSet = true
+				break
+			}
+		}
+	}
+
+	// Image resize must be disabled as could not find the example image with attribute srcset.
+	if !exampleImgHasSrcSet {
+		data["imgResizeDisabled"] = true
+	}
+
+	// Re-render the page with additional data and return the results.
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "examples-images.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

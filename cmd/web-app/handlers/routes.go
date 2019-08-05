@@ -119,9 +119,9 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	ex := Examples{
 		Renderer: renderer,
 	}
-	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages)
-	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages)
-	app.Handle("GET", "/examples/images", ex.Images)
+	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(authenticator))
+	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(authenticator))
+	app.Handle("GET", "/examples/images", ex.Images, mid.AuthenticateSessionOptional(authenticator))
 
 	// Register geo
 	g := Geo{

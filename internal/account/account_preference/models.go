@@ -40,7 +40,7 @@ func (m *AccountPreference) Response(ctx context.Context) *AccountPreferenceResp
 
 	r := &AccountPreferenceResponse{
 		AccountID: m.AccountID,
-		Name:      web.NewEnumResponse(ctx, m.Name, AccountPreferenceName_Values),
+		Name:      web.NewEnumResponse(ctx, m.Name, AccountPreferenceName_ValuesInterface()...),
 		Value:     m.Value,
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
@@ -120,6 +120,15 @@ var AccountPreferenceName_Values = []AccountPreferenceName{
 	AccountPreference_Datetime_Format,
 	AccountPreference_Date_Format,
 	AccountPreference_Time_Format,
+}
+
+// AccountPreferenceName_ValuesInterface returns the AccountPreferenceName options as a slice interface.
+func AccountPreferenceName_ValuesInterface() []interface{} {
+	var l []interface{}
+	for _, v := range AccountPreferenceName_Values {
+		l = append(l, v.String())
+	}
+	return l
 }
 
 // Scan supports reading the AccountPreferenceName value from the database.

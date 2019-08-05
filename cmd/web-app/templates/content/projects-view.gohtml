@@ -1,0 +1,57 @@
+{{define "title"}}Project - {{ .project.Name }}{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <div class="row">
+        <div class="col">
+            <div class="row">
+                <div class="col">
+                    <h4>Name</h4>
+                    <p class="font-14">
+                        {{ .project.Name }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <a href="{{ .urlProjectsUpdate }}" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+            {{ if HasRole $._Ctx "admin" }}
+                <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive"></form>
+            {{ end }}
+        </div>
+    </div>
+
+    <div class="spacer-30"></div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <p>
+                <small>Name</small><br/>
+                <b>{{ .project.Name }}</b>
+            </p>
+            <div class="spacer-15"></div>
+        </div>
+        <div class="col-md-6">
+            <p>
+                <small>Status</small><br/>
+                {{ if .project }}
+                    <b>
+                        {{ if eq .project.Status.Value "active" }}
+                            <span class="text-green"><i class="fas fa-circle"></i>{{ .project.Status.Title }}</span>
+                        {{else}}
+                            <span class="text-orange"><i class="far fa-circle"></i>{{.project.Status.Title }}</span>
+                        {{end}}
+                    </b>
+                {{ end }}
+            </p>
+            <p>
+                <small>ID</small><br/>
+                <b>{{ .project.ID }}</b>
+            </p>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+
+{{end}}

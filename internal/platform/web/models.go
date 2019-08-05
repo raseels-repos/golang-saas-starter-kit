@@ -101,11 +101,16 @@ func NewEnumResponse(ctx context.Context, value interface{}, options ...interfac
 
 	for _, opt := range options {
 		optStr := fmt.Sprintf("%s", opt)
-		er.Options = append(er.Options, EnumOption{
-			Value:    optStr,
-			Title:    EnumValueTitle(optStr),
-			Selected: (value == opt),
-		})
+		opt := EnumOption{
+			Value: optStr,
+			Title: EnumValueTitle(optStr),
+		}
+
+		if optStr == er.Value {
+			opt.Selected = true
+		}
+
+		er.Options = append(er.Options, opt)
 	}
 
 	return er

@@ -1,0 +1,37 @@
+{{define "title"}}Update Project - {{ .project.Name }}{{end}}
+{{define "style"}}
+
+{{end}}
+{{define "content"}}
+    <form class="user" method="post" novalidate>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="inputName">Name</label>
+                    <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
+                           placeholder="enter name" name="Name" id="inputName" value="{{ .form.Name }}" required>
+                    {{template "invalid-feedback" dict "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                </div>
+                <div class="form-group">
+                    <label for="selectStatus">Status</label>
+                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Status" }}"
+                            id="selectStatus" name="Status">
+                        {{ range $idx, $t := .project.Status.Options }}
+                            <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
+                        {{ end }}
+                    </select>
+                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Status" }}
+                </div>
+            </div>
+        </div>
+        <div class="spacer-30"></div>
+        <div class="row">
+            <div class="col">
+                <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+            </div>
+        </div>
+    </form>
+{{end}}
+{{define "js"}}
+
+{{end}}

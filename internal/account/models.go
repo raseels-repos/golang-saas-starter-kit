@@ -68,7 +68,7 @@ func (m *Account) Response(ctx context.Context) *AccountResponse {
 		Country:   m.Country,
 		Zipcode:   m.Zipcode,
 		Timezone:  m.Timezone,
-		Status:    web.NewEnumResponse(ctx, m.Status, AccountStatus_Values),
+		Status:    web.NewEnumResponse(ctx, m.Status, AccountStatus_ValuesInterface()...),
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 	}
@@ -198,6 +198,15 @@ var AccountStatus_Values = []AccountStatus{
 	AccountStatus_Active,
 	AccountStatus_Pending,
 	AccountStatus_Disabled,
+}
+
+// AccountStatus_ValuesInterface returns the AccountStatus options as a slice interface.
+func AccountStatus_ValuesInterface() []interface{} {
+	var l []interface{}
+	for _, v := range AccountStatus_Values {
+		l = append(l, v.String())
+	}
+	return l
 }
 
 // Scan supports reading the AccountStatus value from the database.

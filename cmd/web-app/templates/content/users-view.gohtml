@@ -1,4 +1,4 @@
-{{define "title"}}Profile{{end}}
+{{define "title"}}User - {{ .user.Name }}{{end}}
 {{define "style"}}
 
 {{end}}
@@ -16,15 +16,15 @@
                     </p>
                 </div>
             </div>
-            <div class="spacer-10"></div>
-            <p class="font-10"><a href="https://gravatar.com" target="_blank">Update Avatar</a></p>
         </div>
         <div class="col-auto">
-            <a href="{{ .urlUsersUpdate }}" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
-            {{ $ctxUser := ContextUser $._Ctx }}
-            {{ if $ctxUser }}
-                {{ if ne .user.ID $ctxUser.ID }}
-                    <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive"></form>
+            {{ if HasRole $._Ctx "admin" }}
+                <a href="{{ .urlUsersUpdate }}" class="btn btn-outline-success"><i class="fal fa-edit"></i>Edit Details</a>
+                {{ $ctxUser := ContextUser $._Ctx }}
+                {{ if $ctxUser }}
+                    {{ if ne .user.ID $ctxUser.ID }}
+                        <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive"></form>
+                    {{ end }}
                 {{ end }}
             {{ end }}
         </div>

@@ -43,7 +43,7 @@ func (m *Project) Response(ctx context.Context) *ProjectResponse {
 		ID:        m.ID,
 		AccountID: m.AccountID,
 		Name:      m.Name,
-		Status:    web.NewEnumResponse(ctx, m.Status, ProjectStatus_Values),
+		Status:    web.NewEnumResponse(ctx, m.Status, ProjectStatus_ValuesInterface()...),
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 	}
@@ -131,6 +131,15 @@ const (
 var ProjectStatus_Values = []ProjectStatus{
 	ProjectStatus_Active,
 	ProjectStatus_Disabled,
+}
+
+// ProjectStatus_ValuesInterface returns the ProjectStatus options as a slice interface.
+func ProjectStatus_ValuesInterface() []interface{} {
+	var l []interface{}
+	for _, v := range ProjectStatus_Values {
+		l = append(l, v.String())
+	}
+	return l
 }
 
 // Scan supports reading the ProjectStatus value from the database.

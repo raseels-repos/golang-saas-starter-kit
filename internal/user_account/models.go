@@ -53,7 +53,7 @@ func (m *UserAccount) Response(ctx context.Context) *UserAccountResponse {
 		UserID:    m.UserID,
 		AccountID: m.AccountID,
 		Roles:     m.Roles,
-		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountStatus_Values),
+		Status:    web.NewEnumResponse(ctx, m.Status, UserAccountStatus_ValuesInterface()...),
 		CreatedAt: web.NewTimeResponse(ctx, m.CreatedAt),
 		UpdatedAt: web.NewTimeResponse(ctx, m.UpdatedAt),
 	}
@@ -169,6 +169,15 @@ var UserAccountStatus_Values = []UserAccountStatus{
 	UserAccountStatus_Disabled,
 }
 
+// UserAccountStatus_ValuesInterface returns the UserAccountStatus options as a slice interface.
+func UserAccountStatus_ValuesInterface() []interface{} {
+	var l []interface{}
+	for _, v := range UserAccountStatus_Values {
+		l = append(l, v.String())
+	}
+	return l
+}
+
 // Scan supports reading the UserAccountStatus value from the database.
 func (s *UserAccountStatus) Scan(value interface{}) error {
 	asBytes, ok := value.([]byte)
@@ -215,6 +224,15 @@ const (
 var UserAccountRole_Values = []UserAccountRole{
 	UserAccountRole_Admin,
 	UserAccountRole_User,
+}
+
+// UserAccountRole_ValuesInterface returns the UserAccountRole options as a slice interface.
+func UserAccountRole_ValuesInterface() []interface{} {
+	var l []interface{}
+	for _, v := range UserAccountRole_Values {
+		l = append(l, v.String())
+	}
+	return l
 }
 
 // String converts the UserAccountRole value to a string.

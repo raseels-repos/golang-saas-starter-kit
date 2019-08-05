@@ -1,1 +1,95 @@
 
+
+
+div.dataTables_wrapper div.dataTables_length {
+    flex: 0 0 50%;
+    max-width: 50%;
+    position: relative;
+    float: left;
+    padding: 0.75rem;
+}
+div.dataTables_wrapper div.dataTables_filter {
+    flex: 0 0 50%;
+    max-width: 50%;
+    position: relative;
+    float: right;
+    padding: 0.75rem;
+}
+
+div.dataTables_wrapper div.dataTables_length label {
+    margin-bottom: 0px;
+}
+div.dataTables_wrapper div.dataTables_filter label {
+    margin-bottom: 0px;
+}
+
+div.dataTables_wrapper div.dataTables_info {
+    flex: 0 0 50%;
+    max-width: 50%;
+    position: relative;
+    float: left;
+    padding: 0.75rem;
+}
+
+div.dataTables_wrapper div.dataTables_paginate {
+    flex: 0 0 50%;
+    max-width: 50%;
+    position: relative;
+    float: right;
+    padding: 0.75rem;
+}
+
+
+
+div.dataTable_card table.table-bordered {
+    border-left: 0px;
+    border-right: 0px;
+    border-top: 0px;
+    border-bottom: 0px;
+}
+
+div.dataTables_scrollFootInner th {
+    font-size: .8em;
+    font-weight: normal;
+}
+div.dataTables_scrollFootInner input, div.dataTables_scrollFootInner select {
+    font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    font-size: .8rem;
+    font-weight: 400;
+    border-radius: 0.35rem;
+    font-weight: normal;
+    border: 1px solid rgb(166, 166, 166);
+    color: #858796;
+}
+
+div.dataTable_card a.paginate_button{
+    position: relative;
+    display: inline-block;
+    padding: 0.5rem 0.75rem;
+    margin-left: -1px;
+    line-height: 1.25;
+    color: #007bff;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    font-size: .8em;
+}
+
+div.dataTable_card a.paginate_button.disabled{
+    color: #858796;
+}
+
+div.dataTable_card a.paginate_button.previous{
+    border-top-left-radius: 0.35em;
+    border-bottom-left-radius: 0.35em;
+}
+div.dataTable_card a.paginate_button.next{
+    border-top-right-radius: 0.35em;
+    border-bottom-right-radius: 0.35em;
+}
+
+div.dataTable_card a.paginate_button.current {
+    border-radius: 0;
+    color: #ffffff;
+    background-color: #007bff;
+}
+

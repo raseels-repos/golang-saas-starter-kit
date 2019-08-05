@@ -121,7 +121,7 @@ type EnumMultiResponse []EnumOption
 
 // NewEnumMultiResponse returns a display friendly format for a multi enum field.
 func NewEnumMultiResponse(ctx context.Context, selected []interface{}, options ...interface{}) EnumMultiResponse {
-	var er  EnumMultiResponse
+	var er EnumMultiResponse
 
 	for _, opt := range options {
 		optStr := fmt.Sprintf("%s", opt)
@@ -136,7 +136,6 @@ func NewEnumMultiResponse(ctx context.Context, selected []interface{}, options .
 				opt.Selected = true
 			}
 		}
-
 
 		er = append(er, opt)
 	}

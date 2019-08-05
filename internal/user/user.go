@@ -280,6 +280,10 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Create")
 	defer span.Finish()
 
+	if req.Timezone != nil && *req.Timezone == "" {
+		req.Timezone = nil
+	}
+
 	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
@@ -330,15 +334,11 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 		FirstName:    req.FirstName,
 		LastName:     req.LastName,
 		Email:        req.Email,
+		Timezone:     req.Timezone,
 		PasswordHash: passwordHash,
 		PasswordSalt: passwordSalt,
-		Timezone:     "America/Anchorage",
 		CreatedAt:    now,
 		UpdatedAt:    now,
-	}
-
-	if req.Timezone != nil {
-		u.Timezone = *req.Timezone
 	}
 
 	// Build the insert SQL statement.
@@ -542,8 +542,8 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	if req.Email != nil {
 		fields = append(fields, query.Assign("email", req.Email))
 	}
-	if req.Timezone != nil {
-		fields = append(fields, query.Assign("timezone", req.Timezone))
+	if req.Timezone != nil && *req.Timezone != "" {
+		fields = append(fields, query.Assign("timezone", *req.Timezone))
 	}
 
 	// If there's nothing to update we can quit early.

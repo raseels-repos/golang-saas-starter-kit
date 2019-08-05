@@ -1,28 +1,27 @@
 {{ define "partials/site-topbar" }}
     <!-- Topbar -->
-    <nav class="navbar navbar-expand  navbar-dark bg-primary topbar mb-4 static-top shadow">
 
 
-        <a class="navbar-brand" href="#">Navbar</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+    <nav class="navbar navbar-dark bg-primary topbar navbar-fixed-top shadow" style="position: fixed; right: 0; left: 0; z-index: 1030;">
 
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav justify-content-center" style="justify-content: center!important;float:right;">
-                <li class="nav-item">
-                    <a class="nav-link" href="/">Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/features">Features</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/support">Support</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/api">API</a>
-                </li>
-        </div>
+
+        <a class="my-0 mr-md-auto  navbar-brand" href="/">
+            <img src="{{ SiteAssetUrl "/images/saas-stater-kit-logo-350x100.png"}}"  height="30" alt="SaaS Starter Kit">
+        </a>
+
+        <nav class="my-2 my-md-0 mr-md-3">
+            <a class="p-2 text-white" href="/">Home</a>
+            <a class="p-2 text-white" href="/pricing">Pricing</a>
+            <a class="p-2 text-white" href="/support">Support</a>
+            <a class="p-2 text-white" href="/api">API</a>
+            <a class="p-2 text-white" href="/user/login"><i class="far fa-user"></i> Login</a>
+        </nav>
+        <a class="btn btn-purple" href="/signup">Sign up</a>
+
+
+
+
+
 
     </nav>
     <!-- End of Topbar -->

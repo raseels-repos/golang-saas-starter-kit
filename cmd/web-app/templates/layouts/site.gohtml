@@ -10,9 +10,9 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <meta name="description" content="{{block "description" .}}{{end}} ">
-        <meta name="author" content="{{block "author" .}}{{end}}">
+        <meta name="author" content="Geeks Accelerator">
 
-        <link rel="icon" type="image/png" sizes="16x16" href="{{ SiteAssetUrl "/assets/images/favicon.png" }}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ SiteAssetUrl "/images/saas-stater-kit-icon-200x200.png" }}">
 
         <!-- ============================================================== -->
         <!-- Custom fonts for this template                                 -->
@@ -45,6 +45,11 @@
     <body id="page-top">
 
 
+    <!-- ============================================================== -->
+    <!-- Topbar                                                         -->
+    <!-- ============================================================== -->
+    {{ template "partials/site-topbar" . }}
+    <!-- End of Topbar -->
 
         <!-- ============================================================== -->
         <!-- Page Wrapper                                                   -->
@@ -61,19 +66,15 @@
                 <!-- ============================================================== -->
                 <div id="content">
 
-                    <!-- ============================================================== -->
-                    <!-- Topbar                                                         -->
-                    <!-- ============================================================== -->
-                    {{ template "partials/site-topbar" . }}
-                    <!-- End of Topbar -->
+
 
                     <!-- ============================================================== -->
                     <!-- Page Content                                                   -->
                     <!-- ============================================================== -->
-                    <div class="container-fluid" id="page-content">
+
 
                         {{ template "content" . }}
-                    </div>
+
                     <!-- End Page Content  -->
 
                 </div>
@@ -82,60 +83,7 @@
                 <!-- ============================================================== -->
                 <!-- Footer                                                         -->
                 <!-- ============================================================== -->
-                <footer class="bg-white mt-5 pt-5">
-
-
-                    <div class="container mt-5 pt-5">
-                        <div class="row">
-
-                            <div class="col-sm-9 col-lg-6 mb-7">
-                                <a class="d-inline-flex align-items-center mb-3" href="/" aria-label="Startup Venture Studio">
-                                    <img src="https://dzuyel7n94hma.cloudfront.net/venturestudio/img/geeks-venture-startup-studio-software-alaska-icon-200x150.png?v=1564780012" height="100" alt="Startup Venture Studio Building and Investing in Software Startups"></a>
-                                    <p class="small text-white-70">Our Startup Studio partners with entrepreneurs to create global software-as-a-service (SaaS) startups from Alaska.</p>
-                            </div>
-
-                            <div class="col-6 col-sm-6 col-lg-3 ml-lg-auto mb-4">
-                                <h3 class="h6 text-white">Build &amp; Invest</h3>
-                                <ul class="list-unstyled">
-                                    <li><a href="/">Home</a></li>
-                                    <li><a href="/features">Features</a></li>
-                                    <li><a href="/support">Support</a></li>
-                                    <li><a href="/api">API</a></li>
-                                </ul>
-                            </div>
-                            <div class="col-6 col-sm-6 col-lg-3 mb-4">
-                                <h3 class="h6 text-white">Startup Studio</h3>
-                                <ul class="list-unstyled">
-                                    <li><a href="/legal/privacy">Privacy Policy</a></li>
-                                    <li><a href="/legal/terms">Terms of Service</a></li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-sm-6 mb-5">
-                                <ul class="list-inline mb-0">
-                                    <li class="list-inline-item"><a class="btn btn-sm btn-icon btn-secondary" href="https://www.linkedin.com/company/geeks-accelerator"><span class="fab fa-linkedin-in"></span></a></li>
-
-                                    <li class="list-inline-item"><a class="btn btn-sm btn-icon btn-secondary" href="https://gitlab.com/geeks-accelerator"><span class="fab fa-gitlab"></span></a></li>
-                                </ul>
-                            </div>
-
-                            <div class="col-sm-6 text-sm-right">
-                                <p class="small text-white-70 mb-0">&copy; Copyright 2019 Geeks Accelerator.</p>
-                            </div>
-                        </div>
-
-
-                        <div class="row align-items-center">
-                            <div class="col-sm-6 mb-5">
-                                {{ template "partials/buildinfo" . }}
-                            </div>
-                        </div>
-
-
-
-                    </div>
-                </footer>
+                {{ template "partials/site-footer" . }}
                 <!-- End of Footer -->
 
             </div>

@@ -1,0 +1,56 @@
+{{ define "partials/site-footer" }}
+<footer class="bg-white mt-5 pt-5">
+
+
+    <div class="container mt-5 pt-5">
+        <div class="row">
+
+            <div class="col-sm-9 col-lg-6 mb-7">
+                <a class="d-inline-flex align-items-center mb-3" href="/" aria-label="Starter Kit for Software-as-a-Service">
+                    <img src="{{ SiteAssetUrl "/images/saas-stater-kit-icon-200x200.png" }}" height="50" alt="Starter Kit for Software-as-a-Service"></a>
+                <p class="small text-white-70">Our software-as-a-service digitizes your businesses processes to increase performance and efficiency.</p>
+            </div>
+
+            <div class="col-6 col-sm-6 col-lg-3 ml-lg-auto mb-4">
+                <h3 class="h6">SaaS</h3>
+                <ul class="list-unstyled">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/pricing">Pricing</a></li>
+                    <li><a href="/support">Support</a></li>
+                    <li><a href="/api">API</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-sm-6 col-lg-3 mb-4">
+                <h3 class="h6">Legal</h3>
+                <ul class="list-unstyled">
+                    <li><a href="/legal/privacy">Privacy Policy</a></li>
+                    <li><a href="/legal/terms">Terms of Service</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6 mb-5">
+                <ul class="list-inline mb-0">
+                    <li class="list-inline-item"><a class="btn btn-sm btn-icon btn-secondary" href="https://www.linkedin.com/company/geeks-accelerator"><span class="fab fa-linkedin-in"></span></a></li>
+
+                    <li class="list-inline-item"><a class="btn btn-sm btn-icon btn-secondary" href="https://gitlab.com/geeks-accelerator"><span class="fab fa-gitlab"></span></a></li>
+                </ul>
+            </div>
+
+            <div class="col-sm-6 text-sm-right">
+                <p class="small text-white-70 mb-0">&copy; Copyright 2019 Geeks Accelerator.</p>
+            </div>
+        </div>
+
+
+        <div class="row align-items-center">
+            <div class="col-sm-6 mb-5">
+                {{ template "partials/buildinfo" . }}
+            </div>
+        </div>
+
+
+
+    </div>
+</footer>
+{{end}}

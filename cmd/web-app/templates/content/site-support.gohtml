@@ -1,4 +1,5 @@
 {{define "title"}}Support{{end}}
+{{define "description"}}Let us help with your business processes. Connect with us and let us know how we can help you.{{end}}
 {{define "style"}}
 
 {{end}}
@@ -15,30 +16,45 @@
         <div class="row">
             <div class="col">
 
-                <p>We are excited to help our client’s transform their paper or manual processes into digital workflows. We are as passionate as you to drive innovative change in various industries to raise the bar on what defines organizational excellence. We are leaders in our space, providing best practices for digitizing standard operating procedures. Like you, we are building, learning, and iterating. If we can't answer your question in the Knowledge Base below, contact us 24/7 for support via email, phone or chat.
+                <p>We are excited to help our client’s transform their businesses processes with our Software-as-a-Service. We are as passionate as you to drive innovative change in various industries to raise the bar on what defines organizational excellence.</p>
 
-                </p>
-
-
-                <h2>Contact us 24/7 for support via email, phone and chat!
-                </h2>
+                <p>We are leaders in our space, providing best practices for digitizing businesses processes. Like you, we are building, learning, and iterating. If we can't answer your question in the Knowledge Base below, contact us 24/7 for support via email, phone or chat.</p>
 
             </div>
         </div>
 
 
-
-
         <div class="row mt-5 mb-5">
-            <div class="col">
+            <div class="col text-center">
+                <h2 class="h2 text-purple">Search our Knowledge Base</h2>
+
+                <form action="https://keeni.zendesk.com/hc/en-us/search" method="GET">
+
+                    <div class="input-group">
+                        <input type="text" class="form-control font-24" name="query" placeholder="What can we help with?">
+
+                        <div class="input-group-append">
+                            <input type="submit" value="Search" class="btn btn-primary font-24">
+                        </div>
+                    </div>
+                    <input type="hidden" name="utf8" value="✓">
+                </form>
+
             </div>
         </div>
 
+
         <div class="row mt-5 mb-5">
+            <div class="col text-center">
+                <h2 class="h2 text-purple">Contact us 24/7 for support via email, phone and chat!</h2>
+            </div>
+        </div>
+
+        <div class="row mb-5">
 
                 <div class="col-sm-6 text-center">
-                    <h3 class="h2"><i class="fal fa-envelope"></i>Email Us</h3>
-                    <a href="mailto:support@keeni.space">support@keeni.space</a>
+                    <h3 class="h2"><i class="far fa-envelope"></i>Email Us</h3>
+                    <a href="mailto:support@ExampleDomain.com">support@ExampleDomain.com</a>
 
 
 
@@ -46,9 +62,9 @@
                 </div>
 
                 <div class="col-sm-6 text-center">
-                    <h3 class="h2"><i class="fal fa-phone"></i>Call Us</h3>
+                    <h3 class="h2"><i class="fas fa-phone"></i>Call Us</h3>
 
-                    <a href="tel:1-601-885-3364">+1 (601) 885-3364‬</a>
+                    <a href="tel:1-907-100-2000">+1 (907) 100-2000</a>
 
 
                 </div>
@@ -58,8 +74,24 @@
             </div>
 
 
-
+        <hr class="featurette-divider mt-5 mb-5">
     </div>
+
+
+    <!-- Start the Signup Container -->
+    <div class="container ">
+        <div class="row pt-5">
+            <div class="col-sm-8">
+                <h3 class="h2 text-success">Interested in our Service?</h3>
+                <p>Simplify your business processes with our innovative solution. Signup for your free trial now!</p>
+            </div>
+            <div class="col-sm-4 text-right">
+                <a class="btn btn-info" href="/signup">Try it Now</a>
+            </div>
+        </div>
+    </div>
+    <!-- /End the Signup Container -->
+
 
 
 {{end}}

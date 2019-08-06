@@ -26,6 +26,10 @@
                     {{ $ctxUser := ContextUser $._Ctx }}
                     {{ if $ctxUser }}
                         {{ if ne .user.ID $ctxUser.ID }}
+
+
+                            <a href="{{ .urlUserVirtualLogin }}" class="dropdown-item">Virtual Login</a>
+
                             <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive User"  class="dropdown-item"></form>
                         {{ end }}
                     {{ end }}

@@ -373,6 +373,7 @@ func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	data["urlUsersUpdate"] = urlUsersUpdate(userID)
+	data["urlUserVirtualLogin"] = urlUserVirtualLogin(userID)
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-view.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

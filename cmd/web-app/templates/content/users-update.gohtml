@@ -60,7 +60,7 @@
                         <div class="form-group">
                             <label for="inputRoles">Roles</label>
                             <span class="help-block "><small>- Select at least one role.</small></span>
-                            {{ range $r := .roles }}
+                            {{ range $r := .roles.Options }}
                                 <div class="form-check">
                                     <input class="form-check-input {{ ValidationFieldClass $.validationErrors "Roles" }}"
                                            type="checkbox" name="Roles"

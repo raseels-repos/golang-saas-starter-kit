@@ -102,7 +102,11 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			case "id":
 				v.Value = fmt.Sprintf("%d", q.ID)
 			case "name":
-				v.Value = q.Name
+				if strings.TrimSpace(q.Name) == "" {
+					v.Value = q.Email
+				} else {
+					v.Value = q.Name
+				}
 				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlUsersView(q.ID), v.Value)
 			case "status":
 				v.Value = q.Status.String()
@@ -112,13 +116,13 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 				switch q.Status {
 				case user_account.UserAccountStatus_Active:
 					subStatusClass = "text-green"
-					subStatusIcon = "far fa-dot-circle"
+					subStatusIcon = "fas fa-circle"
 				case user_account.UserAccountStatus_Invited:
-					subStatusClass = "text-blue"
-					subStatusIcon = "far fa-unicorn"
+					subStatusClass = "text-aqua"
+					subStatusIcon = "far fa-dot-circle"
 				case user_account.UserAccountStatus_Disabled:
 					subStatusClass = "text-orange"
-					subStatusIcon = "far fa-circle"
+					subStatusIcon = "fas fa-circle-notch"
 				}
 
 				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s mr-1'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))

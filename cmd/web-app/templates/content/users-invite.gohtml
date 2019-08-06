@@ -15,21 +15,10 @@
     <form method="POST">
 
         <div class="row">
-            <div class="col-md-6">
-                <div class="card">
+            <div class="col">
+
+                <div class="card mb-4">
                     <div class="card-body">
-
-                        <div class="form-group">
-                            <label for="selectRoles">Roles <small>- Select at least one role for invited user(s).</small></label>
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}"
-                                    id="selectRoles" name="Roles" multiple="multiple">
-                                {{ range $t := .roles }}
-                                    <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
-                                {{ end }}
-                            </select>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Roles" }}
-                        </div>
-
 
                         <div id="email-form-groups">
                             <div class="form-group">
@@ -41,23 +30,34 @@
                         <p class="mt-2 mb-0"><a href="javascript:void(0)" class="btn btn-outline-primary btn-sm" id="inviteUser1"><i class="fas fa-user-plus mr-1"></i>Add another invitation</a></p>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-6">
+
                 <div class="card">
                     <div class="card-body">
+
                         <div class="form-group">
-                            <label for="selectRoles">Roles</label>
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}"
-                                    id="selectRoles" name="Roles" multiple="multiple">
-                                {{ range $t := .roles.Options }}
-                                    <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
-                                {{ end }}
-                            </select>
+                            <label for="selectRoles">Roles <small>- Select at least one role for invited user(s).</small></label>
+
+
+                            {{ range $t := .roles.Options }}
+                                <div class="form-check">
+                                    <input class="form-check-input {{ ValidationFieldClass $.validationErrors "Roles" }}"
+                                           type="checkbox" name="Roles"
+                                           value="{{ $t.Value }}" id="inputRole{{ $t.Value }}"
+                                           {{ if $t.Selected  }}checked="checked"{{ end }}>
+                                    <label class="form-check-label" for="inputRole{{ $t.Value }}">
+                                        {{ $t.Title }}
+                                    </label>
+
+                                </div>
+                            {{ end }}
                             {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Roles" }}
                         </div>
                     </div>
                 </div>
+
+
             </div>
+
         </div>
 
 

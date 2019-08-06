@@ -112,8 +112,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Redirect the user to the dashboard.
-			http.Redirect(w, r, redirectUri, http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, redirectUri, http.StatusFound)
 		}
 
 		return false, nil
@@ -148,9 +147,7 @@ func (h *User) Logout(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	}
 
 	// Redirect the user to the root page.
-	http.Redirect(w, r, "/", http.StatusFound)
-
-	return nil
+	return web.Redirect(ctx, w, r, "/", http.StatusFound)
 }
 
 // ResetPassword allows a user to perform forgot password.
@@ -281,8 +278,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Redirect the user to the dashboard.
-			http.Redirect(w, r, "/", http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
 		_, err = user.ParseResetHash(ctx, h.SecretKey, resetHash, ctxValues.Now)
@@ -432,13 +428,8 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			webcontext.SessionFlashSuccess(ctx,
 				"Profile Updated",
 				"User profile successfully updated.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, "/user", http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/user", http.StatusFound)
 		}
 
 		return false, nil
@@ -584,16 +575,8 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 				fmt.Sprintf("You are now virtually logged into user %s.",
 					usr.Response(ctx).Name))
 
-			// Write the session to the client.
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
-
 			// Redirect the user to the dashboard with the new credentials.
-			http.Redirect(w, r, "/", http.StatusFound)
-
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
 		return false, nil
@@ -724,9 +707,7 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 	}
 
 	// Redirect the user to the dashboard with the new credentials.
-	http.Redirect(w, r, "/", http.StatusFound)
-
-	return nil
+	return web.Redirect(ctx, w, r, "/", http.StatusFound)
 }
 
 // VirtualLogin handles switching the scope of the context to another user.
@@ -800,16 +781,8 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 				fmt.Sprintf("You are now logged into account %s.",
 					acc.Response(ctx).Name))
 
-			// Write the session to the client.
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
-
 			// Redirect the user to the dashboard with the new credentials.
-			http.Redirect(w, r, "/", http.StatusFound)
-
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
 		return false, nil

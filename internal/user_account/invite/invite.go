@@ -26,9 +26,6 @@ var (
 
 	// ErrUserAccountActive occurs when the user already has an active user_account entry.
 	ErrUserAccountActive = errors.New("User already active.")
-
-	// ErrInviteUserPasswordSet occurs when the the reset hash exceeds the expiration.
-	ErrInviteUserPasswordSet = errors.New("User password set")
 )
 
 // SendUserInvites sends emails to the users inviting them to join an account.
@@ -181,7 +178,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 }
 
 // AcceptInvite updates the user using the provided invite hash.
-func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) (*InviteHash, error) {
+func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) (*user_account.UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInvite")
 	defer span.Finish()
 
@@ -193,7 +190,7 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		return nil, err
 	}
 
-	hash, err := ParseInviteHash(ctx, secretKey, req.InviteHash, now)
+	hash, err := ParseInviteHash(ctx, req.InviteHash, secretKey, now)
 	if err != nil {
 		return nil, err
 	}
@@ -216,24 +213,86 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		AccountID: hash.AccountID,
 	})
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	// Ensure the entry has the status of invited.
 	if usrAcc.Status != user_account.UserAccountStatus_Invited {
 		// If the entry is already active
 		if usrAcc.Status == user_account.UserAccountStatus_Active {
-			return hash, errors.WithStack(ErrUserAccountActive)
+			return usrAcc, errors.WithStack(ErrUserAccountActive)
+		}
+		return usrAcc, errors.WithStack(ErrNoPendingInvite)
+	}
+
+	// If the user already has a password set, then just update the user_account entry to status of active.
+	// The user will need to login and should not be auto-authenticated.
+	if len(u.PasswordHash) > 0 {
+		usrAcc.Status = user_account.UserAccountStatus_Active
+
+		err = user_account.Update(ctx, auth.Claims{}, dbConn, user_account.UserAccountUpdateRequest{
+			UserID:    usrAcc.UserID,
+			AccountID: usrAcc.AccountID,
+			Status:    &usrAcc.Status,
+		}, now)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return usrAcc, nil
+}
+
+// AcceptInviteUser updates the user using the provided invite hash.
+func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUserRequest, secretKey string, now time.Time) (*user_account.UserAccount, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInviteUser")
+	defer span.Finish()
+
+	v := webcontext.Validator()
+
+	// Validate the request.
+	err := v.StructCtx(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := ParseInviteHash(ctx, req.InviteHash, secretKey, now)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := user.Read(ctx, auth.Claims{}, dbConn,
+		user.UserReadRequest{ID: hash.UserID, IncludeArchived: true})
+	if err != nil {
+		return nil, err
+	}
+
+	if u.ArchivedAt != nil && !u.ArchivedAt.Time.IsZero() {
+		err = user.Restore(ctx, auth.Claims{}, dbConn, user.UserRestoreRequest{ID: hash.UserID}, now)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	usrAcc, err := user_account.Read(ctx, auth.Claims{}, dbConn, user_account.UserAccountReadRequest{
+		UserID:    hash.UserID,
+		AccountID: hash.AccountID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the entry has the status of invited.
+	if usrAcc.Status != user_account.UserAccountStatus_Invited {
+		// If the entry is already active
+		if usrAcc.Status == user_account.UserAccountStatus_Active {
+			return usrAcc, errors.WithStack(ErrUserAccountActive)
 		}
 		return nil, errors.WithStack(ErrNoPendingInvite)
 	}
 
-	if len(u.PasswordHash) > 0 {
-		// Do not update the password for a user that already has a password set.
-		return nil, errors.WithStack(ErrInviteUserPasswordSet)
-	}
-
-	// These two calls, user.Update and user.UpdatePassword should probably be in a transaction!
+	// These three calls, user.Update,  user.UpdatePassword, and user_account.Update
+	// should probably be in a transaction!
 	err = user.Update(ctx, auth.Claims{}, dbConn, user.UserUpdateRequest{
 		ID:        hash.UserID,
 		Email:     &req.Email,
@@ -254,15 +313,15 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		return nil, err
 	}
 
-	activeStatus := user_account.UserAccountStatus_Active
+	usrAcc.Status = user_account.UserAccountStatus_Active
 	err = user_account.Update(ctx, auth.Claims{}, dbConn, user_account.UserAccountUpdateRequest{
 		UserID:    usrAcc.UserID,
 		AccountID: usrAcc.AccountID,
-		Status:    &activeStatus,
+		Status:    &usrAcc.Status,
 	}, now)
 	if err != nil {
 		return nil, err
 	}
 
-	return hash, nil
+	return usrAcc, nil
 }

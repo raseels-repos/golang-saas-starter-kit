@@ -40,12 +40,10 @@ func (h *Root) indexDashboard(ctx context.Context, w http.ResponseWriter, r *htt
 
 // indexDefault loads the root index page when a user has no authentication.
 func (u *Root) indexDefault(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-
 	return u.Renderer.Render(ctx, w, r, tmplLayoutSite, "site-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
-
 }
 
-// indexDefault loads the root index page when a user has no authentication.
+// SitePage loads the page with the layout for site instead of the app base.
 func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	var tmpName string
@@ -63,18 +61,15 @@ func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	case "/legal/terms":
 		tmpName = "legal-terms.gohtml"
 	default:
-		http.Redirect(w, r, "/", http.StatusFound)
-		return nil
+		return web.Redirect(ctx, w, r, "/", http.StatusFound)
 	}
 
 	return u.Renderer.Render(ctx, w, r, tmplLayoutSite, tmpName, web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
-
 }
 
 // IndexHtml redirects /index.html to the website root page.
 func (u *Root) IndexHtml(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
-	return nil
+	return web.Redirect(ctx, w, r, "/", http.StatusMovedPermanently)
 }
 
 // RobotHandler returns a robots.txt response.

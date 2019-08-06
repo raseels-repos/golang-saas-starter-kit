@@ -203,13 +203,8 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 			webcontext.SessionFlashSuccess(ctx,
 				"Project Created",
 				"Project successfully created.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, urlProjectsView(usr.ID), http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, urlProjectsView(usr.ID), http.StatusFound)
 		}
 
 		return false, nil
@@ -266,13 +261,8 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 				webcontext.SessionFlashSuccess(ctx,
 					"Project Archive",
 					"Project successfully archive.")
-				err = webcontext.ContextSession(ctx).Save(r, w)
-				if err != nil {
-					return false, err
-				}
 
-				http.Redirect(w, r, urlProjectsIndex(), http.StatusFound)
-				return true, nil
+				return true, web.Redirect(ctx, w, r, urlProjectsIndex(), http.StatusFound)
 			}
 		}
 
@@ -347,13 +337,8 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 			webcontext.SessionFlashSuccess(ctx,
 				"Project Updated",
 				"Project successfully updated.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, urlProjectsView(req.ID), http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, urlProjectsView(req.ID), http.StatusFound)
 		}
 
 		return false, nil

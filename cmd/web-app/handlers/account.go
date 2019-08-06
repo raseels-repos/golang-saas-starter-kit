@@ -209,13 +209,8 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			webcontext.SessionFlashSuccess(ctx,
 				"Account Updated",
 				"Account profile successfully updated.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, "/account", http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/account", http.StatusFound)
 		}
 
 		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)

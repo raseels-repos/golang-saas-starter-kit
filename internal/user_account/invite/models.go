@@ -32,6 +32,11 @@ type InviteHash struct {
 
 // AcceptInviteRequest defines the fields need to complete an invite request.
 type AcceptInviteRequest struct {
+	InviteHash string `json:"invite_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+}
+
+// AcceptInviteUserRequest defines the fields need to complete an invite request.
+type AcceptInviteUserRequest struct {
 	InviteHash      string  `json:"invite_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	Email           string  `json:"email" validate:"required,email" example:"gabi@geeksinthewoods.com"`
 	FirstName       string  `json:"first_name" validate:"required" example:"Gabi"`
@@ -67,12 +72,12 @@ func NewInviteHash(ctx context.Context, secretKey, userID, accountID, requestIp 
 }
 
 // ParseInviteHash extracts the details encrypted in the hash string.
-func ParseInviteHash(ctx context.Context, secretKey string, str string, now time.Time) (*InviteHash, error) {
+func ParseInviteHash(ctx context.Context, encrypted, secretKey string, now time.Time) (*InviteHash, error) {
 	crypto, err := symcrypto.New(secretKey)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	hashStr, err := crypto.Decrypt(str)
+	hashStr, err := crypto.Decrypt(encrypted)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

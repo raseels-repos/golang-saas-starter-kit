@@ -256,3 +256,16 @@ func StaticHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, 
 
 	return nil
 }
+
+// Redirect ensures the session is flushed to the browser before the redirect is issued.
+func Redirect(ctx context.Context, w http.ResponseWriter, r *http.Request, url string, code int) error {
+	if sess := webcontext.ContextSession(ctx); sess != nil {
+		if err := sess.Save(r, w); err != nil {
+			return err
+		}
+	}
+
+	http.Redirect(w, r, url, code)
+
+	return nil
+}

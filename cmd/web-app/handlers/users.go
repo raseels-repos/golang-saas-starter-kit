@@ -259,13 +259,8 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			webcontext.SessionFlashSuccess(ctx,
 				"User Created",
 				"User successfully created.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, urlUsersView(usr.ID), http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, urlUsersView(usr.ID), http.StatusFound)
 		}
 
 		return false, nil
@@ -333,13 +328,8 @@ func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request
 				webcontext.SessionFlashSuccess(ctx,
 					"User Archive",
 					"User successfully archive.")
-				err = webcontext.ContextSession(ctx).Save(r, w)
-				if err != nil {
-					return false, err
-				}
 
-				http.Redirect(w, r, urlUsersIndex(), http.StatusFound)
-				return true, nil
+				return true, web.Redirect(ctx, w, r, urlUsersIndex(), http.StatusFound)
 			}
 		}
 
@@ -483,13 +473,8 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			webcontext.SessionFlashSuccess(ctx,
 				"User Updated",
 				"User successfully updated.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
-			http.Redirect(w, r, urlUsersView(req.ID), http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, urlUsersView(req.ID), http.StatusFound)
 		}
 
 		return false, nil
@@ -607,13 +592,7 @@ func (h *Users) Invite(ctx context.Context, w http.ResponseWriter, r *http.Reque
 					"No users were invited.")
 			}
 
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
-
-			http.Redirect(w, r, urlUsersIndex(), http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, urlUsersIndex(), http.StatusFound)
 		}
 
 		return false, nil
@@ -652,7 +631,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 	}
 
 	//
-	req := new(invite.AcceptInviteRequest)
+	req := new(invite.AcceptInviteUserRequest)
 	data := make(map[string]interface{})
 	f := func() (bool, error) {
 
@@ -670,30 +649,33 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			// Append the query param value to the request.
 			req.InviteHash = inviteHash
 
-			hash, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			hash, err := invite.AcceptInviteUser(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case invite.ErrInviteExpired:
 					webcontext.SessionFlashError(ctx,
 						"Invite Expired",
 						"The invite has expired.")
+
 					return false, nil
+
 				case invite.ErrUserAccountActive:
 					webcontext.SessionFlashError(ctx,
 						"User already Active",
-						"The user already is already active for the account. Try to login or use forgot password.")
-					http.Redirect(w, r, "/user/login", http.StatusFound)
-					return true, nil
-				case invite.ErrInviteUserPasswordSet:
+						"The user is already is already active for the account. Try to login or use forgot password.")
+
+					return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
+
+				case invite.ErrNoPendingInvite:
 					webcontext.SessionFlashError(ctx,
-						"Invite already Accepted",
+						"Invite Accepted",
 						"The invite has already been accepted. Try to login or use forgot password.")
-					http.Redirect(w, r, "/user/login", http.StatusFound)
-					return true, nil
+
+					return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
+
 				case user_account.ErrNotFound:
 					return false, err
-				case invite.ErrNoPendingInvite:
-					return false, err
+
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
@@ -732,36 +714,57 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Redirect the user to the dashboard.
-			http.Redirect(w, r, "/", http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
-		hash, err := invite.ParseInviteHash(ctx, h.SecretKey, inviteHash, ctxValues.Now)
+		usrAcc, err := invite.AcceptInvite(ctx, h.MasterDB, invite.AcceptInviteRequest{
+			InviteHash: inviteHash,
+		}, h.SecretKey, ctxValues.Now)
 		if err != nil {
+
 			switch errors.Cause(err) {
 			case invite.ErrInviteExpired:
 				webcontext.SessionFlashError(ctx,
 					"Invite Expired",
 					"The invite has expired.")
-				return false, nil
-			case invite.ErrInviteUserPasswordSet:
+
+				return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
+
+			case invite.ErrUserAccountActive:
 				webcontext.SessionFlashError(ctx,
-					"Invite already Accepted",
+					"User already Active",
+					"The user is already is already active for the account. Try to login or use forgot password.")
+
+				return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
+
+			case invite.ErrNoPendingInvite:
+				webcontext.SessionFlashError(ctx,
+					"Invite Accepted",
 					"The invite has already been accepted. Try to login or use forgot password.")
-				http.Redirect(w, r, "/user/login", http.StatusFound)
-				return true, nil
+
+				return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
+
+			case user_account.ErrNotFound:
+				return false, err
 			default:
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)
+
 					return false, nil
 				} else {
 					return false, err
 				}
 			}
+		} else if usrAcc.Status == user_account.UserAccountStatus_Active {
+			webcontext.SessionFlashError(ctx,
+				"Invite Accepted",
+				"The invite has been accepted. Login to continue.")
+
+			return true, web.Redirect(ctx, w, r, "/user/login", http.StatusFound)
 		}
 
 		// Read user by ID with no claims.
-		usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, hash.UserID)
+		usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, usrAcc.UserID)
 		if err != nil {
 			return false, err
 		}
@@ -791,7 +794,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 
 	data["form"] = req
 
-	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(invite.AcceptInviteRequest{})); ok {
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(invite.AcceptInviteUserRequest{})); ok {
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 

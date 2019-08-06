@@ -21,7 +21,7 @@
                             <label for="selectRoles">Roles</label>
                             <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}"
                                     id="selectRoles" name="Roles" multiple="multiple">
-                                {{ range $t := .roles }}
+                                {{ range $t := .roles.Options }}
                                     <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
                                 {{ end }}
                             </select>

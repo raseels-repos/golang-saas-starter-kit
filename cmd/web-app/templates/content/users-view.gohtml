@@ -67,7 +67,7 @@
                         <small>Role</small><br/>
                         {{ if .userAccount }}
                             <b>
-                                {{ range $r := .userAccount.Roles }}{{ if $r.Selected }}
+                                {{ range $r := .userAccount.Roles.Options }}{{ if $r.Selected }}
                                     {{ if eq $r.Value "admin" }}
                                         <span class="text-pink"><i class="far fa-kiss-wink-heart mr-1"></i>{{ $r.Title }}</span>
                                     {{else}}

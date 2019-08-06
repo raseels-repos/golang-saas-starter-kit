@@ -148,13 +148,13 @@ func TestSendUserInvites(t *testing.T) {
 
 		// Ensure validation is working by trying ResetConfirm with an empty request.
 		{
-			expectedErr := errors.New("Key: 'AcceptInviteRequest.invite_hash' Error:Field validation for 'invite_hash' failed on the 'required' tag\n" +
-				"Key: 'AcceptInviteRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
-				"Key: 'AcceptInviteRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
-				"Key: 'AcceptInviteRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
-				"Key: 'AcceptInviteRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
-				"Key: 'AcceptInviteRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{}, secretKey, now)
+			expectedErr := errors.New("Key: 'AcceptInviteUserRequest.invite_hash' Error:Field validation for 'invite_hash' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteUserRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteUserRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteUserRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteUserRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteUserRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
+			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{}, secretKey, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -174,7 +174,7 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure the TTL is enforced.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
 				InviteHash:      inviteHashes[0],
 				Email:           inviteEmails[0],
 				FirstName:       "Foo",
@@ -194,7 +194,7 @@ func TestSendUserInvites(t *testing.T) {
 		for idx, inviteHash := range inviteHashes {
 
 			newPass := uuid.NewRandom().String()
-			hash, err := AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			hash, err := AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
 				InviteHash:      inviteHash,
 				Email:           inviteEmails[idx],
 				FirstName:       "Foo",
@@ -227,7 +227,7 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure the reset hash does not work after its used.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
 				InviteHash:      inviteHashes[0],
 				Email:           inviteEmails[0],
 				FirstName:       "Foo",
@@ -237,7 +237,7 @@ func TestSendUserInvites(t *testing.T) {
 			}, secretKey, now)
 			if errors.Cause(err) != ErrUserAccountActive {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
-				t.Logf("\t\tWant: %+v", ErrInviteUserPasswordSet)
+				t.Logf("\t\tWant: %+v", ErrUserAccountActive)
 				t.Fatalf("\t%s\tInviteAccept verify reuse failed.", tests.Failed)
 			}
 			t.Logf("\t%s\tInviteAccept verify reuse disabled ok.", tests.Success)

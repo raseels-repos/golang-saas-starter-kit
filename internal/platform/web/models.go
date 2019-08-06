@@ -117,11 +117,19 @@ func NewEnumResponse(ctx context.Context, value interface{}, options ...interfac
 }
 
 // EnumResponse is a response friendly format for displaying a multi select enum.
-type EnumMultiResponse []EnumOption
+type EnumMultiResponse struct {
+	Values  []string     `json:"values" example:"active_etc"`
+	Options []EnumOption `json:"options,omitempty"`
+}
 
 // NewEnumMultiResponse returns a display friendly format for a multi enum field.
 func NewEnumMultiResponse(ctx context.Context, selected []interface{}, options ...interface{}) EnumMultiResponse {
 	var er EnumMultiResponse
+
+	for _, s := range selected {
+		selStr := fmt.Sprintf("%s", s)
+		er.Values = append(er.Values, selStr)
+	}
 
 	for _, opt := range options {
 		optStr := fmt.Sprintf("%s", opt)
@@ -137,7 +145,7 @@ func NewEnumMultiResponse(ctx context.Context, selected []interface{}, options .
 			}
 		}
 
-		er = append(er, opt)
+		er.Options = append(er.Options, opt)
 	}
 
 	return er

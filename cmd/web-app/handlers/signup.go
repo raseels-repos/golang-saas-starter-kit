@@ -86,14 +86,9 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			webcontext.SessionFlashSuccess(ctx,
 				"Thank you for Joining",
 				"You workflow will be a breeze starting today.")
-			err = webcontext.ContextSession(ctx).Save(r, w)
-			if err != nil {
-				return false, err
-			}
 
 			// Redirect the user to the dashboard.
-			http.Redirect(w, r, "/", http.StatusFound)
-			return true, nil
+			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
 		return false, nil
@@ -103,6 +98,10 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 	} else if end {
+		err = webcontext.ContextSession(ctx).Save(r, w)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 

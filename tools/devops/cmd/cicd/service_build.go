@@ -1,8 +1,13 @@
 package cicd
 
 import (
+	"bufio"
+	"crypto/md5"
 	"encoding/base64"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -188,13 +193,111 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 
 	// Once we can access the repository in ECR, do the docker build.
 	{
-		log.Println("Starting docker build")
-
+		log.Printf("Starting docker build %s\n", req.ReleaseImage)
 		dockerFile, err := filepath.Rel(req.ProjectRoot, req.DockerFile)
 		if err != nil {
 			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
 		}
 
+		// When the dockerFile is multistage, caching can be applied. Scan the dockerFile for the first stage.
+		// FROM golang:1.12.6-alpine3.9 AS build_base
+		var buildBaseImageTag string
+		{
+			file, err := os.Open(req.DockerFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer file.Close()
+
+			// List of lines in the dockerfile for the first stage. This will be used to tag the image to help ensure
+			// any changes to the lines associated with the first stage force cache to be reset.
+			var stageLines []string
+
+			// Name of the first build stage declared in the docckerFile.
+			var buildStageName string
+
+			// Loop through all the lines in the Dockerfile searching for the lines associated with the first build stage.
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := scanner.Text()
+
+				lineLower := strings.ToLower(line)
+
+				if strings.HasPrefix(lineLower, "from ") {
+					if buildStageName != "" {
+						// Only need to scan all the lines for the first build stage. Break when reach next FROM.
+						break
+					} else if !strings.Contains(lineLower, " as ") {
+						// Caching is only supported if the first FROM has a name.
+						log.Printf("\t\t\tSkipping stage cache, build stage not detected.\n")
+						break
+					}
+
+					buildStageName = strings.TrimSpace(strings.Split(lineLower, " as ")[1])
+					stageLines = append(stageLines, line )
+				} else if buildStageName != "" {
+					stageLines = append(stageLines, line )
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				return errors.WithStack(err)
+			}
+
+			// If we have detected a build stage, then generate the appropriate tag.
+			if buildStageName != "" {
+				log.Printf("\t\tFound build stage %s for caching.\n", buildStageName)
+
+				// Generate a checksum for the lines associated with the build stage.
+				stageChecksum := fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(stageLines, "\n"))))
+
+				// Making the assumption that the first stage always imports go.sum. Compute a checksum for the file.
+				goSumPath := filepath.Join(req.ProjectRoot, "go.sum")
+				goSumDat, err := ioutil.ReadFile(goSumPath)
+				if err != nil {
+					return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+				}
+				goModChecksum := fmt.Sprintf("%x", md5.Sum(goSumDat))
+
+				// Combine both checksums used to tag the target build stage.
+				buildBaseHash := fmt.Sprintf("%x", md5.Sum([]byte(stageChecksum+goModChecksum)))
+
+				buildBaseImageTag = buildStageName + "-" + buildBaseHash[0:8]
+			}
+		}
+
+		var cmds [][]string
+
+		// Enabling caching of the first build stage defined in the dockerFile.
+		var buildBaseImage string
+		if !req.NoCache && buildBaseImageTag != "" {
+			var pushTargetImg bool
+			if ciReg := os.Getenv("CI_REGISTRY"); ciReg != "" {
+				cmds = append(cmds, []string{"docker", "login", "-u", "gitlab-ci-token", "-p", os.Getenv("CI_JOB_TOKEN"), ciReg})
+
+				buildBaseImage = ciReg + "/" + buildBaseImageTag
+				pushTargetImg = true
+			} else {
+				buildBaseImageTag = req.ProjectName + ":" + req.Env + "-" +req.ServiceName + "-" + buildBaseImageTag
+			}
+
+			cmds = append(cmds, []string{"docker", "pull", buildBaseImageTag})
+
+			cmds = append(cmds, []string{
+				"docker", "build",
+				"--file=" + dockerFile,
+				"--build-arg", "service=" + req.ServiceName,
+				"--build-arg", "env=" + req.Env,
+				"-t", buildBaseImageTag,
+				"--target", "build_base",
+				".",
+			})
+
+			if pushTargetImg {
+				cmds = append(cmds, []string{"docker", "push", buildBaseImageTag})
+			}
+		}
+		
 		// The initial build command slice.
 		buildCmd := []string{
 			"docker", "build",
@@ -207,30 +310,31 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 		// Append additional build flags.
 		if req.NoCache {
 			buildCmd = append(buildCmd, "--no-cache")
+		} else if buildBaseImage != "" {
+			buildCmd = append(buildCmd, "--cache-from", buildBaseImage)
 		}
 
 		// Finally append the build context as the current directory since os.Exec will use the project root as
 		// the working directory.
 		buildCmd = append(buildCmd, ".")
 
-		err = execCmds(log, req.ProjectRoot, buildCmd)
-		if err != nil {
-			return errors.Wrap(err, "Failed to build docker image")
+		cmds = append(cmds, buildCmd)
+
+		if req.NoPush == false {
+			cmds = append(cmds, dockerLoginCmd)
+			cmds = append(cmds, []string{"docker", "push", req.ReleaseImage})
 		}
 
-		// Push the newly built image of the Docker container to the registry.
-		if req.NoPush == false {
+		for _, cmd := range cmds {
+			log.Printf("\t\t%s\n", strings.Join(cmd, " "))
 
-			log.Printf("\t\tDocker Login")
-			err = execCmds(log, req.ProjectRoot, dockerLoginCmd)
+			err = execCmds(log, req.ProjectRoot, cmd)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to login to AWS ECR")
-			}
-
-			log.Printf("\t\tPush release image %s", req.ReleaseImage)
-			err = execCmds(log, req.ProjectRoot, []string{"docker", "push", req.ReleaseImage})
-			if err != nil {
-				return errors.Wrapf(err, "Failed to push docker image %s", req.ReleaseImage)
+				if len(cmd) > 2 && cmd[1] == "pull" {
+					log.Printf("\t\t\tSkipping pull - %s\n",  err.Error())
+				} else {
+					return errors.Wrapf(err, "Failed to exec %s", strings.Join(cmd, " "))
+				}
 			}
 		}
 

@@ -23,4 +23,4 @@ fi
 binPath=$GOROOT/bin/devops
 echo "installing to: ${binPath}"
 
-docker run --rm --entrypoint=cat devops /devops > $binPath
+docker run --rm --entrypoint=cat ${releaseImg} /devops > $binPath

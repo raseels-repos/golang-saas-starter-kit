@@ -3,10 +3,11 @@ package user_account
 import (
 	"context"
 	"database/sql/driver"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -341,7 +342,7 @@ func (m *User) Response(ctx context.Context) *UserResponse {
 		r.Timezone = *m.Timezone
 	}
 
-	if r.Name == "" {
+	if strings.TrimSpace(r.Name) == "" {
 		r.Name = r.Email
 	}
 

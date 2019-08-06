@@ -249,19 +249,25 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				log.Printf("\t\tFound build stage %s for caching.\n", buildStageName)
 
 				// Generate a checksum for the lines associated with the build stage.
-				stageChecksum := fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(stageLines, "\n"))))
-
-				// Making the assumption that the first stage always imports go.sum. Compute a checksum for the file.
-				goSumPath := filepath.Join(req.ProjectRoot, "go.sum")
-				goSumDat, err := ioutil.ReadFile(goSumPath)
-				if err != nil {
-					return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+				buildBaseHashPts := []string{
+					fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(stageLines, "\n")))),
 				}
-				goModChecksum := fmt.Sprintf("%x", md5.Sum(goSumDat))
 
-				// Combine both checksums used to tag the target build stage.
-				buildBaseHash := fmt.Sprintf("%x", md5.Sum([]byte(stageChecksum+goModChecksum)))
+				switch buildStageName {
+				case "build_base_golang":
+					// Compute the checksum for the go.mod file.
+					goSumPath := filepath.Join(req.ProjectRoot, "go.sum")
+					goSumDat, err := ioutil.ReadFile(goSumPath)
+					if err != nil {
+						return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+					}
+					buildBaseHashPts = append(buildBaseHashPts, fmt.Sprintf("%x", md5.Sum(goSumDat)))
+				}
 
+				// Combine all the checksums to be used to tag the target build stage.
+				buildBaseHash := fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(buildBaseHashPts, "|"))))
+
+				// New stage image tag.
 				buildBaseImageTag = buildStageName + "-" + buildBaseHash[0:8]
 			}
 		}
@@ -279,7 +285,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 					"-p", os.Getenv("CI_REGISTRY_PASSWORD"),
 					ciReg})
 
-				buildBaseImage = ciReg + "/" + buildBaseImageTag
+				buildBaseImage = os.Getenv("CI_REGISTRY_IMAGE") + ":" + buildBaseImageTag
 				pushTargetImg = true
 			} else {
 				buildBaseImageTag = req.ProjectName + ":" + req.Env + "-" +req.ServiceName + "-" + buildBaseImageTag

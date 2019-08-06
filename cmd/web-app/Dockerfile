@@ -1,4 +1,4 @@
-FROM golang:1.12.6-alpine3.9 AS build_base
+FROM golang:1.12.6-alpine3.9 AS build_base_golang
 
 LABEL maintainer="lee@geeksinthewoods.com"
 
@@ -14,7 +14,7 @@ COPY go.mod .
 COPY go.sum .
 RUN go mod download
 
-FROM build_base AS builder
+FROM build_base_golang AS builder
 
 # Copy shared packages.
 COPY internal ./internal

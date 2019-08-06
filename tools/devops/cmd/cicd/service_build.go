@@ -288,7 +288,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				buildBaseImage = os.Getenv("CI_REGISTRY_IMAGE") + ":" + buildBaseImageTag
 				pushTargetImg = true
 			} else {
-				buildBaseImageTag = req.ProjectName + ":" + req.Env + "-" +req.ServiceName + "-" + buildBaseImageTag
+				buildBaseImage = req.ProjectName + ":" + req.Env + "-" +req.ServiceName + "-" + buildBaseImageTag
 			}
 
 			cmds = append(cmds, []string{"docker", "pull", buildBaseImageTag})
@@ -298,13 +298,13 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				"--file=" + dockerFile,
 				"--build-arg", "service=" + req.ServiceName,
 				"--build-arg", "env=" + req.Env,
-				"-t", buildBaseImageTag,
+				"-t", buildBaseImage,
 				"--target", buildStageName,
 				".",
 			})
 
 			if pushTargetImg {
-				cmds = append(cmds, []string{"docker", "push", buildBaseImageTag})
+				cmds = append(cmds, []string{"docker", "push", buildBaseImage})
 			}
 		}
 

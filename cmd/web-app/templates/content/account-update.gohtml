@@ -25,27 +25,34 @@
                         <div class="form-group row">
                             <div class="col-sm-6">
                                 <label for="AccountName">Account Name</label>
-                                <input type="text" id="AccountName" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}" name="Name" value="{{ $.form.Name }}" placeholder="Company Name" required>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                                <input type="text" id="AccountName"
+                                       class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
+                                       name="Name" value="{{ $.form.Name }}" placeholder="Company Name" required>
+                                {{template "invalid-feedback" dict "fieldName" "Name" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                         </div>
                         <div class="form-group row">
                             <div class="col-sm-6 mb-sm-0">
                                 <label for="AccountAddress1">Address</label>
-                                <input type="text" id="AccountAddress1" class="form-control  {{ ValidationFieldClass $.validationErrors "Address1" }}" name="Address1" value="{{ $.form.Address1 }}" placeholder="Address Line 1" required>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address1" }}
+                                <input type="text" id="AccountAddress1"
+                                       class="form-control {{ ValidationFieldClass $.validationErrors "Address1" }}"
+                                       name="Address1" value="{{ $.form.Address1 }}" placeholder="Address Line 1" required>
+                                {{template "invalid-feedback" dict "fieldName" "Address1" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                             <div class="col-sm-6">
                                 <label for="AccountAddress2">&nbsp;</label>
-                                <input type="text" id="AccountAddress2" class="form-control  {{ ValidationFieldClass $.validationErrors "Address2" }}" name="Address2" value="{{ $.form.Address2 }}" placeholder="Address Line 2">
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Address2" }}
+                                <input type="text" id="AccountAddress2"
+                                       class="form-control {{ ValidationFieldClass $.validationErrors "Address2" }}"
+                                       name="Address2" value="{{ $.form.Address2 }}" placeholder="Address Line 2">
+                                {{template "invalid-feedback" dict "fieldName" "Address2" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                         </div>
                         <div class="form-group row">
                             <div class="col-sm-6">
                                 <label for="selectAccountCountry">Country</label>
                                 <div class="">
-                                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Country" }}" id="selectAccountCountry" name="Country" placeholder="Country" required>
+                                    <select class="form-control {{ ValidationFieldClass $.validationErrors "Country" }}"
+                                            id="selectAccountCountry" name="Country" required>
                                         {{ range $i := $.countries }}
                                             {{ $hasGeonames := false }}
                                             {{ range $c := $.geonameCountries }}
@@ -54,36 +61,39 @@
                                             <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if CmpString $.form.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
                                         {{ end }}
                                     </select>
-                                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Country" }}
+                                    {{template "invalid-feedback" dict "fieldName" "Country" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                 </div>
                             </div>
                         </div>
                         <div class="form-group row">
                             <div class="col-sm-4">
                                 <div id="divAccountZipcode"></div>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Zipcode" }}
+                                {{template "invalid-feedback" dicts "fieldName" "Zipcode" "validationDefaults" $.validationDefaults "validationErrors" $.validationError }}
                             </div>
                             <div class="col-sm-4">
                                 <div id="divAccountRegion"></div>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Region" }}
+                                {{template "invalid-feedback" dict "fieldName" "Region" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                             <div class="col-sm-4">
                                 <label for="inputAccountCity">City</label>
-                                <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Account.City" }}" id="inputAccountCity" name="City" value="{{ $.form.City }}" placeholder="City" required>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "City" }}
+                                <input type="text" id="inputAccountCity"
+                                       class="form-control {{ ValidationFieldClass $.validationErrors "Account.City" }}"
+                                       name="City" value="{{ $.form.City }}" placeholder="City" required>
+                                {{template "invalid-feedback" dict "fieldName" "City" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                         </div>
 
                         <div class="form-group row">
                             <div class="col-sm-6">
-                                <label for="inputTimezone">Timezone</label>
-                                <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}" name="Timezone">
+                                <label for="selectTimezone">Timezone</label>
+                                <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}"
+                                        id="selectTimezone" name="Timezone">
                                     <option value="">Not set</option>
                                     {{ range $idx, $t := .timezones }}
                                         <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
                                     {{ end }}
                                 </select>
-                                {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Timezone" }}
+                                {{template "invalid-feedback" dict "fieldName" "Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                             </div>
                         </div>
 
@@ -114,8 +124,11 @@
                                     <option>Jan _2 15:04:05</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                                <input type="text" class="form-control" id="inputDatetimeFormat" placeholder="enter datetime format" name="PreferenceDatetimeFormat" value="{{ .form.PreferenceDatetimeFormat }}">
-                                <label class="form-check-label" for="inputDatetimeFormat"><small>Current Datetime {{ .exampleDisplayTime.Local }}</small></label>
+                                <input type="text" class="form-control" id="inputDatetimeFormat"
+                                       placeholder="enter datetime format" name="PreferenceDatetimeFormat"
+                                       value="{{ .form.PreferenceDatetimeFormat }}">
+                                <label class="form-check-label" for="inputDatetimeFormat">
+                                    <small>Current Datetime {{ .exampleDisplayTime.Local }}</small></label>
                             </div>
                             <div class="form-group">
                                 <label for="inputDateFormat">Date Format</label>
@@ -131,8 +144,11 @@
                                     <option>Jan _2</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                                <input type="text" class="form-control" id="inputDateFormat" placeholder="enter date format" name="PreferenceDateFormat" value="{{ .form.PreferenceDateFormat }}">
-                                <label class="form-check-label" for="inputDateFormat"><small>Current Date {{ .exampleDisplayTime.LocalDate }}</small></label>
+                                <input type="text" class="form-control" id="inputDateFormat"
+                                       placeholder="enter date format" name="PreferenceDateFormat"
+                                       value="{{ .form.PreferenceDateFormat }}">
+                                <label class="form-check-label" for="inputDateFormat">
+                                    <small>Current Date {{ .exampleDisplayTime.LocalDate }}</small></label>
                             </div>
                             <div class="form-group">
                                 <label for="inputTimeFormat">Time Format</label>
@@ -145,17 +161,17 @@
                                     <option>15:04:05 -0700</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                                <input type="text" class="form-control" id="inputTimeFormat" placeholder="enter time format" name="PreferenceTimeFormat" value="{{ .form.PreferenceTimeFormat }}">
-                                <label class="form-check-label" for="inputDatetimeFormat"><small>Current Time {{ .exampleDisplayTime.LocalTime }}</small></label>
+                                <input type="text" class="form-control" id="inputTimeFormat"
+                                       placeholder="enter time format" name="PreferenceTimeFormat"
+                                       value="{{ .form.PreferenceTimeFormat }}">
+                                <label class="form-check-label" for="inputDatetimeFormat">
+                                    <small>Current Time {{ .exampleDisplayTime.LocalTime }}</small></label>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
-
         </div>
-
         <div class="row">
             <div class="col">
                 <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
@@ -201,7 +217,7 @@
                     });
 
                     // Replace the existing zipcode text input with a new one that will supports autocomplete.
-                    $('#divAccountZipcode').html('<label for="inputAccountZipcode">Zipcode</label><input class="form-control  {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
+                    $('#divAccountZipcode').html('<label for="inputAccountZipcode">Zipcode</label><input class="form-control  {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode" name="Zipcode" value="{{ $.form.Zipcode }}" placeholder="Zipcode" required>');
                     $('#inputAccountZipcode').autoComplete({
                         minLength: 2,
                         events: {

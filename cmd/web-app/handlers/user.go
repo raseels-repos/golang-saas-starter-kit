@@ -76,7 +76,10 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Authenticated the user.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.Email, req.Password, sessionTTL, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:    req.Email,
+				Password: req.Password,
+			}, sessionTTL, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrForbidden:
@@ -258,7 +261,10 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:    u.Email,
+				Password: req.Password,
+			}, time.Hour, ctxValues.Now)
 			if err != nil {
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)

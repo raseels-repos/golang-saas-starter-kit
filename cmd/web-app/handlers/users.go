@@ -670,7 +670,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			// Append the query param value to the request.
 			req.InviteHash = inviteHash
 
-			userID, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			hash, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case invite.ErrInviteExpired:
@@ -705,13 +705,17 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Load the user without any claims applied.
-			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, userID)
+			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, hash.UserID)
 			if err != nil {
 				return false, err
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, usr.Email, req.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:     usr.Email,
+				Password:  req.Password,
+				AccountID: hash.AccountID,
+			}, time.Hour, ctxValues.Now)
 			if err != nil {
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)

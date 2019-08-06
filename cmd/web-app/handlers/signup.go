@@ -68,7 +68,10 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Authenticated the new user.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.User.Email, req.User.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:    req.User.Email,
+				Password: req.User.Password,
+			}, time.Hour, ctxValues.Now)
 			if err != nil {
 				return false, err
 			}

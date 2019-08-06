@@ -192,12 +192,9 @@ func TestSendUserInvites(t *testing.T) {
 
 		// Assuming we have received the email and clicked the link, we now can ensure accept works.
 		for idx, inviteHash := range inviteHashes {
-			type expectRes struct {
-				UserID string `json:"user_id" validate:"required,uuid"`
-			}
-			var res expectRes
+
 			newPass := uuid.NewRandom().String()
-			res.UserID, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			hash, err := AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHash,
 				Email:           inviteEmails[idx],
 				FirstName:       "Foo",
@@ -211,7 +208,14 @@ func TestSendUserInvites(t *testing.T) {
 			}
 
 			// Validate the result.
-			err := webcontext.Validator().StructCtx(ctx, res)
+			var res = struct {
+				UserID    string `validate:"required,uuid"`
+				AccountID string `validate:"required,uuid"`
+			}{
+				UserID:    hash.UserID,
+				AccountID: hash.AccountID,
+			}
+			err = webcontext.Validator().StructCtx(ctx, res)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tInviteAccept failed.", tests.Failed)

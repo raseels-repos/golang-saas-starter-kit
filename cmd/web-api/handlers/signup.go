@@ -30,8 +30,8 @@ type Signup struct {
 // @Produce  json
 // @Param data body signup.SignupRequest true "Signup details"
 // @Success 201 {object} signup.SignupResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /signup [post]
 func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)

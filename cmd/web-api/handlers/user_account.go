@@ -37,9 +37,9 @@ type UserAccount struct {
 // @Param offset			query integer  	false 	"Offset, example: 20"
 // @Param include-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} user_account.UserAccountResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [get]
 func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -130,9 +130,9 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Security OAuth2Password
 // @Param id path string true "UserAccount ID"
 // @Success 200 {object} user_account.UserAccountResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 404 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts/{user_id}/{account_id} [get]
 func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -178,10 +178,10 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Security OAuth2Password
 // @Param data body user_account.UserAccountCreateRequest true "User Account details"
 // @Success 201 {object} user_account.UserAccountResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 404 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [post]
 func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -230,9 +230,9 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 // @Security OAuth2Password
 // @Param data body user_account.UserAccountUpdateRequest true "Update fields"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [patch]
 func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -281,9 +281,9 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 // @Security OAuth2Password
 // @Param data body user_account.UserAccountArchiveRequest true "Update fields"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts/archive [patch]
 func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -332,9 +332,9 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 // @Security OAuth2Password
 // @Param id path string true "UserAccount ID"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [delete]
 func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)

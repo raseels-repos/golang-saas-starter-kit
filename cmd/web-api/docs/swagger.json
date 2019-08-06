@@ -1,14 +1,9 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "This is a sample server celler server.",
+        "description": "{{.Description}}",
         "title": "SaaS Example API",
-        "termsOfService": "http://example.com/terms",
-        "contact": {
-            "name": "API Support",
-            "url": "http://example.com/support",
-            "email": "support@geeksinthewoods.com"
-        },
+        "contact": {},
         "license": {
             "name": "Apache 2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
@@ -54,21 +49,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -113,21 +108,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -169,21 +164,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -235,7 +230,7 @@
                     {
                         "type": "boolean",
                         "description": "Included Archived, example: false",
-                        "name": "included-archived",
+                        "name": "include-archived",
                         "in": "query"
                     }
                 ],
@@ -253,21 +248,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -315,28 +310,28 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -376,21 +371,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -432,21 +427,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -491,21 +486,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -542,21 +537,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -599,14 +594,14 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -658,7 +653,7 @@
                     {
                         "type": "boolean",
                         "description": "Included Archived, example: false",
-                        "name": "included-archived",
+                        "name": "include-archived",
                         "in": "query"
                     }
                 ],
@@ -676,21 +671,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -736,28 +731,28 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -794,21 +789,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -848,21 +843,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -904,27 +899,27 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/user_accounts/{id}": {
+        "/user_accounts/{user_id}/{account_id}": {
             "get": {
                 "security": [
                     {
@@ -963,21 +958,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1029,7 +1024,7 @@
                     {
                         "type": "boolean",
                         "description": "Included Archived, example: false",
-                        "name": "included-archived",
+                        "name": "include-archived",
                         "in": "query"
                     }
                 ],
@@ -1047,14 +1042,14 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1100,21 +1095,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1154,21 +1149,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1210,21 +1205,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1266,21 +1261,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1319,21 +1314,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1378,21 +1373,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1429,21 +1424,21 @@
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/web.ErrorResponse"
+                            "$ref": "#/definitions/weberror.ErrorResponse"
                         }
                     }
                 }
@@ -1558,15 +1553,6 @@
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
                 },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "pending",
-                        "disabled"
-                    ],
-                    "example": "disabled"
-                },
                 "timezone": {
                     "type": "string",
                     "example": "America/Anchorage"
@@ -1603,14 +1589,6 @@
                 "name": {
                     "type": "string",
                     "example": "Rocket Launch"
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "disabled"
-                    ],
-                    "example": "active"
                 }
             }
         },
@@ -1665,14 +1643,6 @@
                 "name": {
                     "type": "string",
                     "example": "Rocket Launch to Moon"
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "disabled"
-                    ],
-                    "example": "disabled"
                 }
             }
         },
@@ -1751,17 +1721,23 @@
             "type": "object",
             "required": [
                 "email",
-                "name",
-                "password"
+                "first_name",
+                "last_name",
+                "password",
+                "password_confirm"
             ],
             "properties": {
                 "email": {
                     "type": "string",
                     "example": "{RANDOM_EMAIL}"
                 },
-                "name": {
+                "first_name": {
                     "type": "string",
-                    "example": "Gabi May"
+                    "example": "Gabi"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "May"
                 },
                 "password": {
                     "type": "string",
@@ -1779,6 +1755,9 @@
                 "id"
             ],
             "properties": {
+                "force": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
@@ -1789,17 +1768,23 @@
             "type": "object",
             "required": [
                 "email",
-                "name",
-                "password"
+                "first_name",
+                "last_name",
+                "password",
+                "password_confirm"
             ],
             "properties": {
                 "email": {
                     "type": "string",
                     "example": "gabi@geeksinthewoods.com"
                 },
-                "name": {
+                "first_name": {
                     "type": "string",
-                    "example": "Gabi May"
+                    "example": "Gabi"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "May"
                 },
                 "password": {
                     "type": "string",
@@ -1830,13 +1815,24 @@
                     "type": "string",
                     "example": "gabi@geeksinthewoods.com"
                 },
+                "first_name": {
+                    "type": "string",
+                    "example": "Gabi"
+                },
+                "gravatar": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
                 },
+                "last_name": {
+                    "type": "string",
+                    "example": "May"
+                },
                 "name": {
                     "type": "string",
-                    "example": "Gabi May"
+                    "example": "Gabi"
                 },
                 "timezone": {
                     "type": "string",
@@ -1852,7 +1848,8 @@
             "type": "object",
             "required": [
                 "id",
-                "password"
+                "password",
+                "password_confirm"
             ],
             "properties": {
                 "id": {
@@ -1879,11 +1876,15 @@
                     "type": "string",
                     "example": "gabi.may@geeksinthewoods.com"
                 },
+                "first_name": {
+                    "type": "string",
+                    "example": "Gabi May Not"
+                },
                 "id": {
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
                 },
-                "name": {
+                "last_name": {
                     "type": "string",
                     "example": "Gabi May Not"
                 },
@@ -1935,15 +1936,6 @@
                         "admin"
                     ]
                 },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "invited",
-                        "disabled"
-                    ],
-                    "example": "active"
-                },
                 "user_id": {
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
@@ -1967,10 +1959,6 @@
                 "created_at": {
                     "type": "object",
                     "$ref": "#/definitions/web.TimeResponse"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
                 },
                 "roles": {
                     "type": "array",
@@ -2023,18 +2011,29 @@
                         "user"
                     ]
                 },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "invited",
-                        "disabled"
-                    ],
-                    "example": "disabled"
-                },
                 "user_id": {
                     "type": "string",
                     "example": "d69bdef7-173f-4d29-b52c-3edc60baf6a2"
+                }
+            }
+        },
+        "web.EnumMultiResponse": {
+            "type": "object",
+            "properties": {
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web.EnumOption"
+                    }
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "active_etc"
+                    ]
                 }
             }
         },
@@ -2074,31 +2073,6 @@
                 }
             }
         },
-        "web.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                },
-                "fields": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web.FieldError"
-                    }
-                }
-            }
-        },
-        "web.FieldError": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                },
-                "field": {
-                    "type": "string"
-                }
-            }
-        },
         "web.TimeResponse": {
             "type": "object",
             "properties": {
@@ -2117,6 +2091,10 @@
                 "local_date": {
                     "type": "string",
                     "example": "Tue Jun 25"
+                },
+                "local_time": {
+                    "type": "string",
+                    "example": "3:00AM"
                 },
                 "now_rel_time": {
                     "type": "string",
@@ -2145,6 +2123,49 @@
                 "value_utc": {
                     "type": "string",
                     "example": "2019-06-25T11:00:53.284Z"
+                }
+            }
+        },
+        "weberror.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/weberror.FieldError"
+                    }
+                },
+                "stack_trace": {
+                    "type": "string"
+                },
+                "status_code": {
+                    "type": "integer"
+                }
+            }
+        },
+        "weberror.FieldError": {
+            "type": "object",
+            "properties": {
+                "display": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "field": {
+                    "type": "string"
+                },
+                "tag": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "object"
                 }
             }
         }

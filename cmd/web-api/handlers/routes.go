@@ -10,6 +10,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -102,9 +103,10 @@ func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB 
 
 // Types godoc
 // @Summary List of types.
-// @Param data body web.FieldError false "Field Error"
+// @Param data body weberror.FieldError false "Field Error"
 // @Param data body web.TimeResponse false "Time Response"
 // @Param data body web.EnumResponse false "Enum Response"
+// @Param data body web.EnumMultiResponse false "Enum Multi Response"
 // @Param data body web.EnumOption false "Enum Option"
 // @Param data body signup.SignupAccount false "SignupAccount"
 // @Param data body signup.SignupUser false "SignupUser"

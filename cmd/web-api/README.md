@@ -263,11 +263,12 @@ If you run into errors running `swag init` try the following:
 Try to install the packages to your $GOPATH.
 
 ```bash
-GO111MODULE=off go get github.com/leodido/go-urn
-GO111MODULE=off go get github.com/lib/pq/oid
-GO111MODULE=off go get  github.com/lib/pq/scram
-GO111MODULE=off go get github.com/tinylib/msgp/msgp
-GO111MODULE=off go get gopkg.in/DataDog/dd-trace-go.v1/ddtrace
+GO111MODULE=off go get -u github.com/leodido/go-urn
+GO111MODULE=off go get -u github.com/lib/pq/oid
+GO111MODULE=off go get -u github.com/lib/pq/scram
+GO111MODULE=off go get -u github.com/tinylib/msgp/msgp
+GO111MODULE=off go get -u gopkg.in/DataDog/dd-trace-go.v1/ddtrace
+GO111MODULE=off go get -u golang.org/x/xerrors
 ```
 
 #### error writing go.mod

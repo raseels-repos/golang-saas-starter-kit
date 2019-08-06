@@ -26,6 +26,7 @@ require (
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/kr/pty v1.1.8 // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
@@ -45,13 +46,13 @@ require (
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/swag v1.6.2
 	github.com/tinylib/msgp v1.1.0 // indirect
-	github.com/urfave/cli v1.20.0
+	github.com/urfave/cli v1.21.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
-	golang.org/x/sys v0.0.0-20190730183949-1393eb018365 // indirect
+	golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa // indirect
 	golang.org/x/text v0.3.2
-	golang.org/x/tools v0.0.0-20190730205120-7deaedd405c4 // indirect
+	golang.org/x/tools v0.0.0-20190805222050-c5a2fd39b72a // indirect
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.16.1

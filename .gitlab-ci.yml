@@ -32,7 +32,7 @@ cache:
 .build_tmpl: &build_tmpl
   <<: *job_tmpl
   script:
-    - 'EMAIL_SENDER=$EMAIL_SENDER devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - 'devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
 
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl

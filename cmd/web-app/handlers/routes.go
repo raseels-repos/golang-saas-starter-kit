@@ -163,7 +163,6 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	check := Check{
 		MasterDB: masterDB,
 		Redis:    redis,
-		Renderer: renderer,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 

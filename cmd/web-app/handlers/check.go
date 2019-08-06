@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/jmoiron/sqlx"
@@ -14,7 +15,6 @@ import (
 type Check struct {
 	MasterDB *sqlx.DB
 	Redis    *redis.Client
-	Renderer web.Renderer
 
 	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
 }
@@ -34,8 +34,24 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return errors.Wrap(err, "Redis failed")
 	}
 
-	data := map[string]interface{}{
-		"Status": "ok",
+	data := struct {
+		Status string `json:"status"`
+		CiCommitRefName     string `json:"ci-commit-ref-name,omitempty"`
+		CiCommitRefSlug     string `json:"ci-commit-ref-slug,omitempty"`
+		CiCommitSha         string `json:"ci-commit-sha,omitempty"`
+		CiCommitTag         string `json:"ci-commit-tag,omitempty"`
+		CiCommitTitle       string `json:"ci-commit-title,omitempty"`
+		CiJobId             string `json:"ci-commit-job-id,omitempty"`
+		CiPipelineId        string `json:"ci-commit-pipeline-id,omitempty"`
+	}{
+		Status: "ok",
+		CiCommitRefName: os.Getenv("CI_COMMIT_REF_NAME"),
+		CiCommitRefSlug: os.Getenv("CI_COMMIT_REF_SLUG"),
+		CiCommitSha: os.Getenv("CI_COMMIT_SHA"),
+		CiCommitTag: os.Getenv("CI_COMMIT_TAG"),
+		CiCommitTitle: os.Getenv("CI_COMMIT_TITLE"),
+		CiJobId : os.Getenv("CI_COMMIT_JOB_ID"),
+		CiPipelineId: os.Getenv("CI_COMMIT_PIPELINE_ID"),
 	}
 
 	return web.RespondJson(ctx, w, data, http.StatusOK)

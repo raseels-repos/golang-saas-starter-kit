@@ -199,6 +199,9 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
 		}
 
+		// Name of the first build stage declared in the docckerFile.
+		var buildStageName string
+
 		// When the dockerFile is multistage, caching can be applied. Scan the dockerFile for the first stage.
 		// FROM golang:1.12.6-alpine3.9 AS build_base
 		var buildBaseImageTag string
@@ -212,9 +215,6 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			// List of lines in the dockerfile for the first stage. This will be used to tag the image to help ensure
 			// any changes to the lines associated with the first stage force cache to be reset.
 			var stageLines []string
-
-			// Name of the first build stage declared in the docckerFile.
-			var buildStageName string
 
 			// Loop through all the lines in the Dockerfile searching for the lines associated with the first build stage.
 			scanner := bufio.NewScanner(file)
@@ -299,7 +299,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				"--build-arg", "service=" + req.ServiceName,
 				"--build-arg", "env=" + req.Env,
 				"-t", buildBaseImageTag,
-				"--target", "build_base",
+				"--target", buildStageName,
 				".",
 			})
 

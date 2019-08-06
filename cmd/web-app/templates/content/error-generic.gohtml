@@ -4,8 +4,6 @@
 {{end}}
 {{ define "partials/app-wrapper" }}
     <div class="container-fluid">
-
-        <!-- Error Text -->
         <div class="text-center mt-5">
             <div class="error mx-auto" data-text="{{ .StatusCode }}">{{ .StatusCode }}</div>
             <p class="lead text-gray-800 mb-5">{{ .Error }}</p>
@@ -13,6 +11,5 @@
                 <p class="text-gray-500 mb-0">{{ .Details }}</p>
             {{ end }}
         </div>
-
     </div>
 {{ end }}

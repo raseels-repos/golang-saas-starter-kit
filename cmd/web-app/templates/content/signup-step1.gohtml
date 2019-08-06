@@ -30,24 +30,31 @@
 
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Name" }}" name="Account.Name" value="{{ $.form.Account.Name }}" placeholder="Company Name" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Name" }}
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Name" }}"
+                                               name="Account.Name" value="{{ $.form.Account.Name }}" placeholder="Company Name" required>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Name" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address1" }}" name="Account.Address1" value="{{ $.form.Account.Address1 }}" placeholder="Address Line 1" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Address1" }}
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address1" }}"
+                                               name="Account.Address1" value="{{ $.form.Account.Address1 }}" placeholder="Address Line 1" required>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Address1" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                     <div class="col-sm-6">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address2" }}" name="Account.Address2" value="{{ $.form.Account.Address2 }}" placeholder="Address Line 2">
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Address2" }}
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address2" }}"
+                                               name="Account.Address2" value="{{ $.form.Account.Address2 }}" placeholder="Address Line 2">
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Address2" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
                                         <div class="form-control-select-wrapper">
-                                            <select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Account.Country" }}" id="selectAccountCountry" name="Account.Country" placeholder="Country" required>
+                                            <select id="selectAccountCountry" name="Account.Country" placeholder="Country" required
+                                                     class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Account.Country" }}">
                                                 {{ range $i := $.countries }}
                                                     {{ $hasGeonames := false }}
                                                     {{ range $c := $.geonameCountries }}
@@ -56,28 +63,30 @@
                                                     <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if eq $.form.Account.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
                                                 {{ end }}
                                             </select>
-                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Country" }}
+                                            {{template "invalid-feedback" dict "fieldName" "Account.Country" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
                                         <div id="divAccountZipcode"></div>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Zipcode" }}
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Zipcode" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                     <div class="col-sm-6 mb-3 mb-sm-0">
                                         <div id="divAccountRegion"></div>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Region" }}
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Region" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                 </div>
                                 <div class="form-group row mb-4">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}" id="inputAccountCity" name="Account.City" value="{{ $.form.Account.City }}" placeholder="City" required>
+                                        <input type="text" id="inputAccountCity"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}"
+                                               name="Account.City" value="{{ $.form.Account.City }}" placeholder="City" required>
                                         {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.City" }}
                                     </div>
                                     <!-- div class="col-sm-6 mb-3 mb-sm-0">
                                         <select class="form-control {{ ValidationFieldClass $.validationErrors "Account.Timezone" }}" id="selectAccountTimezone" name="Account.Timezone" placeholder="Timezone"></select>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.Timezone" }}
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div -->
                                 </div>
 
@@ -89,26 +98,36 @@
 
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.FirstName" }}" name="User.FirstName" value="{{ $.form.User.FirstName }}" placeholder="First Name" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.FirstName" }}
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.FirstName" }}"
+                                               name="User.FirstName" value="{{ $.form.User.FirstName }}" placeholder="First Name" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.FirstName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                     <div class="col-sm-6">
-                                        <input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.LastName" }}" name="User.LastName" value="{{ $.form.User.LastName }}" placeholder="Last Name" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.LastName" }}
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.LastName" }}"
+                                               name="User.LastName" value="{{ $.form.User.LastName }}" placeholder="Last Name" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.LastName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <input type="email" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Email" }}" name="User.Email" value="{{ $.form.User.Email }}" placeholder="Email Address" required>
-                                    {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.Email" }}
+                                    <input type="email"
+                                           class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Email" }}"
+                                           name="User.Email" value="{{ $.form.User.Email }}" placeholder="Email Address" required>
+                                    {{template "invalid-feedback" dict "fieldName" "User.Email" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                 </div>
                                 <div class="form-group row">
                                     <div class="col-sm-6 mb-3 mb-sm-0">
-                                        <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Password" }}" name="User.Password" value="{{ $.form.User.Password }}" placeholder="Password" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.Password" }}
+                                        <input type="password"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Password" }}"
+                                               name="User.Password" value="{{ $.form.User.Password }}" placeholder="Password" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.Password" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                     <div class="col-sm-6">
-                                        <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.PasswordConfirm" }}" name="User.PasswordConfirm" value="{{ $.form.User.PasswordConfirm }}" placeholder="Repeat Password" required>
-                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "User.PasswordConfirm" }}
+                                        <input type="password"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.PasswordConfirm" }}"
+                                               name="User.PasswordConfirm" value="{{ $.form.User.PasswordConfirm }}" placeholder="Repeat Password" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.PasswordConfirm" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                     </div>
                                 </div>
 

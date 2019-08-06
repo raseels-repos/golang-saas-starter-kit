@@ -28,16 +28,21 @@
 
                                     <form class="user" method="post" novalidate>
                                         <div class="form-group">
-                                            <input type="email" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "AuthenticateRequest.Email" }}" name="Email" value="{{ $.form.Email }}" placeholder="Enter Email Address...">
-                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "AuthenticateRequest.Email" }}
+                                            <input type="email"
+                                                   class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "AuthenticateRequest.Email" }}"
+                                                   name="Email" value="{{ $.form.Email }}" placeholder="Enter Email Address...">
+                                            {{template "invalid-feedback" dict "fieldName" "AuthenticateRequest.Email" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                         </div>
                                         <div class="form-group">
-                                            <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "AuthenticateRequest.Password" }}" name="Password" value="{{ $.form.Password }}"  placeholder="Password">
-                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "AuthenticateRequest.Password" }}
+                                            <input type="password"
+                                                   class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "AuthenticateRequest.Password" }}"
+                                                   name="Password" value="{{ $.form.Password }}" placeholder="Password">
+                                            {{template "invalid-feedback" dict "fieldName" "AuthenticateRequest.Password" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                         </div>
                                         <div class="form-group">
                                             <div class="custom-control custom-checkbox small">
-                                                <input type="checkbox" class="custom-control-input" id="inputRemberMe" name="RememberMe" value="1" {{ if $.form.RememberMe }}checked="checked"{{end}}>
+                                                <input type="checkbox" class="custom-control-input"
+                                                       id="inputRemberMe" name="RememberMe" value="1" {{ if $.form.RememberMe }}checked="checked"{{end}}>
                                                 <label class="custom-control-label" for="inputRemberMe">Remember Me</label>
                                             </div>
                                         </div>

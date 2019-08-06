@@ -36,41 +36,50 @@
                                                     <div class="col-md-6">
                                                         <div class="form-group">
                                                             <label for="inputFirstName">First Name</label>
-                                                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "FirstName" }}" placeholder="enter first name" name="FirstName" value="{{ .form.FirstName }}" required>
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors "fieldName" "FirstName" }}
+                                                            <input type="text" id="inputFirstName"
+                                                                   class="form-control {{ ValidationFieldClass $.validationErrors "FirstName" }}"
+                                                                   placeholder="enter first name" name="FirstName" value="{{ .form.FirstName }}" required>
+                                                            {{template "invalid-feedback" dict "fieldName" "FirstName" "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
                                                         <div class="form-group">
                                                             <label for="inputLastName">Last Name</label>
-                                                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "LastName" }}" placeholder="enter last name" name="LastName" value="{{ .form.LastName }}" required>
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors "fieldName" "LastName" }}
+                                                            <input type="text" id="inputLastName"
+                                                                   class="form-control {{ ValidationFieldClass $.validationErrors "LastName" }}"
+                                                                   placeholder="enter last name" name="LastName" value="{{ .form.LastName }}" required>
+                                                            {{template "invalid-feedback" dict "fieldName" "LastName" "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
                                                         <div class="form-group">
                                                             <label for="inputEmail">Email</label>
-                                                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Email" }}" placeholder="enter email" name="Email" value="{{ .form.Email }}" required>
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors "fieldName" "Email" }}
+                                                            <input type="text" id="inputEmail"
+                                                                   class="form-control {{ ValidationFieldClass $.validationErrors "Email" }}"
+                                                                   placeholder="enter email" name="Email" value="{{ .form.Email }}" required>
+                                                            {{template "invalid-feedback" dict "fieldName" "Email" "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
                                                         <div class="form-group">
-                                                            <label for="inputTimezone">Timezone</label>
-                                                            <select class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}" name="Timezone">
+                                                            <label for="selectTimezone">Timezone</label>
+                                                            <select id="selectTimezone" name="Timezone"
+                                                                    class="form-control {{ ValidationFieldClass $.validationErrors "Timezone" }}">
                                                                 <option value="">Not set</option>
                                                                 {{ range $idx, $t := .timezones }}
                                                                     <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
                                                                 {{ end }}
                                                             </select>
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Timezone" }}
+                                                            {{template "invalid-feedback" dict "fieldName" "Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
 
                                                         <div class="form-group">
                                                             <label for="inputPassword">Password</label>
-                                                            <input type="password" class="form-control" id="inputPassword" placeholder="" name="Password" value="">
+                                                            <input type="password" class="form-control"
+                                                                   id="inputPassword" placeholder="" name="Password" value="" required>
                                                             <span class="help-block "><small><a a href="javascript:void(0)" id="btnGeneratePassword"><i class="fas fa-random mr-1"></i>Generate random password </a></small></span>
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Password" }}
+                                                            {{template "invalid-feedback" dict "fieldName" "Password" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
 
                                                         <div class="form-group">
                                                             <label for="inputPasswordConfirm">Confirm Password</label>
-                                                            <input type="password" class="form-control" id="inputPasswordConfirm" placeholder="" name="PasswordConfirm" value="">
-                                                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "PasswordConfirm" }}
+                                                            <input type="password" class="form-control"
+                                                                   id="inputPasswordConfirm" placeholder="" name="PasswordConfirm" value="" required>
+                                                            {{template "invalid-feedback" dict "fieldName" "PasswordConfirm" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                                                         </div>
 
                                                     </div>
@@ -82,7 +91,6 @@
                                                         <a href="/users/{{ .user.ID }}" class="ml-2 btn btn-secondary" >Cancel</a>
                                                     </div>
                                                 </div>
-
 
                                             </div>
                                         </div>

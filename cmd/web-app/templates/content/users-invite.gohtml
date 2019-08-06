@@ -27,7 +27,9 @@
                             </div>
                         </div>
 
-                        <p class="mt-2 mb-0"><a href="javascript:void(0)" class="btn btn-outline-primary btn-sm" id="inviteUser1"><i class="fas fa-user-plus mr-1"></i>Add another invitation</a></p>
+                        <p class="mt-2 mb-0">
+                            <a href="javascript:void(0)" class="btn btn-outline-primary btn-sm" id="inviteUser1">
+                                <i class="fas fa-user-plus mr-1"></i>Add another invitation</a></p>
                     </div>
                 </div>
 
@@ -36,7 +38,6 @@
 
                         <div class="form-group">
                             <label for="selectRoles">Roles <small>- Select at least one role for invited user(s).</small></label>
-
 
                             {{ range $t := .roles.Options }}
                                 <div class="form-check">
@@ -50,16 +51,14 @@
 
                                 </div>
                             {{ end }}
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Roles" }}
+                            {{template "invalid-feedback" dict "fieldName" "Roles" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                     </div>
                 </div>
 
-
             </div>
 
         </div>
-
 
         <div class="row mt-4">
             <div class="col">
@@ -89,8 +88,6 @@
             newHtml = newHtml + '<input type="text" class="form-control invite-user-email" placeholder="enter email" name="Emails" value="">';
             newHtml = newHtml + '</div>';
             $('#email-form-groups').append(newHtml);
-
-
         }
 
         $(document).ready(function(){

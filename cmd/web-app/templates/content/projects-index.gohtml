@@ -12,7 +12,8 @@
 
         <h1 class="h3 mb-0 text-gray-800">Projects</h1>
         {{ if HasRole $._Ctx "admin" }}
-            <a href="{{ .urlProjectsCreate }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-folder-plus fa-sm text-white-50 mr-1"></i>Create Project</a>
+            <a href="{{ .urlProjectsCreate }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+                <i class="fas fa-folder-plus fa-sm text-white-50 mr-1"></i>Create Project</a>
         {{ end }}
     </div>
 
@@ -34,10 +35,10 @@
 {{define "js"}}
     {{ template "partials/datatable/js" . }}
 
-<script>
-    $(document).ready(function(){
-        //$("#dataTable_filter").hide();
-    });
-</script>
+    <script>
+        $(document).ready(function(){
+            //$("#dataTable_filter").hide();
+        });
+    </script>
 
 {{end}}

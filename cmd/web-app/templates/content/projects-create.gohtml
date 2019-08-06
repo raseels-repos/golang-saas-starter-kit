@@ -24,9 +24,10 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="inputName">Project Name</label>
-                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
-                                   placeholder="Enter name for your project" name="Name" id="inputName" value="{{ .form.Name }}" required>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Name" }}
+                            <input type="text" id="inputName"
+                                   class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
+                                   placeholder="Enter name for your project" name="Name"value="{{ .form.Name }}" required>
+                            {{template "invalid-feedback" dict "fieldName" "Name" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                     </div>
                 </div>

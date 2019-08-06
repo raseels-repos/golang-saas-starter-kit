@@ -814,7 +814,7 @@ func main() {
 	tmplFuncs["S3ImgThumbSrcSmall"] = func(ctx context.Context, p string) template.HTMLAttr {
 		return imgSrcAttr(ctx, p, []int{320}, false)
 	}
-	tmplFuncs["S3ImgSrc"] = func(ctx context.Context, p string, sizes []int) template.HTMLAttr {
+	tmplFuncs["S3ImgSrc"] = func(ctx context.Context, p string, sizes ...int) template.HTMLAttr {
 		return imgSrcAttr(ctx, p, sizes, true)
 	}
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {

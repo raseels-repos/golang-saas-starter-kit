@@ -178,12 +178,12 @@
                                 Account Settings
                             </a>
                             <a class="dropdown-item" href="/users">
-                                <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
+                                <i class="fas fa-users fa-sm fa-fw mr-2 text-gray-400"></i>
                                 Manage Users
                             </a>
                             <a class="dropdown-item" href="/users/invite">
-                                <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                Invite User
+                                <i class="fas fa-user-plus fa-sm fa-fw mr-2 text-gray-400"></i>
+                                Invite Users
                             </a>
                         {{ else }}
                             <a class="dropdown-item" href="/user/account">
@@ -193,7 +193,7 @@
                         {{ end }}
 
                         <a class="dropdown-item" href="/support" target="_blank">
-                            <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
+                            <i class="fas fa-hand-holding-heart fa-sm fa-fw mr-2 text-gray-400"></i>
                             Support
                         </a>
                         <div class="dropdown-divider"></div>
@@ -207,7 +207,7 @@
 
                         {{ if ContextIsVirtualSession $._Ctx }}
                             <a class="dropdown-item" href="/user/virtual-logout">
-                                <i class="far fa-sign-out fa-sm fa-fw mr-2 text-gray-400"></i>
+                                <i class="fas fa-undo-alt fa-sm fa-fw mr-2 text-gray-400"></i>
                                 Switch Back
                             </a>
                         {{ end }}
@@ -221,7 +221,19 @@
 
             </ul>
         {{ else }}
-            <button onclick="window.location='/user/login'; return false;">Login</button>
+
+        <ul class="navbar-nav ml-auto unauthenicated">
+            <li class="nav-item">
+                <a class="nav-link" href="/signup">Create Account</a>
+            </li>
+
+            <div class="topbar-divider d-none d-sm-block"></div>
+
+            <li class="nav-item">
+                <a class="nav-link" href="/user/login"><i class="fas fa-unlock-alt mr-1"></i>Login</a>
+            </li>
+
+        </ul>
         {{ end }}
     </nav>
     <!-- End of Topbar -->

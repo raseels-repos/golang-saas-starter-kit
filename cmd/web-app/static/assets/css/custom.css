@@ -109,3 +109,12 @@ div.dataTable_card a.paginate_button.current {
 .alert p:last-child {
     margin-bottom: 0;
 }
+
+
+.topbar.navbar-light .navbar-nav.unauthenicated .nav-item .nav-link {
+    color: #4e73df;
+}
+
+.topbar.navbar-light .navbar-nav.unauthenicated .nav-item .nav-link:hover {
+    color: #1cc88a;
+}

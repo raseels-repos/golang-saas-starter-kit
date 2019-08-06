@@ -22,34 +22,30 @@
 
                                     <div class="text-center">
                                         <h1 class="h4 text-gray-900 mb-2">Reset Your Password</h1>
-                                        <p class="mb-4">.....</p>
+                                        <p class="mb-4">Enter your new password below.</p>
                                     </div>
 
                                     {{ template "validation-error" . }}
 
                                     <form class="user" method="post" novalidate>
                                         <input type="hidden" name="ResetHash" value="{{ $.form.ResetHash }}" />
-                                        <div class="form-group row">
-                                            <div class="col-sm-6 mb-3 mb-sm-0">
-                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Password" }}" name="Password" value="{{ $.form.Password }}" placeholder="Password" required>
+                                        <div class="form-group ">
+                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Password" }}" name="Password" value="{{ $.form.Password }}" placeholder="New Password" required>
                                                 {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Password" }}
-                                            </div>
-                                            <div class="col-sm-6">
-                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "PasswordConfirm" }}" name="PasswordConfirm" value="{{ $.form.PasswordConfirm }}" placeholder="Repeat Password" required>
+                                            
+                                        </div>
+                                        <div class="form-group ">
+                                                <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "PasswordConfirm" }}" name="PasswordConfirm" value="{{ $.form.PasswordConfirm }}" placeholder="Repeat New Password" required>
                                                 {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "PasswordConfirm" }}
-                                            </div>
+
                                         </div>
                                         <button class="btn btn-primary btn-user btn-block">
                                             Reset Password
                                         </button>
-                                        <hr>
                                     </form>
                                     <hr>
                                     <div class="text-center">
                                         <a class="small" href="/user/login">Already have an account? Login!</a>
-                                    </div>
-                                    <div class="text-center">
-                                        <a class="small" href="/signup">Create an Account!</a>
                                     </div>
                                 </div>
                             </div>

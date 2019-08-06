@@ -131,7 +131,6 @@ func (h *Examples) Images(ctx context.Context, w http.ResponseWriter, r *http.Re
 	// List of image sizes that will be used to resize the source image into. The resulting images will then be included
 	// as apart of the image src tag for a responsive image tag.
 	data := map[string]interface{}{
-		"imgSizes":          []int{100, 200, 300, 400, 500},
 		"imgResizeDisabled": false,
 	}
 

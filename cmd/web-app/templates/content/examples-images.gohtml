@@ -23,56 +23,66 @@
 
         <p>This SaaS Starter Kit includes functions to resize images automatically and render the src of an image tag with an array of source URLs. The functions are custom functions that are rendered with the GO templates.</p>
 
-            <pre class="mb-4">&#x7B;&#x7B; FUNCTION_NAME $._ctx "RELATIVE_PATH_TO_IMAGE_HERE" &#x7D;&#x7D;</pre>
+        <pre class="mb-4">&#x7B;&#x7B; FUNCTION_NAME $._ctx "RELATIVE_PATH_TO_IMAGE_HERE" &#x7D;&#x7D;</pre>
 
-        <h5>S3ImgSrcLarge</h5>
-        <p>Generates an array of three images from the source file with widths of 320, 480 and 800.</p>
-        <img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
+        <p>The <em>thumb</em> version of each function does not include the original as part of the array of images. This thumb version of the funciton is used then the original is a very large file at it is not needed to be displayed as the largest option.</p>
 
-        <p class="mb-0 mt-2">HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre></p>
+        <h5 class="mt-5">S3ImgSrcLarge</h5>
+        <p>Generates three resized images from the original with widths of 320, 480 and 800. Then creates an array with four options: the three resized along with the original. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre></p>
+        <img {{ S3ImgSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgThumbSrcLarge</h3>
-        <p>320, 480, 800</p>
-        <img {{ S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+        <h5 class="mt-5">S3ImgThumbSrcLarge</h5>
+        <p>Generates three resized images from the original with widths of 320, 480 and 800. Then creates an array of only the three resized image. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre>
+        <img {{ S3ImgThumbSrcLarge $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgSrcMedium</h3>
-        <p>320, 640</p>
-        <img {{ S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+        <h5 class="mt-5">S3ImgSrcMedium</h5>
+        <p>Generates resized images from the original with widths of 320 and 480. Then creates an array with three options: the two resized along with the original. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre>
+        <img {{ S3ImgSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgThumbSrcMedium</h3>
-        <p>320, 640</p>
-        <img {{ S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+        <h5 class="mt-5">S3ImgThumbSrcMedium</h5>
+        <p>Generates two resized images from the original with widths of 320 and 480. Then creates an array of only the two resized image. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre>
+        <img {{ S3ImgThumbSrcMedium $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgSrcSmall</h3>
-        <p>320</p>
-        <img {{ S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+        <h5 class="mt-5">S3ImgSrcSmall</h5>
+        <p>Generates one resized image from the original with width of 320. Then creates an array with two options: the one resized along with the original. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre>
+        <img {{ S3ImgSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgThumbSrcSmall</h3>
-        <p>320</p>
-        <img {{ S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" &#x7D;&#x7D;&gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1600.png" }}&gt;</pre>
+        <h5 class="mt-5">S3ImgThumbSrcSmall</h5>
+        <p>Generates one resized image from the original with widths of 320. Then creates an array of only the one resized image. Then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" &#x7D;&#x7D;&gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}&gt;</pre>
+        <img {{ S3ImgThumbSrcSmall $._ctx "/images/example-image-resize-galaxy-3000x1000.png" }}/><br/>
 
-        <h3>S3ImgSrc</h3>
-        <p>returns Src array</p>
-        <img id="imgVerifyResizeEnabled" {{ S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1600.png" $.imgSizes }}/><br/>
-        HTML: <pre>&lt;img &#x7B;&#x7B; S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1600.png" $.imgSizes &#x7D;&#x7D; &gt;</pre>
-        Result: <pre>&lt;img {{ S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1600.png" $.imgSizes }} &gt;</pre>
+        <h5 class="mt-5">S3ImgSrc</h5>
+        <p>Generates an array of two images from the source file with widths of 320, 480, and then sets the array as the value of the srcset in an img tag.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img &#x7B;&#x7B; S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 100 200 300 400 500 &#x7D;&#x7D; &gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img {{ S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 100 200 300 400 500 }} &gt;</pre>
+        <img id="imgVerifyResizeEnabled" {{ S3ImgSrc $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 100 200 300 400 500 }}/><br/>
 
-        <h3>S3ImgUrl</h3>
-        <p>Returns URL for file on S3</p>
-        <img src="{{ S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1600.png" 200 }}" /><br/>
-        HTML: <pre>&lt;img src="&#x7B;&#x7B; S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1600.png" 200 &#x7D;&#x7D;" &gt;</pre>
-        Result: <pre>&lt;img src="{{ S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1600.png" 200 }}" &gt;</pre>
+        <h5 class="mt-5">S3ImgUrl <small>with Specific Width</small></h5>
+        <p>Generates a resized image from the source file with specific width and retuns the URL. The example below has the width set to 200 pixels wide.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img src="&#x7B;&#x7B; S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 200 &#x7D;&#x7D;" &gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img src="{{ S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 200 }}" &gt;</pre>
+        <img src="{{ S3ImgUrl $._ctx "/images/example-image-resize-galaxy-3000x1000.png" 200 }}" /><br/>
+
+
+        <h5 class="mt-5">S3Url</h5>
+        <p>If you do not want the image to be resized, you can use the S3Url function. This function returns the URL of the file on S3. However, when environment is not production, function returns the local relative path.</p>
+        <p class="mb-0 mt-2">Example GO HTML:</p><pre>&lt;img src="&#x7B;&#x7B; S3Url "/images/example-image-resize-galaxy-3000x1000.png"  &#x7D;&#x7D;" &gt;</pre>
+        <p class="mb-0">Result:</p><pre>&lt;img src="{{ S3Url  "/images/example-image-resize-galaxy-3000x1000.png" }}" &gt;</pre>
+        <img src="{{ S3Url "/images/example-image-resize-galaxy-3000x1000.png" }}" style="width: 100%;" /><br/>
+
+
 
     {{ end }}
 

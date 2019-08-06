@@ -36,6 +36,10 @@ type User struct {
 	SecretKey     string
 }
 
+func urlUserVirtualLogin(userID string) string {
+	return fmt.Sprintf("/user/virtual-login/%s", userID)
+}
+
 // UserLoginRequest extends the AuthenicateRequest with the RememberMe flag.
 type UserLoginRequest struct {
 	user_auth.AuthenticateRequest

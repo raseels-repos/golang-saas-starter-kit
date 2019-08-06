@@ -3,6 +3,9 @@ image: geeksaccelerator/docker-library:golang1.12-docker
 services:
   - docker:dind
 
+variables:
+  DOCKER_TLS_CERTDIR: ""
+
 before_script:
   - 'cd ./tools/devops && make install && cd ../../'
 

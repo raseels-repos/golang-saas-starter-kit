@@ -13,7 +13,8 @@ RUN GO111MODULE=off go get gopkg.in/go-playground/validator.v9 && \
     GO111MODULE=off go get github.com/lib/pq/scram && \
     GO111MODULE=off go get github.com/tinylib/msgp/msgp && \
     GO111MODULE=off go get gopkg.in/DataDog/dd-trace-go.v1/ddtrace && \
-    GO111MODULE=off go get github.com/xwb1989/sqlparser
+    GO111MODULE=off go get github.com/xwb1989/sqlparser && \
+    GO111MODULE=off go get golang.org/x/xerrors
 
 # Install swag with go modules enabled.
 RUN GO111MODULE=on go get -u github.com/swaggo/swag/cmd/swag

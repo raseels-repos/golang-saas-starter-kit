@@ -40,11 +40,18 @@ const (
 // Authenticate finds a user by their email and verifies their password. On success
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
-func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, email, password string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, req AuthenticateRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.Authenticate")
 	defer span.Finish()
 
-	u, err := user.ReadByEmail(ctx, auth.Claims{}, dbConn, email, false)
+	// Validate the request.
+	v := webcontext.Validator()
+	err := v.Struct(req)
+	if err != nil {
+		return Token{}, err
+	}
+
+	u, err := user.ReadByEmail(ctx, auth.Claims{}, dbConn, req.Email, false)
 	if err != nil {
 		if errors.Cause(err) == user.ErrNotFound {
 			err = errors.WithStack(ErrAuthenticationFailure)
@@ -55,7 +62,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, e
 	}
 
 	// Append the salt from the user record to the supplied password.
-	saltedPassword := password + u.PasswordSalt
+	saltedPassword := req.Password + u.PasswordSalt
 
 	// Compare the provided password with the saved hash. Use the bcrypt comparison
 	// function so it is cryptographically secure. Return authentication error for
@@ -66,7 +73,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, e
 	}
 
 	// The user is successfully authenticated with the supplied email and password.
-	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, "", expires, now, scopes...)
+	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, req.AccountID, expires, now, scopes...)
 }
 
 // SwitchAccount allows users to switch between multiple accounts, this changes the claim audience.

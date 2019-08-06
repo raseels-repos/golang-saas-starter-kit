@@ -56,7 +56,10 @@ func newMockSignup() mockSignup {
 	}
 
 	expires := time.Now().UTC().Sub(s.User.CreatedAt) + time.Hour
-	tkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, req.User.Email, req.User.Password, expires, now)
+	tkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+		Email:    req.User.Email,
+		Password: req.User.Password,
+	}, expires, now)
 	if err != nil {
 		panic(err)
 	}
@@ -139,9 +142,13 @@ func TestSignup(t *testing.T) {
 				"address1":        req.Account.Address1,
 				"city":            req.Account.City,
 				"status": map[string]interface{}{
-					"value":   "active",
-					"title":   "Active",
-					"options": []map[string]interface{}{{"selected": false, "title": "[Active Pending Disabled]", "value": "[active pending disabled]"}},
+					"value": "active",
+					"title": "Active",
+					"options": []map[string]interface{}{
+						{"selected": true, "title": "Active", "value": "active"},
+						{"selected": false, "title": "Pending", "value": "pending"},
+						{"selected": false, "title": "Disabled", "value": "disabled"},
+					},
 				},
 				"signup_user_id": &actual.Account.SignupUserID,
 			},

@@ -1,6 +1,7 @@
 package invite
 
 import (
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"os"
 	"strings"
 	"testing"
@@ -78,7 +79,7 @@ func TestSendUserInvites(t *testing.T) {
 		}
 
 		claims := auth.Claims{
-			AccountIds: []string{a.ID},
+			AccountIDs: []string{a.ID},
 			StandardClaims: jwt.StandardClaims{
 				Subject:   u.ID,
 				Audience:  a.ID,
@@ -148,11 +149,12 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure validation is working by trying ResetConfirm with an empty request.
 		{
 			expectedErr := errors.New("Key: 'AcceptInviteRequest.invite_hash' Error:Field validation for 'invite_hash' failed on the 'required' tag\n" +
+				"Key: 'AcceptInviteRequest.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteRequest.first_name' Error:Field validation for 'first_name' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{}, secretKey, now)
+			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{}, secretKey, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -172,8 +174,9 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure the TTL is enforced.
 		{
 			newPass := uuid.NewRandom().String()
-			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHashes[0],
+				Email:           inviteEmails[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
@@ -188,10 +191,15 @@ func TestSendUserInvites(t *testing.T) {
 		}
 
 		// Assuming we have received the email and clicked the link, we now can ensure accept works.
-		for _, inviteHash := range inviteHashes {
+		for idx, inviteHash := range inviteHashes {
+			type expectRes struct {
+				UserID string `json:"user_id" validate:"required,uuid"`
+			}
+			var res expectRes
 			newPass := uuid.NewRandom().String()
-			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			res.UserID, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHash,
+				Email:           inviteEmails[idx],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
@@ -201,20 +209,29 @@ func TestSendUserInvites(t *testing.T) {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tInviteAccept failed.", tests.Failed)
 			}
+
+			// Validate the result.
+			err := webcontext.Validator().StructCtx(ctx, res)
+			if err != nil {
+				t.Log("\t\tGot :", err)
+				t.Fatalf("\t%s\tInviteAccept failed.", tests.Failed)
+			}
+
 			t.Logf("\t%s\tInviteAccept ok.", tests.Success)
 		}
 
 		// Ensure the reset hash does not work after its used.
 		{
 			newPass := uuid.NewRandom().String()
-			err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
+			_, err = AcceptInvite(ctx, test.MasterDB, AcceptInviteRequest{
 				InviteHash:      inviteHashes[0],
+				Email:           inviteEmails[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
 				PasswordConfirm: newPass,
 			}, secretKey, now)
-			if errors.Cause(err) != ErrInviteUserPasswordSet {
+			if errors.Cause(err) != ErrUserAccountActive {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
 				t.Logf("\t\tWant: %+v", ErrInviteUserPasswordSet)
 				t.Fatalf("\t%s\tInviteAccept verify reuse failed.", tests.Failed)

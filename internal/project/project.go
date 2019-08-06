@@ -104,8 +104,8 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := selectQuery()
 
-	if req.Where != nil {
-		query.Where(query.And(*req.Where))
+	if req.Where != "" {
+		query.Where(query.And(req.Where))
 	}
 
 	if len(req.Order) > 0 {

@@ -28,7 +28,6 @@
                                     {{ template "validation-error" . }}
 
                                     <form class="user" method="post" novalidate>
-                                        <input type="hidden" name="ResetHash" value="{{ $.form.ResetHash }}" />
                                         <div class="form-group row">
                                             <div class="col-sm-6 mb-3 mb-sm-0">
                                                 <input type="password" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Password" }}" name="Password" value="{{ $.form.Password }}" placeholder="Password" required>

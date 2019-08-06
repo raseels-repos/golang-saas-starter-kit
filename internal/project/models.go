@@ -108,7 +108,7 @@ type ProjectDeleteRequest struct {
 // ProjectFindRequest defines the possible options to search for projects. By default
 // archived project will be excluded from response.
 type ProjectFindRequest struct {
-	Where           *string       `json:"where" example:"name = ? and status = ?"`
+	Where           string        `json:"where" example:"name = ? and status = ?"`
 	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Moon Launch,active"`
 	Order           []string      `json:"order" example:"created_at desc"`
 	Limit           *uint         `json:"limit" example:"10"`

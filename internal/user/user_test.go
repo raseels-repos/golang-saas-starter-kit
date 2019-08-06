@@ -33,14 +33,13 @@ func testMain(m *testing.M) int {
 
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
-	where := "first_name = ? or email = ?"
 	var (
 		limit  uint = 12
 		offset uint = 34
 	)
 
 	req := UserFindRequest{
-		Where: &where,
+		Where: "first_name = ? or email = ?",
 		Args: []interface{}{
 			"lee",
 			"lee@geeksinthewoods.com",
@@ -195,7 +194,7 @@ func TestCreateValidation(t *testing.T) {
 					FirstName: "Lee",
 					LastName:  "Brown",
 					Email:     req.Email,
-					Timezone:  "America/Anchorage",
+					Timezone:  nil,
 
 					// Copy this fields from the result.
 					ID:            res.ID,
@@ -847,7 +846,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user.
-				err = Archive(ctx, tt.claims(user, accountId), test.MasterDB, UserArchiveRequest{ID: user.ID}, now)
+				err = Archive(ctx, tt.claims(user, accountId), test.MasterDB, UserArchiveRequest{ID: user.ID, force: true}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
@@ -888,7 +887,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUnarchive ok.", tests.Success)
 
 				// Delete (hard-delete) the user.
-				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, UserDeleteRequest{ID: user.ID})
+				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, UserDeleteRequest{ID: user.ID, force: true})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
@@ -936,7 +935,7 @@ func TestFind(t *testing.T) {
 	type userTest struct {
 		name     string
 		req      UserFindRequest
-		expected []*User
+		expected Users
 		error    error
 	}
 
@@ -947,7 +946,7 @@ func TestFind(t *testing.T) {
 	// Test sort users.
 	userTests = append(userTests, userTest{"Find all order by created_at asc",
 		UserFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
@@ -956,13 +955,13 @@ func TestFind(t *testing.T) {
 	})
 
 	// Test reverse sorted users.
-	var expected []*User
+	var expected Users
 	for i := len(users) - 1; i >= 0; i-- {
 		expected = append(expected, users[i])
 	}
 	userTests = append(userTests, userTest{"Find all order by created_at desc",
 		UserFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
@@ -974,7 +973,7 @@ func TestFind(t *testing.T) {
 	var limit uint = 2
 	userTests = append(userTests, userTest{"Find limit",
 		UserFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
@@ -987,7 +986,7 @@ func TestFind(t *testing.T) {
 	var offset uint = 3
 	userTests = append(userTests, userTest{"Find limit, offset",
 		UserFindRequest{
-			Where:  &createdFilter,
+			Where:  createdFilter,
 			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
@@ -1015,7 +1014,7 @@ func TestFind(t *testing.T) {
 	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
 	userTests = append(userTests, userTest{"Find where",
 		UserFindRequest{
-			Where: &where,
+			Where: where,
 			Args:  whereArgs,
 			Order: []string{"created_at"},
 		},

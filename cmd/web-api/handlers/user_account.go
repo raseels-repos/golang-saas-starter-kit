@@ -55,7 +55,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 		if err != nil {
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
-		req.Where = &where
+		req.Where = where
 		req.Args = args
 	}
 

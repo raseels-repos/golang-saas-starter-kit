@@ -89,13 +89,18 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		}
 		created = actual
 
+		var roles []interface{}
+		for _, r := range req.Roles {
+			roles = append(roles, r)
+		}
+
 		expectedMap := map[string]interface{}{
 			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
 			//"id":         actual.ID,
 			"account_id": req.AccountID,
 			"user_id":    req.UserID,
-			"status":     web.NewEnumResponse(ctx, "active", user_account.UserAccountStatus_Values),
-			"roles":      req.Roles,
+			"status":     web.NewEnumResponse(ctx, "active", user_account.UserAccountStatus_ValuesInterface()...),
+			"roles":      web.NewEnumMultiResponse(ctx, roles, user_account.UserAccountRole_ValuesInterface()...),
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
 		}
 

@@ -8,8 +8,9 @@ import (
 
 // AuthenticateRequest defines what information is required to authenticate a user.
 type AuthenticateRequest struct {
-	Email    string `json:"email" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
-	Password string `json:"password" validate:"required" example:"NeverTellSecret"`
+	Email     string `json:"email" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
+	Password  string `json:"password" validate:"required" example:"NeverTellSecret"`
+	AccountID string `json:"account_id" validate:"omitempty,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
 // Token is the payload we deliver to users when they authenticate.

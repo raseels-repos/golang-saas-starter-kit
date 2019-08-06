@@ -842,7 +842,7 @@ func TestFind(t *testing.T) {
 	type accountTest struct {
 		name     string
 		req      AccountFindRequest
-		expected []*Account
+		expected Accounts
 		error    error
 	}
 
@@ -853,7 +853,7 @@ func TestFind(t *testing.T) {
 	// Test sort accounts.
 	accountTests = append(accountTests, accountTest{"Find all order by created_at asc",
 		AccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
@@ -868,7 +868,7 @@ func TestFind(t *testing.T) {
 	}
 	accountTests = append(accountTests, accountTest{"Find all order by created_at desc",
 		AccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
@@ -880,7 +880,7 @@ func TestFind(t *testing.T) {
 	var limit uint = 2
 	accountTests = append(accountTests, accountTest{"Find limit",
 		AccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
@@ -893,7 +893,7 @@ func TestFind(t *testing.T) {
 	var offset uint = 3
 	accountTests = append(accountTests, accountTest{"Find limit, offset",
 		AccountFindRequest{
-			Where:  &createdFilter,
+			Where:  createdFilter,
 			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
@@ -918,10 +918,9 @@ func TestFind(t *testing.T) {
 		expected = append(expected, &u)
 	}
 
-	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
 	accountTests = append(accountTests, accountTest{"Find where",
 		AccountFindRequest{
-			Where: &where,
+			Where: createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")",
 			Args:  whereArgs,
 			Order: []string{"created_at"},
 		},

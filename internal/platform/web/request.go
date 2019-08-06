@@ -51,7 +51,10 @@ func Decode(ctx context.Context, r *http.Request, val interface{}) error {
 		}
 	}
 
-	if err := webcontext.Validator().Struct(val); err != nil {
+	// Hack since we have no DB connection.
+	ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
+
+	if err := webcontext.Validator().StructCtx(ctx, val); err != nil {
 		verr, _ := weberror.NewValidationError(ctx, err)
 		return verr
 	}

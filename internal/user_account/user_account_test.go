@@ -32,14 +32,14 @@ func testMain(m *testing.M) int {
 
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
-	where := "account_id = ? or user_id = ?"
+
 	var (
 		limit  uint = 12
 		offset uint = 34
 	)
 
 	req := UserAccountFindRequest{
-		Where: &where,
+		Where: "account_id = ? or user_id = ?",
 		Args: []interface{}{
 			"xy7",
 			"qwert",
@@ -598,9 +598,8 @@ func TestCrud(t *testing.T) {
 
 				// Find the account for the user to verify the updates where made. There should only
 				// be one account associated with the user for this test.
-				ff := "user_id = ? or account_id = ?"
 				findRes, err := Find(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountFindRequest{
-					Where: &ff,
+					Where: "user_id = ? or account_id = ?",
 					Args:  []interface{}{userID, accountID},
 					Order: []string{"created_at"},
 				})
@@ -609,7 +608,7 @@ func TestCrud(t *testing.T) {
 					t.Logf("\t\tWant: %+v", tt.findErr)
 					t.Fatalf("\t%s\tVerify update user account failed.", tests.Failed)
 				} else if tt.findErr == nil {
-					expected := []*UserAccount{
+					var expected UserAccounts = []*UserAccount{
 						&UserAccount{
 							//ID:        ua.ID,
 							UserID:    ua.UserID,
@@ -651,7 +650,7 @@ func TestCrud(t *testing.T) {
 						t.Fatalf("\t%s\tVerify archive user account failed when including archived.", tests.Failed)
 					}
 
-					expected := []*UserAccount{
+					var expected UserAccounts = []*UserAccount{
 						&UserAccount{
 							//ID:         ua.ID,
 							UserID:     ua.UserID,
@@ -737,7 +736,7 @@ func TestFind(t *testing.T) {
 	type accountTest struct {
 		name     string
 		req      UserAccountFindRequest
-		expected []*UserAccount
+		expected UserAccounts
 		error    error
 	}
 
@@ -748,7 +747,7 @@ func TestFind(t *testing.T) {
 	// Test sort users.
 	accountTests = append(accountTests, accountTest{"Find all order by created_at asx",
 		UserAccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
@@ -763,7 +762,7 @@ func TestFind(t *testing.T) {
 	}
 	accountTests = append(accountTests, accountTest{"Find all order by created_at desc",
 		UserAccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
@@ -775,7 +774,7 @@ func TestFind(t *testing.T) {
 	var limit uint = 2
 	accountTests = append(accountTests, accountTest{"Find limit",
 		UserAccountFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
@@ -788,7 +787,7 @@ func TestFind(t *testing.T) {
 	var offset uint = 3
 	accountTests = append(accountTests, accountTest{"Find limit, offset",
 		UserAccountFindRequest{
-			Where:  &createdFilter,
+			Where:  createdFilter,
 			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
@@ -813,10 +812,10 @@ func TestFind(t *testing.T) {
 		whereArgs = append(whereArgs, ua.AccountID)
 		expected = append(expected, &ua)
 	}
-	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
+
 	accountTests = append(accountTests, accountTest{"Find where",
 		UserAccountFindRequest{
-			Where: &where,
+			Where: createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")",
 			Args:  whereArgs,
 			Order: []string{"created_at"},
 		},

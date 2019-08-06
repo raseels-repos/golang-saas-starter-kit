@@ -95,7 +95,10 @@ func testMain(m *testing.M) int {
 	}
 
 	expires := time.Now().UTC().Sub(signup1.User.CreatedAt) + time.Hour
-	adminTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, signupReq1.User.Email, signupReq1.User.Password, expires, now)
+	adminTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+		Email:    signupReq1.User.Email,
+		Password: signupReq1.User.Password,
+	}, expires, now)
 	if err != nil {
 		panic(err)
 	}
@@ -146,7 +149,10 @@ func testMain(m *testing.M) int {
 		panic(err)
 	}
 
-	userTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, usr.Email, userReq.Password, expires, now)
+	userTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+		Email:    usr.Email,
+		Password: userReq.Password,
+	}, expires, now)
 	if err != nil {
 		panic(err)
 	}

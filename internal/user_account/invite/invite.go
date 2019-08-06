@@ -54,9 +54,9 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 	emailUserIDs := make(map[string]string)
 	{
 		// Find all users without passing in claims to search all users.
-		where := fmt.Sprintf("email in ('%s')", strings.Join(req.Emails, "','"))
 		users, err := user.Find(ctx, auth.Claims{}, dbConn, user.UserFindRequest{
-			Where: &where,
+			Where: fmt.Sprintf("email in ('%s')",
+				strings.Join(req.Emails, "','")),
 		})
 		if err != nil {
 			return nil, err
@@ -75,9 +75,10 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 			args = append(args, userID)
 		}
 
-		where := fmt.Sprintf("user_id in ('%s') and status = '%s'", strings.Join(args, "','"), user_account.UserAccountStatus_Active.String())
 		userAccs, err := user_account.Find(ctx, claims, dbConn, user_account.UserAccountFindRequest{
-			Where: &where,
+			Where: fmt.Sprintf("user_id in ('%s') and status = '%s'",
+				strings.Join(args, "','"),
+				user_account.UserAccountStatus_Active.String()),
 		})
 		if err != nil {
 			return nil, err

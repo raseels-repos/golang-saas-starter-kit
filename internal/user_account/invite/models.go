@@ -2,7 +2,6 @@ package invite
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -78,8 +77,6 @@ func ParseInviteHash(ctx context.Context, secretKey string, str string, now time
 		return nil, errors.WithStack(err)
 	}
 	hashPts := strings.Split(hashStr, "|")
-
-	fmt.Println(hashPts)
 
 	var hash InviteHash
 	if len(hashPts) == 5 {

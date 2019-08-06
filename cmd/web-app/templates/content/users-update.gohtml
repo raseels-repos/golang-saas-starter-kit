@@ -4,6 +4,14 @@
 {{end}}
 {{define "content"}}
 
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/users">Users</a></li>
+            <li class="breadcrumb-item"><a href="{{ .urlUsersView }}">{{ .user.Name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Update</li>
+        </ol>
+    </nav>
+
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Update User</h1>
     </div>
@@ -40,6 +48,16 @@
                             {{template "invalid-feedback" dict "fieldName" "UserUpdateRequest.Email" "validationDefaults" $.userValidationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
+                            <label for="inputTimezone">Timezone</label>
+                            <select class="form-control {{ ValidationFieldClass $.validationErrors "UserUpdateRequest.Timezone" }}" name="Timezone">
+                                <option value="">Not set</option>
+                                {{ range $idx, $t := .timezones }}
+                                    <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
+                                {{ end }}
+                            </select>
+                            {{template "invalid-feedback" dict "fieldName" "UserUpdateRequest.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                        </div>
+                        <div class="form-group">
                             <label for="inputRoles">Roles</label>
                             <span class="help-block "><small>- Select at least one role.</small></span>
                             {{ range $r := .roles }}
@@ -54,16 +72,6 @@
                                 </div>
                             {{ end }}
                             {{template "invalid-feedback" dict "fieldName" "Roles" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
-                        </div>
-                        <div class="form-group">
-                            <label for="inputTimezone">Timezone</label>
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "UserUpdateRequest.Timezone" }}" name="Timezone">
-                                    <option value="">Not set</option>
-                                {{ range $idx, $t := .timezones }}
-                                    <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
-                                {{ end }}
-                            </select>
-                            {{template "invalid-feedback" dict "fieldName" "UserUpdateRequest.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                     </div>
                 </div>

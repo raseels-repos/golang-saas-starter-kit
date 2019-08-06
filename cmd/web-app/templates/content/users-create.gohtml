@@ -4,6 +4,13 @@
 {{end}}
 {{define "content"}}
 
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/users">Users</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Create</li>
+        </ol>
+    </nav>
+
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Create User</h1>
     </div>
@@ -32,17 +39,6 @@
                             <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Email" }}"
                                    placeholder="enter email" name="Email" value="{{ .form.Email }}" required>
                             {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.Email" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
-                        </div>
-                        <div class="form-group">
-                            <label for="inputTimezone">Timezone</label>
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Timezone" }}"
-                                    id="inputTimezone" name="Timezone">
-                                <option value="">Not set</option>
-                                {{ range $idx, $t := .timezones }}
-                                    <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
-                                {{ end }}
-                            </select>
-                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputPassword">Password</label>

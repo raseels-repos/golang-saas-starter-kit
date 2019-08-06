@@ -38,11 +38,12 @@
                 </a>
                 <div id="navSectionProjects" class="collapse" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/projects">Projects</a>
+                        <a class="collapse-item" href="/projects">Manage Projects</a>
                     </div>
                 </div>
             </li>
 
+            {{ if HasRole $._Ctx "admin" }}
             <!-- Nav Item - Utilities Collapse Menu -->
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#navSectionUsers" aria-expanded="true" aria-controls="navSectionUsers">
@@ -51,10 +52,13 @@
                 </a>
                 <div id="navSectionUsers" class="collapse" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/users">Users</a>
+                        <a class="collapse-item" href="/users">Manage Users</a>
+                        <a class="collapse-item" href="/users/invite">Invite Users</a>
                     </div>
                 </div>
             </li>
+            {{end}}
+
         {{ end }}
 
         <!-- Divider -->

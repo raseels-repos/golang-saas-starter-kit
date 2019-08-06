@@ -91,7 +91,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 					subStatusIcon = "far fa-circle"
 				}
 
-				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))
+				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s mr-1'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))
 			case "created_at":
 				dt := web.NewTimeResponse(ctx, q.CreatedAt)
 				v.Value = dt.Local

@@ -44,6 +44,10 @@ func urlUsersCreate() string {
 	return fmt.Sprintf("/users/create")
 }
 
+func urlUsersInvite() string {
+	return fmt.Sprintf("/users/invite")
+}
+
 func urlUsersView(userID string) string {
 	return fmt.Sprintf("/users/%s", userID)
 }
@@ -117,7 +121,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 					subStatusIcon = "far fa-circle"
 				}
 
-				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))
+				v.Formatted = fmt.Sprintf("<span class='cell-font-status %s'><i class='%s mr-1'></i>%s</span>", subStatusClass, subStatusIcon, web.EnumValueTitle(v.Value))
 			case "created_at":
 				dt := web.NewTimeResponse(ctx, q.CreatedAt)
 				v.Value = dt.Local
@@ -175,6 +179,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	data := map[string]interface{}{
 		"datatable":      dt.Response(),
 		"urlUsersCreate": urlUsersCreate(),
+		"urlUsersInvite": urlUsersInvite(),
 	}
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
@@ -362,6 +367,7 @@ func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	data["urlUsersView"] = urlUsersView(userID)
 	data["urlUsersUpdate"] = urlUsersUpdate(userID)
 	data["urlUserVirtualLogin"] = urlUserVirtualLogin(userID)
 
@@ -530,6 +536,8 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user.UserUpdatePasswordRequest{})); ok {
 		data["passwordValidationDefaults"] = verr.(*weberror.Error)
 	}
+
+	data["urlUsersView"] = urlUsersView(userID)
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "users-update.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

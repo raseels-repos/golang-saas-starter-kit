@@ -31,9 +31,9 @@ type Account struct {
 // @Security OAuth2Password
 // @Param id path string true "Account ID"
 // @Success 200 {object} account.AccountResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 404 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /accounts/{id} [get]
 func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -78,9 +78,9 @@ func (a *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Security OAuth2Password
 // @Param data body account.AccountUpdateRequest true "Update fields"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /accounts [patch]
 func (a *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 

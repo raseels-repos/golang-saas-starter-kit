@@ -37,9 +37,9 @@ type Project struct {
 // @Param offset			query integer  	false 	"Offset, example: 20"
 // @Param include-archived query boolean 	false 	"Included Archived, example: false"
 // @Success 200 {array} project.ProjectResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /project [get]
 func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -130,9 +130,9 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Security OAuth2Password
 // @Param id path string true "Project ID"
 // @Success 200 {object} project.ProjectResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 404 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [get]
 func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -177,10 +177,10 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Security OAuth2Password
 // @Param data body project.ProjectCreateRequest true "Project details"
 // @Success 201 {object} project.ProjectResponse
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 404 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 404 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [post]
 func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -228,9 +228,9 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Security OAuth2Password
 // @Param data body project.ProjectUpdateRequest true "Update fields"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [patch]
 func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -279,9 +279,9 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Security OAuth2Password
 // @Param data body project.ProjectArchiveRequest true "Update fields"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/archive [patch]
 func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
@@ -330,9 +330,9 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Security OAuth2Password
 // @Param id path string true "Project ID"
 // @Success 204
-// @Failure 400 {object} web.ErrorResponse
-// @Failure 403 {object} web.ErrorResponse
-// @Failure 500 {object} web.ErrorResponse
+// @Failure 400 {object} weberror.ErrorResponse
+// @Failure 403 {object} weberror.ErrorResponse
+// @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [delete]
 func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)

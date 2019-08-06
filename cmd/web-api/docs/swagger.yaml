@@ -77,13 +77,6 @@ definitions:
       signup_user_id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
-      status:
-        enum:
-        - active
-        - pending
-        - disabled
-        example: disabled
-        type: string
       timezone:
         example: America/Anchorage
         type: string
@@ -108,12 +101,6 @@ definitions:
         type: string
       name:
         example: Rocket Launch
-        type: string
-      status:
-        enum:
-        - active
-        - disabled
-        example: active
         type: string
     required:
     - account_id
@@ -154,12 +141,6 @@ definitions:
         type: string
       name:
         example: Rocket Launch to Moon
-        type: string
-      status:
-        enum:
-        - active
-        - disabled
-        example: disabled
         type: string
     required:
     - id
@@ -221,8 +202,11 @@ definitions:
       email:
         example: '{RANDOM_EMAIL}'
         type: string
-      name:
-        example: Gabi May
+      first_name:
+        example: Gabi
+        type: string
+      last_name:
+        example: May
         type: string
       password:
         example: SecretString
@@ -232,11 +216,15 @@ definitions:
         type: string
     required:
     - email
-    - name
+    - first_name
+    - last_name
     - password
+    - password_confirm
     type: object
   user.UserArchiveRequest:
     properties:
+      force:
+        type: boolean
       id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
@@ -248,8 +236,11 @@ definitions:
       email:
         example: gabi@geeksinthewoods.com
         type: string
-      name:
-        example: Gabi May
+      first_name:
+        example: Gabi
+        type: string
+      last_name:
+        example: May
         type: string
       password:
         example: SecretString
@@ -262,8 +253,10 @@ definitions:
         type: string
     required:
     - email
-    - name
+    - first_name
+    - last_name
     - password
+    - password_confirm
     type: object
   user.UserResponse:
     properties:
@@ -276,11 +269,19 @@ definitions:
       email:
         example: gabi@geeksinthewoods.com
         type: string
+      first_name:
+        example: Gabi
+        type: string
+      gravatar:
+        type: string
       id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
+      last_name:
+        example: May
+        type: string
       name:
-        example: Gabi May
+        example: Gabi
         type: string
       timezone:
         example: America/Anchorage
@@ -303,16 +304,20 @@ definitions:
     required:
     - id
     - password
+    - password_confirm
     type: object
   user.UserUpdateRequest:
     properties:
       email:
         example: gabi.may@geeksinthewoods.com
         type: string
+      first_name:
+        example: Gabi May Not
+        type: string
       id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
-      name:
+      last_name:
         example: Gabi May Not
         type: string
       timezone:
@@ -347,13 +352,6 @@ definitions:
           - user
           type: string
         type: array
-      status:
-        enum:
-        - active
-        - invited
-        - disabled
-        example: active
-        type: string
       user_id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
@@ -373,9 +371,6 @@ definitions:
       created_at:
         $ref: '#/definitions/web.TimeResponse'
         type: object
-      id:
-        example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
-        type: string
       roles:
         example:
         - admin
@@ -411,19 +406,25 @@ definitions:
           - user
           type: string
         type: array
-      status:
-        enum:
-        - active
-        - invited
-        - disabled
-        example: disabled
-        type: string
       user_id:
         example: d69bdef7-173f-4d29-b52c-3edc60baf6a2
         type: string
     required:
     - account_id
     - user_id
+    type: object
+  web.EnumMultiResponse:
+    properties:
+      options:
+        items:
+          $ref: '#/definitions/web.EnumOption'
+        type: array
+      values:
+        example:
+        - active_etc
+        items:
+          type: string
+        type: array
     type: object
   web.EnumOption:
     properties:
@@ -450,22 +451,6 @@ definitions:
         example: active_etc
         type: string
     type: object
-  web.ErrorResponse:
-    properties:
-      error:
-        type: string
-      fields:
-        items:
-          $ref: '#/definitions/web.FieldError'
-        type: array
-    type: object
-  web.FieldError:
-    properties:
-      error:
-        type: string
-      field:
-        type: string
-    type: object
   web.TimeResponse:
     properties:
       date:
@@ -479,6 +464,9 @@ definitions:
         type: string
       local_date:
         example: Tue Jun 25
+        type: string
+      local_time:
+        example: 3:00AM
         type: string
       now_rel_time:
         example: 15 hours from now
@@ -502,17 +490,41 @@ definitions:
         example: "2019-06-25T11:00:53.284Z"
         type: string
     type: object
+  weberror.ErrorResponse:
+    properties:
+      details:
+        type: string
+      error:
+        type: string
+      fields:
+        items:
+          $ref: '#/definitions/weberror.FieldError'
+        type: array
+      stack_trace:
+        type: string
+      status_code:
+        type: integer
+    type: object
+  weberror.FieldError:
+    properties:
+      display:
+        type: string
+      error:
+        type: string
+      field:
+        type: string
+      tag:
+        type: string
+      value:
+        type: object
+    type: object
 host: '{{.Host}}'
 info:
-  contact:
-    email: support@geeksinthewoods.com
-    name: API Support
-    url: http://example.com/support
-  description: This is a sample server celler server.
+  contact: {}
+  description: '{{.Description}}'
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://example.com/terms
   title: SaaS Example API
   version: '{{.Version}}'
 paths:
@@ -536,17 +548,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -575,17 +587,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -613,17 +625,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - BasicAuth: []
@@ -654,7 +666,7 @@ paths:
         type: integer
       - description: 'Included Archived, example: false'
         in: query
-        name: included-archived
+        name: include-archived
         type: boolean
       produces:
       - application/json
@@ -668,17 +680,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -705,17 +717,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -745,22 +757,22 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -785,17 +797,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -823,17 +835,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -860,17 +872,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -901,12 +913,12 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       summary: Signup handles new account creation.
       tags:
@@ -929,17 +941,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -969,7 +981,7 @@ paths:
         type: integer
       - description: 'Included Archived, example: false'
         in: query
-        name: included-archived
+        name: include-archived
         type: boolean
       produces:
       - application/json
@@ -983,17 +995,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1019,17 +1031,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1059,29 +1071,29 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
       summary: Create new user account.
       tags:
       - user_account
-  /user_accounts/{id}:
+  /user_accounts/{user_id}/{account_id}:
     get:
       consumes:
       - application/json
@@ -1103,17 +1115,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1140,17 +1152,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1182,7 +1194,7 @@ paths:
         type: integer
       - description: 'Included Archived, example: false'
         in: query
-        name: included-archived
+        name: include-archived
         type: boolean
       produces:
       - application/json
@@ -1196,12 +1208,12 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1227,17 +1239,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1267,17 +1279,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1302,17 +1314,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1340,17 +1352,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1377,17 +1389,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1414,17 +1426,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []
@@ -1449,17 +1461,17 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/web.ErrorResponse'
+            $ref: '#/definitions/weberror.ErrorResponse'
             type: object
       security:
       - OAuth2Password: []

@@ -6,22 +6,19 @@
 {{ define "content" }}
     <div class="container" id="page-content">
 
-
         <h1 class="h1 mt-5 mb-3 text-dark">API</h1>
 
         <p>Automate your business process via a simple and powerful API. Our API allows you to integrate complex services with our SaaS to go beyond the integrations we provide out of the box.</p>
 
         <p>API access is only available to clients with the Enterprise plan. If you do not have the Enterprise plan, upgrade your account.</p>
 
-
         <div class="row mt-5">
             <div class="col">
                 <h2>API Documentation</h2>
                 <p>The documentation for the API is available here:</p>
-                <p class="h4"><i class="far fa-window-maximize"></i> <a href="http://127.0.0.1:3001/docs/" target="_blank">http://127.0.0.1:3001/docs/</a></p>
+                <p class="h4"><i class="far fa-window-maximize"></i> <a href="{{ .urlApiDocs }}" target="_blank">{{ .urlApiDocs }}</a></p>
             </div>
         </div>
-
 
         <div class="row mt-5 ">
             <div class="col">
@@ -29,12 +26,10 @@
                 <h2>Base API URI</h2>
 
                 <p>The API is currently version 1. Thus, the endpoint for the API is:</p>
-                <code>http://127.0.0.1:3001/v1/
-                </code>
+                <code>{{ .urlApiBaseUri }}</code>
 
             </div>
         </div>
-
 
         <div class="row mt-5 ">
             <div class="col">
@@ -45,7 +40,7 @@
 
                 <h3 class="h5 mt-4">1. Generate an Auth Token</h3>
 
-                <p>At the top of the <a href="http://127.0.0.1:3001/docs/" target="_blank">API Documentation</a> UI, locate the button `Authorize` and click it.</p>
+                <p>At the top of the <a href="{{ .urlApiDocs }}" target="_blank">API Documentation</a> UI, locate the button `Authorize` and click it.</p>
 
                 <p>Find the section `OAuth2Password (OAuth2, password)`.</p>
 
@@ -70,16 +65,8 @@
 
                 <p>Now that you have an auth token, you can make any number of additional API requests until your auth token expires.</p>
 
-
             </div>
         </div>
-
-
-
-
-
-
-
     </div>
 {{end}}
 {{define "js"}}

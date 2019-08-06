@@ -51,3 +51,15 @@ func (r ProjectRoutes) UserInviteAccept(inviteHash string) string {
 	u.Path = "/users/invite/" + inviteHash
 	return u.String()
 }
+
+func (r ProjectRoutes) ApiDocs() string {
+	u := r.webApiUrl
+	u.Path = "/docs"
+	return u.String()
+}
+
+func (r ProjectRoutes) ApiDocsJson() string {
+	u := r.webApiUrl
+	u.Path = "/docs/doc.json"
+	return u.String()
+}

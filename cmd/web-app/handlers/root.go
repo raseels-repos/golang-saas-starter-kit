@@ -2,7 +2,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/sethgrid/pester"
+	"io/ioutil"
 	"net/http"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -39,12 +43,14 @@ func (h *Root) indexDashboard(ctx context.Context, w http.ResponseWriter, r *htt
 }
 
 // indexDefault loads the root index page when a user has no authentication.
-func (u *Root) indexDefault(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	return u.Renderer.Render(ctx, w, r, tmplLayoutSite, "site-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
+func (h *Root) indexDefault(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+	return h.Renderer.Render(ctx, w, r, tmplLayoutSite, "site-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
 }
 
 // SitePage loads the page with the layout for site instead of the app base.
-func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+
+	data := make(map[string]interface{})
 
 	var tmpName string
 	switch r.RequestURI {
@@ -52,6 +58,47 @@ func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		tmpName = "site-index.gohtml"
 	case "/api":
 		tmpName = "site-api.gohtml"
+
+		// http://127.0.0.1:3001/docs/doc.json
+		swaggerJsonUrl := h.ProjectRoutes.ApiDocsJson()
+
+		// Load the json file from the API service.
+		res, err := pester.Get(swaggerJsonUrl)
+		if err != nil {
+			return errors.WithMessagef(err, "Failed to load url '%s' for api documentation.", swaggerJsonUrl)
+		}
+
+		// Read the entire response body.
+		dat, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// Define the basic JSON struct for the JSON file.
+		type swaggerInfo struct {
+			Description string `json:"description"`
+			Title       string `json:"title"`
+			Version     string `json:"version"`
+		}
+		type swaggerDoc struct {
+			Schemes  []string    `json:"schemes"`
+			Swagger  string      `json:"swagger"`
+			Info     swaggerInfo `json:"info"`
+			Host     string      `json:"host"`
+			BasePath string      `json:"basePath"`
+		}
+
+		// JSON decode the response body.
+		var doc swaggerDoc
+		err = json.Unmarshal(dat, &doc)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		data["urlApiBaseUri"] = h.ProjectRoutes.WebApiUrl(doc.BasePath)
+		data["urlApiDocs"] = h.ProjectRoutes.ApiDocs()
+
 	case "/pricing":
 		tmpName = "site-pricing.gohtml"
 	case "/support":
@@ -64,11 +111,11 @@ func (u *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return web.Redirect(ctx, w, r, "/", http.StatusFound)
 	}
 
-	return u.Renderer.Render(ctx, w, r, tmplLayoutSite, tmpName, web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
+	return h.Renderer.Render(ctx, w, r, tmplLayoutSite, tmpName, web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
 // IndexHtml redirects /index.html to the website root page.
-func (u *Root) IndexHtml(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Root) IndexHtml(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	return web.Redirect(ctx, w, r, "/", http.StatusMovedPermanently)
 }
 

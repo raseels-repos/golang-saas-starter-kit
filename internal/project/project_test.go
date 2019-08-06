@@ -24,14 +24,14 @@ func testMain(m *testing.M) int {
 
 // TestFindRequestQuery validates findRequestQuery
 func TestFindRequestQuery(t *testing.T) {
-	where := "field1 = ? or field2 = ?"
+
 	var (
 		limit  uint = 12
 		offset uint = 34
 	)
 
 	req := ProjectFindRequest{
-		Where: &where,
+		Where: "field1 = ? or field2 = ?",
 		Args: []interface{}{
 			"lee brown",
 			"103 East Main St.",

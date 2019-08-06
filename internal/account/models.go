@@ -170,7 +170,7 @@ type AccountDeleteRequest struct {
 // AccountFindRequest defines the possible options to search for accounts. By default
 // archived accounts will be excluded from response.
 type AccountFindRequest struct {
-	Where           *string       `json:"where" example:"name = ? and status = ?"`
+	Where           string        `json:"where" example:"name = ? and status = ?"`
 	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,active"`
 	Order           []string      `json:"order" example:"created_at desc"`
 	Limit           *uint         `json:"limit" example:"10"`

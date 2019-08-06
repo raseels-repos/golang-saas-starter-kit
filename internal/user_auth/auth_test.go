@@ -48,7 +48,11 @@ func TestAuthenticate(t *testing.T) {
 			now := time.Now().Add(time.Hour * -1)
 
 			// Try to authenticate an invalid user.
-			_, err := Authenticate(ctx, test.MasterDB, tknGen, "doesnotexist@gmail.com", "xy7", time.Hour, now)
+			_, err := Authenticate(ctx, test.MasterDB, tknGen,
+				AuthenticateRequest{
+					Email:    "doesnotexist@gmail.com",
+					Password: "xy7",
+				}, time.Hour, now)
 			if errors.Cause(err) != ErrAuthenticationFailure {
 				t.Logf("\t\tGot : %+v", err)
 				t.Logf("\t\tWant: %+v", ErrAuthenticationFailure)
@@ -88,7 +92,12 @@ func TestAuthenticate(t *testing.T) {
 			now = now.Add(time.Minute * 5)
 
 			// Try to authenticate valid user with invalid password.
-			_, err = Authenticate(ctx, test.MasterDB, tknGen, usrAcc.User.Email, "xy7", time.Hour, now)
+			_, err = Authenticate(ctx, test.MasterDB, tknGen,
+				AuthenticateRequest{
+					Email:    usrAcc.User.Email,
+					Password: "xy7",
+				},
+				time.Hour, now)
 			if errors.Cause(err) != ErrAuthenticationFailure {
 				t.Logf("\t\tGot : %+v", err)
 				t.Logf("\t\tWant: %+v", ErrAuthenticationFailure)
@@ -97,7 +106,11 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tAuthenticate user w/invalid password ok.", tests.Success)
 
 			// Verify that the user can be authenticated with the created user.
-			tkn1, err := Authenticate(ctx, test.MasterDB, tknGen, usrAcc.User.Email, usrAcc.User.Password, time.Hour, now)
+			tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+				AuthenticateRequest{
+					Email:    usrAcc.User.Email,
+					Password: usrAcc.User.Password,
+				}, time.Hour, now)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tAuthenticate user failed.", tests.Failed)
@@ -170,7 +183,11 @@ func TestUserUpdatePassword(t *testing.T) {
 		t.Logf("\t%s\tCreate user account ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the created user.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, usrAcc.User.Email, usrAcc.User.Password, time.Hour, now)
+		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+			AuthenticateRequest{
+				Email:    usrAcc.User.Email,
+				Password: usrAcc.User.Password,
+			}, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
@@ -190,7 +207,11 @@ func TestUserUpdatePassword(t *testing.T) {
 		t.Logf("\t%s\tUpdatePassword ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, usrAcc.User.Email, newPass, time.Hour, now)
+		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+			AuthenticateRequest{
+				Email:    usrAcc.User.Email,
+				Password: newPass,
+			}, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
@@ -257,7 +278,11 @@ func TestUserResetPassword(t *testing.T) {
 		t.Logf("\t%s\tResetConfirm ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen, usrAcc.User.Email, newPass, time.Hour, now)
+		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+			AuthenticateRequest{
+				Email:    usrAcc.User.Email,
+				Password: newPass,
+			}, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)
@@ -456,7 +481,11 @@ func TestSwitchAccount(t *testing.T) {
 			{
 				// Verify that the user can be authenticated with the created user.
 				var claims1 auth.Claims
-				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen, authTest.root.User.Email, authTest.root.User.Password, time.Hour, now)
+				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+					AuthenticateRequest{
+						Email:    authTest.root.User.Email,
+						Password: authTest.root.User.Password,
+					}, time.Hour, now)
 				if err != nil {
 					t.Log("\t\tGot :", err)
 					t.Fatalf("\t%s\tAuthenticate user failed.", tests.Failed)
@@ -856,7 +885,11 @@ func TestVirtualLogin(t *testing.T) {
 			{
 				// Verify that the user can be authenticated with the created user.
 				var claims1 auth.Claims
-				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen, authTest.root.User.Email, authTest.root.User.Password, time.Hour, now)
+				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+					AuthenticateRequest{
+						Email:    authTest.root.User.Email,
+						Password: authTest.root.User.Password,
+					}, time.Hour, now)
 				if err != nil {
 					t.Log("\t\tGot :", err)
 					t.Fatalf("\t%s\tAuthenticate user failed.", tests.Failed)

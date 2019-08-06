@@ -3,9 +3,6 @@ package user
 import (
 	"context"
 	"database/sql"
-	"github.com/sudo-suhas/symcrypto"
-	"strconv"
-	"strings"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -185,8 +182,8 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 // 			to the query.
 func findRequestQuery(req UserFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := selectQuery()
-	if req.Where != nil {
-		query.Where(query.And(*req.Where))
+	if req.Where != "" {
+		query.Where(query.And(req.Where))
 	}
 	if len(req.Order) > 0 {
 		query.OrderBy(req.Order...)
@@ -490,8 +487,6 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
 	defer span.Finish()
 
-	v := webcontext.Validator()
-
 	// Validation email address is unique in the database.
 	if req.Email != nil {
 		// Validation email address is unique in the database.
@@ -505,6 +500,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	}
 
 	// Validate the request.
+	v := webcontext.Validator()
 	err := v.StructCtx(ctx, req)
 	if err != nil {
 		return err
@@ -647,7 +643,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
-	} else if claims.Subject != "" && claims.Subject == req.ID {
+	} else if claims.Subject != "" && claims.Subject == req.ID && !req.force {
 		return errors.WithStack(ErrForbidden)
 	}
 
@@ -772,7 +768,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 	err = CanModifyUser(ctx, claims, dbConn, req.ID)
 	if err != nil {
 		return err
-	} else if claims.Subject != "" && claims.Subject == req.ID {
+	} else if claims.Subject != "" && claims.Subject == req.ID && !req.force {
 		return errors.WithStack(ErrForbidden)
 	}
 
@@ -899,23 +895,9 @@ func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) s
 		requestIp = vals.RequestIP
 	}
 
-	// Generate a string that embeds additional information.
-	hashPts := []string{
-		resetId,
-		strconv.Itoa(int(now.UTC().Unix())),
-		strconv.Itoa(int(now.UTC().Add(req.TTL).Unix())),
-		requestIp,
-	}
-	hashStr := strings.Join(hashPts, "|")
-
-	// This returns the nonce appended with the encrypted string for "hello world".
-	crypto, err := symcrypto.New(secretKey)
+	encrypted, err := NewResetHash(ctx, secretKey, resetId, requestIp, req.TTL, now)
 	if err != nil {
-		return "", errors.WithStack(err)
-	}
-	encrypted, err := crypto.Encrypt(hashStr)
-	if err != nil {
-		return "", errors.WithStack(err)
+		return "", err
 	}
 
 	data := map[string]interface{}{
@@ -946,32 +928,8 @@ func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequ
 		return nil, err
 	}
 
-	crypto, err := symcrypto.New(secretKey)
+	hash, err := ParseResetHash(ctx, secretKey, req.ResetHash, now)
 	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	hashStr, err := crypto.Decrypt(req.ResetHash)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	hashPts := strings.Split(hashStr, "|")
-
-	var hash ResetHash
-	if len(hashPts) == 4 {
-		hash.ResetID = hashPts[0]
-		hash.CreatedAt, _ = strconv.Atoi(hashPts[1])
-		hash.ExpiresAt, _ = strconv.Atoi(hashPts[2])
-		hash.RequestIP = hashPts[3]
-	}
-
-	// Validate the hash.
-	err = v.StructCtx(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-
-	if int64(hash.ExpiresAt) < now.UTC().Unix() {
-		err = errors.WithMessage(ErrResetExpired, "Password reset has expired.")
 		return nil, err
 	}
 

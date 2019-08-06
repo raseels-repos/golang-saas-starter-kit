@@ -5,6 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"github.com/pkg/errors"
+	"github.com/sudo-suhas/symcrypto"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -141,7 +146,8 @@ type UserUpdatePasswordRequest struct {
 // UserArchiveRequest defines the information needed to archive an user. This will archive (soft-delete) the
 // existing database entry.
 type UserArchiveRequest struct {
-	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	ID    string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	force bool
 }
 
 // UserRestoreRequest defines the information needed to restore an user.
@@ -151,13 +157,14 @@ type UserRestoreRequest struct {
 
 // UserDeleteRequest defines the information needed to delete a user.
 type UserDeleteRequest struct {
-	ID string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	ID    string `json:"id" validate:"required,uuid" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
+	force bool
 }
 
 // UserFindRequest defines the possible options to search for users. By default
 // archived users will be excluded from response.
 type UserFindRequest struct {
-	Where           *string       `json:"where" example:"name = ? and email = ?"`
+	Where           string        `json:"where" example:"name = ? and email = ?"`
 	Args            []interface{} `json:"args" swaggertype:"array,string" example:"Company Name,gabi.may@geeksinthewoods.com"`
 	Order           []string      `json:"order" example:"created_at desc"`
 	Limit           *uint         `json:"limit" example:"10"`
@@ -184,4 +191,64 @@ type UserResetConfirmRequest struct {
 	ResetHash       string `json:"reset_hash" validate:"required" example:"d69bdef7-173f-4d29-b52c-3edc60baf6a2"`
 	Password        string `json:"password" validate:"required" example:"SecretString"`
 	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
+}
+
+// NewResetHash generates a new encrypt reset hash that is web safe for use in URLs.
+func NewResetHash(ctx context.Context, secretKey, resetId, requestIp string, ttl time.Duration, now time.Time) (string, error) {
+
+	// Generate a string that embeds additional information.
+	hashPts := []string{
+		resetId,
+		strconv.Itoa(int(now.UTC().Unix())),
+		strconv.Itoa(int(now.UTC().Add(ttl).Unix())),
+		requestIp,
+	}
+	hashStr := strings.Join(hashPts, "|")
+
+	// This returns the nonce appended with the encrypted string.
+	crypto, err := symcrypto.New(secretKey)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	encrypted, err := crypto.Encrypt(hashStr)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	return encrypted, nil
+}
+
+// ParseResetHash extracts the details encrypted in the hash string.
+func ParseResetHash(ctx context.Context, secretKey string, str string, now time.Time) (*ResetHash, error) {
+
+	crypto, err := symcrypto.New(secretKey)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	hashStr, err := crypto.Decrypt(str)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	hashPts := strings.Split(hashStr, "|")
+
+	var hash ResetHash
+	if len(hashPts) == 4 {
+		hash.ResetID = hashPts[0]
+		hash.CreatedAt, _ = strconv.Atoi(hashPts[1])
+		hash.ExpiresAt, _ = strconv.Atoi(hashPts[2])
+		hash.RequestIP = hashPts[3]
+	}
+
+	// Validate the hash.
+	err = webcontext.Validator().StructCtx(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if int64(hash.ExpiresAt) < now.UTC().Unix() {
+		err = errors.WithMessage(ErrResetExpired, "Password reset has expired.")
+		return nil, err
+	}
+
+	return &hash, nil
 }

@@ -9,90 +9,83 @@
     </div>
 
     <form class="user" method="post" novalidate>
-
         <div class="card shadow">
             <div class="card-body">
-
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="inputFirstName">First Name</label>
-                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.FirstName" }}" placeholder="enter first name" name="FirstName" value="{{ .form.FirstName }}" required>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.FirstName" }}
+                            <input type="text"
+                                   class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.FirstName" }}"
+                                   placeholder="enter first name" name="FirstName" value="{{ .form.FirstName }}" required>
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.FirstName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputLastName">Last Name</label>
-                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.LastName" }}" placeholder="enter last name" name="LastName" value="{{ .form.LastName }}" required>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.LastName" }}
+                            <input type="text"
+                                   class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.LastName" }}"
+                                   placeholder="enter last name" name="LastName" value="{{ .form.LastName }}" required>
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.LastName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputEmail">Email</label>
-                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Email" }}" placeholder="enter email" name="Email" value="{{ .form.Email }}" required>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.Email" }}
+                            <input type="text" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Email" }}"
+                                   placeholder="enter email" name="Email" value="{{ .form.Email }}" required>
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.Email" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputTimezone">Timezone</label>
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Timezone" }}" id="inputTimezone" name="Timezone">
+                            <select class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Timezone" }}"
+                                    id="inputTimezone" name="Timezone">
                                 <option value="">Not set</option>
                                 {{ range $idx, $t := .timezones }}
                                     <option value="{{ $t }}" {{ if CmpString $t $.form.Timezone }}selected="selected"{{ end }}>{{ $t }}</option>
                                 {{ end }}
                             </select>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.Timezone" }}
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputPassword">Password</label>
-                            <input type="password" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Password" }}" id="inputPassword" placeholder="" name="Password" value="{{ .form.Password }}" required>
-                            <span class="help-block "><small><a a href="javascript:void(0)" id="btnGeneratePassword"><i class="fas fa-random mr-1"></i>Generate random password </a></small></span>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.Password" }}
+                            <input type="password"
+                                   class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.Password" }}"
+                                   id="inputPassword" placeholder="" name="Password" value="{{ .form.Password }}" required>
+                            <span class="help-block "><small>
+                                    <a a href="javascript:void(0)" id="btnGeneratePassword">
+                                        <i class="fas fa-random mr-1"></i>Generate random password </a>
+                            </small></span>
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.Password" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                         <div class="form-group">
                             <label for="inputPasswordConfirm">Confirm Password</label>
-                            <input type="password" class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.PasswordConfirm" }}" id="inputPasswordConfirm" placeholder="" name="PasswordConfirm" value="{{ .form.PasswordConfirm }}" required>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "UserCreateRequest.PasswordConfirm" }}
+                            <input type="password"
+                                   class="form-control {{ ValidationFieldClass $.validationErrors "UserCreateRequest.PasswordConfirm" }}"
+                                   id="inputPasswordConfirm" placeholder="" name="PasswordConfirm" value="{{ .form.PasswordConfirm }}" required>
+                            {{template "invalid-feedback" dict "fieldName" "UserCreateRequest.PasswordConfirm" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
-
                         <div class="form-group">
                             <label for="inputRoles">Roles</label>
                             <span class="help-block "><small>- Select at least one role.</small></span>
-
-                            {{ range $r := .roles.Options }}
-                                {{ $selectRole := false }}
-                                {{ range $fr := $.form.Roles }}
-                                    {{ if eq $r.Value $fr }}{{ $selectRole = true }}{{ end }}
-                                {{ end }}
-
+                            {{ range $r := .roles }}
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" value="{{ $r.Value }}" id="defaultCheck1" {{ if $selectRole  }}checked="checked"{{ end }}>
-                                    <label class="form-check-label" for="defaultCheck1">
+                                    <input class="form-check-input {{ ValidationFieldClass $.validationErrors "Roles" }}"
+                                           type="checkbox" name="Roles"
+                                           value="{{ $r.Value }}" id="inputRole{{ $r.Value }}"
+                                           {{ if $r.Selected  }}checked="checked"{{ end }}>
+                                    <label class="form-check-label" for="inputRole{{ $r.Value }}">
                                         {{ $r.Title }}
                                     </label>
                                 </div>
                             {{ end }}
-
-
-
-                            <select class="form-control {{ ValidationFieldClass $.validationErrors "Roles" }}" id="inputRoles" name="Roles" multiple="multiple">
-                                {{ range $r := .roles.Options }}
-                                    {{ $selectRole := false }}
-                                    {{ range $fr := $.form.Roles }}
-                                        {{ if eq $r.Value $fr }}{{ $selectRole = true }}{{ end }}
-                                    {{ end }}
-                                    <option value="{{ $r.Value }}" {{ if $selectRole  }}selected="selected"{{ end }}>{{ $r.Title }}</option>
-                                {{ end }}
-                            </select>
-                            {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Roles" }}
+                            {{template "invalid-feedback" dict "fieldName" "Roles" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
-
                     </div>
                 </div>
-
             </div>
         </div>
 
         <div class="row mt-4">
             <div class="col">
-                <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
+                <input type="submit" value="Save" class="btn btn-primary"/>
                 <a href="/users" class="ml-2 btn btn-secondary" >Cancel</a>
             </div>
         </div>

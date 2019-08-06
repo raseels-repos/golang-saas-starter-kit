@@ -1419,7 +1419,7 @@ func TestUserToken(t *testing.T) {
 
 	// Test user token with invalid email.
 	{
-		expectedStatus := http.StatusUnauthorized
+		expectedStatus := http.StatusBadRequest
 
 		rt := requestTest{
 			fmt.Sprintf("Token %d using invalid email", expectedStatus),
@@ -1434,7 +1434,9 @@ func TestUserToken(t *testing.T) {
 		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
 		r := httptest.NewRequest(rt.method, rt.url, nil)
-		r.SetBasicAuth("invalid email.com", "some random password")
+
+		invalidEmail := "invalid email.com"
+		r.SetBasicAuth(invalidEmail, "some random password")
 
 		w := httptest.NewRecorder()
 		r.Header.Set("Content-Type", web.MIMEApplicationJSONCharsetUTF8)
@@ -1456,8 +1458,17 @@ func TestUserToken(t *testing.T) {
 
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
-			Error:      http.StatusText(expectedStatus),
-			Details:    user_auth.ErrAuthenticationFailure.Error(),
+			Error:      "Field validation error",
+			Fields: []weberror.FieldError{
+				{
+					Field:   "email",
+					Value:   invalidEmail,
+					Tag:     "email",
+					Error:   "email must be a valid email address",
+					Display: "email must be a valid email address",
+				},
+			},
+			Details:    actual.Details,
 			StackTrace: actual.StackTrace,
 		}
 

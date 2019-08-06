@@ -52,9 +52,15 @@ func urlUsersUpdate(userID string) string {
 	return fmt.Sprintf("/users/%s/update", userID)
 }
 
-// UserLoginRequest extends the AuthenicateRequest with the RememberMe flag.
+// UserCreateRequest extends the UserCreateRequest with a list of roles.
 type UserCreateRequest struct {
 	user.UserCreateRequest
+	Roles user_account.UserAccountRoles `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+}
+
+// UserUpdateRequest extends the UserUpdateRequest with a list of roles.
+type UserUpdateRequest struct {
+	user.UserUpdateRequest
 	Roles user_account.UserAccountRoles `json:"roles" validate:"required,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
 }
 
@@ -198,8 +204,6 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			decoder := schema.NewDecoder()
-			decoder.IgnoreUnknownKeys(true)
-
 			if err := decoder.Decode(req, r.PostForm); err != nil {
 				return false, err
 			}
@@ -279,11 +283,11 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return err
 	}
 
-	var roleValues []interface{}
-	for _, v := range user_account.UserAccountRole_Values {
-		roleValues = append(roleValues, string(v))
+	var selectedRoles []interface{}
+	for _, r := range req.Roles {
+		selectedRoles = append(selectedRoles, r.String())
 	}
-	data["roles"] = web.NewEnumResponse(ctx, nil, roleValues...)
+	data["roles"] = web.NewEnumMultiResponse(ctx, selectedRoles, user_account.UserAccountRole_ValuesInterface()...)
 
 	data["form"] = req
 
@@ -390,7 +394,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	//
-	req := new(user.UserUpdateRequest)
+	req := new(UserUpdateRequest)
 	data := make(map[string]interface{})
 	f := func() (bool, error) {
 		if r.Method == http.MethodPost {
@@ -401,13 +405,27 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 			decoder := schema.NewDecoder()
 			decoder.IgnoreUnknownKeys(true)
-
 			if err := decoder.Decode(req, r.PostForm); err != nil {
 				return false, err
 			}
 			req.ID = userID
 
-			err = user.Update(ctx, claims, h.MasterDB, *req, ctxValues.Now)
+			// Bypass the uniq check on email here for the moment, it will be caught before the user_account is
+			// created by user.Create.
+			ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
+
+			// Validate the request.
+			err = webcontext.Validator().StructCtx(ctx, req)
+			if err != nil {
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
+			}
+
+			err = user.Update(ctx, claims, h.MasterDB, req.UserUpdateRequest, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -416,6 +434,25 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 						return false, nil
 					} else {
 						return false, err
+					}
+				}
+			}
+
+			if req.Roles != nil {
+				err = user_account.Update(ctx, claims, h.MasterDB, user_account.UserAccountUpdateRequest{
+					UserID:    userID,
+					AccountID: claims.Audience,
+					Roles:     &req.Roles,
+				}, ctxValues.Now)
+				if err != nil {
+					switch errors.Cause(err) {
+					default:
+						if verr, ok := weberror.NewValidationError(ctx, err); ok {
+							data["validationErrors"] = verr.(*weberror.Error)
+							return false, nil
+						} else {
+							return false, err
+						}
 					}
 				}
 			}
@@ -470,11 +507,20 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return err
 	}
 
+	usrAcc, err := user_account.Read(ctx, claims, h.MasterDB, user_account.UserAccountReadRequest{
+		UserID:    userID,
+		AccountID: claims.Audience,
+	})
+	if err != nil {
+		return err
+	}
+
 	if req.ID == "" {
 		req.FirstName = &usr.FirstName
 		req.LastName = &usr.LastName
 		req.Email = &usr.Email
 		req.Timezone = usr.Timezone
+		req.Roles = usrAcc.Roles
 	}
 
 	data["user"] = usr.Response(ctx)
@@ -484,9 +530,15 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return err
 	}
 
+	var selectedRoles []interface{}
+	for _, r := range req.Roles {
+		selectedRoles = append(selectedRoles, r.String())
+	}
+	data["roles"] = web.NewEnumMultiResponse(ctx, selectedRoles, user_account.UserAccountRole_ValuesInterface()...)
+
 	data["form"] = req
 
-	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(user.UserUpdateRequest{})); ok {
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(UserUpdateRequest{})); ok {
 		data["userValidationDefaults"] = verr.(*weberror.Error)
 	}
 
@@ -618,7 +670,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			// Append the query param value to the request.
 			req.InviteHash = inviteHash
 
-			userID, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			hash, err := invite.AcceptInvite(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case invite.ErrInviteExpired:
@@ -653,13 +705,17 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Load the user without any claims applied.
-			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, userID)
+			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, hash.UserID)
 			if err != nil {
 				return false, err
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, usr.Email, req.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:     usr.Email,
+				Password:  req.Password,
+				AccountID: hash.AccountID,
+			}, time.Hour, ctxValues.Now)
 			if err != nil {
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)

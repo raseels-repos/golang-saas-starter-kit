@@ -76,7 +76,10 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Authenticated the user.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, req.Email, req.Password, sessionTTL, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:    req.Email,
+				Password: req.Password,
+			}, sessionTTL, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrForbidden:
@@ -213,6 +216,8 @@ func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http
 // ResetConfirm handles changing a users password after they have clicked on the link emailed.
 func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
+	resetHash := params["hash"]
+
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -221,66 +226,91 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 	//
 	req := new(user.UserResetConfirmRequest)
 	data := make(map[string]interface{})
-	f := func() error {
+	f := func() (bool, error) {
 
 		if r.Method == http.MethodPost {
 			err := r.ParseForm()
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			decoder := schema.NewDecoder()
 			if err := decoder.Decode(req, r.PostForm); err != nil {
-				return err
+				return false, err
 			}
 
 			// Append the query param value to the request.
-			req.ResetHash = params["hash"]
+			req.ResetHash = resetHash
 
 			u, err := user.ResetConfirm(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
+				case user.ErrResetExpired:
+					webcontext.SessionFlashError(ctx,
+						"Reset Expired",
+						"The reset has expired.")
+					return false, nil
 				default:
 					if verr, ok := weberror.NewValidationError(ctx, err); ok {
 						data["validationErrors"] = verr.(*weberror.Error)
-						return nil
+						return false, nil
 					} else {
-						return err
+						return false, err
 					}
 				}
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, u.Email, req.Password, time.Hour, ctxValues.Now)
+			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+				Email:    u.Email,
+				Password: req.Password,
+			}, time.Hour, ctxValues.Now)
 			if err != nil {
-				switch errors.Cause(err) {
-				case account.ErrForbidden:
-					return web.RespondError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
-				default:
-					if verr, ok := weberror.NewValidationError(ctx, err); ok {
-						data["validationErrors"] = verr.(*weberror.Error)
-						return nil
-					} else {
-						return err
-					}
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
 				}
 			}
 
 			// Add the token to the users session.
 			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			// Redirect the user to the dashboard.
 			http.Redirect(w, r, "/", http.StatusFound)
+			return true, nil
 		}
 
-		return nil
+		_, err = user.ParseResetHash(ctx, h.SecretKey, resetHash, ctxValues.Now)
+		if err != nil {
+			switch errors.Cause(err) {
+			case user.ErrResetExpired:
+				webcontext.SessionFlashError(ctx,
+					"Reset Expired",
+					"The reset has expired.")
+				return false, nil
+			default:
+				if verr, ok := weberror.NewValidationError(ctx, err); ok {
+					data["validationErrors"] = verr.(*weberror.Error)
+					return false, nil
+				} else {
+					return false, err
+				}
+			}
+		}
+
+		return false, nil
 	}
 
-	if err := f(); err != nil {
+	end, err := f()
+	if err != nil {
 		return web.RenderError(ctx, w, r, err, h.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+	} else if end {
+		return nil
 	}
 
 	data["form"] = req
@@ -576,9 +606,8 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 		return nil
 	}
 
-	usrAccFilter := "account_id = ?"
 	usrAccs, err := user_account.Find(ctx, claims, h.MasterDB, user_account.UserAccountFindRequest{
-		Where: &usrAccFilter,
+		Where: "account_id = ?",
 		Args:  []interface{}{claims.Audience},
 	})
 	if err != nil {
@@ -601,10 +630,10 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 		userPhs = append(userPhs, "?")
 	}
 
-	usrFilter := fmt.Sprintf("id IN (%s)", strings.Join(userPhs, ", "))
 	users, err := user.Find(ctx, claims, h.MasterDB, user.UserFindRequest{
-		Where: &usrFilter,
-		Args:  userIDs,
+		Where: fmt.Sprintf("id IN (%s)",
+			strings.Join(userPhs, ", ")),
+		Args: userIDs,
 	})
 	if err != nil {
 		return err

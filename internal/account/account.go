@@ -153,8 +153,8 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) (Accounts, error) {
 	query := selectQuery()
 
-	if req.Where != nil {
-		query.Where(query.And(*req.Where))
+	if req.Where != "" {
+		query.Where(query.And(req.Where))
 	}
 	if len(req.Order) > 0 {
 		query.OrderBy(req.Order...)

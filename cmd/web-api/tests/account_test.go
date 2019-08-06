@@ -102,9 +102,13 @@ func TestAccountCRUDAdmin(t *testing.T) {
 			"address1":        tr.Account.Address1,
 			"city":            tr.Account.City,
 			"status": map[string]interface{}{
-				"value":   "active",
-				"title":   "Active",
-				"options": []map[string]interface{}{{"selected": false, "title": "[Active Pending Disabled]", "value": "[active pending disabled]"}},
+				"value": "active",
+				"title": "Active",
+				"options": []map[string]interface{}{
+					{"selected": true, "title": "Active", "value": "active"},
+					{"selected": false, "title": "Pending", "value": "pending"},
+					{"selected": false, "title": "Disabled", "value": "disabled"},
+				},
 			},
 			"signup_user_id": &tr.Account.SignupUserID.String,
 		}
@@ -322,9 +326,13 @@ func TestAccountCRUDUser(t *testing.T) {
 			"address1":        tr.Account.Address1,
 			"city":            tr.Account.City,
 			"status": map[string]interface{}{
-				"value":   "active",
-				"title":   "Active",
-				"options": []map[string]interface{}{{"selected": false, "title": "[Active Pending Disabled]", "value": "[active pending disabled]"}},
+				"value": "active",
+				"title": "Active",
+				"options": []map[string]interface{}{
+					{"selected": true, "title": "Active", "value": "active"},
+					{"selected": false, "title": "Pending", "value": "pending"},
+					{"selected": false, "title": "Disabled", "value": "disabled"},
+				},
 			},
 			"signup_user_id": &tr.Account.SignupUserID.String,
 		}

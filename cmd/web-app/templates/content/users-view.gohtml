@@ -67,13 +67,13 @@
                         <small>Role</small><br/>
                         {{ if .userAccount }}
                             <b>
-                                {{ range $r := .userAccount.Roles }}
-                                    {{ if eq $r "admin" }}
-                                        <span class="text-pink"><i class="far fa-kiss-wink-heart mr-1"></i>{{ $r }}</span>
+                                {{ range $r := .userAccount.Roles }}{{ if $r.Selected }}
+                                    {{ if eq $r.Value "admin" }}
+                                        <span class="text-pink"><i class="far fa-kiss-wink-heart mr-1"></i>{{ $r.Title }}</span>
                                     {{else}}
-                                        <span class="text-purple"><i class="far fa-user-circle mr-1"></i>{{ $r }}</span>
+                                        <span class="text-purple"><i class="far fa-user-circle mr-1"></i>{{ $r.Title }}</span>
                                     {{end}}
-                                {{ end }}
+                                {{ end }}{{ end }}
                             </b>
                         {{ end }}
                     </p>

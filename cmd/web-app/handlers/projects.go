@@ -110,9 +110,8 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	loadFunc := func(ctx context.Context, sorting string, fields []datatable.DisplayField) (resp [][]datatable.ColumnValue, err error) {
-		whereFilter := "account_id = ?"
 		res, err := project.Find(ctx, claims, h.MasterDB, project.ProjectFindRequest{
-			Where: &whereFilter,
+			Where: "account_id = ?",
 			Args:  []interface{}{claims.Audience},
 			Order: strings.Split(sorting, ","),
 		})

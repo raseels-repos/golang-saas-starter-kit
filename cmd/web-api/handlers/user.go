@@ -60,7 +60,7 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		if err != nil {
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 		}
-		req.Where = &where
+		req.Where = where
 		req.Args = args
 	}
 
@@ -442,7 +442,9 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		return err
 	}
 
-	tkn, err := user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, params["account_id"], sessionTtl, v.Now)
+	tkn, err := user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, user_auth.SwitchAccountRequest{
+		AccountID: params["account_id"],
+	}, sessionTtl, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -486,10 +488,16 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
 	}
 
+	accountID := r.URL.Query().Get("account_id")
+
 	// Optional to include scope.
 	scope := r.URL.Query().Get("scope")
 
-	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, email, pass, sessionTtl, v.Now, scope)
+	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, user_auth.AuthenticateRequest{
+		Email:     email,
+		Password:  pass,
+		AccountID: accountID,
+	}, sessionTtl, v.Now, scope)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -502,31 +510,6 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			return errors.Wrap(err, "authenticating")
-		}
-	}
-
-	accountID := r.URL.Query().Get("account_id")
-	if accountID != "" && accountID != tkn.AccountID {
-
-		claims, err := u.TokenGenerator.ParseClaims(tkn.AccessToken)
-		if err != nil {
-			return err
-		}
-
-		tkn, err = user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, accountID, sessionTtl, v.Now)
-		if err != nil {
-			cause := errors.Cause(err)
-			switch cause {
-			case user_auth.ErrAuthenticationFailure:
-				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
-			default:
-				_, ok := cause.(validator.ValidationErrors)
-				if ok {
-					return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
-				}
-
-				return errors.Wrap(err, "switch account")
-			}
 		}
 	}
 

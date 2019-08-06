@@ -114,8 +114,8 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 // 			to the query.
 func findRequestQuery(req UserAccountFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := selectQuery()
-	if req.Where != nil {
-		query.Where(query.And(*req.Where))
+	if req.Where != "" {
+		query.Where(query.And(req.Where))
 	}
 	if len(req.Order) > 0 {
 		query.OrderBy(req.Order...)

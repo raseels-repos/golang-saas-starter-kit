@@ -397,7 +397,7 @@ func TestFind(t *testing.T) {
 	// Test sort accounts.
 	prefTests = append(prefTests, accountTest{"Find all order by created_at asc",
 		AccountPreferenceFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 		},
@@ -412,7 +412,7 @@ func TestFind(t *testing.T) {
 	}
 	prefTests = append(prefTests, accountTest{"Find all order by created_at desc",
 		AccountPreferenceFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at desc"},
 		},
@@ -424,7 +424,7 @@ func TestFind(t *testing.T) {
 	var limit uint = 2
 	prefTests = append(prefTests, accountTest{"Find limit",
 		AccountPreferenceFindRequest{
-			Where: &createdFilter,
+			Where: createdFilter,
 			Args:  []interface{}{startTime, endTime},
 			Order: []string{"created_at"},
 			Limit: &limit,
@@ -437,7 +437,7 @@ func TestFind(t *testing.T) {
 	var offset uint = 1
 	prefTests = append(prefTests, accountTest{"Find limit, offset",
 		AccountPreferenceFindRequest{
-			Where:  &createdFilter,
+			Where:  createdFilter,
 			Args:   []interface{}{startTime, endTime},
 			Order:  []string{"created_at"},
 			Limit:  &limit,
@@ -462,10 +462,9 @@ func TestFind(t *testing.T) {
 		expected = append(expected, &u)
 	}
 
-	where := createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")"
 	prefTests = append(prefTests, accountTest{"Find where",
 		AccountPreferenceFindRequest{
-			Where: &where,
+			Where: createdFilter + " AND (" + strings.Join(whereParts, " OR ") + ")",
 			Args:  whereArgs,
 			Order: []string{"created_at"},
 		},

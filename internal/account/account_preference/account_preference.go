@@ -65,8 +65,8 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 // TODO: Need to figure out why can't parse the args when appending the where to the query.
 func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceFindRequest) ([]*AccountPreference, error) {
 	query := sqlbuilder.NewSelectBuilder()
-	if req.Where != nil {
-		query.Where(query.And(*req.Where))
+	if req.Where != "" {
+		query.Where(query.And(req.Where))
 	}
 	if len(req.Order) > 0 {
 		query.OrderBy(req.Order...)

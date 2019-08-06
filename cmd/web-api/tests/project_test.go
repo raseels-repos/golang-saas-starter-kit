@@ -79,7 +79,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
 			"id":         actual.ID,
 			"account_id": req.AccountID,
-			"status":     web.NewEnumResponse(ctx, "active", project.ProjectStatus_Values),
+			"status":     web.NewEnumResponse(ctx, "active", project.ProjectStatus_ValuesInterface()...),
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
 			"name":       req.Name,
 		}

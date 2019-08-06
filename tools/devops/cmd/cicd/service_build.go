@@ -273,7 +273,11 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 		if !req.NoCache && buildBaseImageTag != "" {
 			var pushTargetImg bool
 			if ciReg := os.Getenv("CI_REGISTRY"); ciReg != "" {
-				cmds = append(cmds, []string{"docker", "login", "-u", "gitlab-ci-token", "-p", os.Getenv("CI_JOB_TOKEN"), ciReg})
+				cmds = append(cmds, []string{
+					"docker", "login",
+					"-u", os.Getenv("CI_REGISTRY_USER"),
+					"-p", os.Getenv("CI_REGISTRY_PASSWORD"),
+					ciReg})
 
 				buildBaseImage = ciReg + "/" + buildBaseImageTag
 				pushTargetImg = true
@@ -297,7 +301,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				cmds = append(cmds, []string{"docker", "push", buildBaseImageTag})
 			}
 		}
-		
+
 		// The initial build command slice.
 		buildCmd := []string{
 			"docker", "build",

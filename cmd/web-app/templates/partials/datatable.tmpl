@@ -119,7 +119,6 @@
                 }
                 if (filter_column && filter_value ) {
                     $( "#dataTable_wrapper thead th" ).each(function( index ) {
-                        //console.log( index + ": " + $( this ).text() );
                         column_text = $( this ).text().toLowerCase();
                         column_text = column_text.replace(" ", "_");
                         if (column_text ==filter_column) {
@@ -127,11 +126,7 @@
                         }
                     });
                     if (filer_column_num ) {
-                        //console.log(filer_column_num);
                         dtbl.column(filer_column_num).search(filter_value).draw();
-                        //filer_column_num = filer_column_num +1 ;
-                        //console.log($(".dataTables_scrollFootInner tfoot th:nth-child("+filer_column_num+") ").text());
-                        //$(".dataTables_scrollFootInner tfoot th:nth-child("+filer_column_num+") select ").val(filter_value);
                     }
                 }
             }

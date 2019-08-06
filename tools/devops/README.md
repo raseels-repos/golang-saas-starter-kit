@@ -6,10 +6,10 @@ twins@geeksaccelerator.com
 
 ## Description
 
-_Devops_ handles creating AWS resources and deploying your services with minimal 
-additional configuration. You can customizing any of the configuration in the code. While AWS is already a core part of 
-the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
-project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
+_Devops_ handles creating AWS resources and deploying your services with minimal additional configuration. You can 
+customizing any of the configuration in the code. While AWS is already a core part of the saas-starter-kit, keeping 
+the deployment in GoLang limits the scope of additional technologies required to get your project successfully up and 
+running. If you understand Golang, then you will be a master at devops with this tool.
 
 The project includes a Postgres database which adds an additional resource dependency when deploying the 
 project. It is important to know that the tasks running schema migration for the Postgres database can not run as shared 

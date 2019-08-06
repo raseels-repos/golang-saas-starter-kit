@@ -292,7 +292,7 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return err
 	}
 	data["project"] = prj.Response(ctx)
-
+	data["urlProjectsView"] = urlProjectsView(projectID)
 	data["urlProjectsUpdate"] = urlProjectsUpdate(projectID)
 
 	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-view.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
@@ -372,6 +372,8 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return err
 	}
 	data["project"] = prj.Response(ctx)
+
+	data["urlProjectsView"] = urlProjectsView(projectID)
 
 	if req.ID == "" {
 		req.Name = &prj.Name

@@ -3,6 +3,15 @@
 
 {{end}}
 {{define "content"}}
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/users">Users</a></li>
+            <li class="breadcrumb-item"><a href="{{ .urlUsersView }}">{{ .user.Name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">View</li>
+        </ol>
+    </nav>
+
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">{{ .user.Name }}</h1>
         {{ if HasRole $._Ctx "admin" }}
@@ -64,7 +73,7 @@
                 </div>
                 <div class="col-md-5">
                     <p>
-                        <small>Role</small><br/>
+                        <small>Roles</small><br/>
                         {{ if .userAccount }}
                             <b>
                                 {{ range $r := .userAccount.Roles }}{{ if $r.Selected }}

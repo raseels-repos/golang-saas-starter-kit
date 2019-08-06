@@ -32,17 +32,17 @@ cache:
 .build_tmpl: &build_tmpl
   <<: *job_tmpl
   script:
-    - 'devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - './devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
 
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - 'devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -public_bucket_cloudfront=${S3_BUCKET_PUBLIC_CLOUDFRONT}  -static_files_s3=${STATIC_FILES_S3} -static_files_img_resize=${STATIC_FILES_IMG_RESIZE}'
+    - './devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -public_bucket_cloudfront=${S3_BUCKET_PUBLIC_CLOUDFRONT}  -static_files_s3=${STATIC_FILES_S3} -static_files_img_resize=${STATIC_FILES_IMG_RESIZE}'
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl
   script:
-    - 'devops migrate -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - './devops migrate -project=${PROJECT_NAME} -env=${TARGET_ENV}'
 
 db:migrate:dev:
   <<: *migrate_tmpl

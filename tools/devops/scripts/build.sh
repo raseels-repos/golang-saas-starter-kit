@@ -20,7 +20,4 @@ if [[ $doPush == 1 ]]; then
     docker push ${releaseImg}
 fi
 
-binPath=$GOROOT/bin/devops
-echo "installing to: ${binPath}"
-
-docker run --rm --entrypoint=cat ${releaseImg} /devops > $binPath
+docker run --rm --entrypoint=cat ${releaseImg} /devops > devops

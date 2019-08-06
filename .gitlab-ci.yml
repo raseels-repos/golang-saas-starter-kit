@@ -29,7 +29,7 @@ cache:
 .build_tmpl: &build_tmpl
   <<: *job_tmpl
   script:
-    - 'devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - 'EMAIL_SENDER=$EMAIL_SENDER devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
 
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
@@ -92,7 +92,7 @@ webapp:deploy:dev:
     STATIC_FILES_S3: 'true'
     STATIC_FILES_IMG_RESIZE: 'true'
     AWS_USE_ROLE: 'true'
-    EMAIL_SENDER: 'lee@geeksinthewoods.com'
+    EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
 
 webapi:build:dev:
   <<: *build_tmpl
@@ -132,7 +132,7 @@ webapi:deploy:dev:
     STATIC_FILES_S3: 'false'
     STATIC_FILES_IMG_RESIZE: 'false'
     AWS_USE_ROLE: 'true'
-    EMAIL_SENDER: 'lee@geeksinthewoods.com'
+    EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

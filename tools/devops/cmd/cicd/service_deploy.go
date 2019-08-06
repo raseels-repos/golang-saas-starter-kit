@@ -1480,7 +1480,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			// Start the database migrations.
 			log.Printf("\t\tStart migrations.")
-			if err = schema.Migrate(masterDb, log); err != nil {
+			if err = schema.Migrate(masterDb, log, false); err != nil {
 				return errors.WithStack(err)
 			}
 			log.Printf("\t\tFinished migrations.")
@@ -2552,22 +2552,23 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			pks = append(pks, k)
 		}
 
-		// Generate new regular expression for finding placeholders.
-		expr := "(" + strings.Join(pks, "|") + ")"
-		r, err := regexp.Compile(expr)
-		if err != nil {
-			return err
-		}
+
 
 		// Read the defined json task definition.
 		dat, err := EcsReadTaskDefinition(req.ServiceDir, req.Env)
 		if err != nil {
 			return err
 		}
+		jsonStr := string(dat)
 
 		// Replace placeholders used in the JSON task definition.
 		{
-			jsonStr := string(dat)
+			// Generate new regular expression for finding placeholders.
+			expr := "(" + strings.Join(pks, "|") + ")"
+			r, err := regexp.Compile(expr)
+			if err != nil {
+				return err
+			}
 
 			matches := r.FindAllString(jsonStr, -1)
 
@@ -2586,11 +2587,37 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 					jsonStr = strings.Replace(jsonStr, m, newVal, -1)
 				}
 			}
-
-			dat = []byte(jsonStr)
 		}
 
+		// Replace placeholders defined in task def but not here from env vars.
+		{
+			r, err := regexp.Compile(`{\b(\w*)\b}`)
+			if err != nil {
+				return err
+			}
+
+			matches := r.FindAllString(jsonStr, -1)
+			if len(matches) > 0 {
+				log.Println("\t\tSearching for placeholders in env variables.")
+
+				replaced := make(map[string]bool)
+				for _, m := range matches {
+					m = strings.Trim(m, "{}")
+					if replaced[m] {
+						continue
+					}
+					replaced[m] = true
+
+					newVal := os.Getenv(m)
+					log.Printf("\t\t\t%s -> %s", m, newVal)
+					jsonStr = strings.Replace(jsonStr, m, newVal, -1)
+				}
+			}
+		}
+		dat = []byte(jsonStr)
+
 		log.Println("\t\tParse JSON to task definition.")
+
 		taskDefInput, err := parseTaskDefinitionInput(dat)
 		if err != nil {
 			return err

@@ -200,7 +200,7 @@ func Migrate(log *log.Logger, req *migrateRequest) error {
 
 		// Start Migrations
 		log.Printf("\t\tStart migrations.")
-		if err = schema.Migrate(masterDb, log); err != nil {
+		if err = schema.Migrate(masterDb, log, false); err != nil {
 			return errors.WithStack(err)
 		}
 

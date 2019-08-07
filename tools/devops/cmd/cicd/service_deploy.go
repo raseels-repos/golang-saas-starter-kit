@@ -2552,8 +2552,6 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 			pks = append(pks, k)
 		}
 
-
-
 		// Read the defined json task definition.
 		dat, err := EcsReadTaskDefinition(req.ServiceDir, req.Env)
 		if err != nil {
@@ -2602,13 +2600,13 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 				replaced := make(map[string]bool)
 				for _, m := range matches {
-					m = strings.Trim(m, "{}")
 					if replaced[m] {
 						continue
 					}
 					replaced[m] = true
 
-					newVal := os.Getenv(m)
+					envKey := strings.Trim(m, "{}")
+					newVal := os.Getenv(envKey)
 					log.Printf("\t\t\t%s -> %s", m, newVal)
 					jsonStr = strings.Replace(jsonStr, m, newVal, -1)
 				}

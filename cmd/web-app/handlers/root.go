@@ -4,28 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/sethgrid/pester"
-	"io/ioutil"
-	"net/http"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
+	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"github.com/sethgrid/pester"
+	"io/ioutil"
+	"net/http"
 )
 
 // Root represents the Root API method handler set.
 type Root struct {
 	MasterDB      *sqlx.DB
 	Renderer      web.Renderer
+	Sitemap       *stm.Sitemap
 	ProjectRoutes project_routes.ProjectRoutes
 }
 
 // Index determines if the user has authentication and loads the associated page.
 func (h *Root) Index(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-
 	if claims, err := auth.ClaimsFromContext(ctx); err == nil && claims.HasAuth() {
 		return h.indexDashboard(ctx, w, r, params)
 	}
@@ -130,4 +131,23 @@ func (h *Root) RobotTxt(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 	txt := fmt.Sprintf("User-agent: *\nDisallow: /ping\nDisallow: /status\nDisallow: /debug/\nSitemap: %s", sitemapUrl)
 	return web.RespondText(ctx, w, txt, http.StatusOK)
+}
+
+type SiteMap struct {
+	Pages []SiteMapPage `json:"pages"`
+}
+
+type SiteMapPage struct {
+	Loc        string  `json:"loc" xml:"loc"`
+	File       string  `json:"file" xml:"file"`
+	Changefreq string  `json:"changefreq" xml:"changefreq"`
+	Mobile     bool    `json:"mobile" xml:"mobile"`
+	Priority   float64 `json:"priority" xml:"priority"`
+	Lastmod    string  `json:"lastmod" xml:"lastmod"`
+}
+
+// SitemapXml returns a robots.txt response.
+func (h *Root) SitemapXml(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+	w.Write(h.Sitemap.XMLContent())
+	return nil
 }

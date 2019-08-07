@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -14,6 +16,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
+	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
@@ -39,6 +42,24 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Construct the web.App which holds all routes as well as common Middleware.
 	app := web.NewApp(shutdown, log, env, middlewares...)
+
+	// Build a sitemap.
+	sm := stm.NewSitemap(1)
+	sm.SetDefaultHost(projectRoutes.WebAppUrl(""))
+	sm.Create()
+
+	smLocAddModified := func(loc stm.URL, filename string) {
+		contentPath := filepath.Join(templateDir, "content", filename)
+
+		file, err := os.Stat(contentPath)
+		if err != nil {
+			log.Fatalf("main : Add sitemap file modified for %s: %+v", filename, err)
+		}
+
+		lm := []interface{}{"lastmod", file.ModTime().Format(time.RFC3339)}
+		loc = append(loc, lm)
+		sm.Add(loc)
+	}
 
 	// Register project management pages.
 	p := Projects{
@@ -149,6 +170,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 		MasterDB:      masterDB,
 		Renderer:      renderer,
 		ProjectRoutes: projectRoutes,
+		Sitemap:       sm,
 	}
 	app.Handle("GET", "/api", r.SitePage)
 	app.Handle("GET", "/pricing", r.SitePage)
@@ -158,6 +180,15 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/", r.Index, mid.AuthenticateSessionOptional(authenticator))
 	app.Handle("GET", "/index.html", r.IndexHtml)
 	app.Handle("GET", "/robots.txt", r.RobotTxt)
+	app.Handle("GET", "/sitemap.xml", r.SitemapXml)
+
+	// Add sitemap entries for Root.
+	smLocAddModified(stm.URL{{"loc", "/"}, {"changefreq", "weekly"}, {"mobile", true}, {"priority", 0.9}}, "site-index.gohtml")
+	smLocAddModified(stm.URL{{"loc", "/pricing"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.8}}, "site-pricing.gohtml")
+	smLocAddModified(stm.URL{{"loc", "/support"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.8}}, "site-support.gohtml")
+	smLocAddModified(stm.URL{{"loc", "/api"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.7}}, "site-api.gohtml")
+	smLocAddModified(stm.URL{{"loc", "/legal/privacy"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.5}}, "legal-privacy.gohtml")
+	smLocAddModified(stm.URL{{"loc", "/legal/terms"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.5}}, "legal-terms.gohtml")
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{

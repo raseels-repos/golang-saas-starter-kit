@@ -542,7 +542,7 @@ func main() {
 			return f.String()
 		},
 		"SiteBaseUrl": func(p string) string {
-			u, err := url.Parse(cfg.HTTP.Host)
+			u, err := url.Parse(cfg.Service.BaseUrl)
 			if err != nil {
 				return "?"
 			}

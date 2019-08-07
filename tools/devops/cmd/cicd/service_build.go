@@ -234,9 +234,9 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 					}
 
 					buildStageName = strings.TrimSpace(strings.Split(lineLower, " as ")[1])
-					stageLines = append(stageLines, line )
+					stageLines = append(stageLines, line)
 				} else if buildStageName != "" {
-					stageLines = append(stageLines, line )
+					stageLines = append(stageLines, line)
 				}
 			}
 
@@ -288,7 +288,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				buildBaseImage = os.Getenv("CI_REGISTRY_IMAGE") + ":" + buildBaseImageTag
 				pushTargetImg = true
 			} else {
-				buildBaseImage = req.ProjectName + ":" + req.Env + "-" +req.ServiceName + "-" + buildBaseImageTag
+				buildBaseImage = req.ProjectName + ":" + req.Env + "-" + req.ServiceName + "-" + buildBaseImageTag
 			}
 
 			cmds = append(cmds, []string{"docker", "pull", buildBaseImageTag})
@@ -341,7 +341,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			err = execCmds(log, req.ProjectRoot, cmd)
 			if err != nil {
 				if len(cmd) > 2 && cmd[1] == "pull" {
-					log.Printf("\t\t\tSkipping pull - %s\n",  err.Error())
+					log.Printf("\t\t\tSkipping pull - %s\n", err.Error())
 				} else {
 					return errors.Wrapf(err, "Failed to exec %s", strings.Join(cmd, " "))
 				}

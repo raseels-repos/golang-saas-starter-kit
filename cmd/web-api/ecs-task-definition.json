@@ -38,7 +38,7 @@
         {"name": "WEB_API_SERVICE_BASE_URL", "value": "{APP_BASE_URL}"},
         {"name": "WEB_API_SERVICE_HOST_NAMES", "value": "{HOST_NAMES}"},
         {"name": "WEB_API_SERVICE_ENABLE_HTTPS", "value": "{HTTPS_ENABLED}"},
-        {"name": "WEB_API_EMAIL_SENDER", "value": "{EMAIL_SENDER}"},
+        {"name": "WEB_API_SERVICE_EMAIL_SENDER", "value": "{EMAIL_SENDER}"},
         {"name": "WEB_API_REDIS_HOST", "value": "{CACHE_HOST}"},
         {"name": "WEB_API_DB_HOST", "value": "{DB_HOST}"},
         {"name": "WEB_API_DB_USER", "value": "{DB_USER}"},

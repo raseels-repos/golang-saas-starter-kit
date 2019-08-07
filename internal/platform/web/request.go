@@ -3,12 +3,11 @@ package web
 import (
 	"context"
 	"encoding/json"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"net"
 	"net/http"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
 	"github.com/xwb1989/sqlparser"
@@ -49,14 +48,6 @@ func Decode(ctx context.Context, r *http.Request, val interface{}) error {
 			err = errors.Wrap(err, "decode request query failed")
 			return weberror.NewErrorMessage(ctx, err, http.StatusBadRequest, "decode request query failed")
 		}
-	}
-
-	// Hack since we have no DB connection.
-	ctx = context.WithValue(ctx, webcontext.KeyTagUnique, true)
-
-	if err := webcontext.Validator().StructCtx(ctx, val); err != nil {
-		verr, _ := weberror.NewValidationError(ctx, err)
-		return verr
 	}
 
 	return nil

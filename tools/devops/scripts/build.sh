@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 doPush=0
-if [[ "${CI_REGISTRY_USER}" != "" ]]; then
-    docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
+if [[ "${CI_REGISTRY_IMAGE}" != "" ]]; then
+    docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
 
     releaseImg="${CI_REGISTRY_IMAGE}:devops-${CI_COMMIT_REF_NAME}"
     doPush=1

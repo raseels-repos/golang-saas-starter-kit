@@ -487,7 +487,7 @@ func main() {
 		staticS3UrlFormatter = func(p string) string {
 			// When the path starts with a forward slash its referencing a local file,
 			// make sure the static file prefix is included
-			if strings.HasPrefix(p, "/") {
+			if strings.HasPrefix(p, "/") || !strings.HasPrefix(p, "://") {
 				p = filepath.Join(cfg.Service.StaticFiles.S3Prefix, p)
 			}
 			return s3UrlFormatter(p)
@@ -565,7 +565,7 @@ func main() {
 		"SiteAssetUrl": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
-				u = staticUrlFormatter(filepath.Join(cfg.Service.Name, p))
+				u = staticUrlFormatter(p)
 			} else {
 				if !strings.HasPrefix(p, "/") {
 					p = "/" + p

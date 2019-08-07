@@ -2,13 +2,14 @@ package cicd
 
 import (
 	"bytes"
-	"net/http"
-	"os"
-	"path/filepath"
-
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 )
 
 // DirectoryIterator represents an iterator of a specified directory
@@ -76,10 +77,19 @@ func (di *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
 	}
 
 	// Get file size and read the file content into a buffer
-	fileInfo, _ := f.Stat()
+	fileInfo, err := f.Stat()
+	if err != nil {
+		fmt.Println(err)
+	}
 	var size int64 = fileInfo.Size()
 	buffer := make([]byte, size)
 	f.Read(buffer)
+
+	f.Seek(0, io.SeekStart)
+
+	ctBuf := make([]byte, 512)
+	f.Read(ctBuf)
+	contentType := http.DetectContentType(ctBuf)
 
 	nextPath, _ := filepath.Rel(di.dir, di.next.path)
 
@@ -88,7 +98,7 @@ func (di *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
 			Bucket:      aws.String(di.bucket),
 			Key:         aws.String(filepath.Join(di.keyPrefix, nextPath)),
 			Body:        bytes.NewReader(buffer),
-			ContentType: aws.String(http.DetectContentType(buffer)),
+			ContentType: aws.String(contentType),
 			ACL:         acl,
 		},
 		After: func() error {

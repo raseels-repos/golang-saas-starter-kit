@@ -96,6 +96,7 @@ webapp:deploy:dev:
     STATIC_FILES_IMG_RESIZE: 'true'
     AWS_USE_ROLE: 'true'
     EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
+    WEB_API_BASE_URL: https://api.eproc.tech
 
 webapi:build:dev:
   <<: *build_tmpl
@@ -136,6 +137,7 @@ webapi:deploy:dev:
     STATIC_FILES_IMG_RESIZE: 'false'
     AWS_USE_ROLE: 'true'
     EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
+    WEB_APP_BASE_URL: https://eproc.tech
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

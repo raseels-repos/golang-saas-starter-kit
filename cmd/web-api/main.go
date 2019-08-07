@@ -133,14 +133,14 @@ func main() {
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
 		}
 		BuildInfo struct {
-			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
-			CiCommitShortSha     string `envconfig:"CI_COMMIT_SHORT_SHA"`
-			CiCommitSha         string `envconfig:"CI_COMMIT_SHA"`
-			CiCommitTag         string `envconfig:"CI_COMMIT_TAG"`
-			CiJobId             string `envconfig:"CI_JOB_ID"`
-			CiJobUrl            string `envconfig:"CI_JOB_URL"`
-			CiPipelineId        string `envconfig:"CI_PIPELINE_ID"`
-			CiPipelineUrl       string `envconfig:"CI_PIPELINE_URL"`
+			CiCommitRefName  string `envconfig:"CI_COMMIT_REF_NAME"`
+			CiCommitShortSha string `envconfig:"CI_COMMIT_SHORT_SHA"`
+			CiCommitSha      string `envconfig:"CI_COMMIT_SHA"`
+			CiCommitTag      string `envconfig:"CI_COMMIT_TAG"`
+			CiJobId          string `envconfig:"CI_JOB_ID"`
+			CiJobUrl         string `envconfig:"CI_JOB_URL"`
+			CiPipelineId     string `envconfig:"CI_PIPELINE_ID"`
+			CiPipelineUrl    string `envconfig:"CI_PIPELINE_URL"`
 		}
 	}
 

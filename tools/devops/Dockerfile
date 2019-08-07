@@ -21,7 +21,7 @@ WORKDIR ./tools/devops
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /go/bin/devops .
 
-FROM scratch
+FROM busybox
 
 COPY --from=builder /go/bin/devops /go/bin/devops
 

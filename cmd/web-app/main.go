@@ -151,15 +151,13 @@ func main() {
 		}
 		BuildInfo struct {
 			CiCommitRefName     string `envconfig:"CI_COMMIT_REF_NAME"`
-			CiCommitRefSlug     string `envconfig:"CI_COMMIT_REF_SLUG"`
+			CiCommitShortSha     string `envconfig:"CI_COMMIT_SHORT_SHA"`
 			CiCommitSha         string `envconfig:"CI_COMMIT_SHA"`
 			CiCommitTag         string `envconfig:"CI_COMMIT_TAG"`
-			CiCommitTitle       string `envconfig:"CI_COMMIT_TITLE"`
-			CiCommitDescription string `envconfig:"CI_COMMIT_DESCRIPTION"`
-			CiJobId             string `envconfig:"CI_COMMIT_JOB_ID"`
-			CiJobUrl            string `envconfig:"CI_COMMIT_JOB_URL"`
-			CiPipelineId        string `envconfig:"CI_COMMIT_PIPELINE_ID"`
-			CiPipelineUrl       string `envconfig:"CI_COMMIT_PIPELINE_URL"`
+			CiJobId             string `envconfig:"CI_JOB_ID"`
+			CiJobUrl            string `envconfig:"CI_JOB_URL"`
+			CiPipelineId        string `envconfig:"CI_PIPELINE_ID"`
+			CiPipelineUrl       string `envconfig:"CI_PIPELINE_URL"`
 		}
 	}
 

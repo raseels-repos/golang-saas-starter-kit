@@ -37,7 +37,7 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	data := struct {
 		Status          string `json:"status"`
 		CiCommitRefName string `json:"ci-commit-ref-name,omitempty"`
-		CiCommitRefSlug string `json:"ci-commit-ref-slug,omitempty"`
+		CiCommitShortSha string `json:"ci-commit-short-sha,omitempty"`
 		CiCommitSha     string `json:"ci-commit-sha,omitempty"`
 		CiCommitTag     string `json:"ci-commit-tag,omitempty"`
 		CiCommitTitle   string `json:"ci-commit-title,omitempty"`
@@ -46,12 +46,11 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}{
 		Status:          "ok",
 		CiCommitRefName: os.Getenv("CI_COMMIT_REF_NAME"),
-		CiCommitRefSlug: os.Getenv("CI_COMMIT_REF_SLUG"),
+		CiCommitShortSha : os.Getenv("CI_COMMIT_SHORT_SHA"),
 		CiCommitSha:     os.Getenv("CI_COMMIT_SHA"),
 		CiCommitTag:     os.Getenv("CI_COMMIT_TAG"),
-		CiCommitTitle:   os.Getenv("CI_COMMIT_TITLE"),
-		CiJobId:         os.Getenv("CI_COMMIT_JOB_ID"),
-		CiPipelineId:    os.Getenv("CI_COMMIT_PIPELINE_ID"),
+		CiJobId:         os.Getenv("CI_JOB_ID"),
+		CiPipelineId:    os.Getenv("CI_PIPELINE_ID"),
 	}
 
 	return web.RespondJson(ctx, w, data, http.StatusOK)

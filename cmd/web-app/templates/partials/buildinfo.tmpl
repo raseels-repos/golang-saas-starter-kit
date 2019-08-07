@@ -6,7 +6,6 @@
             Branch: {{ ._Service.BuildInfo.CiCommitRefName }}@{{ ._Service.BuildInfo.CiCommitSha }}<br/>
         {{end}}
         {{if ne ._Service.ENV "prod"}}
-            Commit: {{ ._Service.BuildInfo.CiCommitTitle }}
             {{if ne ._Service.BuildInfo.CiJobId ""}}
                 Job: <a href="{{ ._Service.BuildInfo.CiJobUrl }}" target="_blank">{{ ._Service.BuildInfo.CiJobId }}</a>
             {{end}}

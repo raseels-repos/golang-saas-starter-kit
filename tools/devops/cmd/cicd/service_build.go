@@ -296,6 +296,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			cmds = append(cmds, []string{
 				"docker", "build",
 				"--file=" + dockerFile,
+				"--cache-from", buildBaseImage,
 				"--build-arg", "service=" + req.ServiceName,
 				"--build-arg", "env=" + req.Env,
 				"-t", buildBaseImage,

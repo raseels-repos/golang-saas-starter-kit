@@ -20,5 +20,5 @@ if [[ $doPush == 1 ]]; then
     docker push ${releaseImg}
 fi
 
-docker run --rm --entrypoint=cat ${releaseImg} /devops > devops
+docker run --rm --entrypoint=cat ${releaseImg} /go/bin/devops > devops
 chmod +x devops

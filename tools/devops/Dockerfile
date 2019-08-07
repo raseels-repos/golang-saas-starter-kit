@@ -1,4 +1,4 @@
-FROM golang:1.12.6-alpine3.9
+FROM golang:1.12.6-alpine3.9 AS builder
 
 LABEL maintainer="lee@geeksinthewoods.com"
 
@@ -19,6 +19,10 @@ COPY tools/devops ./tools/devops
 
 WORKDIR ./tools/devops
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /devops .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /go/bin/devops .
 
-ENTRYPOINT ["/devops"]
+FROM scratch
+
+COPY --from=builder /go/bin/devops /go/bin/devops
+
+ENTRYPOINT ["/go/bin/devops"]

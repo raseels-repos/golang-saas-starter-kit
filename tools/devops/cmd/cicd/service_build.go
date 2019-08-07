@@ -291,7 +291,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 				buildBaseImage = req.ProjectName + ":" + req.Env + "-" + req.ServiceName + "-" + buildBaseImageTag
 			}
 
-			cmds = append(cmds, []string{"docker", "pull", buildBaseImageTag})
+			cmds = append(cmds, []string{"docker", "pull", buildBaseImage})
 
 			cmds = append(cmds, []string{
 				"docker", "build",
@@ -337,7 +337,14 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 		}
 
 		for _, cmd := range cmds {
-			log.Printf("\t\t%s\n", strings.Join(cmd, " "))
+			var logCmd string
+			if len(cmd) >= 2 && cmd[1] == "login" {
+				logCmd = strings.Join(cmd[0:2], " ")
+			} else {
+				logCmd = strings.Join(cmd, " ")
+			}
+
+			log.Printf("\t\t%s\n", logCmd)
 
 			err = execCmds(log, req.ProjectRoot, cmd)
 			if err != nil {

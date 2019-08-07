@@ -23,11 +23,7 @@
         <!-- ============================================================== -->
         <!-- Base styles for Start Bootstrap template SB Admin 2            -->
         <!-- ============================================================== -->
-        {{ if eq $._Service.ENV "dev" }}
-            <link href="{{ SiteAssetUrl "/assets/css/sb-admin-2.css" }}" rel="stylesheet">
-        {{ else }}
-            <link href="{{ SiteAssetUrl "/assets/css/sb-admin-2.min.css" }}" rel="stylesheet">
-        {{ end }}
+        <link href="{{ SiteAssetUrl "/assets/css/sb-admin-2.css" }}" rel="stylesheet">
 
         <!-- ============================================================== -->
         <!-- Custom styles for this service applied to all pages            -->
@@ -80,11 +76,7 @@
         <!-- ============================================================== -->
         <!-- Javascript for Start Bootstrap template SB Admin 2             -->
         <!-- ============================================================== -->
-        {{ if eq $._Service.ENV "dev" }}
-            <script src="{{ SiteAssetUrl "/assets/js/sb-admin-2.js" }}"></script>
-        {{ else }}
-            <script src="{{ SiteAssetUrl "/assets/js/sb-admin-2.min.js" }}"></script>
-        {{ end }}
+        <script src="{{ SiteAssetUrl "/assets/js/sb-admin-2.js" }}"></script>
 
         <!-- ============================================================== -->
         <!-- Custom Javascript for this service applied to all pages        -->

@@ -3329,7 +3329,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		staticDir := filepath.Join(req.ServiceDir, "static")
 
-		if _, err := os.Stat(staticDir); err != nil  {
+		if _, err := os.Stat(staticDir); err != nil {
 			return errors.Wrapf(err, "Static directory '%s' does not exist.", staticDir)
 		}
 

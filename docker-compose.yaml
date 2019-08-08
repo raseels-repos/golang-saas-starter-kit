@@ -58,13 +58,14 @@ services:
       - DD_TAGS=source:docker env:dev
       - DD_DOGSTATSD_ORIGIN_DETECTION=true
       - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
-      #- ECS_FARGATE=false
       - DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
   web-app:
     image: example-project/web-app:latest
     build:
       context: .
       dockerfile: cmd/web-app/Dockerfile
+      args:
+        service: 'web-app'
     ports:
       - 3000:3000 # WEB APP
       - 4000:4000 # DEBUG API
@@ -83,10 +84,11 @@ services:
       - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
       - WEB_API_APP_DEBUG_HOST=:4000
       - WEB_APP_REDIS_HOST=redis:6379
-      - WEB_APP_DB_HOST=postgres:5433
+      - WEB_APP_DB_HOST=postgres:5432
       - WEB_APP_DB_USER=postgres
       - WEB_APP_DB_PASS=postgres
       - WEB_APP_DB_DATABASE=shared
+      - WEB_APP_DB_DISABLE_TLS=true
       - DD_TRACE_AGENT_HOSTNAME=datadog
       - DD_TRACE_AGENT_PORT=8126
       - DD_SERVICE_NAME=web-app
@@ -98,6 +100,8 @@ services:
     build:
       context: .
       dockerfile: cmd/web-api/Dockerfile
+      args:
+        service: 'web-api'
     ports:
       - 3001:3001 # WEB API
       - 4001:4001 # DEBUG API
@@ -116,10 +120,11 @@ services:
       - WEB_API_APP_BASE_URL=http://127.0.0.1:3001
       - WEB_API_APP_DEBUG_HOST=:4001
       - WEB_API_REDIS_HOST=redis:6379
-      - WEB_API_DB_HOST=postgres:5433
+      - WEB_API_DB_HOST=postgres:5432
       - WEB_API_DB_USER=postgres
       - WEB_API_DB_PASS=postgres
       - WEB_API_DB_DATABASE=shared
+      - WEB_API_DB_DISABLE_TLS=true
       - DD_TRACE_AGENT_HOSTNAME=datadog
       - DD_TRACE_AGENT_PORT=8126
       - DD_SERVICE_NAME=web-app

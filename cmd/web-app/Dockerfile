@@ -16,20 +16,23 @@ RUN go mod download
 
 FROM build_base_golang AS builder
 
+ARG service
+ARG commit_ref=-
+
 # Copy shared packages.
 COPY internal ./internal
 
 # Copy cmd specific packages.
-COPY cmd/web-app ./cmd/web-app
-COPY cmd/web-app/templates /templates
-COPY cmd/web-app/static /static
+COPY cmd/${service} ./cmd/web-app
+COPY cmd/${service}/templates /templates
+COPY cmd/${service}/static /static
 
 # Copy the global templates.
 ADD resources/templates/shared /templates/shared
 
-WORKDIR ./cmd/web-app
+WORKDIR ./cmd/${service}
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /gosrv .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /gosrv .
 
 FROM alpine:3.9
 

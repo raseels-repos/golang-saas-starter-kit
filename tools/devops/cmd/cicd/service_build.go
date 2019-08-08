@@ -29,6 +29,7 @@ type ServiceBuildFlags struct {
 	ProjectRoot string `validate:"omitempty" example:"."`
 	ProjectName string ` validate:"omitempty" example:"example-project"`
 	DockerFile  string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
+	CommitRef   string `validate:"omitempty" example:"master@1ecfd275"`
 	NoCache     bool   `validate:"omitempty" example:"false"`
 	NoPush      bool   `validate:"omitempty" example:"false"`
 }
@@ -41,8 +42,9 @@ type serviceBuildRequest struct {
 	EcrRepository          *ecr.CreateRepositoryInput
 	EcrRepositoryMaxImages int `validate:"omitempty"`
 
-	NoCache bool `validate:"omitempty"`
-	NoPush  bool `validate:"omitempty"`
+	CommitRef string `validate:"omitempty"`
+	NoCache   bool   `validate:"omitempty"`
+	NoPush    bool   `validate:"omitempty"`
 
 	flags ServiceBuildFlags
 }
@@ -79,8 +81,9 @@ func NewServiceBuildRequest(log *log.Logger, flags ServiceBuildFlags) (*serviceB
 		req = serviceBuildRequest{
 			serviceRequest: sr,
 
-			NoCache: flags.NoCache,
-			NoPush:  flags.NoPush,
+			CommitRef: flags.CommitRef,
+			NoCache:   flags.NoCache,
+			NoPush:    flags.NoPush,
 
 			flags: flags,
 		}
@@ -99,6 +102,19 @@ func NewServiceBuildRequest(log *log.Logger, flags ServiceBuildFlags) (*serviceB
 		// Set default AWS ECR Regsistry Max Images.
 		req.EcrRepositoryMaxImages = defaultAwsRegistryMaxImages
 		log.Printf("\t\t\tSet ECR Regsistry Max Images to '%d'.", req.EcrRepositoryMaxImages)
+
+		// Get the default commit ref.
+		if req.CommitRef == "" {
+			if ev := os.Getenv("CI_COMMIT_TAG"); ev != "" {
+				req.CommitRef = "tag-" + ev
+			} else if ev := os.Getenv("CI_COMMIT_REF_NAME"); ev != "" {
+				req.CommitRef = "branch-" + ev
+			}
+
+			if ev := os.Getenv("CI_COMMIT_SHORT_SHA"); ev != "" {
+				req.CommitRef = req.CommitRef + "@" + ev
+			}
+		}
 
 	}
 
@@ -315,6 +331,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			"--file=" + dockerFile,
 			"--build-arg", "service=" + req.ServiceName,
 			"--build-arg", "env=" + req.Env,
+			"--build-arg", "commit_ref=" + req.CommitRef,
 			"-t", req.ReleaseImage,
 		}
 

@@ -102,7 +102,7 @@ func main() {
 			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.eproc.tech"`
 			SessionKey      string        `default:"" envconfig:"SESSION_KEY"`
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
-			EmailSender     string        `default:"" envconfig:"EMAIL_SENDER"`
+			EmailSender     string        `default:"test@eproc.tech" envconfig:"EMAIL_SENDER"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}

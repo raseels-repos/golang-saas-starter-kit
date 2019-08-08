@@ -75,8 +75,7 @@ func (di *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
 		acl = aws.String(di.acl)
 	}
 
-
-	buffer, contentType, rerr :=  readFile(f)
+	buffer, contentType, rerr := readFile(f)
 
 	nextPath, _ := filepath.Rel(di.dir, di.next.path)
 

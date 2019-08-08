@@ -74,15 +74,18 @@ type ServiceDeployFlags struct {
 	RecreateService bool `validate:"omitempty" example:"false"`
 }
 
-// serviceDeployRequest defines the details needed to execute a service deployment.
-type serviceDeployRequest struct {
-	*serviceRequest
+
+
+// deployEcsServiceRequest defines the details needed to execute a service deployment to AWS ECS.
+type deployEcsServiceRequest struct {
+
+	S3BucketPublicName      string `validate:"omitempty"`
+	S3BucketPublicKeyPrefix string `validate:"omitempty"`
 
 	EnableHTTPS        bool     `validate:"omitempty"`
 	ServiceHostPrimary string   `validate:"omitempty,required_with=EnableHTTPS,fqdn"`
 	ServiceHostNames   []string `validate:"omitempty,dive,fqdn"`
 
-	EcrRepositoryName string `validate:"required"`
 
 	EcsClusterName string `validate:"required"`
 	EcsCluster     *ecs.CreateClusterInput
@@ -104,19 +107,10 @@ type serviceDeployRequest struct {
 	EcsTaskPolicy         *iam.CreatePolicyInput
 	EcsTaskPolicyDocument IamPolicyDocument
 
-	Ec2SecurityGroupName string `validate:"required"`
-	Ec2SecurityGroup     *ec2.CreateSecurityGroupInput
-
-	GitlabRunnerEc2SecurityGroupName string `validate:"required"`
 
 	CloudWatchLogGroupName string `validate:"required"`
 	CloudWatchLogGroup     *cloudwatchlogs.CreateLogGroupInput
 
-	S3BucketTempPrefix      string `validate:"required_with=S3BucketPrivateName S3BucketPublicName"`
-	S3BucketPrivateName     string `validate:"omitempty"`
-	S3BucketPublicName      string `validate:"omitempty"`
-	S3BucketPublicKeyPrefix string `validate:"omitempty"`
-	S3Buckets               []S3Bucket
 
 	CloudfrontPublic *cloudfront.DistributionConfig
 
@@ -136,8 +130,6 @@ type serviceDeployRequest struct {
 	VpcPublic        *ec2.CreateVpcInput
 	VpcPublicSubnets []*ec2.CreateSubnetInput
 
-	EnableLambdaVPC bool `validate:"omitempty"`
-	IsLambda            bool   `validate:"omitempty"`
 	RecreateService bool `validate:"omitempty"`
 
 	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
@@ -151,6 +143,9 @@ type serviceDeployRequest struct {
 
 	flags ServiceDeployFlags
 }
+
+
+
 
 // NewServiceDeployRequest generates a new request for executing deployment of a single service for a given set of CLI flags.
 func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*serviceDeployRequest, error) {

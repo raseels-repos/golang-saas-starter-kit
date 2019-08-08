@@ -70,7 +70,7 @@ func main() {
 			},
 		},
 		{
-			Name:  "deploy",
+			Name:  "deploy-service",
 			Usage: "-service=web-api -env=dev",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "service", Usage: "name of cmd", Destination: &deployFlags.ServiceName},
@@ -88,7 +88,7 @@ func main() {
 				cli.BoolTFlag{Name: "lambda_vpc", Usage: "deploy lambda behind VPC", Destination: &deployFlags.EnableLambdaVPC},
 				cli.BoolFlag{Name: "static_files_s3", Usage: "service static files from S3", Destination: &deployFlags.StaticFilesS3Enable},
 				cli.BoolFlag{Name: "static_files_img_resize", Usage: "enable response images from service", Destination: &deployFlags.StaticFilesImgResizeEnable},
-				cli.BoolFlag{Name: "recreate_service", Usage: "skip docker push after build", Destination: &deployFlags.RecreateService},
+				cli.BoolFlag{Name: "recreate", Usage: "skip docker push after build", Destination: &deployFlags.RecreateService},
 			},
 			Action: func(c *cli.Context) error {
 				if len(deployFlags.ServiceHostNames.Value()) == 1 {
@@ -114,6 +114,44 @@ func main() {
 				return cicd.ServiceDeploy(log, req)
 			},
 		},
+		{
+			Name:  "deploy-function",
+			Usage: "-function=web-api -env=dev",
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "function", Usage: "name of function", Destination: &deployFlags.ServiceName},
+				cli.StringFlag{Name: "env", Usage: "dev, stage, or prod", Destination: &deployFlags.Env},
+				cli.StringFlag{Name: "private_bucket", Usage: "dev, stage, or prod", Destination: &deployFlags.S3BucketPrivateName},
+				cli.StringFlag{Name: "dockerfile", Usage: "DockerFile for service", Destination: &deployFlags.DockerFile},
+				cli.StringFlag{Name: "root", Usage: "project root directory", Destination: &deployFlags.ProjectRoot},
+				cli.StringFlag{Name: "project", Usage: "name of project", Destination: &deployFlags.ProjectName},
+				cli.BoolTFlag{Name: "use_vpc", Usage: "deploy lambda behind VPC", Destination: &deployFlags.EnableLambdaVPC},
+				cli.BoolFlag{Name: "recreate", Usage: "skip docker push after build", Destination: &deployFlags.RecreateService},
+			},
+			Action: func(c *cli.Context) error {
+				if len(deployFlags.ServiceHostNames.Value()) == 1 {
+					var hostNames []string
+					for _, inpVal := range deployFlags.ServiceHostNames.Value() {
+						pts := strings.Split(inpVal, ",")
+
+						for _, h := range pts {
+							h = strings.TrimSpace(h)
+							if h != "" {
+								hostNames = append(hostNames, h)
+							}
+						}
+					}
+
+					deployFlags.ServiceHostNames = hostNames
+				}
+
+				req, err := cicd.NewServiceDeployRequest(log, deployFlags)
+				if err != nil {
+					return err
+				}
+				return cicd.ServiceDeploy(log, req)
+			},
+		},
+
 		{
 			Name:  "migrate",
 			Usage: "-env=dev",

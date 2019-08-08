@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -10,9 +11,12 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
@@ -92,6 +96,8 @@ func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB 
 	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
 
+	app.Handle("GET", "/v1/examples/error-response", ExampleErrorResponse)
+
 	// Register swagger documentation.
 	// TODO: Add authentication. Current authenticator requires an Authorization header
 	// 		 which breaks the browser experience.
@@ -99,6 +105,36 @@ func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB 
 	app.Handle("GET", "/docs/*", saasSwagger.WrapHandler)
 
 	return app
+}
+
+// ExampleErrorResponse returns example error messages.
+func ExampleErrorResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+
+	if qv := r.URL.Query().Get("test-validation-error"); qv != "" {
+		_, err := project.Create(ctx, auth.Claims{}, nil, project.ProjectCreateRequest{}, v.Now)
+		return web.RespondJsonError(ctx, w, err)
+
+	}
+
+	if qv := r.URL.Query().Get("test-web-error"); qv != "" {
+		terr := errors.New("Some random error")
+		terr = errors.WithMessage(terr, "Actual error message")
+		rerr := weberror.NewError(ctx, terr, http.StatusBadRequest).(*weberror.Error)
+		rerr.Message = "Test Web Error Message"
+		return web.RespondJsonError(ctx, w, rerr)
+	}
+
+	if qv := r.URL.Query().Get("test-error"); qv != "" {
+		terr := errors.New("Test error")
+		terr = errors.WithMessage(terr, "Error message")
+		return web.RespondJsonError(ctx, w, terr)
+	}
+
+	return nil
 }
 
 // Types godoc

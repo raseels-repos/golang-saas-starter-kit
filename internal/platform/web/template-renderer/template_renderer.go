@@ -135,7 +135,16 @@ func NewTemplate(templateFuncs template.FuncMap) *Template {
 			}
 			return false
 		},
-
+		"HasField": func(v interface{}, name string) bool {
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Ptr {
+				rv = rv.Elem()
+			}
+			if rv.Kind() != reflect.Struct {
+				return false
+			}
+			return rv.FieldByName(name).IsValid()
+		},
 		"dict": func(values ...interface{}) (map[string]interface{}, error) {
 			if len(values) == 0 {
 				return nil, errors.New("invalid dict call")

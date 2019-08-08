@@ -125,13 +125,14 @@
         {{ if or ($errMsg) ($errDetails) }}
             <div class="alert alert-danger" role="alert">
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close"> <span aria-hidden="true">×</span> </button> {{ if $errMsg }}<h3>{{ $errMsg }}</h3> {{end}}
-                {{ if .error.Fields }}
+                {{ if HasField .error "Fields" }}
                     <ul>
                         {{ range $i := .error.Fields }}
                             <li>{{ if $i.Display }}{{ $i.Display }}{{ else }}{{ $i.Error }}{{ end }}</li>
                         {{end}}
                     </ul>
                 {{ end }}
+
                 {{ if $errDetails }}
                     <p><small>{{ $errDetails }}</small></p>
                 {{ end }}

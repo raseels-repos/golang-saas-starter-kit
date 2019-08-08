@@ -22,7 +22,6 @@ import (
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
-	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
 
@@ -823,10 +822,6 @@ func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter,
 	}
 
 	sess := webcontext.ContextSession(ctx)
-
-	if sess.IsNew {
-		sess.ID = uuid.NewRandom().String()
-	}
 
 	sess.Options = &sessions.Options{
 		Path:     "/",

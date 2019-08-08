@@ -36,11 +36,7 @@ func (h *Root) Index(ctx context.Context, w http.ResponseWriter, r *http.Request
 
 // indexDashboard loads the dashboard for a user when they are authenticated.
 func (h *Root) indexDashboard(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	data := map[string]interface{}{
-		"imgSizes": []int{100, 200, 300, 400, 500},
-	}
-
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "root-dashboard.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "root-dashboard.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, nil)
 }
 
 // indexDefault loads the root index page when a user has no authentication.

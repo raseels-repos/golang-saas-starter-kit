@@ -470,13 +470,10 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 // @Tags user
 // @Accept  x-www-form-urlencoded
 // @Produce  json
-// @Security BasicAuth
 // @Param username formData string true "Email"
 // @Param password formData string true "Password"
 // @Param account_id formData string false "Account ID"
-// @Param scope formData {array} string true "Scope" Enums(user, admin)
-// @Param scope query {array}  string false "Scope" Enums(user, admin)
-// @Param account_id query string false "Account ID"
+// @Param scope formData string false "Scope" Enums(user, admin)
 // @Success 200
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 401 {object} weberror.ErrorResponse

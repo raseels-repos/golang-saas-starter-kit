@@ -596,15 +596,29 @@ paths:
   /oauth/token:
     post:
       consumes:
-      - application/json
+      - application/x-www-form-urlencoded
       description: Token generates an oauth2 accessToken using Basic Auth with a user's
         email and password.
       parameters:
+      - description: Email
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Account ID
+        in: formData
+        name: account_id
+        type: string
       - description: Scope
         enum:
         - user
         - admin
-        in: query
+        in: formData
         name: scope
         type: string
       produces:
@@ -623,12 +637,10 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-      security:
-      - BasicAuth: []
       summary: Token handles a request to authenticate a user.
       tags:
       - user
-  /project:
+  /projects:
     get:
       consumes:
       - application/json
@@ -680,7 +692,6 @@ paths:
       summary: List projects
       tags:
       - project
-  /projects:
     patch:
       consumes:
       - application/json

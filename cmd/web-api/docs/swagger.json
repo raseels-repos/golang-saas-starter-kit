@@ -119,14 +119,9 @@
         },
         "/oauth/token": {
             "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
                 "description": "Token generates an oauth2 accessToken using Basic Auth with a user's email and password.",
                 "consumes": [
-                    "application/json"
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -137,6 +132,26 @@
                 "summary": "Token handles a request to authenticate a user.",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Email",
+                        "name": "username",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "account_id",
+                        "in": "formData"
+                    },
+                    {
                         "enum": [
                             "user",
                             "admin"
@@ -144,7 +159,7 @@
                         "type": "string",
                         "description": "Scope",
                         "name": "scope",
-                        "in": "query"
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -170,7 +185,7 @@
                 }
             }
         },
-        "/project": {
+        "/projects": {
             "get": {
                 "security": [
                     {
@@ -249,9 +264,7 @@
                         }
                     }
                 }
-            }
-        },
-        "/projects": {
+            },
             "post": {
                 "security": [
                     {

@@ -15,6 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
@@ -26,12 +28,15 @@ type ServiceBuildFlags struct {
 	Env         string `validate:"oneof=dev stage prod" example:"dev"`
 
 	// Optional flags.
-	ProjectRoot string `validate:"omitempty" example:"."`
-	ProjectName string ` validate:"omitempty" example:"example-project"`
-	DockerFile  string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
-	CommitRef   string `validate:"omitempty" example:"master@1ecfd275"`
-	NoCache     bool   `validate:"omitempty" example:"false"`
-	NoPush      bool   `validate:"omitempty" example:"false"`
+	ProjectRoot         string `validate:"omitempty" example:"."`
+	ProjectName         string ` validate:"omitempty" example:"example-project"`
+	DockerFile          string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
+	CommitRef           string `validate:"omitempty" example:"master@1ecfd275"`
+	S3BucketPrivateName string `validate:"omitempty" example:"saas-example-project-private"`
+	BuildDir            string `validate:"omitempty" example:"."`
+	NoCache             bool   `validate:"omitempty" example:"false"`
+	NoPush              bool   `validate:"omitempty" example:"false"`
+	IsLambda            bool   `validate:"omitempty" example:"false"`
 }
 
 // serviceBuildRequest defines the details needed to execute a service build.
@@ -42,9 +47,12 @@ type serviceBuildRequest struct {
 	EcrRepository          *ecr.CreateRepositoryInput
 	EcrRepositoryMaxImages int `validate:"omitempty"`
 
-	CommitRef string `validate:"omitempty"`
-	NoCache   bool   `validate:"omitempty"`
-	NoPush    bool   `validate:"omitempty"`
+	BuildDir            string `validate:"omitempty" example:""`
+	CommitRef           string `validate:"omitempty"`
+	S3BucketPrivateName string `validate:"omitempty"`
+	NoCache             bool   `validate:"omitempty"`
+	NoPush              bool   `validate:"omitempty"`
+	IsLambda            bool   `validate:"omitempty"`
 
 	flags ServiceBuildFlags
 }
@@ -81,11 +89,18 @@ func NewServiceBuildRequest(log *log.Logger, flags ServiceBuildFlags) (*serviceB
 		req = serviceBuildRequest{
 			serviceRequest: sr,
 
-			CommitRef: flags.CommitRef,
-			NoCache:   flags.NoCache,
-			NoPush:    flags.NoPush,
+			CommitRef:           flags.CommitRef,
+			S3BucketPrivateName: flags.S3BucketPrivateName,
+			BuildDir:            flags.BuildDir,
+			NoCache:             flags.NoCache,
+			NoPush:              flags.NoPush,
+			IsLambda:            flags.IsLambda,
 
 			flags: flags,
+		}
+
+		if req.BuildDir == "" {
+			req.BuildDir = req.ProjectRoot
 		}
 
 		// Set default AWS ECR Repository Name.
@@ -210,9 +225,18 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 	// Once we can access the repository in ECR, do the docker build.
 	{
 		log.Printf("Starting docker build %s\n", req.ReleaseImage)
-		dockerFile, err := filepath.Rel(req.ProjectRoot, req.DockerFile)
-		if err != nil {
-			return errors.Wrapf(err, "Failed parse relative path for %s from %s", req.DockerFile, req.ProjectRoot)
+
+		var dockerFile string
+		dockerPath := filepath.Join(req.BuildDir, req.DockerFile)
+		if _, err := os.Stat(dockerPath); err == nil {
+			dockerFile = req.DockerFile
+		} else {
+			dockerPath = req.DockerFile
+
+			dockerFile, err = filepath.Rel(req.BuildDir, dockerPath)
+			if err != nil {
+				return errors.Wrapf(err, "Failed parse relative path for %s from %s", dockerPath, req.BuildDir)
+			}
 		}
 
 		// Name of the first build stage declared in the docckerFile.
@@ -222,7 +246,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 		// FROM golang:1.12.6-alpine3.9 AS build_base
 		var buildBaseImageTag string
 		{
-			file, err := os.Open(req.DockerFile)
+			file, err := os.Open(dockerPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -349,9 +373,32 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 
 		cmds = append(cmds, buildCmd)
 
+		s3Files := make(map[string]*s3manager.UploadInput)
 		if req.NoPush == false {
-			cmds = append(cmds, dockerLoginCmd)
-			cmds = append(cmds, []string{"docker", "push", req.ReleaseImage})
+			if req.IsLambda {
+
+				lambdaS3Key := LambdaS3KeyFromReleaseImage(req.ReleaseImage)
+
+				tmpDir := os.TempDir()
+				lambdaZip := filepath.Join(tmpDir, filepath.Base(lambdaS3Key))
+
+				containerName := uuid.NewRandom().String()
+
+				cmds = append(cmds, []string{"docker", "create", "-ti", "--name", containerName, req.ReleaseImage, "bash"})
+				cmds = append(cmds, []string{"docker", "cp", containerName + ":/var/task", tmpDir})
+				cmds = append(cmds, []string{"docker", "rm", containerName})
+				cmds = append(cmds, []string{"cd", tmpDir + "/task"})
+				cmds = append(cmds, []string{"zip", "-r", lambdaZip, "."})
+
+				s3Files[lambdaZip] = &s3manager.UploadInput{
+					Bucket: &req.S3BucketPrivateName,
+					Key:    &lambdaS3Key,
+				}
+
+			} else {
+				cmds = append(cmds, dockerLoginCmd)
+				cmds = append(cmds, []string{"docker", "push", req.ReleaseImage})
+			}
 		}
 
 		for _, cmd := range cmds {
@@ -364,13 +411,34 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 
 			log.Printf("\t\t%s\n", logCmd)
 
-			err = execCmds(log, req.ProjectRoot, cmd)
+			err := execCmds(log, req.BuildDir, cmd)
 			if err != nil {
 				if len(cmd) > 2 && cmd[1] == "pull" {
 					log.Printf("\t\t\tSkipping pull - %s\n", err.Error())
 				} else {
 					return errors.Wrapf(err, "Failed to exec %s", strings.Join(cmd, " "))
 				}
+			}
+		}
+
+		if s3Files != nil && len(s3Files) > 0 {
+			// Create an uploader with the session and default options
+			uploader := s3manager.NewUploader(req.awsSession())
+
+			// Perform an upload.
+			for lf, upParams := range s3Files {
+				f, err := os.Open(lf)
+				if err != nil {
+					return errors.Wrapf(err, "Failed open file to %s", lf)
+				}
+				upParams.Body = f
+
+				_, err = uploader.Upload(upParams)
+				if err != nil {
+					return errors.Wrapf(err, "Failed upload file to %s", *upParams.Key)
+				}
+
+				log.Printf("\t\tUploaded %s to s3://%s/%s\n", lf, *upParams.Bucket, *upParams.Key)
 			}
 		}
 

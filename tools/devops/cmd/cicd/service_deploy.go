@@ -66,6 +66,7 @@ type ServiceDeployFlags struct {
 	DockerFile      string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
 	EnableLambdaVPC bool   `validate:"omitempty" example:"false"`
 	EnableEcsElb    bool   `validate:"omitempty" example:"false"`
+	IsLambda            bool   `validate:"omitempty" example:"false"`
 
 	StaticFilesS3Enable        bool `validate:"omitempty" example:"false"`
 	StaticFilesImgResizeEnable bool `validate:"omitempty" example:"false"`
@@ -136,6 +137,7 @@ type serviceDeployRequest struct {
 	VpcPublicSubnets []*ec2.CreateSubnetInput
 
 	EnableLambdaVPC bool `validate:"omitempty"`
+	IsLambda            bool   `validate:"omitempty"`
 	RecreateService bool `validate:"omitempty"`
 
 	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
@@ -192,6 +194,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			S3BucketPrivateName: flags.S3BucketPrivateName,
 			S3BucketPublicName:  flags.S3BucketPublicName,
 
+			IsLambda: flags.IsLambda,
 			EnableLambdaVPC: flags.EnableLambdaVPC,
 			EnableEcsElb:    flags.EnableEcsElb,
 			RecreateService: flags.RecreateService,
@@ -435,6 +438,12 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			// Set default AWS ECR Repository Name.
 			req.EcrRepositoryName = ecrRepositoryName(req.ProjectName)
 			log.Printf("\t\t\tSet ECR Repository Name to '%s'.", req.EcrRepositoryName)
+
+			if req.IsLambda {
+
+			}	else {
+
+			}
 
 			// Set default AWS ECS Cluster Name.
 			req.EcsClusterName = req.ProjectName + "-" + req.Env

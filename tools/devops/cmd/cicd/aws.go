@@ -303,6 +303,41 @@ func EcsReadTaskDefinition(serviceDir, targetEnv string) ([]byte, error) {
 	return dat, nil
 }
 
+// LambdaReadFuncDefinition reads a task definition file and json decodes it.
+func LambdaReadFuncDefinition(serviceDir, targetEnv string) ([]byte, error) {
+	checkPaths := []string{
+		filepath.Join(serviceDir, fmt.Sprintf("lambda-func-definition-%s.json", targetEnv)),
+		filepath.Join(serviceDir, "lambda-func-definition.json"),
+	}
+
+	var defFile string
+	for _, tf := range checkPaths {
+		ok, _ := exists(tf)
+		if ok {
+			defFile = tf
+			break
+		}
+	}
+
+	if defFile == "" {
+		return nil, errors.Errorf("failed to locate task definition - checked %s", strings.Join(checkPaths, ", "))
+	}
+
+	dat, err := ioutil.ReadFile(defFile)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read file %s", defFile)
+	}
+
+	return dat, nil
+}
+
+// LambdaS3KeyFromReleaseImage generates an S3 key from a release image.
+func LambdaS3KeyFromReleaseImage(releaseImage string) string {
+	it := filepath.Base(releaseImage)
+	it = strings.Replace(it, ":", "/", -1)
+	return filepath.Join("src/aws/lambda/", it+".zip")
+}
+
 // parseTaskDefinition json decodes it.
 func parseTaskDefinitionInput(dat []byte) (*ecs.RegisterTaskDefinitionInput, error) {
 	dat = convertKeys(dat)

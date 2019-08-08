@@ -40,7 +40,7 @@ type Project struct {
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /project [get]
+// @Router /projects [get]
 func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {

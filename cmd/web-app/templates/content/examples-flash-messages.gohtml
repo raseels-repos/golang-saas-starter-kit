@@ -14,6 +14,11 @@
         <button class="btn btn-purple btn-user ">
             Submit Form
         </button>
+
+        <!-- hidden_field is not included in the form to show how inline validation errors
+        are removed from list of validation issues in the flash message. When submitting an
+        invalid email address, the flash message includes the validation issues for hidden_field
+        but does not include in for email. Instead the email validation issue is displayed inline -->
         <hr>
     </form>
 {{end}}

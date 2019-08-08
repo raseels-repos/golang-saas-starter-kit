@@ -3329,6 +3329,10 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 		staticDir := filepath.Join(req.ServiceDir, "static")
 
+		if _, err := os.Stat(staticDir); err != nil  {
+			return errors.Wrapf(err, "Static directory '%s' does not exist.", staticDir)
+		}
+
 		err := SyncPublicS3Files(req.awsSession(), req.S3BucketPublicName, req.StaticFilesS3Prefix, staticDir)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to sync static files from %s to s3://%s/%s", staticDir, req.S3BucketPublicName, req.StaticFilesS3Prefix)

@@ -8,9 +8,19 @@ accelerator@geeksinthewoods.com.com
 
 Web API is a client facing API. Standard response format is JSON. 
 
+While the web app is meant for humans to experience and requires
+a friendly UI, the web API is meant for customers or third-party partners of your SaaS to programmatically integrate. To 
+help show the similarities and differences between the pages in the web app and similar endpoints in the web API, we 
+have created this diagram below. Since it is very detailed, you can click on the image to see the larger version. 
+
+[![Diagram of pages in web app and endpoints in web API](resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)
+
+
+
 **Not all CRUD methods are exposed as endpoints.** Only endpoints that clients may need should be exposed. Internal 
 services should communicate directly with the business logic packages or a new API should be created to support it. This 
 separation should help decouple client integrations from internal application development. 
+
 
 
 ## Making Requests to Web API

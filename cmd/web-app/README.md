@@ -8,8 +8,15 @@ accelerator@geeksinthewoods.com
 
 Responsive web application that renders HTML using the `html/template` package from the standard library to enable 
 direct interaction with clients and their users. It allows clients to sign up new accounts and provides user 
-authentication with HTTP sessions. The web app relies on the Golang business logic packages developed to provide an API 
-for internal requests. 
+authentication with HTTP sessions. To see screen captures of the web app, check out this Google Slides deck:
+https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
+
+*You are welcome to add comments to the Google Slides.*
+
+[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
+
+
+The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
 Once the web-app service is running it will be available on port 3000.
 

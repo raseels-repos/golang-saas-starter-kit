@@ -3,17 +3,17 @@ package saasSwagger
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"github.com/pborman/uuid"
 	"html/template"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/pborman/uuid"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"github.com/pkg/errors"
-	"github.com/swaggo/files"
-	"github.com/swaggo/swag"
+	"github.com/geeks-accelerator/files"
+	"github.com/geeks-accelerator/swag"
 )
 
 var (

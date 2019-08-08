@@ -1,4 +1,3 @@
-basePath: '{{.BasePath}}'
 definitions:
   account.AccountResponse:
     properties:
@@ -518,15 +517,12 @@ definitions:
       value:
         type: object
     type: object
-host: '{{.Host}}'
 info:
   contact: {}
-  description: '{{.Description}}'
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   title: SaaS Example API
-  version: '{{.Version}}'
 paths:
   /accounts:
     patch:
@@ -549,17 +545,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Update account by ID
@@ -583,22 +576,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/account.AccountResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Get account by ID
@@ -626,17 +615,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - BasicAuth: []
       summary: Token handles a request to authenticate a user.
@@ -681,17 +667,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: List projects
@@ -718,17 +701,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Update project by ID
@@ -753,27 +733,22 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/project.ProjectResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Create new project.
@@ -798,17 +773,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Delete project by ID
@@ -831,22 +803,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/project.ProjectResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Get project by ID.
@@ -873,17 +841,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Archive project by ID
@@ -909,17 +874,14 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/signup.SignupResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       summary: Signup handles new account creation.
       tags:
       - signup
@@ -942,17 +904,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Delete user account by user ID and account ID
@@ -996,17 +955,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: List user accounts
@@ -1032,17 +988,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Update user account by user ID and account ID
@@ -1067,27 +1020,22 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/user_account.UserAccountResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Create new user account.
@@ -1111,22 +1059,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/user_account.UserAccountResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Get user account by ID
@@ -1153,17 +1097,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Archive user account by user ID and account ID
@@ -1209,12 +1150,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: List users
@@ -1240,17 +1179,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Update user by ID
@@ -1275,22 +1211,18 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/user.UserResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Create new user.
@@ -1315,17 +1247,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Delete user by ID
@@ -1348,22 +1277,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/user.UserResponse'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Get user by ID
@@ -1390,17 +1315,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Archive user by ID
@@ -1427,17 +1349,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Update user password by ID
@@ -1462,17 +1381,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/weberror.ErrorResponse'
-            type: object
       security:
       - OAuth2Password: []
       summary: Switch account.

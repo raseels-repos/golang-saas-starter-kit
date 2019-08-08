@@ -12,14 +12,14 @@ saas middleware to automatically generate RESTful API documentation with Swagger
 ## Usage
 
 ### Start using it
-1. Add comments to your API source code, [See Declarative Comments Format](https://github.com/swaggo/swag#declarative-comments-format).
+1. Add comments to your API source code, [See Declarative Comments Format](https://github.com/geeks-accelerator/swag#declarative-comments-format).
 
-2. Download [Swag](https://github.com/swaggo/swag) for Go by using:
+2. Download [Swag](https://github.com/geeks-accelerator/swag) for Go by using:
     ```sh
-    $ go get github.com/swaggo/swag/cmd/swag
+    $ go get github.com/geeks-accelerator/swag/cmd/swag
     ```
 
-3. Run the [Swag](https://github.com/swaggo/swag) in your Go project root folder which contains `main.go` file, [Swag](https://github.com/swaggo/swag) will parse comments and generate required files(`docs` folder and `docs/doc.go`).
+3. Run the [Swag](https://github.com/geeks-accelerator/swag) in your Go project root folder which contains `main.go` file, [Swag](https://github.com/geeks-accelerator/swag) will parse comments and generate required files(`docs` folder and `docs/doc.go`).
     ```sh_ "github.com/swaggo/echo-swagger/v2/example/docs"
     $ swag init
     ```

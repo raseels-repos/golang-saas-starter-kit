@@ -332,6 +332,7 @@ func ServiceBuild(log *log.Logger, req *serviceBuildRequest) error {
 			"--build-arg", "service=" + req.ServiceName,
 			"--build-arg", "env=" + req.Env,
 			"--build-arg", "commit_ref=" + req.CommitRef,
+			"--build-arg", "swagInit=1",
 			"-t", req.ReleaseImage,
 		}
 

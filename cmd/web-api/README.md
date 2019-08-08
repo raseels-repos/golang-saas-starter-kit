@@ -26,7 +26,7 @@ initial admin user must first be created. The initial admin user can easily be c
 
 ## API Documentation
 
-Documentation for this API service is automatically generated using [swag](https://github.com/swaggo/swag). Once this
+Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). Once this
 web-api service is running, it can be accessed at /docs
 
 http://127.0.0.1:3001/docs/
@@ -227,14 +227,14 @@ curl -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:3001/v1/users
 
 ## Update Swagger API Documentation 
 
-Documentation is generated using [swag](https://github.com/swaggo/swag)
+Documentation is generated using [swag](https://github.com/geeks-accelerator/swag)
 
 If you are developing this web-api service and you want your changes reflected in the API documentation, you will need
 to download Swag and then run it each time you want the API documentation to be updated.
 
 Download Swag with this command:
 ```bash
-go get -u github.com/swaggo/swag/cmd/swag
+go get -u github.com/geeks-accelerator/swag/cmd/swag
 ```
 
 Run `swag init` in the service's root folder which contains the main.go file. This will parse your comments and generate the required files (docs folder and docs/docs.go).

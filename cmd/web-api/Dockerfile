@@ -19,7 +19,7 @@ RUN GO111MODULE=off go get gopkg.in/go-playground/validator.v9 && \
     GO111MODULE=off go get golang.org/x/crypto/nacl/secretbox
 
 # Install swag with go modules enabled.
-RUN GO111MODULE=on go get -u github.com/swaggo/swag/cmd/swag
+RUN GO111MODULE=on go get -u github.com/geeks-accelerator/swag/cmd/swag
 
 # Change dir to project base.
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
@@ -34,6 +34,7 @@ FROM build_base_golang AS builder
 
 ARG service
 ARG commit_ref=-
+ARG swagInit
 
 # Copy shared packages.
 COPY internal ./internal
@@ -50,7 +51,8 @@ WORKDIR ./cmd/${service}
 
 # Update the API documentation.
 # Disabled for the moment as it takes forever to run, rely on manual execution.
-#RUN swag init
+RUN if [ "$swagInit" != "" ] swag init ; fi
+
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /gosrv .
 

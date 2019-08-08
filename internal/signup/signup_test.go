@@ -1,13 +1,13 @@
 package signup
 
 import (
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"os"
 	"testing"
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
@@ -40,15 +40,17 @@ func TestSignupValidation(t *testing.T) {
 			func(req SignupRequest, res *SignupResult) *SignupResult {
 				return nil
 			},
-			errors.New("Key: 'SignupRequest.account.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.account.address1' Error:Field validation for 'address1' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.account.city' Error:Field validation for 'city' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.account.region' Error:Field validation for 'region' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.account.country' Error:Field validation for 'country' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.account.zipcode' Error:Field validation for 'zipcode' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.user.name' Error:Field validation for 'name' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.user.email' Error:Field validation for 'email' failed on the 'required' tag\n" +
-				"Key: 'SignupRequest.user.password' Error:Field validation for 'password' failed on the 'required' tag"),
+			errors.New("Key: 'SignupRequest.{{account}}.{{name}}' Error:Field validation for '{{name}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{account}}.{{address1}}' Error:Field validation for '{{address1}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{account}}.{{city}}' Error:Field validation for '{{city}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{account}}.{{region}}' Error:Field validation for '{{region}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{account}}.{{country}}' Error:Field validation for '{{country}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{account}}.{{zipcode}}' Error:Field validation for '{{zipcode}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{user}}.{{first_name}}' Error:Field validation for '{{first_name}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{user}}.{{last_name}}' Error:Field validation for '{{last_name}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{user}}.{{email}}' Error:Field validation for '{{email}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{user}}.{{password}}' Error:Field validation for '{{password}}' failed on the 'required' tag\n" +
+				"Key: 'SignupRequest.{{user}}.{{password_confirm}}' Error:Field validation for '{{password_confirm}}' failed on the 'required' tag"),
 		},
 	}
 
@@ -111,7 +113,8 @@ func TestSignupFull(t *testing.T) {
 			Zipcode:  "99686",
 		},
 		User: SignupUser{
-			Name:            "Lee Brown",
+			FirstName:            "Lee",
+			LastName:            "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -122,7 +125,7 @@ func TestSignupFull(t *testing.T) {
 
 	now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	tknGen := &user.MockTokenGenerator{}
+	tknGen := &auth.MockTokenGenerator{}
 
 	t.Log("Given the need to ensure signup works.")
 	{
@@ -159,7 +162,10 @@ func TestSignupFull(t *testing.T) {
 		t.Logf("\t%s\tSignup ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = user.Authenticate(ctx, test.MasterDB, tknGen, res.User.Email, req.User.Password, time.Hour, now)
+		_, err = user_auth.Authenticate(ctx, test.MasterDB, tknGen, user_auth.AuthenticateRequest{
+			Email:res.User.Email,
+			Password: req.User.Password,
+		}, time.Hour, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tAuthenticate failed.", tests.Failed)

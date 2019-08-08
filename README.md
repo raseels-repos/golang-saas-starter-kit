@@ -324,7 +324,7 @@ For more details on this service, read [web-api readme](https://gitlab.com/geeks
 
 ### API Documentation
 
-Documentation for this API service is automatically generated using [swag](https://github.com/swaggo/swag). Once this
+Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). Once this
 web-api service is running, it can be accessed at /docs
 
 http://127.0.0.1:3001/docs/

@@ -7,7 +7,7 @@ twins@geeksaccelerator.com
 ## Description
 
 The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications while 
-preventing both misuse and fraud. The goal of this project is project is to provide a proven starting point for new 
+preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
 and ready to onboard enterprise clients. It uses minimal dependencies, implements idiomatic code and follows Golang 
 best practices. Collectively, the toolkit lays out everything logically to minimize guess work and enable engineers to 
@@ -17,6 +17,18 @@ new engineers.
 This project should not be considered a web framework. It is a starter toolkit that provides a set of working examples 
 to handle some of the common challenges for developing SaaS using Golang. Coding is a discovery process and with that, 
 it leaves you in control of your project’s architecture and development. 
+
+SaaS product offerings typically provide two main components: an API and a web application. Both facilitate delivering a 
+valuable software based product to clients ideally from a single code base on a recurring basis delivered over the 
+internet. 
+
+To see screen captures of the web app and auto-generated API documentation, check out this Google Slides deck:
+https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
+
+*You are welcome to add comments to the Google Slides.*
+
+[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
+
 
 There are five areas of expertise that an engineer or her engineering team must do for a project to grow and scale. 
 Based on our experience, a few core decisions were made for each of these areas that help you focus initially on writing 
@@ -30,9 +42,6 @@ reside and how the code will be delivered to clients.
 5. Observability - Implements Datadog to facilitate exposing metrics, logs and request tracing that ensure stable and 
 responsive service for clients.  
 
-SaaS product offerings typically provide two main components: an API and a web application. Both facilitate delivering a 
-valuable software based product to clients ideally from a single code base on a recurring basis delivered over the 
-internet. 
 
 The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
@@ -104,6 +113,13 @@ The project groups code in three distinct directories:
 
 All business logic should be contained as a package inside the internal directory. This enables both the web app and web 
 API to use the same API (Golang packages) with the only main difference between them is their response, HTML or JSON.
+
+The web API and web app have similar functionality. While the web app is meant for humans to experience and requires
+a friendly UI, the web API is meant for customers or third-party partners of your SaaS to programmatically integrate. To 
+help show the similarities and differences between the pages in the web app and similar endpoints in the web API, we 
+have created this diagram below. Since it is very detailed, you can click on the image to see the larger version. 
+
+[![Diagram of pages in web app and endpoints in web API](resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)
 
 
 

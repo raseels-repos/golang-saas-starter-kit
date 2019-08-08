@@ -114,7 +114,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	data["form"] = req
 
-	if verr, ok := weberror.NewValidationError(ctx, signup.Validator().Struct(signup.SignupRequest{})); ok {
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(signup.SignupRequest{})); ok {
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 

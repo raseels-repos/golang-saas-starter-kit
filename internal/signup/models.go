@@ -14,7 +14,7 @@ type SignupRequest struct {
 
 // SignupAccount defined the details needed for account.
 type SignupAccount struct {
-	Name     string  `json:"name" validate:"required,unique-name" example:"Company {RANDOM_UUID}"`
+	Name     string  `json:"name" validate:"required,unique" example:"Company {RANDOM_UUID}"`
 	Address1 string  `json:"address1" validate:"required" example:"221 Tatitlek Ave"`
 	Address2 string  `json:"address2" validate:"omitempty" example:"Box #1832"`
 	City     string  `json:"city" validate:"required" example:"Valdez"`
@@ -28,7 +28,7 @@ type SignupAccount struct {
 type SignupUser struct {
 	FirstName       string `json:"first_name" validate:"required" example:"Gabi"`
 	LastName        string `json:"last_name" validate:"required" example:"May"`
-	Email           string `json:"email" validate:"required,email,unique-email" example:"{RANDOM_EMAIL}"`
+	Email           string `json:"email" validate:"required,email,unique" example:"{RANDOM_EMAIL}"`
 	Password        string `json:"password" validate:"required" example:"SecretString"`
 	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password" example:"SecretString"`
 }

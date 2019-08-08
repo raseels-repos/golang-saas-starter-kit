@@ -113,8 +113,8 @@ func TestSignupFull(t *testing.T) {
 			Zipcode:  "99686",
 		},
 		User: SignupUser{
-			FirstName:            "Lee",
-			LastName:            "Brown",
+			FirstName:       "Lee",
+			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
@@ -163,7 +163,7 @@ func TestSignupFull(t *testing.T) {
 
 		// Verify that the user can be authenticated with the updated password.
 		_, err = user_auth.Authenticate(ctx, test.MasterDB, tknGen, user_auth.AuthenticateRequest{
-			Email:res.User.Email,
+			Email:    res.User.Email,
 			Password: req.User.Password,
 		}, time.Hour, now)
 		if err != nil {

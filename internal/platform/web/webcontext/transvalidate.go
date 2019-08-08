@@ -91,23 +91,6 @@ func init() {
 	zh_translations.RegisterDefaultTranslations(validate, transZh)
 
 	/*
-		validate.RegisterTranslation("required", transEn, func(ut ut.Translator) error {
-			return ut.Add("required", "{0} must have a value!", true) // see universal-translator for details
-		}, func(ut ut.Translator, fe validator.FieldError) string {
-			t, _ := ut.T("required", fe.Field())
-
-			return t
-		})
-
-		validate.RegisterTranslation("required", transFr, func(ut ut.Translator) error {
-			return ut.Add("required", "{0} must have a value!", true) // see universal-translator for details
-		}, func(ut ut.Translator, fe validator.FieldError) string {
-			t, _ := ut.T("required", fe.Field())
-
-			return t
-		})
-
-
 		validate.RegisterTranslation("unique", transEn, func(ut ut.Translator) error {
 			return ut.Add("unique", "{0} must be unique", true) // see universal-translator for details
 		}, func(ut ut.Translator, fe validator.FieldError) string {
@@ -122,13 +105,19 @@ func init() {
 			t, _ := ut.T("unique", fe.Field())
 
 			return t
-		})*/
-
+		})
+	*/
 }
 
+// ctxKeyTagUnique represents the type of unique value for the context key used by the validation function.
 type ctxKeyTagUnique int
 
+// KeyTagUnique defines the value used in the context key for storing the uniqueness of a field.
 const KeyTagUnique ctxKeyTagUnique = 1
+
+// KeyTagFieldValue defined the struct+field name used as the context key for storing whether the field is unique
+// or not that is used by the custom validation function registered in newValidator.
+type KeyTagFieldValue string
 
 // newValidator inits a new validator with custom settings.
 func newValidator() *validator.Validate {
@@ -145,20 +134,24 @@ func newValidator() *validator.Validate {
 		return "{{" + name + "}}"
 	})
 
-	// Empty method that can be overwritten in business logic packages to prevent web.Decode from failing.
-	f := func(fl validator.FieldLevel) bool {
-		return false
-	}
-	v.RegisterValidation("unique", f)
-
+	// Custom Validation function for the unique tag that checks the context to determine if a field is
+	// unique or not. First it will check a field specific context key and if that doesn't work, it will
+	// check a shared context key.
 	fctx := func(ctx context.Context, fl validator.FieldLevel) bool {
 		if fl.Field().String() == "invalid" {
 			return false
 		}
 
-		cv := ctx.Value(KeyTagUnique)
+		// First check to see if a value is set for the specific field.
+		fk := KeyTagFieldValue(fl.Parent().Type().String() + "." + fl.StructFieldName())
+		cv := ctx.Value(fk)
+
+		// Second check if the default unique key is set in context.
 		if cv == nil {
-			return false
+			cv := ctx.Value(KeyTagUnique)
+			if cv == nil {
+				return false
+			}
 		}
 
 		if v, ok := cv.(bool); ok {
@@ -170,6 +163,14 @@ func newValidator() *validator.Validate {
 	v.RegisterValidationCtx("unique", fctx)
 
 	return v
+}
+
+// ContextAddUniqueValue allows multiple fields to be validated using the same unique validation function by added
+// the unique value to the context using the struct name and field name.
+func ContextAddUniqueValue(ctx context.Context, req interface{}, fieldName string, unique bool) context.Context {
+	fk := KeyTagFieldValue(reflect.TypeOf(req).String() + "." + fieldName)
+
+	return context.WithValue(ctx, fk, unique)
 }
 
 // Validator returns the current init validator.

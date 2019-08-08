@@ -9,9 +9,9 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/camelcase v1.0.0
 	github.com/fatih/structtag v1.0.0
-	github.com/geeks-accelerator/files v0.0.0-20190704085106-630677cd5c14 // indirect
+	github.com/geeks-accelerator/files v0.0.0-20190704085106-630677cd5c14
 	github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190527223850-4a863a2d30db
-	github.com/geeks-accelerator/swag v1.6.3 // indirect
+	github.com/geeks-accelerator/swag v1.6.3
 	github.com/go-openapi/spec v0.19.2 // indirect
 	github.com/go-openapi/swag v0.19.4 // indirect
 	github.com/go-playground/locales v0.12.1

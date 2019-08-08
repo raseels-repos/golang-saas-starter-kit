@@ -41,7 +41,7 @@ func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 	// Claims are optional as authentication is not required ATM for this method.
 	claims, _ := auth.ClaimsFromContext(ctx)
-	
+
 	var req signup.SignupRequest
 	if err := web.Decode(ctx, r, &req); err != nil {
 		if _, ok := errors.Cause(err).(*weberror.Error); !ok {

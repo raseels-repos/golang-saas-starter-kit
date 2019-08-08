@@ -13,6 +13,15 @@ type AuthenticateRequest struct {
 	AccountID string `json:"account_id" validate:"omitempty,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
 }
 
+// OAuth2PasswordRequest defines what information is required to authenticate a user.
+type OAuth2PasswordRequest struct {
+	Username  string   `json:"username" schema:"username" validate:"required,email" example:"gabi.may@geeksinthewoods.com"`
+	Password  string   `json:"password" schema:"password" validate:"required" example:"NeverTellSecret"`
+	AccountID string   `json:"account_id" schema:"account_id" validate:"omitempty,uuid" example:"c4653bf9-5978-48b7-89c5-95704aebb7e2"`
+	Scope     []string `json:"scope" schema:"scope" validate:"omitempty,dive,oneof=admin user" enums:"admin,user" swaggertype:"array,string" example:"admin"`
+	// GrantType string `json:"grant_type" validate:"omitempty" example:"password"`
+}
+
 // Token is the payload we deliver to users when they authenticate.
 type Token struct {
 	// AccessToken is the token that authorizes and authenticates

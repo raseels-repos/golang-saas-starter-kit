@@ -148,7 +148,7 @@ func newValidator() *validator.Validate {
 
 		// Second check if the default unique key is set in context.
 		if cv == nil {
-			cv := ctx.Value(KeyTagUnique)
+			cv = ctx.Value(KeyTagUnique)
 			if cv == nil {
 				return false
 			}

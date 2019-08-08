@@ -13,6 +13,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -467,10 +468,15 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 // @Summary Token handles a request to authenticate a user.
 // @Description Token generates an oauth2 accessToken using Basic Auth with a user's email and password.
 // @Tags user
-// @Accept  json
+// @Accept  x-www-form-urlencoded
 // @Produce  json
 // @Security BasicAuth
-// @Param scope query string false "Scope" Enums(user, admin)
+// @Param username formData string true "Email"
+// @Param password formData string true "Password"
+// @Param account_id formData string false "Account ID"
+// @Param scope formData {array} string true "Scope" Enums(user, admin)
+// @Param scope query {array}  string false "Scope" Enums(user, admin)
+// @Param account_id query string false "Account ID"
 // @Success 200
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 401 {object} weberror.ErrorResponse
@@ -482,22 +488,56 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		return err
 	}
 
+	var authReq user_auth.AuthenticateRequest
+	var scopes []string
+
 	email, pass, ok := r.BasicAuth()
-	if !ok {
-		err := errors.New("must provide email and password in Basic auth")
-		return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
+	if !ok || email == "" {
+		if r.Method == http.MethodPost {
+			err := r.ParseForm()
+			if err != nil {
+				return err
+			}
+
+			decoder := schema.NewDecoder()
+			decoder.IgnoreUnknownKeys(true)
+
+			var req user_auth.OAuth2PasswordRequest
+			if err := decoder.Decode(&req, r.PostForm); err != nil {
+				if _, ok := errors.Cause(err).(*weberror.Error); !ok {
+					err = weberror.NewError(ctx, err, http.StatusBadRequest)
+				}
+				return web.RespondJsonError(ctx, w, err)
+			}
+
+			// Validate the request.
+			err = webcontext.Validator().StructCtx(ctx, req)
+			if err != nil {
+				return err
+			}
+
+			authReq.Email = req.Username
+			authReq.Password = req.Password
+			scopes = req.Scope
+		} else {
+			err := errors.New("must provide email and password in Basic auth")
+			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusUnauthorized))
+		}
+	} else {
+		authReq.Email = email
+		authReq.Password = pass
 	}
 
-	accountID := r.URL.Query().Get("account_id")
+	if qv := r.URL.Query().Get("account_id"); qv != "" {
+		authReq.AccountID = qv
+	}
 
 	// Optional to include scope.
-	scope := r.URL.Query().Get("scope")
+	if qv := r.URL.Query().Get("scope"); qv != "" {
+		scopes = strings.Split(qv, ",")
+	}
 
-	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, user_auth.AuthenticateRequest{
-		Email:     email,
-		Password:  pass,
-		AccountID: accountID,
-	}, sessionTtl, v.Now, scope)
+	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, authReq, sessionTtl, v.Now, scopes...)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

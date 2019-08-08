@@ -51,7 +51,7 @@ WORKDIR ./cmd/${service}
 
 # Update the API documentation.
 # Disabled for the moment as it takes forever to run, rely on manual execution.
-RUN if [ "$swagInit" != "" ] swag init ; fi
+RUN if [ "$swagInit" != "" ]; then swag init ; fi
 
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /gosrv .

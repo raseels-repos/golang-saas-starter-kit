@@ -861,11 +861,30 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
 
+
+		r, err := regexp.Compile(`^(\d+)`)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		// Workaround for domains that start with a numeric value like 8north.com
+		// Validation fails with error: failed on the 'fqdn' tag
+		origServiceHostPrimary := req.ServiceHostPrimary
+		matches := r.FindAllString(req.ServiceHostPrimary, -1)
+		if len(matches) > 0 {
+			for _, m := range matches {
+				req.ServiceHostPrimary = strings.Replace(req.ServiceHostPrimary, m, "X", -1)
+			}
+		}
+
 		log.Println("\tValidate request.")
 		errs := validator.New().Struct(req)
 		if errs != nil {
 			return nil, errs
 		}
+
+		// Reset the primary domain after validation is completed.
+		req.ServiceHostPrimary = origServiceHostPrimary
 
 		log.Printf("\t%s\tNew request generated.", tests.Success)
 	}

@@ -6,7 +6,7 @@ twins@geeksaccelerator.com
 
 ## Description
 
-The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that help 
+The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
 preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
 and ready to onboard enterprise clients. It uses minimal dependencies, implements idiomatic code and follows Golang 

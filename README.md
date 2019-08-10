@@ -40,11 +40,11 @@ potentially different teams responsible for the different repositories.
 Once the SaaS product has gained market traction and the core set of functionality has been identified to achieve 
 product-market fit, the functionality could be re-written with a language that would improve user experience or 
 further increase efficiency. Two good examples of this would be:
-1. Developing an iPhone or Android app. The front example end web application provided by this project is responsive 
+1. Developing an iPhone or Android app. The front end web application provided by this project is responsive 
 to support mobile devices. However, there may be a point that developing native would provide an enhanced experience. 
 2. The backend business logic has a set of methods that handle small data transformations on a massive scale. If the code 
 for this is relatively small and can easily be rewritten, it might make sense to rewrite this directly in C or Rust. 
-However, this is a very rare as GoLang is already a preformat language. 
+This is a very rare case as GoLang is already a preformat language. 
 
 There are five areas of expertise that an engineer or engineering team must do for a project to grow and scale. 
 Based on our experience, a few core decisions were made for each of these areas that help you focus initially on 

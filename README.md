@@ -4,8 +4,6 @@ Copyright 2019, Geeks Accelerator
 twins@geeksaccelerator.com
 
 
-## Description
-
 The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
 preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
@@ -18,9 +16,8 @@ This project should not be considered a web framework. It is a starter toolkit t
 to handle some of the common challenges for developing SaaS using Golang. Coding is a discovery process and with that, 
 it leaves you in control of your project’s architecture and development. 
 
-SaaS product offerings typically provide two main components: a REST API and a web application. Both facilitate delivering a 
-valuable software, based product to clients ideally from a single code base on a recurring basis delivered over the 
-internet. 
+SaaS product offerings generally provide a web-based service using a subscription model. They typically provide at 
+least two main components: a REST API and a web application. 
 
 To see screen captures of the web app and auto-generated API documentation, check out this Google Slides deck:
 https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
@@ -30,18 +27,46 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 [![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
 
 
-There are five areas of expertise that an engineer or engineering team must do for a project to grow and scale. 
-Based on our experience, a few core decisions were made for each of these areas that help you focus initially on working 
-the business logic.
-1. Micro level - Since SaaS requires transactions, project implements Postgres. Implementation facilitates the data 
-semantics that define the data being captured and their relationships. 
-2. Macro level - The project architecture and design, provides basic project structure and foundation for development.
-3. Business logic - Defines an example Golang package that helps illustrate where value generating activities should 
-reside and how the code will be delivered to clients.
-4. Deployment and Operations - Integrates with GitLab for CI/CD and AWS for serverless deployments with AWS Fargate.  
-5. Observability - Implements Datadog to facilitate exposing metrics, logs and request tracing that ensure stable and 
-responsive service for clients.  
+## Motivation
 
+When getting started building SaaS, we believe that is important for both the frontend web experience and the backend 
+business logic (business value) be developed in the same codebase - using the same language for the frontend and backend
+development in the same single repository. We believe this for two main reasons:
+1. Lower barrier for and accelerate onboarding of new engineers developing the SaaS by making it easy for them
+to load a complete mental model of the codebase.
+2. Minimize potential bottlenecks and eliminate complexities of coordinating development across repositories, with 
+potentially different teams responsible for the different repositories. 
+
+Once the SaaS product has gained market traction and the core set of functionality has been identified to achieve 
+product-market fit, the functionality could be re-written with a language that would improve user experience or 
+further increase efficiency. Two good examples of this would be:
+1. Developing an iPhone or Android app. The front example end web application provided by this project is responsive 
+to support mobile devices. However, there may be a point that developing native would provide an enhanced experience. 
+2. The backend business logic has a set of methods that handle small data transformations on a massive scale. If the code 
+for this is relatively small and can easily be rewritten, it might make sense to rewrite this directly in C or Rust. 
+However, this is a very rare as GoLang is already a preformat language. 
+
+There are five areas of expertise that an engineer or engineering team must do for a project to grow and scale. 
+Based on our experience, a few core decisions were made for each of these areas that help you focus initially on 
+building the business logic.
+1. Micro level - The semantics that cover how data is defined, the relationships and how the data is being captured. This 
+project tries to minimize the connection between packages on the same horizontally later. Data models should not be part 
+of feature functionality. Hopefully these micro level decisions help prevent cases where 30K lines of code rely on a 
+single data model which makes simple one line changes potentially high risk. 
+2. Macro level - The architecture and its design provides basic project structure and the foundation for development. 
+This project provides a good set of examples that demonstrate where different types of code can reside. 
+3. Business logic - The code for the business logic facilitates value generating activities for the business. This 
+project provides an example Golang package that helps illustrate the implementation of business logic and how it can be 
+delivered to clients.
+4. Deployment and Operations - Get the code to production! This sometimes can be a challenging task as it requires 
+a knowledge of a completely different expertise - DevOps. This project provides a complete continuous build pipeline that 
+will push the code to production with minimal effort using serverless deployments to AWS Fargate with GitLab CI/CD.  
+5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
+facilitate exposing metrics, logs and request tracing to obversabe and validate your services are stable and responsive 
+ for your clients (hopefully paying clients). 
+
+
+## Description
 
 The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
@@ -418,7 +443,11 @@ shared=# \dt
 
 ## Deployment 
 
-This project includes a complete build pipeline that relies on AWS and GitLab. The `.gitlab-ci.yaml` file includes the following build 
+This project includes a complete build pipeline that relies on AWS and GitLab. The presentation "[SaaS Starter Kit - Setup GitLab CI / CD](https://docs.google.com/presentation/d/1sRFQwipziZlxBtN7xuF-ol8vtUqD55l_4GE-4_ns-qM/edit#slide=id.p)" 
+has been made available on Google Docs that provides a step by step guide to setting up a build pipeline using your own 
+AWS and GitLab accounts.  
+
+The `.gitlab-ci.yaml` file includes the following build 
 stages: 
 ```yaml
 stages:
@@ -442,7 +471,9 @@ additional configuration. You can customizing any of the configuration in the co
 the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
 project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 
-Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/devops/README.md) for setup details. 
+Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/devops/README.md) for 
+setup details. 
+
 
 ## Development Notes
 

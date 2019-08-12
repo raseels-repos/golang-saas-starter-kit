@@ -66,7 +66,7 @@ type ServiceDeployFlags struct {
 	DockerFile      string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
 	EnableLambdaVPC bool   `validate:"omitempty" example:"false"`
 	EnableEcsElb    bool   `validate:"omitempty" example:"false"`
-	IsLambda            bool   `validate:"omitempty" example:"false"`
+	IsLambda        bool   `validate:"omitempty" example:"false"`
 
 	StaticFilesS3Enable        bool `validate:"omitempty" example:"false"`
 	StaticFilesImgResizeEnable bool `validate:"omitempty" example:"false"`
@@ -137,7 +137,7 @@ type serviceDeployRequest struct {
 	VpcPublicSubnets []*ec2.CreateSubnetInput
 
 	EnableLambdaVPC bool `validate:"omitempty"`
-	IsLambda            bool   `validate:"omitempty"`
+	IsLambda        bool `validate:"omitempty"`
 	RecreateService bool `validate:"omitempty"`
 
 	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
@@ -194,7 +194,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			S3BucketPrivateName: flags.S3BucketPrivateName,
 			S3BucketPublicName:  flags.S3BucketPublicName,
 
-			IsLambda: flags.IsLambda,
+			IsLambda:        flags.IsLambda,
 			EnableLambdaVPC: flags.EnableLambdaVPC,
 			EnableEcsElb:    flags.EnableEcsElb,
 			RecreateService: flags.RecreateService,
@@ -441,7 +441,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			if req.IsLambda {
 
-			}	else {
+			} else {
 
 			}
 
@@ -860,7 +860,6 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
-
 
 		r, err := regexp.Compile(`^(\d+)`)
 		if err != nil {

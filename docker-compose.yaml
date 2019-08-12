@@ -2,7 +2,7 @@
 # docker-compose up
 # docker-compose stop
 # docker-compose down
-version: '3'
+version: '3.7'
 
 networks:
   main:
@@ -63,9 +63,12 @@ services:
     image: example-project/web-app:latest
     build:
       context: .
+      target: dev
       dockerfile: cmd/web-app/Dockerfile
       args:
         service: 'web-app'
+    volumes:
+      - ./:/go/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
     ports:
       - 3000:3000 # WEB APP
       - 4000:4000 # DEBUG API
@@ -99,9 +102,12 @@ services:
     image: example-project/web-api:latest
     build:
       context: .
+      target: dev
       dockerfile: cmd/web-api/Dockerfile
       args:
         service: 'web-api'
+    volumes:
+      - ./:/go/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
     ports:
       - 3001:3001 # WEB API
       - 4001:4001 # DEBUG API

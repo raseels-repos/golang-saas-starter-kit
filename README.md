@@ -477,6 +477,13 @@ setup details.
 
 ## Development Notes
 
+### Country / Region / Postal Code Support 
+
+This project uses [geonames.org](https://www.geonames.org/) to populate database tables for countries, postal codes and 
+timezones that help facilitate standardizing user input. To keep the schema script quick for `dev`, the postal codes for 
+only country code `US` are loaded. This can be changed as needed in 
+[geonames.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/geonames/geonames.go#L30).
+
 ### Datadog
 
 Datadog has a custom init script to support setting multiple expvar urls for monitoring. The docker-compose file then 

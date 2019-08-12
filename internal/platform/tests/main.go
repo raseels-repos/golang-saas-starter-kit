@@ -93,8 +93,16 @@ func New() *Test {
 			log.Fatalf("startup : Register DB : %v", err)
 		}
 
+		// Set the context with the required values to
+		// process the request.
+		v := webcontext.Values{
+			Now: time.Now(),
+			Env: webcontext.Env_Dev,
+		}
+		ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+
 		// Execute the migrations
-		if err = schema.Migrate(masterDB, log, true); err != nil {
+		if err = schema.Migrate(ctx, masterDB, log, true); err != nil {
 			log.Fatalf("main : Migrate : %v", err)
 		}
 		log.Printf("main : Migrate : Completed")

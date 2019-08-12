@@ -524,6 +524,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 							"ecs:UpdateService",
 							"ses:SendEmail",
 							"ses:ListIdentities",
+							"ses:GetAccountSendingEnabled",
 							"secretsmanager:ListSecretVersionIds",
 							"secretsmanager:GetSecretValue",
 							"secretsmanager:CreateSecret",

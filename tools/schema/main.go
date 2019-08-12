@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"expvar"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net/url"
 	"os"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
@@ -125,8 +128,16 @@ func main() {
 	// =========================================================================
 	// Start Migrations
 
+	// Set the context with the required values to
+	// process the request.
+	v := webcontext.Values{
+		Now: time.Now(),
+		Env: cfg.Env,
+	}
+	ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+
 	// Execute the migrations
-	if err = schema.Migrate(masterDb, log, false); err != nil {
+	if err = schema.Migrate(ctx, masterDb, log, false); err != nil {
 		log.Fatalf("main : Migrate : %v", err)
 	}
 	log.Printf("main : Migrate : Completed")

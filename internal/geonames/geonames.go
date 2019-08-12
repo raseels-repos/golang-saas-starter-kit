@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -24,9 +25,12 @@ const (
 	geonamesTableName = "geonames"
 )
 
-var (
-	// List of country codes that will geonames will be downloaded for.
-	ValidGeonameCountries = []string{
+// List of country codes that will geonames will be downloaded for.
+func ValidGeonameCountries(ctx context.Context) []string {
+	if webcontext.ContextEnv(ctx) == webcontext.Env_Dev {
+		return []string{"US"}
+	}
+	return []string{
 		"AD", "AR", "AS", "AT", "AU", "AX", "BD", "BE", "BG", "BM",
 		"BR", "BY", "CA", "CH", "CO", "CR", "CZ", "DE", "DK", "DO",
 		"DZ", "ES", "FI", "FO", "FR", "GB", "GF", "GG", "GL", "GP",
@@ -36,7 +40,7 @@ var (
 		"PK", "PL", "PM", "PR", "PT", "RE", "RO", "RU", "SE", "SI",
 		"SJ", "SK", "SM", "TH", "TR", "UA", "US", "UY", "VA", "VI",
 		"WF", "YT", "ZA"}
-)
+}
 
 // FindGeonames ....
 func FindGeonames(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*Geoname, error) {
@@ -194,7 +198,7 @@ func LoadGeonames(ctx context.Context, rr chan<- interface{}, countries ...strin
 	defer close(rr)
 
 	if len(countries) == 0 {
-		countries = ValidGeonameCountries
+		countries = ValidGeonameCountries(ctx)
 	}
 
 	for _, country := range countries {

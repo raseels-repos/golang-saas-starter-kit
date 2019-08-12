@@ -66,7 +66,7 @@ type ServiceDeployFlags struct {
 	DockerFile      string `validate:"omitempty" example:"./cmd/web-api/Dockerfile"`
 	EnableLambdaVPC bool   `validate:"omitempty" example:"false"`
 	EnableEcsElb    bool   `validate:"omitempty" example:"false"`
-	IsLambda            bool   `validate:"omitempty" example:"false"`
+	IsLambda        bool   `validate:"omitempty" example:"false"`
 
 	StaticFilesS3Enable        bool `validate:"omitempty" example:"false"`
 	StaticFilesImgResizeEnable bool `validate:"omitempty" example:"false"`
@@ -130,6 +130,8 @@ type deployEcsServiceRequest struct {
 	VpcPublic        *ec2.CreateVpcInput
 	VpcPublicSubnets []*ec2.CreateSubnetInput
 
+	EnableLambdaVPC bool `validate:"omitempty"`
+	IsLambda        bool `validate:"omitempty"`
 	RecreateService bool `validate:"omitempty"`
 
 	SDNamepsace *servicediscovery.CreatePrivateDnsNamespaceInput
@@ -189,7 +191,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			S3BucketPrivateName: flags.S3BucketPrivateName,
 			S3BucketPublicName:  flags.S3BucketPublicName,
 
-			IsLambda: flags.IsLambda,
+			IsLambda:        flags.IsLambda,
 			EnableLambdaVPC: flags.EnableLambdaVPC,
 			EnableEcsElb:    flags.EnableEcsElb,
 			RecreateService: flags.RecreateService,
@@ -436,7 +438,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 
 			if req.IsLambda {
 
-			}	else {
+			} else {
 
 			}
 
@@ -856,11 +858,29 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			log.Printf("\t%s\tDefaults set.", tests.Success)
 		}
 
+		r, err := regexp.Compile(`^(\d+)`)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		// Workaround for domains that start with a numeric value like 8north.com
+		// Validation fails with error: failed on the 'fqdn' tag
+		origServiceHostPrimary := req.ServiceHostPrimary
+		matches := r.FindAllString(req.ServiceHostPrimary, -1)
+		if len(matches) > 0 {
+			for _, m := range matches {
+				req.ServiceHostPrimary = strings.Replace(req.ServiceHostPrimary, m, "X", -1)
+			}
+		}
+
 		log.Println("\tValidate request.")
 		errs := validator.New().Struct(req)
 		if errs != nil {
 			return nil, errs
 		}
+
+		// Reset the primary domain after validation is completed.
+		req.ServiceHostPrimary = origServiceHostPrimary
 
 		log.Printf("\t%s\tNew request generated.", tests.Success)
 	}

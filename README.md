@@ -4,9 +4,7 @@ Copyright 2019, Geeks Accelerator
 twins@geeksaccelerator.com
 
 
-## Description
-
-The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications while 
+The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
 preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
 and ready to onboard enterprise clients. It uses minimal dependencies, implements idiomatic code and follows Golang 
@@ -18,9 +16,8 @@ This project should not be considered a web framework. It is a starter toolkit t
 to handle some of the common challenges for developing SaaS using Golang. Coding is a discovery process and with that, 
 it leaves you in control of your project’s architecture and development. 
 
-SaaS product offerings typically provide two main components: an API and a web application. Both facilitate delivering a 
-valuable software based product to clients ideally from a single code base on a recurring basis delivered over the 
-internet. 
+SaaS product offerings generally provide a web-based service using a subscription model. They typically provide at 
+least two main components: a REST API and a web application. 
 
 To see screen captures of the web app and auto-generated API documentation, check out this Google Slides deck:
 https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
@@ -30,27 +27,55 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 [![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
 
 
-There are five areas of expertise that an engineer or her engineering team must do for a project to grow and scale. 
-Based on our experience, a few core decisions were made for each of these areas that help you focus initially on writing 
-the business logic.
-1. Micro level - Since SaaS requires transactions, project implements Postgres. Implementation facilitates the data 
-semantics that define the data being captured and their relationships. 
-2. Macro level - The project architecture and design, provides basic project structure and foundation for development.
-3. Business logic - Defines an example Golang package that helps illustrate where value generating activities should 
-reside and how the code will be delivered to clients.
-4. Deployment and Operations - Integrates with GitLab for CI/CD and AWS for serverless deployments with AWS Fargate.  
-5. Observability - Implements Datadog to facilitate exposing metrics, logs and request tracing that ensure stable and 
-responsive service for clients.  
+## Motivation
 
+When getting started building SaaS, we believe that is important for both the frontend web experience and the backend 
+business logic (business value) be developed in the same codebase - using the same language for the frontend and backend
+development in the same single repository. We believe this for two main reasons:
+1. Lower barrier for and accelerate onboarding of new engineers developing the SaaS by making it easy for them
+to load a complete mental model of the codebase.
+2. Minimize potential bottlenecks and eliminate complexities of coordinating development across repositories, with 
+potentially different teams responsible for the different repositories. 
+
+Once the SaaS product has gained market traction and the core set of functionality has been identified to achieve 
+product-market fit, the functionality could be re-written with a language that would improve user experience or 
+further increase efficiency. Two good examples of this would be:
+1. Developing an iPhone or Android app. The front end web application provided by this project is responsive 
+to support mobile devices. However, there may be a point that developing native would provide an enhanced experience. 
+2. The backend business logic has a set of methods that handle small data transformations on a massive scale. If the code 
+for this is relatively small and can easily be rewritten, it might make sense to rewrite this directly in C or Rust. 
+This is a very rare case as GoLang is already a preformat language. 
+
+There are five areas of expertise that an engineer or engineering team must do for a project to grow and scale. 
+Based on our experience, a few core decisions were made for each of these areas that help you focus initially on 
+building the business logic.
+1. Micro level - The semantics that cover how data is defined, the relationships and how the data is being captured. This 
+project tries to minimize the connection between packages on the same horizontally later. Data models should not be part 
+of feature functionality. Hopefully these micro level decisions help prevent cases where 30K lines of code rely on a 
+single data model which makes simple one line changes potentially high risk. 
+2. Macro level - The architecture and its design provides basic project structure and the foundation for development. 
+This project provides a good set of examples that demonstrate where different types of code can reside. 
+3. Business logic - The code for the business logic facilitates value generating activities for the business. This 
+project provides an example Golang package that helps illustrate the implementation of business logic and how it can be 
+delivered to clients.
+4. Deployment and Operations - Get the code to production! This sometimes can be a challenging task as it requires 
+a knowledge of a completely different expertise - DevOps. This project provides a complete continuous build pipeline that 
+will push the code to production with minimal effort using serverless deployments to AWS Fargate with GitLab CI/CD.  
+5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
+facilitate exposing metrics, logs and request tracing to obversabe and validate your services are stable and responsive 
+ for your clients (hopefully paying clients). 
+
+
+## Description
 
 The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
-direct client interaction via their web connected devices. 
+direct client interaction via their web browsers. 
 * Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-pary companies to develop deep 
 integrations with the project.
 
-And these tools:
-* Schema - Initializing of Postgres database and handles schema migration. 
+The example project also provides these tools:
+* Schema - Creating, initializing tables of Postgres database and handles schema migration. 
 * Dev Ops - Deploying project to AWS with GitLab CI/CD.
 
 It contains the following features:
@@ -58,17 +83,17 @@ It contains the following features:
 * Auto-documented REST API.
 * Middleware integration.
 * Database support using Postgres.
-* Key value store using Redis
+* Cache and key value store using Redis
 * CRUD based pattern.
 * Role-based access control (RBAC).
 * Account signup and user management.  
 * Distributed logging and tracing.
 * Integration with Datadog for enterprise-level observability. 
 * Testing patterns.
-* Use of Docker, Docker Compose, and Makefiles.
+* Build, deploy and run application using Docker, Docker Compose, and Makefiles.
 * Vendoring dependencies with Modules, requires Go 1.12 or higher.
 * Continuous deployment pipeline. 
-* Serverless deployments.
+* Serverless deployments with AWS ECS Fargate.
 * CLI with boilerplate templates to reduce repetitive copy/pasting.
 * Integration with GitLab for enterprise-level CI/CD.
 
@@ -81,9 +106,8 @@ Accordingly, the project architecture is illustrated with the following diagram.
 With SaaS, a client subscribes to an online service you provide them. The example project provides functionality for 
 clients to subscribe and then once subscribed they can interact with your software service. 
 
-The initial contributors to this project are building this saas-starter-kit based on their years of experience building 
-building enterprise B2B SaaS. Particularily, this saas-starter-kit is based on their most recent experience building the
-B2B SaaS for [standard operating procedure software](https://keeni.space) (100% Golang). Reference the Keeni.Space website,
+The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularily, this saas-starter-kit is based on their most recent experience building the
+B2B SaaS for [standard operating procedure software](https://keeni.space) (written entirely in Golang). Please refer to the Keeni.Space website,
 its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web app is then available at 
 [app.keeni.space](https://app.keeni.space). They plan on leveraging this experience and build it into a simplified set 
 example services for both a web API and a web app for SaaS businesses. 
@@ -147,8 +171,8 @@ need to be using Go >= 1.11.
 You should now be able to clone the project. 
 
 ```bash
-git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
-cd saas-starter-kit/
+$ git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
+$ cd saas-starter-kit/
 ```
 
 If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modulels disabled, see 
@@ -162,13 +186,13 @@ This project is using Go Module support for vendoring dependencies.
 We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. 
 
 ```bash
-GO111MODULE=on go mod tidy
+$ GO111MODULE=on go mod tidy
 ```
 
 It is recommended to use at least Go 1.12 and enable go modules.
 
 ```bash
-echo "export  GO111MODULE=on" >> ~/.bash_profile
+$ echo "export  GO111MODULE=on" >> ~/.bash_profile
 ```
 
 
@@ -184,8 +208,8 @@ https://docs.docker.com/install/
 There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a 
 `dockerfile`.
 
-When you run `docker-compose up` it will run all the services including the main.go file for each Go service. The 
-services the project will run are:
+Before using `docker-compose`, you need to copy `sample.env_docker_compose` to `.env_docker_compose` that docker will use. When you run `docker-compose up` it will run all the services including the main.go file for each Go service. The 
+following services will run:
 - web-api
 - web-app 
 - postgres
@@ -198,7 +222,8 @@ Use the `docker-compose.yaml` to run all of the services, including the 3rd part
 command, Docker will download the required images for the 3rd party services.
 
 ```bash
-$ docker-compose up --build
+$ cp sample.env_docker_compose .env_docker_compose
+$ docker-compose up
 ```
 
 Default configuration is set which should be valid for most systems. 
@@ -208,7 +233,7 @@ Use the `docker-compose.yaml` file to configure the services differently using e
 #### How we run the project
 
 We like to run the project where the services run in the background of our CLI. This can be done by using the -d with 
-the `docker-compose up` command: 
+the `docker-compose up --build` command: 
 ```bash
 $ docker-compose up --build -d
 ```
@@ -226,7 +251,7 @@ $ docker-compose logs -f
 
 ### Stopping the project
 
-You can hit <ctrl>C in the terminal window running `docker-compose up`. 
+You can hit `ctrl-C` in the terminal window that ran `docker-compose up`. 
 
 Once that shutdown sequence is complete, it is important to run the `docker-compose down` command.
 
@@ -251,7 +276,7 @@ services again with 'docker-compose up'.
 To restart a specific service, first use `docker ps` to see the list of services running.
 
 ```bash
-docker ps
+$ docker ps
 CONTAINER ID        IMAGE                            COMMAND                  NAMES
 35043164fd0d        example-project/web-api:latest   "/gosrv"                 saas-starter-kit_web-api_1
 d34c8fc27f3b        example-project/web-app:latest   "/gosrv"                 saas-starter-kit_web-app_1
@@ -259,23 +284,23 @@ fd844456243e        postgres:11-alpine               "docker-entrypoint.s…"   
 dda16bfbb8b5        redis:latest                     "redis-server --appe…"   saas-starter-kit_redis_1
 ```
 
-Then use `docker-compose down` for a specific service. In the command include the name of the container for the service 
-to shut down. In the example command, we will shut down down the web-api service so we can start it again.
+Then use `docker-compose stop` for a specific service. In the command including the name of service in `docker-compose.yaml` file for the service 
+to shut down. In the example command, we will shut down the web-api service so we can start it again.
 
 ```bash
-docker-compose down saas-starter-kit_web-api_1
+$ docker-compose stop web-app
 ```
 
-If you are not in the directory for the service you want to restart navigate to it. We will go to the directory for the 
+If you are not in the directory for the service you want to restart then navigate to it. We will go to the directory for the 
 web-api.
 
 ```bash
-cd cmd/web-api/
+$ cd cmd/web-api/
 ```
 
 Then you can start the service again by running main.go
 ```bash
-go run main.go
+$ go run main.go
 ```
 
 
@@ -283,7 +308,7 @@ go run main.go
 
 By default the project will compile and run without AWS configs or other third-party dependencies. 
 
-As you use start utilizing AWS services in this project and/or ready for deployment, you will need to start specifying 
+As you start utilizing AWS services in this project and/or ready for deployment, you will need to start specifying 
 AWS configs in a docker-compose file. You can also set credentials for other dependencies in the new docker-compose file 
 too.
 
@@ -291,7 +316,7 @@ The sample docker-compose file is not loaded since it is named sample, which all
 configs.
 
 To set AWS configs and credentials for other third-party dependencies, you need to create a copy of the sample 
-docker-compose file without "sample" prepending the file name. 
+environment docker-compose file without "sample" prepending the file name. 
 
 Navigate to the root of the project. Copy `sample.env_docker_compose` to `.env_docker_compose`. 
 
@@ -311,20 +336,20 @@ $ DD_API_KEY=
 ```
 
 In your new copy of the example docker-compose file ".env_docker_compose", set the AWS configs by updating the following 
-environmental variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION. Remember to remove the $ before the 
+environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION. Remember to remove the $ before the 
 variable name. 
 
 As noted in the Local Installation section, the project is integrated with Datadog for observability. You can specify 
-the API key for you Datadog account by setting the environmental variable: DD_API_KEY.
+the API key for your Datadog account by setting the environment variable: DD_API_KEY.
 
 
 ## Web API
 [cmd/web-api](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/web-api)
 
-REST API available to clients for supporting deeper integrations. This API is also a foundation for third-party 
+REST API is available to clients for supporting deeper integrations. This API is also a foundation for third-party 
 integrations. The API implements JWT authentication that renders results as JSON to clients. 
 
-Once the web-app service is running it will be available on port 3001. 
+Once the web-api service is running it will be available on port 3001. 
 http://127.0.0.1:3001/
 
 This web-api service is not directly used by the web-app service to prevent locking the functionally required for 
@@ -334,7 +359,7 @@ client expectations.
 
 The web-app will have its own internal API, similar to this external web-api service, but not exposed for third-party 
 integrations. It is believed that in the beginning, having to define an additional API for internal purposes is worth 
-the additional effort as the internal API can handle more flexible updates. 
+for the additional effort as the internal API can handle more flexible updates. 
 
 For more details on this service, read [web-api readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-api/README.md)
 
@@ -418,7 +443,11 @@ shared=# \dt
 
 ## Deployment 
 
-This project includes a complete build pipeline that relies on AWS and GitLab. The `.gitlab-ci.yaml` file includes the following build 
+This project includes a complete build pipeline that relies on AWS and GitLab. The presentation "[SaaS Starter Kit - Setup GitLab CI / CD](https://docs.google.com/presentation/d/1sRFQwipziZlxBtN7xuF-ol8vtUqD55l_4GE-4_ns-qM/edit#slide=id.p)" 
+has been made available on Google Docs that provides a step by step guide to setting up a build pipeline using your own 
+AWS and GitLab accounts.  
+
+The `.gitlab-ci.yaml` file includes the following build 
 stages: 
 ```yaml
 stages:
@@ -442,9 +471,18 @@ additional configuration. You can customizing any of the configuration in the co
 the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
 project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 
-Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/devops/README.md) for setup details. 
+Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/devops/README.md) for 
+setup details. 
+
 
 ## Development Notes
+
+### Country / Region / Postal Code Support 
+
+This project uses [geonames.org](https://www.geonames.org/) to populate database tables for countries, postal codes and 
+timezones that help facilitate standardizing user input. To keep the schema script quick for `dev`, the postal codes for 
+only country code `US` are loaded. This can be changed as needed in 
+[geonames.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/geonames/geonames.go#L30).
 
 ### Datadog
 

@@ -105,10 +105,10 @@ instance will be a dedicated host since we need it always up and running, thus i
     Advanced Details: none 
     ```
     
-4. Add Storage. Increase the volume size for the root device to 100 GiB.
+4. Add Storage. Increase the volume size for the root device to 30 GiB.
     ```    
     Volume Type |   Device      | Size (GiB) |  Volume Type 
-    Root        |   /dev/xvda   | 100        |  General Purpose SSD (gp2)
+    Root        |   /dev/xvda   | 30        |  General Purpose SSD (gp2)
     ```
 
 5. Add Tags.
@@ -127,7 +127,7 @@ instance will be a dedicated host since we need it always up and running, thus i
     
 7. Review and Launch instance. Select an existing key pair or create a new one. This will be used to SSH into the 
     instance for additional configuration. 
-    
+     
 8. Update the security group to reference itself. The instances need to be able to communicate between each other. 
 
     Navigate to edit the security group and add the following two rules where `SECURITY_GROUP_ID` is replaced with the 

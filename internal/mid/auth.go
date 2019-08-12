@@ -107,7 +107,11 @@ func authenticateSession(authenticator *auth.Authenticator, required bool) web.M
 
 				claims, err := authenticator.ParseClaims(tknStr)
 				if err != nil {
-					return weberror.NewError(ctx, err, http.StatusUnauthorized)
+					if required {
+						return weberror.NewError(ctx, err, http.StatusUnauthorized)
+					} else {
+						return nil
+					}
 				}
 
 				// Add claims to the context so they can be retrieved later.

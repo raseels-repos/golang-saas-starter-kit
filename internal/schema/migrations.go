@@ -18,7 +18,7 @@ import (
 
 // migrationList returns a list of migrations to be executed. If the id of the
 // migration already exists in the migrations table it will be skipped.
-func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate.Migration {
+func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate.Migration {
 	return []*sqlxmigrate.Migration{
 		// Create table users.
 		{
@@ -213,7 +213,7 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 		},
 		// Load new geonames table.
 		{
-			ID: "20190731-02b",
+			ID: "20190731-02h",
 			Migrate: func(tx *sql.Tx) error {
 
 				schemas := []string{
@@ -253,7 +253,7 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 
 				} else {
 					resChan := make(chan interface{})
-					go geonames.LoadGeonames(context.Background(), resChan)
+					go geonames.LoadGeonames(ctx, resChan)
 
 					for r := range resChan {
 						switch v := r.(type) {
@@ -288,7 +288,7 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 		},
 		// Load new countries table.
 		{
-			ID: "20190731-02d",
+			ID: "20190731-02f",
 			Migrate: func(tx *sql.Tx) error {
 
 				schemas := []string{
@@ -489,7 +489,7 @@ func migrationList(db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate
 		},
 		// Load new country_timezones table.
 		{
-			ID: "20190731-03d",
+			ID: "20190731-03e",
 			Migrate: func(tx *sql.Tx) error {
 
 				queries := []string{

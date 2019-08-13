@@ -818,7 +818,12 @@ func main() {
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
 		imgUrl := imgUrlFormatter(p)
 		if cfg.Service.StaticFiles.ImgResizeEnabled {
-			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
+			var rerr error
+			imgUrl, rerr = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
+			if rerr != nil {
+				imgUrl = "error"
+				log.Printf("main : S3ImgUrl : %s - %s\n", p, rerr)
+			}
 		}
 		return imgUrl
 	}
@@ -841,6 +846,10 @@ func main() {
 			if webErr, ok := er.(*weberror.Error); ok {
 				statusCode = webErr.Status
 			}
+		}
+
+		if web.RequestIsImage(r) {
+			return err
 		}
 
 		switch statusCode {

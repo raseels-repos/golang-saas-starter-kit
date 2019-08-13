@@ -279,6 +279,11 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 // statusCode: the error method calls this function so allow the HTTP Status Code to be set
 // data: map[string]interface{} to allow including additional request and globally defined values.
 func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, req *http.Request, templateLayoutName, templateContentName, contentType string, statusCode int, data map[string]interface{}) error {
+	// Not really anyway to render an image response using a template.
+	if web.RequestIsImage(req) {
+		return nil
+	}
+
 	// If the template has not been rendered yet or hot reload is enabled,
 	// then parse the template files.
 	t, ok := r.templates[templateContentName]

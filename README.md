@@ -305,6 +305,10 @@ flist=`grep -r "saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
 for f in $flist; do echo $f; sed -i "" -e "s#saas-starter-kit#aurora-cam#g" $f; done
 
 
+flist=`grep -r "example-project" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#example-project#aurora-cam#g" $f; done
+
+
 ```
 
 3. Create a new AWS Policy with the following details:

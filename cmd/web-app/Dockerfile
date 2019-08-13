@@ -32,6 +32,8 @@ COPY cmd/${service}/static /static
 ADD resources/templates/shared /templates/shared
 ADD fresh-auto-reload.conf /runner.conf
 
+ENV TEMPLATE_DIR=/templates
+
 WORKDIR ./cmd/${service}
 
 ENTRYPOINT ["fresh", "-c", "/runner.conf"]

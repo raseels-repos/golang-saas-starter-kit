@@ -105,7 +105,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	data["geonameCountries"] = geonames.ValidGeonameCountries
+	data["geonameCountries"] = geonames.ValidGeonameCountries(ctx)
 
 	data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
 	if err != nil {

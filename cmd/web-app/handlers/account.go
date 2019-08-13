@@ -249,7 +249,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return false, err
 		}
 
-		data["geonameCountries"] = geonames.ValidGeonameCountries
+		data["geonameCountries"] = geonames.ValidGeonameCountries(ctx)
 
 		data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
 		if err != nil {

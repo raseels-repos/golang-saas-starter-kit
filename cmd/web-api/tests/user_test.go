@@ -1378,7 +1378,7 @@ func TestUserToken(t *testing.T) {
 
 	// Test user token with empty credentials.
 	{
-		expectedStatus := http.StatusUnauthorized
+		expectedStatus := http.StatusBadRequest
 
 		rt := requestTest{
 			fmt.Sprintf("Token %d using empty request", expectedStatus),
@@ -1406,8 +1406,24 @@ func TestUserToken(t *testing.T) {
 
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
-			Error:      http.StatusText(expectedStatus),
-			Details:    "must provide email and password in Basic auth",
+			Error:       "Field validation error",
+			Fields: []weberror.FieldError{
+				{
+					Field:   "username",
+					Value:   "",
+					Tag:     "required",
+					Error:   "username is a required field",
+					Display: "username is a required field",
+				},
+				{
+					Field:   "password",
+					Value:   "",
+					Tag:     "required",
+					Error:   "password is a required field",
+					Display: "password is a required field",
+				},
+			},
+			Details:    actual.Details,
 			StackTrace: actual.StackTrace,
 		}
 

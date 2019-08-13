@@ -269,38 +269,25 @@ builds locally, update `docker-compose.yaml` to define a volume.
 
 ### Re-starting a specific Go service for development
 
-When writing code in an iterative fashion, it is nice to be able to restart a specific service so it will run updated 
-Go code. This decreases the overhead of stopping all services with `docker-compose down` and then re-starting all the 
-services again with 'docker-compose up'.
+When writing code in an iterative fashion, it is nice to have your change automatically rebuilt. This project uses 
+[github.com/gravityblast/fresh](https://github.com/gravityblast/fresh) to recompile your services that will include most
+changes. 
 
-To restart a specific service, first use `docker ps` to see the list of services running.
+    Fresh is a command line tool that builds and (re)starts your web application everytime you save a Go or template file. 
+     
+The (Fresh configuration file](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/fresh-auto-reload.conf) 
+is located in the project root. By default the following folders are watched by Fresh:
+- handlers
+- static
+- templates
 
-```bash
-$ docker ps
-CONTAINER ID        IMAGE                            COMMAND                  NAMES
-35043164fd0d        example-project/web-api:latest   "/gosrv"                 saas-starter-kit_web-api_1
-d34c8fc27f3b        example-project/web-app:latest   "/gosrv"                 saas-starter-kit_web-app_1
-fd844456243e        postgres:11-alpine               "docker-entrypoint.s…"   saas-starter-kit_postgres_1
-dda16bfbb8b5        redis:latest                     "redis-server --appe…"   saas-starter-kit_redis_1
-```
+Any changes to [internal/*](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal) or 
+additional project dependencies added to [go.mod](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/go.mod) 
+will require the service to be rebuilt. 
 
-Then use `docker-compose stop` for a specific service. In the command including the name of service in `docker-compose.yaml` file for the service 
-to shut down. In the example command, we will shut down the web-api service so we can start it again.
-
-```bash
-$ docker-compose stop web-app
-```
-
-If you are not in the directory for the service you want to restart then navigate to it. We will go to the directory for the 
-web-api.
 
 ```bash
-$ cd cmd/web-api/
-```
-
-Then you can start the service again by running main.go
-```bash
-$ go run main.go
+docker-compose up  --build -d web-app
 ```
 
 

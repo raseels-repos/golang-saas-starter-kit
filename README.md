@@ -304,6 +304,109 @@ $ go run main.go
 ```
 
 
+### Forking your own copy 
+
+1. Checkout the project
+
+2. Update references.
+```bash
+flist=`grep -r "geeks-accelerator/oss/saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#geeks-accelerator/oss/saas-starter-kit#geeks-accelerator/oss/aurora-cam#g" $f; done
+
+
+flist=`grep -r "saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#saas-starter-kit#aurora-cam#g" $f; done
+
+
+```
+
+3. Create a new AWS Policy with the following details:
+```
+Name:   SaasStarterKitDevServices 
+Description: Defines access for saas-starter-kit services. 
+Policy Document: {
+                     "Version": "2012-10-17",
+                     "Statement": [
+                         {
+                             "Sid": "DefaultServiceAccess",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "s3:HeadBucket",
+                                 "s3:ListObjects",
+                                 "s3:PutObject",
+                                 "s3:PutObjectAcl",
+                                 "cloudfront:ListDistributions",
+                                 "ec2:DescribeNetworkInterfaces",
+                                 "ec2:DeleteNetworkInterface",
+                                 "ecs:ListTasks",
+                                 "ecs:DescribeServices",
+                                 "ecs:DescribeTasks",
+                                 "ec2:DescribeNetworkInterfaces",
+                                 "route53:ListHostedZones",
+                                 "route53:ListResourceRecordSets",
+                                 "route53:ChangeResourceRecordSets",
+                                 "ecs:UpdateService",
+                                 "ses:SendEmail",
+                                 "ses:ListIdentities",
+                                 "ses:GetAccountSendingEnabled",
+                                 "secretsmanager:ListSecretVersionIds",
+                                 "secretsmanager:GetSecretValue",
+                                 "secretsmanager:CreateSecret",
+                                 "secretsmanager:UpdateSecret",
+                                 "secretsmanager:RestoreSecret",
+                                 "secretsmanager:DeleteSecret"
+                             ],
+                             "Resource": "*"
+                         },
+                         {
+                             "Sid": "ServiceInvokeLambda",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "iam:GetRole",
+                                 "lambda:InvokeFunction",
+                                 "lambda:ListVersionsByFunction",
+                                 "lambda:GetFunction",
+                                 "lambda:InvokeAsync",
+                                 "lambda:GetFunctionConfiguration",
+                                 "iam:PassRole",
+                                 "lambda:GetAlias",
+                                 "lambda:GetPolicy"
+                             ],
+                             "Resource": [
+                                 "arn:aws:iam:::role/*",
+                                 "arn:aws:lambda:::function:*"
+                             ]
+                         },
+                         {
+                             "Sid": "datadoglambda",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "cloudwatch:Get*",
+                                 "cloudwatch:List*",
+                                 "ec2:Describe*",
+                                 "support:*",
+                                 "tag:GetResources",
+                                 "tag:GetTagKeys",
+                                 "tag:GetTagValues"
+                             ],
+                             "Resource": "*"
+                         }
+                     ]
+                 }
+```
+
+Create a new user with programic access and directly attach it the policy `SaasStarterKitDevServices`
+
+4. Create a new docker-compose config file
+```bash
+ cp sample.env_docker_compose .env_docker_compose 
+```
+
+5. Update .env_docker_compose with the Access key ID and Secret access key  
+
+6. Update `.gitlab-ci.yml` with relevent details. 
+
+
 ### Optional. Set AWS and Datadog Configs
 
 By default the project will compile and run without AWS configs or other third-party dependencies. 

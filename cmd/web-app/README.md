@@ -24,7 +24,7 @@ http://127.0.0.1:3000/
 
 While the web-api service has 
 significant functionality, this web-app service is still in development. Currently this web-app services only resizes 
-an image and displays resvised versions of it on the index page. See section below on Future Functionality. 
+an image and displays resized versions of it on the index page. See section below on Future Functionality. 
 
 If you would like to help, please email twins@geeksinthewoods.com.
 

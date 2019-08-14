@@ -254,7 +254,7 @@ swag init
 
 ### Additional Swagger Annotations
 
-Below are some additional example annotions that can be added to `main.go`
+Below are some additional example annotations that can be added to `main.go`
 ```go
 // @title SaaS Example API
 // @description This provides a public API...

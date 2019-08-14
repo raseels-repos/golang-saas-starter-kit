@@ -63,7 +63,7 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 
 // Find gets all the account preferences from the database based on the request params.
 // TODO: Need to figure out why can't parse the args when appending the where to the query.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceFindRequest) ([]*AccountPreference, error) {
+func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req AccountPreferenceFindRequest) ([]*AccountPreference, error) {
 	query := sqlbuilder.NewSelectBuilder()
 	if req.Where != "" {
 		query.Where(query.And(req.Where))
@@ -78,11 +78,11 @@ func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountP
 		query.Offset(int(*req.Offset))
 	}
 
-	return find(ctx, claims, dbConn, query, req.Args, req.IncludeArchived)
+	return find(ctx, claims, repo.DbConn, query, req.Args, req.IncludeArchived)
 }
 
 // FindByAccountID gets the specified account preferences for an account from the database.
-func FindByAccountID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceFindByAccountIDRequest) ([]*AccountPreference, error) {
+func (repo *Repository) FindByAccountID(ctx context.Context, claims auth.Claims, req AccountPreferenceFindByAccountIDRequest) ([]*AccountPreference, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account_preference.FindByAccountID")
 	defer span.Finish()
 
@@ -106,7 +106,7 @@ func FindByAccountID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 		query.Offset(int(*req.Offset))
 	}
 
-	return find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	return find(ctx, claims, repo.DbConn, query, []interface{}{}, req.IncludeArchived)
 }
 
 // find internal method for getting all the account preferences from the database using a select query.
@@ -157,7 +157,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 }
 
 // Read gets the specified account preference from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceReadRequest) (*AccountPreference, error) {
+func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req AccountPreferenceReadRequest) (*AccountPreference, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account_preference.Read")
 	defer span.Finish()
 
@@ -173,7 +173,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountP
 		query.Equal("account_id", req.AccountID)),
 		query.Equal("name", req.Name))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	res, err := find(ctx, claims, repo.DbConn, query, []interface{}{}, req.IncludeArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -263,7 +263,7 @@ func Validator() *validator.Validate {
 }
 
 // Set inserts a new account preference or updates an existing on.
-func Set(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceSetRequest, now time.Time) error {
+func (repo *Repository) Set(ctx context.Context, claims auth.Claims, req AccountPreferenceSetRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account_preference.Set")
 	defer span.Finish()
 
@@ -276,7 +276,7 @@ func Set(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPr
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = account.CanModifyAccount(ctx, claims, dbConn, req.AccountID)
+	err = account.CanModifyAccount(ctx, claims, repo.DbConn, req.AccountID)
 	if err != nil {
 		return err
 	}
@@ -301,11 +301,11 @@ func Set(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPr
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
+	sql = repo.DbConn.Rebind(sql)
 
 	sql = sql + " ON CONFLICT ON CONSTRAINT account_preferences_pkey DO UPDATE set value = EXCLUDED.value "
 
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "set account preference failed")
@@ -316,7 +316,7 @@ func Set(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPr
 }
 
 // Archive soft deleted the account preference from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceArchiveRequest, now time.Time) error {
+func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req AccountPreferenceArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account_preference.Archive")
 	defer span.Finish()
 
@@ -328,7 +328,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = account.CanModifyAccount(ctx, claims, dbConn, req.AccountID)
+	err = account.CanModifyAccount(ctx, claims, repo.DbConn, req.AccountID)
 	if err != nil {
 		return err
 	}
@@ -355,8 +355,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "archive account preference %s for account %s failed", req.Name, req.AccountID)
@@ -367,7 +367,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 }
 
 // Delete removes an account preference from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountPreferenceDeleteRequest) error {
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req AccountPreferenceDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account_preference.Delete")
 	defer span.Finish()
 
@@ -379,13 +379,13 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = account.CanModifyAccount(ctx, claims, dbConn, req.AccountID)
+	err = account.CanModifyAccount(ctx, claims, repo.DbConn, req.AccountID)
 	if err != nil {
 		return err
 	}
 
 	// Start a new transaction to handle rollbacks on error.
-	tx, err := dbConn.Begin()
+	tx, err := repo.DbConn.Begin()
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -397,7 +397,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
+	sql = repo.DbConn.Rebind(sql)
 	_, err = tx.ExecContext(ctx, sql, args...)
 	if err != nil {
 		tx.Rollback()
@@ -417,10 +417,15 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 // MockAccountPreference returns a fake AccountPreference for testing.
 func MockAccountPreference(ctx context.Context, dbConn *sqlx.DB, now time.Time) error {
+
+	repo := &Repository{
+		DbConn: dbConn,
+	}
+
 	req := AccountPreferenceSetRequest{
 		AccountID: uuid.NewRandom().String(),
 		Name:      AccountPreference_Datetime_Format,
 		Value:     AccountPreference_Datetime_Format_Default,
 	}
-	return Set(ctx, auth.Claims{}, dbConn, req, now)
+	return repo.Set(ctx, auth.Claims{}, req, now)
 }

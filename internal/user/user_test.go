@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
@@ -32,14 +31,7 @@ func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
 
-	// Mock the methods needed to make a password reset.
-	resetUrl := func(string) string {
-		return ""
-	}
-	notify := &notify.MockEmail{}
-	secretKey := "6368616e676520746869732070617373"
-
-	repo = NewRepository(test.MasterDB, resetUrl, notify, secretKey)
+	repo = MockRepository(test.MasterDB)
 
 	return m.Run()
 }
@@ -930,7 +922,7 @@ func TestFind(t *testing.T) {
 
 	var users []*User
 	for i := 0; i <= 4; i++ {
-		user, err := repo.Create(tests.Context(), auth.Claims{},  UserCreateRequest{
+		user, err := repo.Create(tests.Context(), auth.Claims{}, UserCreateRequest{
 			FirstName:       "Lee",
 			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -1042,7 +1034,7 @@ func TestFind(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := repo.Find(ctx, auth.Claims{},  tt.req)
+				res, err := repo.Find(ctx, auth.Claims{}, tt.req)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)

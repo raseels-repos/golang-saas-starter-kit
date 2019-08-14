@@ -2,13 +2,27 @@ package project
 
 import (
 	"context"
+	"time"
+
 	"database/sql/driver"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
-	"time"
 )
+
+// Repository defines the required dependencies for Project.
+type Repository struct {
+	DbConn *sqlx.DB
+}
+
+// NewRepository creates a new Repository that defines dependencies for Project.
+func NewRepository(db *sqlx.DB) *Repository {
+	return &Repository{
+		DbConn: db,
+	}
+}
 
 // Project represents a workflow.
 type Project struct {

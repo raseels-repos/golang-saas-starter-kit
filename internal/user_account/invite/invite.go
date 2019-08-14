@@ -8,11 +8,9 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -29,7 +27,7 @@ var (
 )
 
 // SendUserInvites sends emails to the users inviting them to join an account.
-func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, resetUrl func(string) string, notify notify.Email, req SendUserInvitesRequest, secretKey string, now time.Time) ([]string, error) {
+func (repo *Repository) SendUserInvites(ctx context.Context, claims auth.Claims, req SendUserInvitesRequest, now time.Time) ([]string, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.SendUserInvites")
 	defer span.Finish()
 
@@ -42,7 +40,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = user_account.CanModifyAccount(ctx, claims, dbConn, req.AccountID)
+	err = account.CanModifyAccount(ctx, claims, repo.DbConn, req.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +49,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 	emailUserIDs := make(map[string]string)
 	{
 		// Find all users without passing in claims to search all users.
-		users, err := user.Find(ctx, auth.Claims{}, dbConn, user.UserFindRequest{
+		users, err := repo.User.Find(ctx, auth.Claims{}, user.UserFindRequest{
 			Where: fmt.Sprintf("email in ('%s')",
 				strings.Join(req.Emails, "','")),
 		})
@@ -72,7 +70,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 			args = append(args, userID)
 		}
 
-		userAccs, err := user_account.Find(ctx, claims, dbConn, user_account.UserAccountFindRequest{
+		userAccs, err := repo.UserAccount.Find(ctx, claims, user_account.UserAccountFindRequest{
 			Where: fmt.Sprintf("user_id in ('%s') and status = '%s'",
 				strings.Join(args, "','"),
 				user_account.UserAccountStatus_Active.String()),
@@ -99,7 +97,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 			continue
 		}
 
-		u, err := user.CreateInvite(ctx, claims, dbConn, user.UserCreateInviteRequest{
+		u, err := repo.User.CreateInvite(ctx, claims, user.UserCreateInviteRequest{
 			Email: email,
 		}, now)
 		if err != nil {
@@ -118,7 +116,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 		}
 
 		status := user_account.UserAccountStatus_Invited
-		_, err = user_account.Create(ctx, claims, dbConn, user_account.UserAccountCreateRequest{
+		_, err = repo.UserAccount.Create(ctx, claims, user_account.UserAccountCreateRequest{
 			UserID:    userID,
 			AccountID: req.AccountID,
 			Roles:     req.Roles,
@@ -133,12 +131,12 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 		req.TTL = time.Minute * 90
 	}
 
-	fromUser, err := user.ReadByID(ctx, claims, dbConn, req.UserID)
+	fromUser, err := repo.User.ReadByID(ctx, claims, req.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := account.ReadByID(ctx, claims, dbConn, req.AccountID)
+	account, err := repo.Account.ReadByID(ctx, claims, req.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +149,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 
 	var inviteHashes []string
 	for email, userID := range emailUserIDs {
-		hash, err := NewInviteHash(ctx, secretKey, userID, req.AccountID, requestIp, req.TTL, now)
+		hash, err := NewInviteHash(ctx, repo.secretKey, userID, req.AccountID, requestIp, req.TTL, now)
 		if err != nil {
 			return nil, err
 		}
@@ -159,13 +157,13 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 		data := map[string]interface{}{
 			"FromUser": fromUser.Response(ctx),
 			"Account":  account.Response(ctx),
-			"Url":      resetUrl(hash),
+			"Url":      repo.ResetUrl(hash),
 			"Minutes":  req.TTL.Minutes(),
 		}
 
 		subject := fmt.Sprintf("%s %s has invited you to %s", fromUser.FirstName, fromUser.LastName, account.Name)
 
-		err = notify.Send(ctx, email, subject, "user_invite", data)
+		err = repo.Notify.Send(ctx, email, subject, "user_invite", data)
 		if err != nil {
 			err = errors.WithMessagef(err, "Send invite to %s failed.", email)
 			return nil, err
@@ -178,7 +176,7 @@ func SendUserInvites(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, r
 }
 
 // AcceptInvite updates the user using the provided invite hash.
-func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest, secretKey string, now time.Time) (*user_account.UserAccount, error) {
+func (repo *Repository) AcceptInvite(ctx context.Context, req AcceptInviteRequest, now time.Time) (*user_account.UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInvite")
 	defer span.Finish()
 
@@ -190,25 +188,25 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 		return nil, err
 	}
 
-	hash, err := ParseInviteHash(ctx, req.InviteHash, secretKey, now)
+	hash, err := ParseInviteHash(ctx, req.InviteHash, repo.secretKey, now)
 	if err != nil {
 		return nil, err
 	}
 
-	u, err := user.Read(ctx, auth.Claims{}, dbConn,
+	u, err := repo.User.Read(ctx, auth.Claims{},
 		user.UserReadRequest{ID: hash.UserID, IncludeArchived: true})
 	if err != nil {
 		return nil, err
 	}
 
 	if u.ArchivedAt != nil && !u.ArchivedAt.Time.IsZero() {
-		err = user.Restore(ctx, auth.Claims{}, dbConn, user.UserRestoreRequest{ID: hash.UserID}, now)
+		err = repo.User.Restore(ctx, auth.Claims{}, user.UserRestoreRequest{ID: hash.UserID}, now)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	usrAcc, err := user_account.Read(ctx, auth.Claims{}, dbConn, user_account.UserAccountReadRequest{
+	usrAcc, err := repo.UserAccount.Read(ctx, auth.Claims{}, user_account.UserAccountReadRequest{
 		UserID:    hash.UserID,
 		AccountID: hash.AccountID,
 	})
@@ -230,7 +228,7 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 	if len(u.PasswordHash) > 0 {
 		usrAcc.Status = user_account.UserAccountStatus_Active
 
-		err = user_account.Update(ctx, auth.Claims{}, dbConn, user_account.UserAccountUpdateRequest{
+		err = repo.UserAccount.Update(ctx, auth.Claims{}, user_account.UserAccountUpdateRequest{
 			UserID:    usrAcc.UserID,
 			AccountID: usrAcc.AccountID,
 			Status:    &usrAcc.Status,
@@ -244,7 +242,7 @@ func AcceptInvite(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteRequest,
 }
 
 // AcceptInviteUser updates the user using the provided invite hash.
-func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUserRequest, secretKey string, now time.Time) (*user_account.UserAccount, error) {
+func (repo *Repository) AcceptInviteUser(ctx context.Context, req AcceptInviteUserRequest, now time.Time) (*user_account.UserAccount, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.invite.AcceptInviteUser")
 	defer span.Finish()
 
@@ -256,25 +254,25 @@ func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUser
 		return nil, err
 	}
 
-	hash, err := ParseInviteHash(ctx, req.InviteHash, secretKey, now)
+	hash, err := ParseInviteHash(ctx, req.InviteHash, repo.secretKey, now)
 	if err != nil {
 		return nil, err
 	}
 
-	u, err := user.Read(ctx, auth.Claims{}, dbConn,
+	u, err := repo.User.Read(ctx, auth.Claims{},
 		user.UserReadRequest{ID: hash.UserID, IncludeArchived: true})
 	if err != nil {
 		return nil, err
 	}
 
 	if u.ArchivedAt != nil && !u.ArchivedAt.Time.IsZero() {
-		err = user.Restore(ctx, auth.Claims{}, dbConn, user.UserRestoreRequest{ID: hash.UserID}, now)
+		err = repo.User.Restore(ctx, auth.Claims{}, user.UserRestoreRequest{ID: hash.UserID}, now)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	usrAcc, err := user_account.Read(ctx, auth.Claims{}, dbConn, user_account.UserAccountReadRequest{
+	usrAcc, err := repo.UserAccount.Read(ctx, auth.Claims{}, user_account.UserAccountReadRequest{
 		UserID:    hash.UserID,
 		AccountID: hash.AccountID,
 	})
@@ -293,7 +291,7 @@ func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUser
 
 	// These three calls, user.Update,  user.UpdatePassword, and user_account.Update
 	// should probably be in a transaction!
-	err = user.Update(ctx, auth.Claims{}, dbConn, user.UserUpdateRequest{
+	err = repo.User.Update(ctx, auth.Claims{}, user.UserUpdateRequest{
 		ID:        hash.UserID,
 		Email:     &req.Email,
 		FirstName: &req.FirstName,
@@ -304,7 +302,7 @@ func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUser
 		return nil, err
 	}
 
-	err = user.UpdatePassword(ctx, auth.Claims{}, dbConn, user.UserUpdatePasswordRequest{
+	err = repo.User.UpdatePassword(ctx, auth.Claims{}, user.UserUpdatePasswordRequest{
 		ID:              hash.UserID,
 		Password:        req.Password,
 		PasswordConfirm: req.PasswordConfirm,
@@ -314,7 +312,7 @@ func AcceptInviteUser(ctx context.Context, dbConn *sqlx.DB, req AcceptInviteUser
 	}
 
 	usrAcc.Status = user_account.UserAccountStatus_Active
-	err = user_account.Update(ctx, auth.Claims{}, dbConn, user_account.UserAccountUpdateRequest{
+	err = repo.UserAccount.Update(ctx, auth.Claims{}, user_account.UserAccountUpdateRequest{
 		UserID:    usrAcc.UserID,
 		AccountID: usrAcc.AccountID,
 		Status:    &usrAcc.Status,

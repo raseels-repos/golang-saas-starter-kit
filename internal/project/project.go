@@ -3,6 +3,8 @@ package project
 import (
 	"context"
 	"database/sql"
+	"time"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
@@ -10,7 +12,6 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"time"
 )
 
 const (
@@ -27,7 +28,7 @@ var (
 )
 
 // CanReadProject determines if claims has the authority to access the specified project by id.
-func CanReadProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) error {
+func (repo *Repository) CanReadProject(ctx context.Context, claims auth.Claims, id string) error {
 
 	// If the request has claims from a specific project, ensure that the claims
 	// has the correct access to the project.
@@ -40,9 +41,9 @@ func CanReadProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id
 		))
 
 		queryStr, args := query.Build()
-		queryStr = dbConn.Rebind(queryStr)
+		queryStr = repo.DbConn.Rebind(queryStr)
 		var id string
-		err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&id)
+		err := repo.DbConn.QueryRowContext(ctx, queryStr, args...).Scan(&id)
 		if err != nil && err != sql.ErrNoRows {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			return err
@@ -60,8 +61,8 @@ func CanReadProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id
 }
 
 // CanModifyProject determines if claims has the authority to modify the specified project by id.
-func CanModifyProject(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) error {
-	err := CanReadProject(ctx, claims, dbConn, id)
+func (repo *Repository) CanModifyProject(ctx context.Context, claims auth.Claims, id string) error {
+	err := repo.CanReadProject(ctx, claims, id)
 	if err != nil {
 		return err
 	}
@@ -124,9 +125,9 @@ func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []inte
 }
 
 // Find gets all the projects from the database based on the request params.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectFindRequest) (Projects, error) {
+func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req ProjectFindRequest) (Projects, error) {
 	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
+	return find(ctx, claims, repo.DbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the projects from the database using a select query.
@@ -177,15 +178,15 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 }
 
 // ReadByID gets the specified project by ID from the database.
-func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*Project, error) {
-	return Read(ctx, claims, dbConn, ProjectReadRequest{
+func (repo *Repository) ReadByID(ctx context.Context, claims auth.Claims, id string) (*Project, error) {
+	return repo.Read(ctx, claims, ProjectReadRequest{
 		ID:              id,
 		IncludeArchived: false,
 	})
 }
 
 // Read gets the specified project from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectReadRequest) (*Project, error) {
+func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req ProjectReadRequest) (*Project, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Read")
 	defer span.Finish()
 
@@ -200,7 +201,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectR
 	query := sqlbuilder.NewSelectBuilder()
 	query.Where(query.Equal("id", req.ID))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	res, err := find(ctx, claims, repo.DbConn, query, []interface{}{}, req.IncludeArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -213,7 +214,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectR
 }
 
 // Create inserts a new project into the database.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectCreateRequest, now time.Time) (*Project, error) {
+func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req ProjectCreateRequest, now time.Time) (*Project, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Create")
 	defer span.Finish()
 	if claims.Audience != "" {
@@ -290,8 +291,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "create project failed")
@@ -302,7 +303,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 }
 
 // Update replaces an project in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectUpdateRequest, now time.Time) error {
+func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req ProjectUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Update")
 	defer span.Finish()
 
@@ -314,7 +315,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	}
 
 	// Ensure the claims can modify the project specified in the request.
-	err = CanModifyProject(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyProject(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -352,8 +353,8 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	query.Where(query.Equal("id", req.ID))
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "update project %s failed", req.ID)
@@ -364,7 +365,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 }
 
 // Archive soft deleted the project from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectArchiveRequest, now time.Time) error {
+func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req ProjectArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Archive")
 	defer span.Finish()
 
@@ -376,7 +377,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 	}
 
 	// Ensure the claims can modify the project specified in the request.
-	err = CanModifyProject(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyProject(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -401,8 +402,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 	query.Where(query.Equal("id", req.ID))
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "archive project %s failed", req.ID)
@@ -413,7 +414,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Proje
 }
 
 // Delete removes an project from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectDeleteRequest) error {
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
 	defer span.Finish()
 
@@ -425,7 +426,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Projec
 	}
 
 	// Ensure the claims can modify the project specified in the request.
-	err = CanModifyProject(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyProject(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}

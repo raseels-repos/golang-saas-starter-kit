@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -200,11 +201,11 @@ func findRequestQuery(req UserFindRequest) (*sqlbuilder.SelectBuilder, []interfa
 // Find gets all the users from the database based on the request params.
 func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req UserFindRequest) (Users, error) {
 	query, args := findRequestQuery(req)
-	return repo.find(ctx, claims, query, args, req.IncludeArchived)
+	return find(ctx, claims, repo.DbConn, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the users from the database using a select query.
-func (repo *Repository) find(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Users, error) {
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Users, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Find")
 	defer span.Finish()
 
@@ -221,11 +222,11 @@ func (repo *Repository) find(ctx context.Context, claims auth.Claims, query *sql
 		return nil, err
 	}
 	queryStr, queryArgs := query.Build()
-	queryStr = repo.DbConn.Rebind(queryStr)
+	queryStr = dbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find users failed")
@@ -247,17 +248,17 @@ func (repo *Repository) find(ctx context.Context, claims auth.Claims, query *sql
 }
 
 // Validation an email address is unique excluding the current user ID.
-func (repo *Repository) UniqueEmail(ctx context.Context, email, userId string) (bool, error) {
+func UniqueEmail(ctx context.Context, dbConn *sqlx.DB, email, userId string) (bool, error) {
 	query := sqlbuilder.NewSelectBuilder().Select("id").From(userTableName)
 	query.Where(query.And(
 		query.Equal("email", email),
 		query.NotEqual("id", userId),
 	))
 	queryStr, args := query.Build()
-	queryStr = repo.DbConn.Rebind(queryStr)
+	queryStr = dbConn.Rebind(queryStr)
 
 	var existingId string
-	err := repo.DbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
+	err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		return false, err
@@ -283,7 +284,7 @@ func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req User
 	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
-	uniq, err := repo.UniqueEmail(ctx, req.Email, "")
+	uniq, err := UniqueEmail(ctx, repo.DbConn, req.Email, "")
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +365,7 @@ func (repo *Repository) CreateInvite(ctx context.Context, claims auth.Claims, re
 	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
-	uniq, err := repo.UniqueEmail(ctx, req.Email, "")
+	uniq, err := UniqueEmail(ctx, repo.DbConn, req.Email, "")
 	if err != nil {
 		return nil, err
 	}
@@ -448,7 +449,7 @@ func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req UserRe
 	query := selectQuery()
 	query.Where(query.Equal("id", req.ID))
 
-	res, err := repo.find(ctx, claims, query, []interface{}{}, req.IncludeArchived)
+	res, err := find(ctx, claims, repo.DbConn, query, []interface{}{}, req.IncludeArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -469,7 +470,7 @@ func (repo *Repository) ReadByEmail(ctx context.Context, claims auth.Claims, ema
 	query := selectQuery()
 	query.Where(query.Equal("email", email))
 
-	res, err := repo.find(ctx, claims, query, []interface{}{}, includedArchived)
+	res, err := find(ctx, claims, repo.DbConn, query, []interface{}{}, includedArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -489,7 +490,7 @@ func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req User
 	// Validation email address is unique in the database.
 	if req.Email != nil {
 		// Validation email address is unique in the database.
-		uniq, err := repo.UniqueEmail(ctx,  *req.Email, req.ID)
+		uniq, err := UniqueEmail(ctx, repo.DbConn, *req.Email, req.ID)
 		if err != nil {
 			return err
 		}
@@ -844,7 +845,7 @@ func (repo *Repository) ResetPassword(ctx context.Context, req UserResetPassword
 		query := selectQuery()
 		query.Where(query.Equal("email", req.Email))
 
-		res, err := repo.find(ctx, auth.Claims{}, query, []interface{}{}, false)
+		res, err := find(ctx, auth.Claims{}, repo.DbConn, query, []interface{}{}, false)
 		if err != nil {
 			return "", err
 		} else if res == nil || len(res) == 0 {
@@ -894,7 +895,7 @@ func (repo *Repository) ResetPassword(ctx context.Context, req UserResetPassword
 		requestIp = vals.RequestIP
 	}
 
-	encrypted, err := NewResetHash(ctx, repo.SecretKey, resetId, requestIp, req.TTL, now)
+	encrypted, err := NewResetHash(ctx, repo.secretKey, resetId, requestIp, req.TTL, now)
 	if err != nil {
 		return "", err
 	}
@@ -927,7 +928,7 @@ func (repo *Repository) ResetConfirm(ctx context.Context, req UserResetConfirmRe
 		return nil, err
 	}
 
-	hash, err := ParseResetHash(ctx, repo.SecretKey, req.ResetHash, now)
+	hash, err := ParseResetHash(ctx, repo.secretKey, req.ResetHash, now)
 	if err != nil {
 		return nil, err
 	}
@@ -938,7 +939,7 @@ func (repo *Repository) ResetConfirm(ctx context.Context, req UserResetConfirmRe
 		query := selectQuery()
 		query.Where(query.Equal("password_reset", hash.ResetID))
 
-		res, err := repo.find(ctx, auth.Claims{}, query, []interface{}{}, false)
+		res, err := find(ctx, auth.Claims{}, repo.DbConn, query, []interface{}{}, false)
 		if err != nil {
 			return nil, err
 		} else if res == nil || len(res) == 0 {
@@ -1019,4 +1020,15 @@ func MockUser(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*MockUserRes
 		User:     u,
 		Password: pass,
 	}, nil
+}
+
+func MockRepository(dbConn *sqlx.DB) *Repository {
+	// Mock the methods needed to make a password reset.
+	resetUrl := func(string) string {
+		return ""
+	}
+	notify := &notify.MockEmail{}
+	secretKey := "6368616e676520746869732070617373"
+
+	return NewRepository(dbConn, resetUrl, notify, secretKey)
 }

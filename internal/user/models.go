@@ -4,34 +4,34 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
-	"github.com/sudo-suhas/symcrypto"
 	"strconv"
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
+	"github.com/sudo-suhas/symcrypto"
 )
 
 // Repository defines the required dependencies for User.
 type Repository struct {
-	DbConn *sqlx.DB
-	ResetUrl func(string) string
-	Notify notify.Email
-	SecretKey string
+	DbConn    *sqlx.DB
+	ResetUrl  func(string) string
+	Notify    notify.Email
+	secretKey string
 }
 
 // NewRepository creates a new Repository that defines dependencies for User.
 func NewRepository(db *sqlx.DB, resetUrl func(string) string, notify notify.Email, secretKey string) *Repository {
 	return &Repository{
-		DbConn: db,
-		ResetUrl: resetUrl,
-		Notify: notify,
-		SecretKey: secretKey,
+		DbConn:    db,
+		ResetUrl:  resetUrl,
+		Notify:    notify,
+		secretKey: secretKey,
 	}
 }
 

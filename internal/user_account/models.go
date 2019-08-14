@@ -2,13 +2,13 @@ package user_account
 
 import (
 	"context"
-	"database/sql/driver"
-	"github.com/jmoiron/sqlx"
 	"strings"
 	"time"
 
+	"database/sql/driver"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"

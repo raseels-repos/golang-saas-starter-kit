@@ -235,3 +235,10 @@ instance will be a dedicated host since we need it always up and running, thus i
     ```bash 
     sudo gitlab-runner restart
     ``` 
+    
+    
+## Examples 
+
+```bash
+go run main.go deploy -service=web-app -env=dev -enable_https=true -primary_host=example.saasstartupkit.com -host_names=example.saasstartupkit.com,dev.example.saasstartupkit.com -private_bucket=saas-starter-kit-private -public_bucket=saas-starter-kit-public -public_bucket_cloudfront=true -static_files_s3=true -static_files_img_resize=1 -recreate_service=0
+```    

@@ -45,6 +45,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Build a sitemap.
 	sm := stm.NewSitemap(1)
+	sm.SetVerbose(false)
 	sm.SetDefaultHost(projectRoutes.WebAppUrl(""))
 	sm.Create()
 

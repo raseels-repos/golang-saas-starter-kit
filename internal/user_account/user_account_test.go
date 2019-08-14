@@ -17,7 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -27,6 +30,9 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	repo = NewRepository(test.MasterDB)
+
 	return m.Run()
 }
 

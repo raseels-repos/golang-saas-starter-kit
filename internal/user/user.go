@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -55,7 +54,7 @@ func mapRowsToUser(rows *sql.Rows) (*User, error) {
 }
 
 // CanReadUser determines if claims has the authority to access the specified user ID.
-func CanReadUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
+func (repo *Repository) CanReadUser(ctx context.Context, claims auth.Claims, userID string) error {
 	// If the request has claims from a specific user, ensure that the user
 	// has the correct access to the user.
 	if claims.Subject != "" && claims.Subject != userID {
@@ -68,10 +67,10 @@ func CanReadUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userI
 			query.Equal("user_id", userID),
 		))
 		queryStr, args := query.Build()
-		queryStr = dbConn.Rebind(queryStr)
+		queryStr = repo.DbConn.Rebind(queryStr)
 
 		var userAccountId string
-		err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
+		err := repo.DbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
 		if err != nil && err != sql.ErrNoRows {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			return err
@@ -88,7 +87,7 @@ func CanReadUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userI
 }
 
 // CanModifyUser determines if claims has the authority to modify the specified user ID.
-func CanModifyUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, userID string) error {
+func (repo *Repository) CanModifyUser(ctx context.Context, claims auth.Claims, userID string) error {
 	// If the request has claims from a specific user, ensure that the user
 	// has the correct role for creating a new user.
 	if claims.Subject != "" && claims.Subject != userID {
@@ -99,7 +98,7 @@ func CanModifyUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, use
 		}
 	}
 
-	if err := CanReadUser(ctx, claims, dbConn, userID); err != nil {
+	if err := repo.CanReadUser(ctx, claims, userID); err != nil {
 		return err
 	}
 
@@ -118,10 +117,10 @@ func CanModifyUser(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, use
 				"'"+auth.RoleAdmin+"' = ANY (roles)",
 			))
 			queryStr, args := query.Build()
-			queryStr = dbConn.Rebind(queryStr)
+			queryStr = repo.DbConn.Rebind(queryStr)
 
 			var userAccountId string
-			err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
+			err := repo.DbConn.QueryRowContext(ctx, queryStr, args...).Scan(&userAccountId)
 			if err != nil && err != sql.ErrNoRows {
 				err = errors.Wrapf(err, "query - %s", query.String())
 				return err
@@ -199,13 +198,13 @@ func findRequestQuery(req UserFindRequest) (*sqlbuilder.SelectBuilder, []interfa
 }
 
 // Find gets all the users from the database based on the request params.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserFindRequest) (Users, error) {
+func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req UserFindRequest) (Users, error) {
 	query, args := findRequestQuery(req)
-	return find(ctx, claims, dbConn, query, args, req.IncludeArchived)
+	return repo.find(ctx, claims, query, args, req.IncludeArchived)
 }
 
 // find internal method for getting all the users from the database using a select query.
-func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Users, error) {
+func (repo *Repository) find(ctx context.Context, claims auth.Claims, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Users, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Find")
 	defer span.Finish()
 
@@ -222,11 +221,11 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		return nil, err
 	}
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find users failed")
@@ -248,17 +247,17 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 }
 
 // Validation an email address is unique excluding the current user ID.
-func UniqueEmail(ctx context.Context, dbConn *sqlx.DB, email, userId string) (bool, error) {
+func (repo *Repository) UniqueEmail(ctx context.Context, email, userId string) (bool, error) {
 	query := sqlbuilder.NewSelectBuilder().Select("id").From(userTableName)
 	query.Where(query.And(
 		query.Equal("email", email),
 		query.NotEqual("id", userId),
 	))
 	queryStr, args := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 
 	var existingId string
-	err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
+	err := repo.DbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		return false, err
@@ -273,7 +272,7 @@ func UniqueEmail(ctx context.Context, dbConn *sqlx.DB, email, userId string) (bo
 }
 
 // Create inserts a new user into the database.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCreateRequest, now time.Time) (*User, error) {
+func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req UserCreateRequest, now time.Time) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Create")
 	defer span.Finish()
 
@@ -284,7 +283,7 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
-	uniq, err := UniqueEmail(ctx, dbConn, req.Email, "")
+	uniq, err := repo.UniqueEmail(ctx, req.Email, "")
 	if err != nil {
 		return nil, err
 	}
@@ -346,8 +345,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "create user failed")
@@ -358,14 +357,14 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCr
 }
 
 // Create invite inserts a new user into the database.
-func CreateInvite(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserCreateInviteRequest, now time.Time) (*User, error) {
+func (repo *Repository) CreateInvite(ctx context.Context, claims auth.Claims, req UserCreateInviteRequest, now time.Time) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.CreateInvite")
 	defer span.Finish()
 
 	v := webcontext.Validator()
 
 	// Validation email address is unique in the database.
-	uniq, err := UniqueEmail(ctx, dbConn, req.Email, "")
+	uniq, err := repo.UniqueEmail(ctx, req.Email, "")
 	if err != nil {
 		return nil, err
 	}
@@ -414,8 +413,8 @@ func CreateInvite(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req 
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "create user failed")
@@ -426,15 +425,15 @@ func CreateInvite(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req 
 }
 
 // ReadByID gets the specified user by ID from the database.
-func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*User, error) {
-	return Read(ctx, claims, dbConn, UserReadRequest{
+func (repo *Repository) ReadByID(ctx context.Context, claims auth.Claims, id string) (*User, error) {
+	return repo.Read(ctx, claims, UserReadRequest{
 		ID:              id,
 		IncludeArchived: false,
 	})
 }
 
 // Read gets the specified user from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserReadRequest) (*User, error) {
+func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req UserReadRequest) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Read")
 	defer span.Finish()
 
@@ -449,7 +448,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserRead
 	query := selectQuery()
 	query.Where(query.Equal("id", req.ID))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	res, err := repo.find(ctx, claims, query, []interface{}{}, req.IncludeArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -462,7 +461,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserRead
 }
 
 // ReadByEmail gets the specified user from the database.
-func ReadByEmail(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, email string, includedArchived bool) (*User, error) {
+func (repo *Repository) ReadByEmail(ctx context.Context, claims auth.Claims, email string, includedArchived bool) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ReadByEmail")
 	defer span.Finish()
 
@@ -470,7 +469,7 @@ func ReadByEmail(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, email
 	query := selectQuery()
 	query.Where(query.Equal("email", email))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, includedArchived)
+	res, err := repo.find(ctx, claims, query, []interface{}{}, includedArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -483,14 +482,14 @@ func ReadByEmail(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, email
 }
 
 // Update replaces a user in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUpdateRequest, now time.Time) error {
+func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req UserUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Update")
 	defer span.Finish()
 
 	// Validation email address is unique in the database.
 	if req.Email != nil {
 		// Validation email address is unique in the database.
-		uniq, err := UniqueEmail(ctx, dbConn, *req.Email, req.ID)
+		uniq, err := repo.UniqueEmail(ctx,  *req.Email, req.ID)
 		if err != nil {
 			return err
 		}
@@ -507,7 +506,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyUser(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -555,8 +554,8 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "update user %s failed", req.ID)
@@ -567,7 +566,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUp
 }
 
 // Update changes the password for a user in the database.
-func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserUpdatePasswordRequest, now time.Time) error {
+func (repo *Repository) UpdatePassword(ctx context.Context, claims auth.Claims, req UserUpdatePasswordRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.UpdatePassword")
 	defer span.Finish()
 
@@ -579,7 +578,7 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyUser(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -616,8 +615,8 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "update password for user %s failed", req.ID)
@@ -628,7 +627,7 @@ func UpdatePassword(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, re
 }
 
 // Archive soft deleted the user from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserArchiveRequest, now time.Time) error {
+func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req UserArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Archive")
 	defer span.Finish()
 
@@ -640,7 +639,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyUser(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	} else if claims.Subject != "" && claims.Subject == req.ID && !req.force {
@@ -669,8 +668,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "archive user %s failed", req.ID)
@@ -689,8 +688,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
-		_, err = dbConn.ExecContext(ctx, sql, args...)
+		sql = repo.DbConn.Rebind(sql)
+		_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "archive accounts for user %s failed", req.ID)
@@ -702,7 +701,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserA
 }
 
 // Restore undeletes the user from the database.
-func Restore(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserRestoreRequest, now time.Time) error {
+func (repo *Repository) Restore(ctx context.Context, claims auth.Claims, req UserRestoreRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Restore")
 	defer span.Finish()
 
@@ -714,7 +713,7 @@ func Restore(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserR
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyUser(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -741,8 +740,8 @@ func Restore(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserR
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "unarchive user %s failed", req.ID)
@@ -753,7 +752,7 @@ func Restore(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserR
 }
 
 // Delete removes a user from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDeleteRequest) error {
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req UserDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.Delete")
 	defer span.Finish()
 
@@ -765,7 +764,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 	}
 
 	// Ensure the claims can modify the user specified in the request.
-	err = CanModifyUser(ctx, claims, dbConn, req.ID)
+	err = repo.CanModifyUser(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	} else if claims.Subject != "" && claims.Subject == req.ID && !req.force {
@@ -773,7 +772,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 	}
 
 	// Start a new transaction to handle rollbacks on error.
-	tx, err := dbConn.Begin()
+	tx, err := repo.DbConn.Begin()
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -790,7 +789,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
+		sql = repo.DbConn.Rebind(sql)
 		_, err = tx.ExecContext(ctx, sql, args...)
 		if err != nil {
 			tx.Rollback()
@@ -808,7 +807,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
+	sql = repo.DbConn.Rebind(sql)
 	_, err = tx.ExecContext(ctx, sql, args...)
 	if err != nil {
 		tx.Rollback()
@@ -827,7 +826,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserDe
 }
 
 // ResetPassword sends en email to the user to allow them to reset their password.
-func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) string, notify notify.Email, req UserResetPasswordRequest, secretKey string, now time.Time) (string, error) {
+func (repo *Repository) ResetPassword(ctx context.Context, req UserResetPasswordRequest, now time.Time) (string, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ResetPassword")
 	defer span.Finish()
 
@@ -845,7 +844,7 @@ func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) s
 		query := selectQuery()
 		query.Where(query.Equal("email", req.Email))
 
-		res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
+		res, err := repo.find(ctx, auth.Claims{}, query, []interface{}{}, false)
 		if err != nil {
 			return "", err
 		} else if res == nil || len(res) == 0 {
@@ -876,8 +875,8 @@ func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) s
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
-		_, err = dbConn.ExecContext(ctx, sql, args...)
+		sql = repo.DbConn.Rebind(sql)
+		_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "Update user %s failed.", u.ID)
@@ -895,18 +894,18 @@ func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) s
 		requestIp = vals.RequestIP
 	}
 
-	encrypted, err := NewResetHash(ctx, secretKey, resetId, requestIp, req.TTL, now)
+	encrypted, err := NewResetHash(ctx, repo.SecretKey, resetId, requestIp, req.TTL, now)
 	if err != nil {
 		return "", err
 	}
 
 	data := map[string]interface{}{
 		"Name":    u.FirstName,
-		"Url":     resetUrl(encrypted),
+		"Url":     repo.ResetUrl(encrypted),
 		"Minutes": req.TTL.Minutes(),
 	}
 
-	err = notify.Send(ctx, u.Email, "Reset your Password", "user_reset_password", data)
+	err = repo.Notify.Send(ctx, u.Email, "Reset your Password", "user_reset_password", data)
 	if err != nil {
 		err = errors.WithMessagef(err, "Send password reset email to %s failed.", u.Email)
 		return "", err
@@ -916,7 +915,7 @@ func ResetPassword(ctx context.Context, dbConn *sqlx.DB, resetUrl func(string) s
 }
 
 // ResetConfirm updates the password for a user using the provided reset password ID.
-func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequest, secretKey string, now time.Time) (*User, error) {
+func (repo *Repository) ResetConfirm(ctx context.Context, req UserResetConfirmRequest, now time.Time) (*User, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user.ResetConfirm")
 	defer span.Finish()
 
@@ -928,7 +927,7 @@ func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequ
 		return nil, err
 	}
 
-	hash, err := ParseResetHash(ctx, secretKey, req.ResetHash, now)
+	hash, err := ParseResetHash(ctx, repo.SecretKey, req.ResetHash, now)
 	if err != nil {
 		return nil, err
 	}
@@ -939,7 +938,7 @@ func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequ
 		query := selectQuery()
 		query.Where(query.Equal("password_reset", hash.ResetID))
 
-		res, err := find(ctx, auth.Claims{}, dbConn, query, []interface{}{}, false)
+		res, err := repo.find(ctx, auth.Claims{}, query, []interface{}{}, false)
 		if err != nil {
 			return nil, err
 		} else if res == nil || len(res) == 0 {
@@ -979,8 +978,8 @@ func ResetConfirm(ctx context.Context, dbConn *sqlx.DB, req UserResetConfirmRequ
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
-		_, err = dbConn.ExecContext(ctx, sql, args...)
+		sql = repo.DbConn.Rebind(sql)
+		_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "update password for user %s failed", u.ID)
@@ -1000,6 +999,10 @@ type MockUserResponse struct {
 func MockUser(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*MockUserResponse, error) {
 	pass := uuid.NewRandom().String()
 
+	repo := &Repository{
+		DbConn: dbConn,
+	}
+
 	req := UserCreateRequest{
 		FirstName:       "Lee",
 		LastName:        "Brown",
@@ -1007,7 +1010,7 @@ func MockUser(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*MockUserRes
 		Password:        pass,
 		PasswordConfirm: pass,
 	}
-	u, err := Create(ctx, auth.Claims{}, dbConn, req, now)
+	u, err := repo.Create(ctx, auth.Claims{}, req, now)
 	if err != nil {
 		return nil, err
 	}

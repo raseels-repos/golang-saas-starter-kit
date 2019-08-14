@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"log"
 	"net/http"
 	"os"
@@ -20,33 +21,52 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
+
+type AppContext struct {
+	Log *log.Logger
+	Env webcontext.Env
+	Repo *user.Repository
+	MasterDB *sqlx.DB
+	Redis *redis.Client
+	Authenticator *auth.Authenticator
+	PreAppMiddleware []web.Middleware
+	PostAppMiddleware []web.Middleware
+}
+
+
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, globalMids ...web.Middleware) http.Handler {
+func API(shutdown chan os.Signal, appContext *AppContext ) http.Handler {
 
-	// Define base middlewares applied to all requests.
-	middlewares := []web.Middleware{
-		mid.Trace(), mid.Logger(log), mid.Errors(log, nil), mid.Metrics(), mid.Panics(),
-	}
+	// Include the pre middlewares first.
+	middlewares := appContext.PreAppMiddleware
 
-	// Append any global middlewares if they were included.
-	if len(globalMids) > 0 {
-		middlewares = append(middlewares, globalMids...)
+	// Define app middlewares applied to all requests.
+	middlewares = append(middlewares,
+		mid.Trace(),
+		mid.Logger(appContext.Log),
+		mid.Errors(appContext.Log, nil),
+		mid.Metrics(),
+		mid.Panics())
+
+	// Append any global middlewares that should be included after the app middlewares.
+	if len(appContext.PostAppMiddleware) > 0 {
+		middlewares = append(middlewares, appContext.PostAppMiddleware...)
 	}
 
 	// Construct the web.App which holds all routes as well as common Middleware.
-	app := web.NewApp(shutdown, log, env, middlewares...)
+	app := web.NewApp(shutdown, appContext.Log, appContext.Env, middlewares...)
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
-		MasterDB: masterDB,
-		Redis:    redis,
+		MasterDB: appContext.MasterDB,
+		Redis:    appContext.Redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 	app.Handle("GET", "/ping", check.Ping)
 
 	// Register user management and authentication endpoints.
 	u := User{
-		MasterDB:       masterDB,
+		MasterDB:       appContext.MasterDB,
 		TokenGenerator: authenticator,
 	}
 	app.Handle("GET", "/v1/users", u.Find, mid.AuthenticateHeader(authenticator))

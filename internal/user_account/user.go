@@ -6,13 +6,12 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 // UserFindByAccount lists all the users for a given account ID.
-func UserFindByAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req UserFindByAccountRequest) (Users, error) {
+func (repo *Repository) UserFindByAccount(ctx context.Context, claims auth.Claims, req UserFindByAccountRequest) (Users, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_account.UserFindByAccount")
 	defer span.Finish()
 
@@ -113,12 +112,12 @@ func UserFindByAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB,
 	}
 
 	queryStr, moreQueryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 
 	queryArgs = append(queryArgs, moreQueryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, queryArgs...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, queryArgs...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find users failed")

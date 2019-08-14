@@ -49,14 +49,14 @@ func mapRowsToUserAccount(rows *sql.Rows) (*UserAccount, error) {
 }
 
 // CanReadAccount determines if claims has the authority to access the specified user account by user ID.
-func CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
-	err := account.CanReadAccount(ctx, claims, dbConn, accountID)
+func (repo *Repository) CanReadAccount(ctx context.Context, claims auth.Claims, accountID string) error {
+	err := account.CanReadAccount(ctx, claims, accountID)
 	return mapAccountError(err)
 }
 
 // CanModifyAccount determines if claims has the authority to modify the specified user ID.
-func CanModifyAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
-	err := account.CanModifyAccount(ctx, claims, dbConn, accountID)
+func (repo *Repository) CanModifyAccount(ctx context.Context, claims auth.Claims, accountID string) error {
+	err := account.CanModifyAccount(ctx, claims, accountID)
 	return mapAccountError(err)
 }
 

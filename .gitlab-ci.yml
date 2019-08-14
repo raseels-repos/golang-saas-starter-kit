@@ -87,8 +87,8 @@ webapp:deploy:dev:
     SERVICE: 'web-app'
     ENABLE_HTTPS: 1
     ENABLE_ELB: 0
-    PRIMARY_HOST: 'eproc.tech'
-    HOST_NAMES: 'www.eproc.tech,dev.eproc.tech'
+    PRIMARY_HOST: 'example.saasstartupkit.com'
+    HOST_NAMES: 'example.saasstartupkit.com,dev.example.saasstartupkit.com'
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     S3_BUCKET_PUBLIC_CLOUDFRONT: 'true'
@@ -96,7 +96,7 @@ webapp:deploy:dev:
     STATIC_FILES_IMG_RESIZE: 'true'
     AWS_USE_ROLE: 'true'
     EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
-    WEB_API_BASE_URL: https://api.eproc.tech
+    WEB_API_BASE_URL: https://api.example.saasstartupkit.com
 
 webapi:build:dev:
   <<: *build_tmpl
@@ -128,8 +128,8 @@ webapi:deploy:dev:
     SERVICE: 'web-api'
     ENABLE_HTTPS: 1
     ENABLE_ELB: 0
-    PRIMARY_HOST: 'api.eproc.tech'
-    HOST_NAMES: 'api.dev.eproc.tech'
+    PRIMARY_HOST: 'api.example.saasstartupkit.com'
+    HOST_NAMES: 'api.dev.example.saasstartupkit.com'
     S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
     S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
     S3_BUCKET_PUBLIC_CLOUDFRONT: 'false'
@@ -137,7 +137,7 @@ webapi:deploy:dev:
     STATIC_FILES_IMG_RESIZE: 'false'
     AWS_USE_ROLE: 'true'
     EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
-    WEB_APP_BASE_URL: https://eproc.tech
+    WEB_APP_BASE_URL: https://example.saasstartupkit.com
 
 #ddlogscollector:deploy:stage:
 #  <<: *deploy_stage_tmpl

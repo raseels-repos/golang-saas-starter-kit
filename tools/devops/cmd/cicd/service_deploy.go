@@ -507,10 +507,8 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						Sid:    "DefaultServiceAccess",
 						Effect: "Allow",
 						Action: []string{
+							"s3:ListBucket",
 							"s3:HeadBucket",
-							"s3:ListObjects",
-							"s3:PutObject",
-							"s3:PutObjectAcl",
 							"cloudfront:ListDistributions",
 							"ec2:DescribeNetworkInterfaces",
 							"ec2:DeleteNetworkInterface",
@@ -568,6 +566,33 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 						Resource: "*",
 					},
 				},
+			}
+
+			if req.S3BucketPublicName != "" || req.S3BucketPrivateName != "" {
+				var bpr []string
+				if req.S3BucketPublicName != "" {
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName )
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName + "/*" )
+				}
+				if req.S3BucketPrivateName != "" {
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName )
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName + "/*" )
+				}
+
+				bp := IamStatementEntry{
+					Sid:    "S3BucketAccess",
+					Effect: "Allow",
+					Action: []string{
+						"s3:ListObjects",
+						"s3:PutObject",
+						"s3:PutObjectAcl",
+						"s3:GetObject",
+						"s3:HeadObject",
+					},
+					Resource: bpr,
+				}
+
+				req.EcsTaskPolicyDocument.Statement = append(req.EcsTaskPolicyDocument.Statement, bp)
 			}
 
 			// Set default Cloudwatch Log Group Name.

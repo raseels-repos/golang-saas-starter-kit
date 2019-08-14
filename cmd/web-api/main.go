@@ -87,11 +87,11 @@ func main() {
 		Service struct {
 			Name            string        `default:"web-api" envconfig:"NAME"`
 			Project         string        `default:"" envconfig:"PROJECT"`
-			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.eproc.tech"`
-			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.eproc.tech"`
+			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.example.saasstartupkit.com"`
+			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.example.saasstartupkit.com"`
 			EnableHTTPS     bool          `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			WebAppBaseUrl   string        `default:"http://127.0.0.1:3000" envconfig:"WEB_APP_BASE_URL" example:"www.eproc.tech"`
+			WebAppBaseUrl   string        `default:"http://127.0.0.1:3000" envconfig:"WEB_APP_BASE_URL" example:"www.example.saasstartupkit.com"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}

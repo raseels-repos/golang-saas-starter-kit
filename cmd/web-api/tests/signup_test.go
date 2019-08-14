@@ -50,13 +50,13 @@ func mockSignupRequest() signup.SignupRequest {
 func newMockSignup() mockSignup {
 	req := mockSignupRequest()
 	now := time.Now().UTC().AddDate(-1, -1, -1)
-	s, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, req, now)
+	s, err := appCtx.SignupRepo.Signup(tests.Context(), auth.Claims{}, req, now)
 	if err != nil {
 		panic(err)
 	}
 
 	expires := time.Now().UTC().Sub(s.User.CreatedAt) + time.Hour
-	tkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+	tkn, err := appCtx.AuthRepo.Authenticate(tests.Context(), user_auth.AuthenticateRequest{
 		Email:    req.User.Email,
 		Password: req.User.Password,
 	}, expires, now)

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net"
 	"net/http"
@@ -21,18 +20,30 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/docs"
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/securecookie"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
@@ -66,10 +77,9 @@ func main() {
 
 	// =========================================================================
 	// Logging
-	log.SetFlags(log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-	log.SetPrefix(service+" : ")
-	log := log.New(os.Stdout, log.Prefix() , log.Flags())
-
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.SetPrefix(service + " : ")
+	log := log.New(os.Stdout, log.Prefix(), log.Flags())
 
 	// =========================================================================
 	// Configuration
@@ -87,15 +97,20 @@ func main() {
 			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
 		Service struct {
-			Name            string        `default:"web-api" envconfig:"NAME"`
-			Project         string        `default:"" envconfig:"PROJECT"`
+			Name            string        `default:"web-api" envconfig:"SERVICE"`
 			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.example.saasstartupkit.com"`
 			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.example.saasstartupkit.com"`
 			EnableHTTPS     bool          `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			WebAppBaseUrl   string        `default:"http://127.0.0.1:3000" envconfig:"WEB_APP_BASE_URL" example:"www.example.saasstartupkit.com"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
+		}
+		Project struct {
+			Name              string `default:"" envconfig:"PROJECT"`
+			SharedTemplateDir string `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
+			SharedSecretKey   string `default:"" envconfig:"SHARED_SECRET_KEY"`
+			EmailSender       string `default:"test@example.saasstartupkit.com" envconfig:"EMAIL_SENDER"`
+			WebAppBaseUrl     string `default:"http://127.0.0.1:3000" envconfig:"WEB_APP_BASE_URL" example:"www.example.saasstartupkit.com"`
 		}
 		Redis struct {
 			Host            string        `default:":6379" envconfig:"HOST"`
@@ -185,8 +200,8 @@ func main() {
 	// deployments and distributed to each instance of the service running.
 	if cfg.Aws.SecretsManagerConfigPrefix == "" {
 		var pts []string
-		if cfg.Service.Project != "" {
-			pts = append(pts, cfg.Service.Project)
+		if cfg.Project.Name != "" {
+			pts = append(pts, cfg.Project.Name)
 		}
 		pts = append(pts, cfg.Env, cfg.Service.Name)
 
@@ -277,6 +292,37 @@ func main() {
 	}
 
 	// =========================================================================
+	// Shared Secret Key used for encrypting sessions and links.
+
+	// Set the secret key if not provided in the config.
+	if cfg.Project.SharedSecretKey == "" {
+
+		// AWS secrets manager ID for storing the session key. This is optional and only will be used
+		// if a valid AWS session is provided.
+		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "sharedSecretKey")
+
+		// If AWS is enabled, check the Secrets Manager for the session key.
+		if awsSession != nil {
+			cfg.Project.SharedSecretKey, err = devops.SecretManagerGetString(awsSession, secretID)
+			if err != nil && errors.Cause(err) != devops.ErrSecreteNotFound {
+				log.Fatalf("main : Session : %+v", err)
+			}
+		}
+
+		// If the session key is still empty, generate a new key.
+		if cfg.Project.SharedSecretKey == "" {
+			cfg.Project.SharedSecretKey = string(securecookie.GenerateRandomKey(32))
+
+			if awsSession != nil {
+				err = devops.SecretManagerPutString(awsSession, secretID, cfg.Project.SharedSecretKey)
+				if err != nil {
+					log.Fatalf("main : Session : %+v", err)
+				}
+			}
+		}
+	}
+
+	// =========================================================================
 	// Start Redis
 	// Ensure the eviction policy on the redis cluster is set correctly.
 	// 		AWS Elastic cache redis clusters by default have the volatile-lru.
@@ -347,6 +393,31 @@ func main() {
 	defer masterDb.Close()
 
 	// =========================================================================
+	// Notify Email
+	var notifyEmail notify.Email
+	if awsSession != nil {
+		// Send emails with AWS SES. Alternative to use SMTP with notify.NewEmailSmtp.
+		notifyEmail, err = notify.NewEmailAws(awsSession, cfg.Project.SharedTemplateDir, cfg.Project.EmailSender)
+		if err != nil {
+			log.Fatalf("main : Notify Email : %+v", err)
+		}
+
+		err = notifyEmail.Verify()
+		if err != nil {
+			switch errors.Cause(err) {
+			case notify.ErrAwsSesIdentityNotVerified:
+				log.Printf("main : Notify Email : %s\n", err)
+			case notify.ErrAwsSesSendingDisabled:
+				log.Printf("main : Notify Email : %s\n", err)
+			default:
+				log.Fatalf("main : Notify Email Verify : %+v", err)
+			}
+		}
+	} else {
+		notifyEmail = notify.NewEmailDisabled()
+	}
+
+	// =========================================================================
 	// Init new Authenticator
 	var authenticator *auth.Authenticator
 	if cfg.Auth.UseAwsSecretManager {
@@ -360,10 +431,40 @@ func main() {
 	}
 
 	// =========================================================================
-	// Load middlewares that need to be configured specific for the service.
-	var serviceMiddlewares = []web.Middleware{
-		mid.Translator(webcontext.UniversalTranslator()),
+	// Init repositories and AppContext
+
+	projectRoute, err := project_route.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
+	if err != nil {
+		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
 	}
+
+	usrRepo := user.NewRepository(masterDb, projectRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
+	usrAccRepo := user_account.NewRepository(masterDb)
+	accRepo := account.NewRepository(masterDb)
+	accPrefRepo := account_preference.NewRepository(masterDb)
+	authRepo := user_auth.NewRepository(masterDb, authenticator, usrRepo, usrAccRepo, accPrefRepo)
+	signupRepo := signup.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo)
+	inviteRepo := invite.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo, projectRoute.UserInviteAccept, notifyEmail, cfg.Project.SharedSecretKey)
+	prjRepo := project.NewRepository(masterDb)
+
+	appCtx := &handlers.AppContext{
+		Log:             log,
+		Env:             cfg.Env,
+		MasterDB:        masterDb,
+		Redis:           redisClient,
+		UserRepo:        usrRepo,
+		UserAccountRepo: usrAccRepo,
+		AccountRepo:     accRepo,
+		AccountPrefRepo: accPrefRepo,
+		AuthRepo:        authRepo,
+		SignupRepo:      signupRepo,
+		InviteRepo:      inviteRepo,
+		ProjectRepo:     prjRepo,
+		Authenticator:   authenticator,
+	}
+
+	// =========================================================================
+	// Load middlewares that need to be configured specific for the service.
 
 	// Init redirect middleware to ensure all requests go to the primary domain contained in the base URL.
 	if primaryServiceHost != "127.0.0.1" && primaryServiceHost != "localhost" {
@@ -380,8 +481,11 @@ func main() {
 			DomainName:   primaryServiceHost,
 			HTTPSEnabled: cfg.Service.EnableHTTPS,
 		})
-		serviceMiddlewares = append(serviceMiddlewares, redirect)
+		appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, redirect)
 	}
+
+	// Add the translator middleware for localization.
+	appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, mid.Translator(webcontext.UniversalTranslator()))
 
 	// =========================================================================
 	// Start Tracing Support
@@ -443,7 +547,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.API(shutdown, log, cfg.Env, masterDb, redisClient, authenticator, serviceMiddlewares...),
+			Handler:        handlers.API(shutdown, appCtx),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -460,7 +564,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.API(shutdown, log, cfg.Env, masterDb, redisClient, authenticator, serviceMiddlewares...),
+			Handler:        handlers.API(shutdown, appCtx),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

@@ -11,14 +11,13 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
 // Project represents the Project API method handler set.
 type Project struct {
-	MasterDB *sqlx.DB
+	*project.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
 }
@@ -41,7 +40,7 @@ type Project struct {
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [get]
-func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -108,7 +107,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
 
-	res, err := project.Find(ctx, claims, p.MasterDB, req)
+	res, err := h.Repository.Find(ctx, claims, req)
 	if err != nil {
 		return err
 	}
@@ -134,7 +133,7 @@ func (p *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [get]
-func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -151,7 +150,7 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		includeArchived = b
 	}
 
-	res, err := project.Read(ctx, claims, p.MasterDB, project.ProjectReadRequest{
+	res, err := h.Repository.Read(ctx, claims, project.ProjectReadRequest{
 		ID:              params["id"],
 		IncludeArchived: includeArchived,
 	})
@@ -182,7 +181,7 @@ func (p *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [post]
-func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -201,7 +200,7 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	res, err := project.Create(ctx, claims, p.MasterDB, req, v.Now)
+	res, err := h.Repository.Create(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -232,7 +231,7 @@ func (p *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [patch]
-func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -251,7 +250,7 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = project.Update(ctx, claims, p.MasterDB, req, v.Now)
+	err = h.Repository.Update(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -283,7 +282,7 @@ func (p *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/archive [patch]
-func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -302,7 +301,7 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = project.Archive(ctx, claims, p.MasterDB, req, v.Now)
+	err = h.Repository.Archive(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -334,13 +333,13 @@ func (p *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [delete]
-func (p *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = project.Delete(ctx, claims, p.MasterDB,
+	err = h.Repository.Delete(ctx, claims,
 		project.ProjectDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)

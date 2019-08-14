@@ -1,122 +1,134 @@
 package handlers
 
 import (
-	"context"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"log"
 	"net/http"
 	"os"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
-
 type AppContext struct {
-	Log *log.Logger
-	Env webcontext.Env
-	Repo *user.Repository
-	MasterDB *sqlx.DB
-	Redis *redis.Client
-	Authenticator *auth.Authenticator
-	PreAppMiddleware []web.Middleware
+	Log               *log.Logger
+	Env               webcontext.Env
+	MasterDB          *sqlx.DB
+	Redis             *redis.Client
+	UserRepo          *user.Repository
+	UserAccountRepo   *user_account.Repository
+	AccountRepo       *account.Repository
+	AccountPrefRepo   *account_preference.Repository
+	AuthRepo          *user_auth.Repository
+	SignupRepo        *signup.Repository
+	InviteRepo        *invite.Repository
+	ProjectRepo       *project.Repository
+	Authenticator     *auth.Authenticator
+	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
 }
 
-
 // API returns a handler for a set of routes.
-func API(shutdown chan os.Signal, appContext *AppContext ) http.Handler {
+func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
 	// Include the pre middlewares first.
-	middlewares := appContext.PreAppMiddleware
+	middlewares := appCtx.PreAppMiddleware
 
 	// Define app middlewares applied to all requests.
 	middlewares = append(middlewares,
 		mid.Trace(),
-		mid.Logger(appContext.Log),
-		mid.Errors(appContext.Log, nil),
+		mid.Logger(appCtx.Log),
+		mid.Errors(appCtx.Log, nil),
 		mid.Metrics(),
 		mid.Panics())
 
 	// Append any global middlewares that should be included after the app middlewares.
-	if len(appContext.PostAppMiddleware) > 0 {
-		middlewares = append(middlewares, appContext.PostAppMiddleware...)
+	if len(appCtx.PostAppMiddleware) > 0 {
+		middlewares = append(middlewares, appCtx.PostAppMiddleware...)
 	}
 
 	// Construct the web.App which holds all routes as well as common Middleware.
-	app := web.NewApp(shutdown, appContext.Log, appContext.Env, middlewares...)
+	app := web.NewApp(shutdown, appCtx.Log, appCtx.Env, middlewares...)
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
-		MasterDB: appContext.MasterDB,
-		Redis:    appContext.Redis,
+		MasterDB: appCtx.MasterDB,
+		Redis:    appCtx.Redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 	app.Handle("GET", "/ping", check.Ping)
 
+	// Register example endpoints.
+	ex := Example{
+		Project: appCtx.ProjectRepo,
+	}
+	app.Handle("GET", "/v1/examples/error-response", ex.ErrorResponse)
+
 	// Register user management and authentication endpoints.
 	u := User{
-		MasterDB:       appContext.MasterDB,
-		TokenGenerator: authenticator,
+		Repository: appCtx.UserRepo,
+		Auth:       appCtx.AuthRepo,
 	}
-	app.Handle("GET", "/v1/users", u.Find, mid.AuthenticateHeader(authenticator))
-	app.Handle("POST", "/v1/users", u.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/users/:id", u.Read, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/users", u.Update, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.AuthenticateHeader(authenticator))
+	app.Handle("GET", "/v1/users", u.Find, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("POST", "/v1/users", u.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/users/:id", u.Read, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/users", u.Update, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/users/password", u.UpdatePassword, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/users/archive", u.Archive, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/users/:id", u.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/users/switch-account/:account_id", u.SwitchAccount, mid.AuthenticateHeader(appCtx.Authenticator))
 
 	// This route is not authenticated
 	app.Handle("POST", "/v1/oauth/token", u.Token)
 
 	// Register user account management endpoints.
 	ua := UserAccount{
-		MasterDB: masterDB,
+		Repository: appCtx.UserAccountRepo,
 	}
-	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.AuthenticateHeader(authenticator))
-	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/user_accounts/:user_id/:account_id", ua.Read, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/user_accounts", ua.Find, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("POST", "/v1/user_accounts", ua.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/user_accounts/:user_id/:account_id", ua.Read, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/user_accounts", ua.Update, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/user_accounts/archive", ua.Archive, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register account endpoints.
 	a := Account{
-		MasterDB: masterDB,
+		Repository: appCtx.AccountRepo,
 	}
-	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/accounts", a.Update, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/accounts", a.Update, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register signup endpoints.
 	s := Signup{
-		MasterDB: masterDB,
+		Repository: appCtx.SignupRepo,
 	}
 	app.Handle("POST", "/v1/signup", s.Signup)
 
 	// Register project.
 	p := Project{
-		MasterDB: masterDB,
+		Repository: appCtx.ProjectRepo,
 	}
-	app.Handle("GET", "/v1/projects", p.Find, mid.AuthenticateHeader(authenticator))
-	app.Handle("POST", "/v1/projects", p.Create, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/projects/:id", p.Read, mid.AuthenticateHeader(authenticator))
-	app.Handle("PATCH", "/v1/projects", p.Update, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.AuthenticateHeader(authenticator), mid.HasRole(auth.RoleAdmin))
-
-	app.Handle("GET", "/v1/examples/error-response", ExampleErrorResponse)
+	app.Handle("GET", "/v1/projects", p.Find, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("POST", "/v1/projects", p.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/projects/:id", p.Read, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/projects", p.Update, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register swagger documentation.
 	// TODO: Add authentication. Current authenticator requires an Authorization header
@@ -125,36 +137,6 @@ func API(shutdown chan os.Signal, appContext *AppContext ) http.Handler {
 	app.Handle("GET", "/docs/*", saasSwagger.WrapHandler)
 
 	return app
-}
-
-// ExampleErrorResponse returns example error messages.
-func ExampleErrorResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-	v, err := webcontext.ContextValues(ctx)
-	if err != nil {
-		return err
-	}
-
-	if qv := r.URL.Query().Get("test-validation-error"); qv != "" {
-		_, err := project.Create(ctx, auth.Claims{}, nil, project.ProjectCreateRequest{}, v.Now)
-		return web.RespondJsonError(ctx, w, err)
-
-	}
-
-	if qv := r.URL.Query().Get("test-web-error"); qv != "" {
-		terr := errors.New("Some random error")
-		terr = errors.WithMessage(terr, "Actual error message")
-		rerr := weberror.NewError(ctx, terr, http.StatusBadRequest).(*weberror.Error)
-		rerr.Message = "Test Web Error Message"
-		return web.RespondJsonError(ctx, w, rerr)
-	}
-
-	if qv := r.URL.Query().Get("test-error"); qv != "" {
-		terr := errors.New("Test error")
-		terr = errors.WithMessage(terr, "Error message")
-		return web.RespondJsonError(ctx, w, terr)
-	}
-
-	return nil
 }
 
 // Types godoc

@@ -14,7 +14,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/gorilla/schema"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
@@ -24,8 +23,8 @@ var sessionTtl = time.Hour * 24
 
 // User represents the User API method handler set.
 type User struct {
-	MasterDB       *sqlx.DB
-	TokenGenerator user_auth.TokenGenerator
+	*user.Repository
+	Auth *user_auth.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
@@ -47,7 +46,7 @@ type User struct {
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [get]
-func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -114,7 +113,7 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
 
-	res, err := user.Find(ctx, claims, u.MasterDB, req)
+	res, err := h.Repository.Find(ctx, claims, req)
 	if err != nil {
 		return err
 	}
@@ -140,7 +139,7 @@ func (u *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/{id} [get]
-func (u *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -157,7 +156,7 @@ func (u *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		includeArchived = b
 	}
 
-	res, err := user.Read(ctx, claims, u.MasterDB, user.UserReadRequest{
+	res, err := h.Repository.Read(ctx, claims, user.UserReadRequest{
 		ID:              params["id"],
 		IncludeArchived: includeArchived,
 	})
@@ -187,7 +186,7 @@ func (u *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request,
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [post]
-func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -206,7 +205,7 @@ func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	res, err := user.Create(ctx, claims, u.MasterDB, req, v.Now)
+	res, err := h.Repository.Create(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -238,7 +237,7 @@ func (u *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [patch]
-func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -257,7 +256,7 @@ func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user.Update(ctx, claims, u.MasterDB, req, v.Now)
+	err = h.Repository.Update(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -289,7 +288,7 @@ func (u *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/password [patch]
-func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -308,7 +307,7 @@ func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user.UpdatePassword(ctx, claims, u.MasterDB, req, v.Now)
+	err = h.Repository.UpdatePassword(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -342,7 +341,7 @@ func (u *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/archive [patch]
-func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -361,7 +360,7 @@ func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user.Archive(ctx, claims, u.MasterDB, req, v.Now)
+	err = h.Repository.Archive(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -393,13 +392,13 @@ func (u *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/{id} [delete]
-func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = user.Delete(ctx, claims, u.MasterDB,
+	err = h.Repository.Delete(ctx, claims,
 		user.UserDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)
@@ -432,7 +431,7 @@ func (u *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 401 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/switch-account/{account_id} [patch]
-func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -443,7 +442,7 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		return err
 	}
 
-	tkn, err := user_auth.SwitchAccount(ctx, u.MasterDB, u.TokenGenerator, claims, user_auth.SwitchAccountRequest{
+	tkn, err := h.Auth.SwitchAccount(ctx, claims, user_auth.SwitchAccountRequest{
 		AccountID: params["account_id"],
 	}, sessionTtl, v.Now)
 	if err != nil {
@@ -479,7 +478,7 @@ func (u *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 401 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /oauth/token [post]
-func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -534,7 +533,7 @@ func (u *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		scopes = strings.Split(qv, ",")
 	}
 
-	tkn, err := user_auth.Authenticate(ctx, u.MasterDB, u.TokenGenerator, authReq, sessionTtl, v.Now, scopes...)
+	tkn, err := h.Auth.Authenticate(ctx, authReq, sessionTtl, v.Now, scopes...)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

@@ -10,14 +10,13 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
 // Signup represents the Signup API method handler set.
 type Signup struct {
-	MasterDB *sqlx.DB
+	*signup.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
@@ -33,7 +32,7 @@ type Signup struct {
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /signup [post]
-func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -50,7 +49,7 @@ func (c *Signup) Signup(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	res, err := signup.Signup(ctx, claims, c.MasterDB, req, v.Now)
+	res, err := h.Repository.Signup(ctx, claims, req, v.Now)
 	if err != nil {
 		switch errors.Cause(err) {
 		case account.ErrForbidden:

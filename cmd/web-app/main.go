@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
 	"html/template"
 	"log"
 	"net"
@@ -88,12 +89,10 @@ func main() {
 		}
 		Service struct {
 			Name              string   `default:"web-app" envconfig:"NAME"`
-			Project           string   `default:"" envconfig:"PROJECT"`
 			BaseUrl           string   `default:"" envconfig:"BASE_URL"  example:"http://example.saasstartupkit.com"`
 			HostNames         []string `envconfig:"HOST_NAMES" example:"www.example.saasstartupkit.com"`
 			EnableHTTPS       bool     `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir       string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
-			SharedTemplateDir string   `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
 			StaticFiles       struct {
 				Dir               string `default:"./static" envconfig:"STATIC_DIR"`
 				S3Enabled         bool   `envconfig:"S3_ENABLED"`
@@ -101,12 +100,16 @@ func main() {
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
-			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.example.saasstartupkit.com"`
-			SessionKey      string        `default:"" envconfig:"SESSION_KEY"`
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
-			EmailSender     string        `default:"test@example.saasstartupkit.com" envconfig:"EMAIL_SENDER"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
+		}
+		Project struct {
+			Name           string   `default:"" envconfig:"PROJECT"`
+			SharedTemplateDir string   `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
+			SharedSecretKey      string        `default:"" envconfig:"SHARED_SECRET_KEY"`
+			EmailSender     string        `default:"test@example.saasstartupkit.com" envconfig:"EMAIL_SENDER"`
+			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.example.saasstartupkit.com"`
 		}
 		Redis struct {
 			Host            string        `default:":6379" envconfig:"HOST"`
@@ -144,12 +147,6 @@ func main() {
 		Auth struct {
 			UseAwsSecretManager bool          `default:"false" envconfig:"USE_AWS_SECRET_MANAGER"`
 			KeyExpiration       time.Duration `default:"3600s" envconfig:"KEY_EXPIRATION"`
-		}
-		STMP struct {
-			Host string `default:"localhost" envconfig:"HOST"`
-			Port int    `default:"25" envconfig:"PORT"`
-			User string `default:"" envconfig:"USER"`
-			Pass string `default:"" envconfig:"PASS" json:"-"` // don't print
 		}
 		BuildInfo struct {
 			CiCommitRefName  string `envconfig:"CI_COMMIT_REF_NAME"`
@@ -202,8 +199,8 @@ func main() {
 	// deployments and distributed to each instance of the service running.
 	if cfg.Aws.SecretsManagerConfigPrefix == "" {
 		var pts []string
-		if cfg.Service.Project != "" {
-			pts = append(pts, cfg.Service.Project)
+		if cfg.Project.Name != "" {
+			pts = append(pts, cfg.Project.Name)
 		}
 		pts = append(pts, cfg.Env, cfg.Service.Name)
 
@@ -294,6 +291,37 @@ func main() {
 	}
 
 	// =========================================================================
+	// Shared Secret Key used for encrypting sessions and links.
+
+	// Set the secret key if not provided in the config.
+	if cfg.Project.SharedSecretKey == "" {
+
+		// AWS secrets manager ID for storing the session key. This is optional and only will be used
+		// if a valid AWS session is provided.
+		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "sharedSecretKey")
+
+		// If AWS is enabled, check the Secrets Manager for the session key.
+		if awsSession != nil {
+			cfg.Project.SharedSecretKey, err = devops.SecretManagerGetString(awsSession, secretID)
+			if err != nil && errors.Cause(err) != devops.ErrSecreteNotFound {
+				log.Fatalf("main : Session : %+v", err)
+			}
+		}
+
+		// If the session key is still empty, generate a new key.
+		if cfg.Project.SharedSecretKey == "" {
+			cfg.Project.SharedSecretKey  = string(securecookie.GenerateRandomKey(32))
+
+			if awsSession != nil {
+				err = devops.SecretManagerPutString(awsSession, secretID, cfg.Service.SecretKey)
+				if err != nil {
+					log.Fatalf("main : Session : %+v", err)
+				}
+			}
+		}
+	}
+
+	// =========================================================================
 	// Start Redis
 	// Ensure the eviction policy on the redis cluster is set correctly.
 	// 		AWS Elastic cache redis clusters by default have the volatile-lru.
@@ -367,6 +395,7 @@ func main() {
 	// Notify Email
 	var notifyEmail notify.Email
 	if awsSession != nil {
+		// Send emails with AWS SES. Alternative to use SMTP with notify.NewEmailSmtp.
 		notifyEmail, err = notify.NewEmailAws(awsSession, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
 		if err != nil {
 			log.Fatalf("main : Notify Email : %+v", err)
@@ -384,15 +413,7 @@ func main() {
 			}
 		}
 	} else {
-		d := gomail.Dialer{
-			Host:     cfg.STMP.Host,
-			Port:     cfg.STMP.Port,
-			Username: cfg.STMP.User,
-			Password: cfg.STMP.Pass}
-		notifyEmail, err = notify.NewEmailSmtp(d, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
-		if err != nil {
-			log.Fatalf("main : Notify Email : %+v", err)
-		}
+		notifyEmail = notify.NewEmailDisabled()
 	}
 
 	// =========================================================================
@@ -433,46 +454,18 @@ func main() {
 		serviceMiddlewares = append(serviceMiddlewares, redirect)
 	}
 
+	// Generate the new session store and append it to the global list of middlewares.
+
 	// Init session store
 	if cfg.Service.SessionName == "" {
 		cfg.Service.SessionName = fmt.Sprintf("%s-session", cfg.Service.Name)
 	}
-
-	// Set the session key if not provided in the config.
-	if cfg.Service.SessionKey == "" {
-
-		// AWS secrets manager ID for storing the session key. This is optional and only will be used
-		// if a valid AWS session is provided.
-		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "session")
-
-		// If AWS is enabled, check the Secrets Manager for the session key.
-		if awsSession != nil {
-			cfg.Service.SessionKey, err = devops.SecretManagerGetString(awsSession, secretID)
-			if err != nil && errors.Cause(err) != devops.ErrSecreteNotFound {
-				log.Fatalf("main : Session : %+v", err)
-			}
-		}
-
-		// If the session key is still empty, generate a new key.
-		if cfg.Service.SessionKey == "" {
-			cfg.Service.SessionKey = string(securecookie.GenerateRandomKey(32))
-
-			if awsSession != nil {
-				err = devops.SecretManagerPutString(awsSession, secretID, cfg.Service.SessionKey)
-				if err != nil {
-					log.Fatalf("main : Session : %+v", err)
-				}
-			}
-		}
-	}
-
-	// Generate the new session store and append it to the global list of middlewares.
-	sessionStore := sessions.NewCookieStore([]byte(cfg.Service.SessionKey))
+	sessionStore := sessions.NewCookieStore([]byte(cfg.Service.SecretKey))
 	serviceMiddlewares = append(serviceMiddlewares, mid.Session(sessionStore, cfg.Service.SessionName))
 
 	// =========================================================================
 	// URL Formatter
-	projectRoutes, err := project_routes.New(cfg.Service.WebApiBaseUrl, cfg.Service.BaseUrl)
+	projectRoutes, err := project_route.New(cfg.Service.WebApiBaseUrl, cfg.Service.BaseUrl)
 	if err != nil {
 		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
 	}
@@ -926,7 +919,7 @@ func main() {
 	if cfg.HTTP.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTP.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SessionKey, notifyEmail, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SecretKey, notifyEmail, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTP.ReadTimeout,
 			WriteTimeout:   cfg.HTTP.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -943,7 +936,7 @@ func main() {
 	if cfg.HTTPS.Host != "" {
 		api := http.Server{
 			Addr:           cfg.HTTPS.Host,
-			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SessionKey, notifyEmail, renderer, serviceMiddlewares...),
+			Handler:        handlers.APP(shutdown, log, cfg.Env, cfg.Service.StaticFiles.Dir, cfg.Service.TemplateDir, masterDb, redisClient, authenticator, projectRoutes, cfg.Service.SecretKey, notifyEmail, renderer, serviceMiddlewares...),
 			ReadTimeout:    cfg.HTTPS.ReadTimeout,
 			WriteTimeout:   cfg.HTTPS.WriteTimeout,
 			MaxHeaderBytes: 1 << 20,

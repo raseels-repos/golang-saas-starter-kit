@@ -414,7 +414,7 @@ func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req Pro
 }
 
 // Delete removes an project from the database.
-func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req ProjectDeleteRequest) error {
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req ProjectDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
 	defer span.Finish()
 
@@ -437,8 +437,8 @@ func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, dbConn *
 	query.Where(query.Equal("id", req.ID))
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "delete project %s failed", req.ID)

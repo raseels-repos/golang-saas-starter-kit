@@ -571,12 +571,12 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 			if req.S3BucketPublicName != "" || req.S3BucketPrivateName != "" {
 				var bpr []string
 				if req.S3BucketPublicName != "" {
-					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName )
-					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName + "/*" )
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName)
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPublicName+"/*")
 				}
 				if req.S3BucketPrivateName != "" {
-					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName )
-					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName + "/*" )
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName)
+					bpr = append(bpr, "arn:aws:s3:::"+req.S3BucketPrivateName+"/*")
 				}
 
 				bp := IamStatementEntry{
@@ -918,7 +918,7 @@ func NewServiceDeployRequest(log *log.Logger, flags ServiceDeployFlags) (*servic
 }
 
 // Run is the main entrypoint for deploying a service for a given target environment.
-func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
+func ServiceDeploy(log *log.Logger, ctx context.Context, req *serviceDeployRequest) error {
 
 	startTime := time.Now()
 
@@ -1533,7 +1533,7 @@ func ServiceDeploy(log *log.Logger, req *serviceDeployRequest) error {
 
 			// Start the database migrations.
 			log.Printf("\t\tStart migrations.")
-			if err = schema.Migrate(masterDb, log, false); err != nil {
+			if err = schema.Migrate(ctx, masterDb, log, false); err != nil {
 				return errors.WithStack(err)
 			}
 			log.Printf("\t\tFinished migrations.")

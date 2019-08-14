@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/kelseyhightower/envconfig"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
-	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
+	"github.com/kelseyhightower/envconfig"
 )
 
 // Success and failure markers.
@@ -48,15 +48,14 @@ func New() *Test {
 
 	log := log.New(os.Stdout, "TEST : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-
 	// =========================================================================
 	// Configuration
 	var cfg struct {
 		Aws struct {
-			AccessKeyID                string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
-			SecretAccessKey            string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
-			Region                     string `default:"us-west-2" envconfig:"AWS_REGION"`
-			UseRole bool `envconfig:"AWS_USE_ROLE"`
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region          string `default:"us-west-2" envconfig:"AWS_REGION"`
+			UseRole         bool   `envconfig:"AWS_USE_ROLE"`
 		}
 	}
 
@@ -64,7 +63,6 @@ func New() *Test {
 	if err := envconfig.Process("TESTS", &cfg); err != nil {
 		log.Fatalf("startup : Parsing Config : %+v", err)
 	}
-
 
 	// AWS access keys are required, if roles are enabled, remove any placeholders.
 	if cfg.Aws.UseRole {
@@ -97,7 +95,6 @@ func New() *Test {
 		log.Printf("startup : Config : %v\n", string(cfgJSON))
 	}
 
-
 	// ============================================================
 	// Init AWS Session
 	var awsSession *session.Session
@@ -117,7 +114,6 @@ func New() *Test {
 
 		log.Printf("startup : AWS : Using static credentials\n")
 	}
-
 
 	// ============================================================
 	// Startup Postgres container

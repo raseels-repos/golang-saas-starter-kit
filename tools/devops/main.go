@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"expvar"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/tools/devops/cmd/cicd"
 	_ "github.com/lib/pq"
@@ -111,7 +114,16 @@ func main() {
 				if err != nil {
 					return err
 				}
-				return cicd.ServiceDeploy(log, req)
+
+				// Set the context with the required values to
+				// process the request.
+				v := webcontext.Values{
+					Now: time.Now(),
+					Env: req.Env,
+				}
+				ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+
+				return cicd.ServiceDeploy(log, ctx, req)
 			},
 		},
 		{
@@ -127,7 +139,16 @@ func main() {
 				if err != nil {
 					return err
 				}
-				return cicd.Migrate(log, req)
+
+				// Set the context with the required values to
+				// process the request.
+				v := webcontext.Values{
+					Now: time.Now(),
+					Env: req.Env,
+				}
+				ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+
+				return cicd.Migrate(log, ctx, req)
 			},
 		},
 	}

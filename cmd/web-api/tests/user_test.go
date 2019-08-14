@@ -1406,7 +1406,7 @@ func TestUserToken(t *testing.T) {
 
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
-			Error:       "Field validation error",
+			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
 				{
 					Field:   "username",

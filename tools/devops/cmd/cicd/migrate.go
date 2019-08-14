@@ -1,6 +1,7 @@
 package cicd
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"path/filepath"
@@ -144,7 +145,7 @@ func NewMigrateRequest(log *log.Logger, flags MigrateFlags) (*migrateRequest, er
 }
 
 // Run is the main entrypoint for migration of database schema for a given target environment.
-func Migrate(log *log.Logger, req *migrateRequest) error {
+func Migrate(log *log.Logger, ctx context.Context, req *migrateRequest) error {
 
 	// Load the database details.
 	var db DB
@@ -200,7 +201,7 @@ func Migrate(log *log.Logger, req *migrateRequest) error {
 
 		// Start Migrations
 		log.Printf("\t\tStart migrations.")
-		if err = schema.Migrate(masterDb, log, false); err != nil {
+		if err = schema.Migrate(ctx, masterDb, log, false); err != nil {
 			return errors.WithStack(err)
 		}
 

@@ -13,8 +13,7 @@
         "options": {
           "awslogs-group": "{AWS_LOGS_GROUP}",
           "awslogs-region": "{AWS_REGION}",
-          "awslogs-stream-prefix": "ecs",
-          "_awslogs-datetime-format": "%Y\/%m\/%d %H:%M:%S.%L"
+          "awslogs-stream-prefix": "ecs"
         }
       },
       "portMappings": [

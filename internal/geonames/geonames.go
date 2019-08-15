@@ -8,10 +8,13 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -324,4 +327,135 @@ func loadGeonameCountry(ctx context.Context, rr chan<- interface{}, country stri
 			rr <- errors.WithStack(err)
 		}
 	}
+}
+
+// GetGeonameCountry downloads geoname data for the country.
+// Parses data and returns slice of Geoname
+func GetGeonameCountry(ctx context.Context, country string) ([]Geoname, error) {
+	res := make([]Geoname, 0)
+	var err error
+	var resp *http.Response
+
+	u := fmt.Sprintf("http://download.geonames.org/export/zip/%s.zip", country)
+	resp, err = pester.Get(u)
+	if err != nil {
+		for i := 0; i < 3; i++ {
+			resp, err = pester.Get(u)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Second * 1)
+		}
+		if err != nil {
+			err = errors.WithMessagef(err, "Failed to read countries from '%s'", u)
+			return res, err
+		}
+	}
+	defer resp.Body.Close()
+
+	br := bufio.NewReader(resp.Body)
+
+	buff := bytes.NewBuffer([]byte{})
+	size, err := io.Copy(buff, br)
+	if err != nil {
+		err = errors.WithStack(err)
+		return res, err
+	}
+
+	b := bytes.NewReader(buff.Bytes())
+	zr, err := zip.NewReader(b, size)
+	if err != nil {
+		err = errors.WithStack(err)
+		return res, err
+	}
+
+	for _, f := range zr.File {
+		if f.Name == "readme.txt" {
+			continue
+		}
+
+		fh, err := f.Open()
+		if err != nil {
+			err = errors.WithStack(err)
+			return res, err
+		}
+
+		scanner := bufio.NewScanner(fh)
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			if strings.Contains(line, "\"") {
+				line = strings.Replace(line, "\"", "\\\"", -1)
+			}
+
+			r := csv.NewReader(strings.NewReader(line))
+			r.Comma = '\t' // Use tab-delimited instead of comma <---- here!
+			r.LazyQuotes = true
+			r.FieldsPerRecord = -1
+
+			lines, err := r.ReadAll()
+			if err != nil {
+				err = errors.WithStack(err)
+				continue
+			}
+
+			for _, row := range lines {
+
+				/*
+					fmt.Println("CountryCode: row[0]", row[0])
+					fmt.Println("PostalCode: row[1]", row[1])
+					fmt.Println("PlaceName: row[2]", row[2])
+					fmt.Println("StateName: row[3]", row[3])
+					fmt.Println("StateCode : row[4]", row[4])
+					fmt.Println("CountyName: row[5]", row[5])
+					fmt.Println("CountyCode : row[6]", row[6])
+					fmt.Println("CommunityName: row[7]", row[7])
+					fmt.Println("CommunityCode: row[8]", row[8])
+					fmt.Println("Latitude: row[9]", row[9])
+					fmt.Println("Longitude: row[10]", row[10])
+					fmt.Println("Accuracy: row[11]", row[11])
+				*/
+
+				gn := Geoname{
+					CountryCode:   row[0],
+					PostalCode:    row[1],
+					PlaceName:     row[2],
+					StateName:     row[3],
+					StateCode:     row[4],
+					CountyName:    row[5],
+					CountyCode:    row[6],
+					CommunityName: row[7],
+					CommunityCode: row[8],
+				}
+				if row[9] != "" {
+					gn.Latitude, err = decimal.NewFromString(row[9])
+					if err != nil {
+						err = errors.WithStack(err)
+					}
+				}
+
+				if row[10] != "" {
+					gn.Longitude, err = decimal.NewFromString(row[10])
+					if err != nil {
+						err = errors.WithStack(err)
+					}
+				}
+
+				if row[11] != "" {
+					gn.Accuracy, err = strconv.Atoi(row[11])
+					if err != nil {
+						err = errors.WithStack(err)
+					}
+				}
+
+				res = append(res, gn)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			err = errors.WithStack(err)
+		}
+	}
+
+	return res, err
 }

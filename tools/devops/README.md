@@ -26,7 +26,7 @@ in other configuration files. And since this project is open-source, we wanted t
 
 If you don't have an AWS account, signup for one now and then proceed with the deployment setup. 
 
-We assume that if you are deploying the SaaS Stater Kit, you are starting from scratch with no existing dependencies. 
+We assume that if you are deploying the SaaS Starter Kit, you are starting from scratch with no existing dependencies. 
 This however, excludes any domain names that you would like to use for resolving your services publicly. To use any 
 pre-purchased domain names, make sure they are added to Route 53 in the AWS account. Or you can let the deploy script 
 create a new zone is Route 53 and update the DNS for the domain name when your ready to make the transition. It is 

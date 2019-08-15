@@ -20,9 +20,10 @@ import (
 
 // Signup represents the Signup API method handler set.
 type Signup struct {
-	MasterDB      *sqlx.DB
-	Renderer      web.Renderer
-	Authenticator *auth.Authenticator
+	SignupRepo *signup.Repository
+	AuthRepo   *user_auth.Repository
+	MasterDB   *sqlx.DB
+	Renderer   web.Renderer
 }
 
 // Step1 handles collecting the first detailed needed to create a new account.
@@ -52,7 +53,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Execute the account / user signup.
-			_, err = signup.Signup(ctx, claims, h.MasterDB, *req, ctxValues.Now)
+			_, err = h.SignupRepo.Signup(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case account.ErrForbidden:
@@ -68,7 +69,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Authenticated the new user.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+			token, err := h.AuthRepo.Authenticate(ctx, user_auth.AuthenticateRequest{
 				Email:    req.User.Email,
 				Password: req.User.Password,
 			}, time.Hour, ctxValues.Now)
@@ -77,7 +78,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
+			err = handleSessionToken(ctx, w, r, token)
 			if err != nil {
 				return false, err
 			}

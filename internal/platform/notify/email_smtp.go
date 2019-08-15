@@ -20,7 +20,7 @@ package notify
 		Username: cfg.SMTP.User,
 		Password: cfg.SMTP.Pass}
 	notifyEmail, err = notify.NewEmailSmtp(d, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
- */
+*/
 
 import (
 	"context"

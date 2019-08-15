@@ -272,3 +272,8 @@ func ParseResetHash(ctx context.Context, secretKey string, str string, now time.
 
 	return &hash, nil
 }
+
+// ParseResetHash extracts the details encrypted in the hash string.
+func (repo *Repository) ParseResetHash(ctx context.Context, str string, now time.Time) (*ResetHash, error) {
+	return ParseResetHash(ctx, repo.secretKey, str, now)
+}

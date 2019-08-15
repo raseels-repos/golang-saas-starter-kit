@@ -11,11 +11,9 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
@@ -27,12 +25,12 @@ import (
 
 // User represents the User API method handler set.
 type User struct {
-	MasterDB      *sqlx.DB
-	Renderer      web.Renderer
-	Authenticator *auth.Authenticator
-	ProjectRoutes project_routes.ProjectRoutes
-	NotifyEmail   notify.Email
-	SecretKey     string
+	UserRepo        *user.Repository
+	AuthRepo        *user_auth.Repository
+	UserAccountRepo *user_account.Repository
+	AccountRepo     *account.Repository
+	MasterDB        *sqlx.DB
+	Renderer        web.Renderer
 }
 
 func urlUserVirtualLogin(userID string) string {
@@ -75,7 +73,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Authenticated the user.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+			token, err := h.AuthRepo.Authenticate(ctx, user_auth.AuthenticateRequest{
 				Email:    req.Email,
 				Password: req.Password,
 			}, sessionTTL, ctxValues.Now)
@@ -97,7 +95,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
+			err = handleSessionToken(ctx, w, r, token)
 			if err != nil {
 				return false, err
 			}
@@ -173,7 +171,7 @@ func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http
 				return err
 			}
 
-			_, err = user.ResetPassword(ctx, h.MasterDB, h.ProjectRoutes.UserResetPassword, h.NotifyEmail, *req, h.SecretKey, ctxValues.Now)
+			_, err = h.UserRepo.ResetPassword(ctx, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -238,7 +236,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			// Append the query param value to the request.
 			req.ResetHash = resetHash
 
-			u, err := user.ResetConfirm(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			u, err := h.UserRepo.ResetConfirm(ctx, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case user.ErrResetExpired:
@@ -257,7 +255,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+			token, err := h.AuthRepo.Authenticate(ctx, user_auth.AuthenticateRequest{
 				Email:    u.Email,
 				Password: req.Password,
 			}, time.Hour, ctxValues.Now)
@@ -271,7 +269,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
+			err = handleSessionToken(ctx, w, r, token)
 			if err != nil {
 				return false, err
 			}
@@ -280,7 +278,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
-		_, err = user.ParseResetHash(ctx, h.SecretKey, resetHash, ctxValues.Now)
+		_, err = h.UserRepo.ParseResetHash(ctx, resetHash, ctxValues.Now)
 		if err != nil {
 			switch errors.Cause(err) {
 			case user.ErrResetExpired:
@@ -328,14 +326,14 @@ func (h *User) View(ctx context.Context, w http.ResponseWriter, r *http.Request,
 			return err
 		}
 
-		usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
+		usr, err := h.UserRepo.ReadByID(ctx, claims, claims.Subject)
 		if err != nil {
 			return err
 		}
 
 		data["user"] = usr.Response(ctx)
 
-		usrAccs, err := user_account.FindByUserID(ctx, claims, h.MasterDB, claims.Subject, false)
+		usrAccs, err := h.UserAccountRepo.FindByUserID(ctx, claims, claims.Subject, false)
 		if err != nil {
 			return err
 		}
@@ -388,7 +386,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			}
 			req.ID = claims.Subject
 
-			err = user.Update(ctx, claims, h.MasterDB, *req, ctxValues.Now)
+			err = h.UserRepo.Update(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -409,7 +407,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 				}
 				pwdReq.ID = claims.Subject
 
-				err = user.UpdatePassword(ctx, claims, h.MasterDB, *pwdReq, ctxValues.Now)
+				err = h.UserRepo.UpdatePassword(ctx, claims, *pwdReq, ctxValues.Now)
 				if err != nil {
 					switch errors.Cause(err) {
 					default:
@@ -441,7 +439,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return nil
 	}
 
-	usr, err := user.ReadByID(ctx, claims, h.MasterDB, claims.Subject)
+	usr, err := h.UserRepo.ReadByID(ctx, claims, claims.Subject)
 	if err != nil {
 		return err
 	}
@@ -484,7 +482,7 @@ func (h *User) Account(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			return err
 		}
 
-		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
+		acc, err := h.AccountRepo.ReadByID(ctx, claims, claims.Audience)
 		if err != nil {
 			return err
 		}
@@ -551,7 +549,7 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 			}
 
 			// Perform the account switch.
-			tkn, err := user_auth.VirtualLogin(ctx, h.MasterDB, h.Authenticator, claims, *req, expires, ctxValues.Now)
+			tkn, err := h.AuthRepo.VirtualLogin(ctx, claims, *req, expires, ctxValues.Now)
 			if err != nil {
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)
@@ -565,7 +563,7 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 			sess = webcontext.SessionUpdateAccessToken(sess, tkn.AccessToken)
 
 			// Read the account for a flash message.
-			usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+			usr, err := h.UserRepo.ReadByID(ctx, claims, tkn.UserID)
 			if err != nil {
 				return false, err
 			}
@@ -588,7 +586,7 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 		return nil
 	}
 
-	usrAccs, err := user_account.Find(ctx, claims, h.MasterDB, user_account.UserAccountFindRequest{
+	usrAccs, err := h.UserAccountRepo.Find(ctx, claims, user_account.UserAccountFindRequest{
 		Where: "account_id = ?",
 		Args:  []interface{}{claims.Audience},
 	})
@@ -612,7 +610,7 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 		userPhs = append(userPhs, "?")
 	}
 
-	users, err := user.Find(ctx, claims, h.MasterDB, user.UserFindRequest{
+	users, err := h.UserRepo.Find(ctx, claims, user.UserFindRequest{
 		Where: fmt.Sprintf("id IN (%s)",
 			strings.Join(userPhs, ", ")),
 		Args: userIDs,
@@ -657,7 +655,7 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 		expires = time.Hour
 	}
 
-	tkn, err := user_auth.VirtualLogout(ctx, h.MasterDB, h.Authenticator, claims, expires, ctxValues.Now)
+	tkn, err := h.AuthRepo.VirtualLogout(ctx, claims, expires, ctxValues.Now)
 	if err != nil {
 		return err
 	}
@@ -667,11 +665,11 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 
 	// Display a success message to verify the user has switched contexts.
 	if claims.Subject != tkn.UserID && claims.Audience != tkn.AccountID {
-		usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+		usr, err := h.UserRepo.ReadByID(ctx, claims, tkn.UserID)
 		if err != nil {
 			return err
 		}
-		acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+		acc, err := h.AccountRepo.ReadByID(ctx, claims, tkn.AccountID)
 		if err != nil {
 			return err
 		}
@@ -680,7 +678,7 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 			fmt.Sprintf("You are now virtually logged back into account %s user %s.",
 				acc.Response(ctx).Name, usr.Response(ctx).Name))
 	} else if claims.Audience != tkn.AccountID {
-		acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+		acc, err := h.AccountRepo.ReadByID(ctx, claims, tkn.AccountID)
 		if err != nil {
 			return err
 		}
@@ -689,7 +687,7 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 			fmt.Sprintf("You are now virtually logged back into account %s.",
 				acc.Response(ctx).Name))
 	} else {
-		usr, err := user.ReadByID(ctx, claims, h.MasterDB, tkn.UserID)
+		usr, err := h.UserRepo.ReadByID(ctx, claims, tkn.UserID)
 		if err != nil {
 			return err
 		}
@@ -757,7 +755,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Perform the account switch.
-			tkn, err := user_auth.SwitchAccount(ctx, h.MasterDB, h.Authenticator, claims, *req, expires, ctxValues.Now)
+			tkn, err := h.AuthRepo.SwitchAccount(ctx, claims, *req, expires, ctxValues.Now)
 			if err != nil {
 				if verr, ok := weberror.NewValidationError(ctx, err); ok {
 					data["validationErrors"] = verr.(*weberror.Error)
@@ -771,7 +769,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 			sess = webcontext.SessionUpdateAccessToken(sess, tkn.AccessToken)
 
 			// Read the account for a flash message.
-			acc, err := account.ReadByID(ctx, claims, h.MasterDB, tkn.AccountID)
+			acc, err := h.AccountRepo.ReadByID(ctx, claims, tkn.AccountID)
 			if err != nil {
 				return false, err
 			}
@@ -794,7 +792,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
-	accounts, err := account.Find(ctx, claims, h.MasterDB, account.AccountFindRequest{
+	accounts, err := h.AccountRepo.Find(ctx, claims, account.AccountFindRequest{
 		Order: []string{"name"},
 	})
 	if err != nil {
@@ -816,7 +814,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 }
 
 // handleSessionToken persists the access token to the session for request authentication.
-func handleSessionToken(ctx context.Context, db *sqlx.DB, w http.ResponseWriter, r *http.Request, token user_auth.Token) error {
+func handleSessionToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token user_auth.Token) error {
 	if token.AccessToken == "" {
 		return errors.New("accessToken is required.")
 	}

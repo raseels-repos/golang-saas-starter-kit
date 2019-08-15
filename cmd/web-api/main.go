@@ -97,7 +97,7 @@ func main() {
 			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
 		Service struct {
-			Name            string        `default:"web-api" envconfig:"SERVICE"`
+			Name            string        `default:"web-api" envconfig:"SERVICE_NAME"`
 			BaseUrl         string        `default:"" envconfig:"BASE_URL"  example:"http://api.example.saasstartupkit.com"`
 			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.example.saasstartupkit.com"`
 			EnableHTTPS     bool          `default:"false" envconfig:"ENABLE_HTTPS"`
@@ -106,7 +106,7 @@ func main() {
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
 		Project struct {
-			Name              string `default:"" envconfig:"PROJECT"`
+			Name              string `default:"" envconfig:"PROJECT_NAME"`
 			SharedTemplateDir string `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
 			SharedSecretKey   string `default:"" envconfig:"SHARED_SECRET_KEY"`
 			EmailSender       string `default:"test@example.saasstartupkit.com" envconfig:"EMAIL_SENDER"`
@@ -203,7 +203,7 @@ func main() {
 		if cfg.Project.Name != "" {
 			pts = append(pts, cfg.Project.Name)
 		}
-		pts = append(pts, cfg.Env, cfg.Service.Name)
+		pts = append(pts, cfg.Env)
 
 		cfg.Aws.SecretsManagerConfigPrefix = filepath.Join(pts...)
 	}
@@ -299,7 +299,7 @@ func main() {
 
 		// AWS secrets manager ID for storing the session key. This is optional and only will be used
 		// if a valid AWS session is provided.
-		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "sharedSecretKey")
+		secretID := filepath.Join(cfg.Aws.SecretsManagerConfigPrefix, "SharedSecretKey")
 
 		// If AWS is enabled, check the Secrets Manager for the session key.
 		if awsSession != nil {

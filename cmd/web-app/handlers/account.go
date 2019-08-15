@@ -12,6 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -19,9 +20,12 @@ import (
 
 // Account represents the Account API method handler set.
 type Account struct {
-	MasterDB      *sqlx.DB
-	Renderer      web.Renderer
-	Authenticator *auth.Authenticator
+	AccountRepo     *account.Repository
+	AccountPrefRepo *account_preference.Repository
+	AuthRepo        *user_auth.Repository
+	Authenticator   *auth.Authenticator
+	MasterDB        *sqlx.DB
+	Renderer        web.Renderer
 }
 
 // View handles displaying the current account profile.
@@ -35,7 +39,7 @@ func (h *Account) View(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			return err
 		}
 
-		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
+		acc, err := h.AccountRepo.ReadByID(ctx, claims, claims.Audience)
 		if err != nil {
 			return err
 		}
@@ -77,7 +81,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return false, err
 		}
 
-		prefs, err := account_preference.FindByAccountID(ctx, claims, h.MasterDB, account_preference.AccountPreferenceFindByAccountIDRequest{
+		prefs, err := h.AccountPrefRepo.FindByAccountID(ctx, claims, account_preference.AccountPreferenceFindByAccountIDRequest{
 			AccountID: claims.Audience,
 		})
 		if err != nil {
@@ -115,7 +119,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			}
 			req.ID = claims.Audience
 
-			err = account.Update(ctx, claims, h.MasterDB, req.AccountUpdateRequest, ctxValues.Now)
+			err = h.AccountRepo.Update(ctx, claims, req.AccountUpdateRequest, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -135,7 +139,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			}
 
 			if preferenceDatetimeFormat != req.PreferenceDatetimeFormat {
-				err = account_preference.Set(ctx, claims, h.MasterDB, account_preference.AccountPreferenceSetRequest{
+				err = h.AccountPrefRepo.Set(ctx, claims, account_preference.AccountPreferenceSetRequest{
 					AccountID: claims.Audience,
 					Name:      account_preference.AccountPreference_Datetime_Format,
 					Value:     req.PreferenceDatetimeFormat,
@@ -156,7 +160,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			}
 
 			if preferenceDateFormat != req.PreferenceDateFormat {
-				err = account_preference.Set(ctx, claims, h.MasterDB, account_preference.AccountPreferenceSetRequest{
+				err = h.AccountPrefRepo.Set(ctx, claims, account_preference.AccountPreferenceSetRequest{
 					AccountID: claims.Audience,
 					Name:      account_preference.AccountPreference_Date_Format,
 					Value:     req.PreferenceDateFormat,
@@ -177,7 +181,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			}
 
 			if preferenceTimeFormat != req.PreferenceTimeFormat {
-				err = account_preference.Set(ctx, claims, h.MasterDB, account_preference.AccountPreferenceSetRequest{
+				err = h.AccountPrefRepo.Set(ctx, claims, account_preference.AccountPreferenceSetRequest{
 					AccountID: claims.Audience,
 					Name:      account_preference.AccountPreference_Time_Format,
 					Value:     req.PreferenceTimeFormat,
@@ -213,7 +217,7 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return true, web.Redirect(ctx, w, r, "/account", http.StatusFound)
 		}
 
-		acc, err := account.ReadByID(ctx, claims, h.MasterDB, claims.Audience)
+		acc, err := h.AccountRepo.ReadByID(ctx, claims, claims.Audience)
 		if err != nil {
 			return false, err
 		}

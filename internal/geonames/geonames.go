@@ -339,6 +339,8 @@ func GetGeonameCountry(ctx context.Context, country string) ([]Geoname, error) {
 	u := fmt.Sprintf("http://download.geonames.org/export/zip/%s.zip", country)
 	resp, err = pester.Get(u)
 	if err != nil {
+		// Add re-try three times after failing first time
+		// This reduces the risk when network is lagy, we still have chance to re-try.
 		for i := 0; i < 3; i++ {
 			resp, err = pester.Get(u)
 			if err == nil {

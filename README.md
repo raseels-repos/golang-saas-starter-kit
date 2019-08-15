@@ -614,4 +614,4 @@ documentation or just send us your feedback and suggestions ; )
 ## Join us on Gopher Slack
 
 If you are having problems installing, troubles getting the project running or would like to contribute, join the 
-channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/) 
+channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/)

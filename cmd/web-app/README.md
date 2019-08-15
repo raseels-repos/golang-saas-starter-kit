@@ -112,6 +112,3 @@ This web-app service eventually will include the following:
         - view item
         - create item (adds task to checklist)
         - update item
-
-
-

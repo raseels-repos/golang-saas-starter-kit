@@ -244,7 +244,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					}
 				}
 
-				countries := geonames.ValidGeonameCountries(context.Background())
+				countries := geonames.ValidGeonameCountries(ctx)
 				if isUnittest {
 
 				}

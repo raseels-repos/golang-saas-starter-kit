@@ -25,7 +25,7 @@ separation should help decouple client integrations from internal application de
 
 ## Making Requests to Web API
 
-Once the web-api service is running it will be available on port 3000. 
+Once the web-api service is running it will be available on port 3001. 
 http://127.0.0.1:3001/
 
 The easiest way to make requests to the web-api service is by using CURL via your CLI.
@@ -53,7 +53,9 @@ go build .
 
 ### Docker 
 
-To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
+To build using the docker file you need to be in the project root directory. 
+The `Dockerfile` assumes the working context is the root directory since it references Go Module 
+files to build the image.
 
 
 ```bash
@@ -63,7 +65,7 @@ docker build -f cmd/web-api/Dockerfile -t saas-web-api .
 
 ## Getting Started 
 
-###1. Ensure dependant services are running. 
+### 1. Ensure dependant services are running. 
 
 Navigate to the project root where `docker-compose.yaml` exists. There is only 
 one `docker-compose.yaml` file that is shared between all services. 
@@ -73,44 +75,46 @@ one `docker-compose.yaml` file that is shared between all services.
 docker-compose up -d 
 ```
 
-1.1. Set env variables. 
+#### 1.1. Set env variables. 
 
-*Copy the sample file to make your own copy.* 
+Copy the sample file to make your own copy:
 ```bash
 cp sample.env local.env
 ```
-*Make any changes to your copy of the file if necessary and then add them to your env.
+Make any changes to your copy of the file if necessary and then add them to your env:
 ```bash 
 source local.env
 ```
 
-1.2. Start the web-api service.
+#### 1.2. Start the web-api service.
 
-*Invoke main.go directly or use `go build .`* 
+Invoke main.go directly or use `go build .`:
 ```bash
 go run main.go
 ```
 
 
-###2. Initialize the MySQL database.
+### 2. Initialize the MySQL database.
   
-When `docker-compose up` if first ran, as discussed in the main readme, the database is created but does not include 
-any schema.
+When `docker-compose up` is first ran, as discussed in the main readme, 
+the database is created but does not include any schema.
 
-Thus, you need to use the project's schema tool to initialize the database. To do this navigate the the tools/schema
-folder. Add the source to your env. Then run the `main.go` file for schema.  
+Thus, you need to use the project's schema tool to initialize the database.
+To do this navigate to the `tools/schema` folder. Add the source to your env. Then run the `main.go` file for schema.  
 ```bash
 cd tools/schema/
 source sample.env 
 go run main.go 
 ```
 
+Notice that if you run `main.go` again, you should see in the output than 
+all migrations `already ran` (as expected).
   
-###3. Open the Swagger UI. 
+### 3. Open the Swagger UI. 
 Navigate your browser to [http://127.0.0.1:3001/docs](http://127.0.0.1:3001/docs).
 
 
-###4. Signup a new account. 
+### 4. Signup a new account. 
 
 Find the `signup` endpoint in the Swagger UI.
 
@@ -180,36 +184,37 @@ If successful, data should be returned for code 201 for created.
  
 Now you will now be able to use the email and password credentials to generate an auth token with the web-api service. 
 
+*Note: if Swagger `Try it out` response is `TypeError: Failed to fetch`, you probably accesed the swagger webpage via `http://localhost:3001/docs`. This would lead to a CORS error. You should open `http://127.0.0.1:3001/docs`*
 
-###5. Generate an Auth Token    
+
+### 5. Generate an Auth Token    
 An auth token is required for all other requests. 
     
 Near the top of the Swagger UI locate the button `Authorize` and click it. 
 
 Find the section `OAuth2Password (OAuth2, password)`
 
-Enter the user email and password.
-
-Change the type to `basic auth`
+In `username` and `password` field fill the `email` value and `password` used in the signup process respectively.
+Be careful that Swagger UI generates a random email in the signup process, it isn't the same as in section 4.
 
 Click the button `Authorize` to generate a token that will be used by the Swagger UI for all future requests.
     
-###6. Test Auth Token 
+### 6. Test Auth Token 
 
 Now that the Swagger UI is authorized, try running endpoint using the oauth token.    
 
-Find the endpoint GET `/accounts/{id}` endpoint in the Swagger UI. This endpoint should return the account by ID.
+Find the endpoint GET `/accounts/{id}` endpoint in the Swagger UI.
   
 Click `Try it out` and enter the account ID from generated from signup (step 5).   
   
 Click `Execute`. The response should be of an Account.
 
 
-###Authenticating Directly with Web API
+### Authenticating Directly with Web API
 
 If you want to authenticate directly with this web-api service and not via the Swagger UI, use the following steps.
 
-####1. Authenticating
+#### 1. Authenticating
 
 Before any authenticated requests can be sent you must acquire an auth token. Make a request using HTTP Basic auth with 
 your email and password to get an auth token.
@@ -218,7 +223,7 @@ your email and password to get an auth token.
 curl --user "twin@example.com:SecretString" -X POST http://127.0.0.1:3001/v1/oauth/token
 ```
 
-It is best to put the resulting token in an environment variable like `$TOKEN`.
+It is best to put the resulting token in an environment variable like `$TOKEN`. Notice that security tokens have an `expiry` date.
 
 ####2. Adding Token as Environment Variable
 

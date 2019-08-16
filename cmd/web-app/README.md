@@ -23,7 +23,7 @@ https://example.saasstartupkit.com
 
 The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
-Once the web-app service is running it will be available on port 3000.
+Once the web-app service is running, it will be available on port 3000.
 
 http://127.0.0.1:3000/
 
@@ -154,7 +154,8 @@ go build .
 
 ### Docker 
 
-To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
+To build using the docker file, you need to be in the project root directory since the `Dockerfile` references 
+Go Modules that are located there.
 
 ```bash
 docker build -f cmd/web-app/Dockerfile -t saas-web-app .
@@ -175,7 +176,7 @@ http://127.0.0.1:3000/signup?test-web-error=1
 ### Localization 
 
 Test a specific language by appending the locale to the request URL.
-127.0.0.1:3000/signup?local=fr
+http://127.0.0.1:3000/signup?local=fr
 
 
 [github.com/go-playground/validator](https://github.com/go-playground/validator) supports the following languages.

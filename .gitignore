@@ -4,3 +4,4 @@ aws.*
 .env_docker_compose
 local.env
 .DS_Store
+tmp

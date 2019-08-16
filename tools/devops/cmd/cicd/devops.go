@@ -19,8 +19,28 @@ import (
 	"strings"
 )
 
-// DeployContext defines the flags for defining the deployment env.
-type DeployContext struct {
+
+/*
+	// Register informs the sqlxtrace package of the driver that we will be using in our program.
+	// It uses a default service name, in the below case "postgres.db". To use a custom service
+	// name use RegisterWithServiceName.
+	sqltrace.Register(db.Driver, &pq.Driver{}, sqltrace.WithServiceName("devops:migrate"))
+	masterDb, err := sqlxtrace.Open(db.Driver, db.URL())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer masterDb.Close()
+
+	// Start the database migrations.
+	log.Printf("\t\tStart migrations.")
+	if err = schema.Migrate(masterDb, log, false); err != nil {
+		return errors.WithStack(err)
+	}
+	log.Printf("\t\tFinished migrations.")
+*/
+
+// BuildContext defines the flags for defining the deployment env.
+type BuildContext struct {
 	// Env is the target environment used for the deployment.
 	Env         string `validate:"oneof=dev stage prod"`
 
@@ -28,66 +48,82 @@ type DeployContext struct {
 	AwsCredentials devdeploy.AwsCredentials `validate:"required,dive,required"`
 }
 
-// DefineDeploymentEnv handles defining all the information needed to setup the target env including RDS and cache.
-func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.DeploymentEnv, error) {
+// DefineBuildEnv defines the details to setup the target environment for the project to build services and functions.
+func DefineBuildEnv(buildCtx BuildContext) (*devdeploy.BuildEnv, error) {
 
 	// If AWS Credentials are not set and use role is not enabled, try to load the credentials from env vars.
-	if ctx.AwsCredentials.UseRole == false && ctx.AwsCredentials.AccessKeyID == "" {
+	if buildCtx.AwsCredentials.UseRole == false && buildCtx.AwsCredentials.AccessKeyID == "" {
 		var err error
-		ctx.AwsCredentials, err = devdeploy.GetAwsCredentialsFromEnv(ctx.Env)
+		buildCtx.AwsCredentials, err = devdeploy.GetAwsCredentialsFromEnv(buildCtx.Env)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	targetEnv := &devdeploy.DeploymentEnv{
-		Env: ctx.Env,
-		AwsCredentials: ctx.AwsCredentials,
+	// Init a new build target environment for the project.
+	buildEnv := &devdeploy.BuildEnv{
+		Env: buildCtx.Env,
+		AwsCredentials: buildCtx.AwsCredentials,
 	}
 
 	// Get the current working directory. This should be somewhere contained within the project.
 	workDir, err := os.Getwd()
 	if err != nil {
-		return targetEnv, errors.WithMessage(err, "Failed to get current working directory.")
+		return buildEnv, errors.WithMessage(err, "Failed to get current working directory.")
 	}
 
 	// Set the project root directory and project name. This is current set by finding the go.mod file for the project
 	// repo. Project name is the directory name.
 	modDetails, err := devdeploy.LoadModuleDetails(workDir)
 	if err != nil {
-		return targetEnv, err
+		return buildEnv, err
 	}
 
 	// ProjectRoot should be the root directory for the project.
-	targetEnv.ProjectRoot = modDetails.ProjectRoot
+	buildEnv.ProjectRoot = modDetails.ProjectRoot
 
 	// ProjectName will be used for prefixing AWS resources. This could be changed as needed or manually defined.
-	targetEnv.ProjectName = modDetails.ProjectName
+	buildEnv.ProjectName = modDetails.ProjectName
 
 	// Set default AWS ECR Repository Name.
-	targetEnv.AwsEcrRepository = &devdeploy.AwsEcrRepository{
-		RepositoryName: targetEnv.ProjectName,
+	buildEnv.AwsEcrRepository = &devdeploy.AwsEcrRepository{
+		RepositoryName: buildEnv.ProjectName,
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  buildEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: buildEnv.Env},
 		},
 	}
 
+	return buildEnv, nil
+}
+
+// DefineDeploymentEnv handles defining all the information needed to setup the target env including RDS and cache.
+func DefineDeploymentEnv(log *log.Logger, buildEnv *devdeploy.BuildEnv) (*devdeploy.DeploymentEnv, error) {
+
+	// Init a new deployment target environment for the project.
+	deployEnv := &devdeploy.DeploymentEnv{
+		BuildEnv: buildEnv,
+	}
+
 	// Set the deployment to use the default VPC for the region.
-	targetEnv.AwsEc2Vpc = &devdeploy.AwsEc2Vpc{
+	deployEnv.AwsEc2Vpc = &devdeploy.AwsEc2Vpc{
 		IsDefault : true,
 	}
 
 	// Set the security group to use for the deployed services, database and cluster. This will used the VPC ID defined
 	// for the deployment.
-	targetEnv.AwsEc2SecurityGroup =  &devdeploy.AwsEc2SecurityGroup{
-		GroupName: targetEnv.ProjectName + "-" + ctx.Env,
-		Description: fmt.Sprintf("Security group for %s services running on ECS", targetEnv.ProjectName),
+	deployEnv.AwsEc2SecurityGroup =  &devdeploy.AwsEc2SecurityGroup{
+		GroupName: deployEnv.ProjectName + "-" + buildEnv.Env,
+		Description: fmt.Sprintf("Security group for %s services running on ECS", deployEnv.ProjectName),
+		Tags: []devdeploy.Tag{
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
+		},
 	}
 
 	// Set the name of the EC2 Security Group used by the gitlab runner. This is used to ensure the security
 	// group defined above has access to the RDS cluster/instance and can thus handle schema migrations.
-	targetEnv.GitlabRunnerEc2SecurityGroupName = "gitlab-runner"
+	deployEnv.GitlabRunnerEc2SecurityGroupName = "gitlab-runner"
 
 	// Set the s3 buckets used by the deployed services.
 	// S3 temp prefix used by services for short term storage. A lifecycle policy will be used for expiration.
@@ -116,11 +152,11 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 	}
 
 	// Define the public S3 bucket used to serve static files for all the services.
-	targetEnv.AwsS3BucketPublic = &devdeploy.AwsS3Bucket{
-		BucketName: targetEnv.ProjectName+"-public",
+	deployEnv.AwsS3BucketPublic = &devdeploy.AwsS3Bucket{
+		BucketName: deployEnv.ProjectName+"-public",
 		IsPublic: true,
 		TempPrefix: s3BucketTempPrefix,
-		LocationConstraint: &ctx.AwsCredentials.Region,
+		LocationConstraint: &buildEnv.AwsCredentials.Region,
 		LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
 		CORSRules: []*s3.CORSRule{
 			&s3.CORSRule{
@@ -154,13 +190,13 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 	}
 
 	// The base s3 key prefix used to upload static files.
-	targetEnv.AwsS3BucketPublicKeyPrefix = "/public"
+	deployEnv.AwsS3BucketPublicKeyPrefix = "/public"
 
 	// For production, enable Cloudfront CND for all static files to avoid serving them from the slower S3 option.
-	if ctx.Env == webcontext.Env_Prod {
-		targetEnv.AwsS3BucketPublic.CloudFront =  &devdeploy.AwsS3BucketCloudFront{
+	if deployEnv.Env == webcontext.Env_Prod {
+		deployEnv.AwsS3BucketPublic.CloudFront =  &devdeploy.AwsS3BucketCloudFront{
 			// S3 key prefix to request your content from a directory in your Amazon S3 bucket.
-			OriginPath : targetEnv.AwsS3BucketPublicKeyPrefix ,
+			OriginPath : deployEnv.AwsS3BucketPublicKeyPrefix ,
 
 			// A complex type that controls whether CloudFront caches the response to requests.
 			CachedMethods: []string{"HEAD", "GET"},
@@ -201,11 +237,11 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 
 	// Define the private S3 bucket used for long term file storage including but not limited to: log exports,
 	// AWS Lambda code, application caching.
-	targetEnv.AwsS3BucketPrivate = &devdeploy.AwsS3Bucket{
-		BucketName: targetEnv.ProjectName+"-private",
+	deployEnv.AwsS3BucketPrivate = &devdeploy.AwsS3Bucket{
+		BucketName: deployEnv.ProjectName+"-private",
 		IsPublic: false,
 		TempPrefix: s3BucketTempPrefix,
-		LocationConstraint: &ctx.AwsCredentials.Region,
+		LocationConstraint: &buildEnv.AwsCredentials.Region,
 		LifecycleRules: []*s3.LifecycleRule{bucketLifecycleTempRule},
 		PublicAccessBlock: &s3.PublicAccessBlockConfiguration{
 			// Specifies whether Amazon S3 should block public access control lists (ACLs)
@@ -248,8 +284,8 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 	}
 
 	// Add a bucket policy to enable exports from Cloudwatch Logs for the private S3 bucket.
-	targetEnv.AwsS3BucketPrivate.Policy = func() string {
-		policyResource := strings.Trim(filepath.Join(targetEnv.AwsS3BucketPrivate.BucketName, targetEnv.AwsS3BucketPrivate.TempPrefix), "/")
+	deployEnv.AwsS3BucketPrivate.Policy = func() string {
+		policyResource := strings.Trim(filepath.Join(deployEnv.AwsS3BucketPrivate.BucketName, deployEnv.AwsS3BucketPrivate.TempPrefix), "/")
 		return fmt.Sprintf(`{
 				"Version": "2012-10-17",
 				"Statement": [
@@ -267,12 +303,12 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 					  "Principal": { "Service": "logs.%s.amazonaws.com" }
 				  }
 				]
-			}`, targetEnv.AwsS3BucketPrivate.BucketName, ctx.AwsCredentials.Region, policyResource, ctx.AwsCredentials.Region)
+			}`, deployEnv.AwsS3BucketPrivate.BucketName, buildEnv.AwsCredentials.Region, policyResource, buildEnv.AwsCredentials.Region)
 	}()
 
 	// Define the Redis Cache cluster used for ephemeral storage.
-	targetEnv.AwsElasticCacheCluster = &devdeploy.AwsElasticCacheCluster{
-		CacheClusterId:          targetEnv.ProjectName + "-" + ctx.Env,
+	deployEnv.AwsElasticCacheCluster = &devdeploy.AwsElasticCacheCluster{
+		CacheClusterId:          deployEnv.ProjectName + "-" + buildEnv.Env,
 		CacheNodeType:           "cache.t2.micro",
 		CacheSubnetGroupName:    "default",
 		Engine:                  "redis",
@@ -290,8 +326,8 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 	}
 
 	// Define the RDS Database instance for transactional data. A random one will be generated for any created instance.
-	targetEnv.AwsRdsDBInstance = &devdeploy.AwsRdsDBInstance{
-		DBInstanceIdentifier:     targetEnv.ProjectName + "-" + ctx.Env,
+	deployEnv.AwsRdsDBInstance = &devdeploy.AwsRdsDBInstance{
+		DBInstanceIdentifier:     deployEnv.ProjectName + "-" + buildEnv.Env,
 		DBName:                   "shared",
 		Engine:                   "postgres",
 		MasterUsername:            "god",
@@ -304,12 +340,12 @@ func DefineDeploymentEnv(log *log.Logger, ctx DeployContext) (*devdeploy.Deploym
 		AutoMinorVersionUpgrade:   true,
 		CopyTagsToSnapshot:        aws.Bool(true),
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 		},
 	}
 
-	return targetEnv, nil
+	return deployEnv, nil
 }
 
 // ServiceContext defines the flags for deploying a service.
@@ -333,13 +369,13 @@ type ServiceContext struct {
 }
 
 // DefineDeployService handles defining all the information needed to deploy a service to AWS ECS.
-func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdeploy.DeploymentEnv) (*devdeploy.DeployService, error) {
+func DefineDeployService(log *log.Logger, ctx ServiceContext, deployEnv *devdeploy.DeploymentEnv) (*devdeploy.DeployService, error) {
 
 	log.Printf("\tDefine deploy for service '%s'.", ctx.ServiceName)
 
 	// Start to define all the information for the service from the service context.
 	srv := &devdeploy.DeployService{
-		DeploymentEnv: targetEnv,
+		//DeploymentEnv: deployEnv,
 		ServiceName: ctx.ServiceName,
 		EnableHTTPS: ctx.EnableHTTPS,
 		ServiceHostPrimary: ctx.ServiceHostPrimary,
@@ -354,12 +390,12 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 	}
 
 	// Set the release tag for the image to use include env + service name + commit hash/tag.
-	srv.ReleaseTag = devdeploy.GitLabCiReleaseTag(targetEnv.Env, srv.ServiceName)
+	srv.ReleaseTag = devdeploy.GitLabCiReleaseTag(deployEnv.Env, srv.ServiceName)
 	log.Printf("\t\tSet ReleaseTag '%s'.", srv.ReleaseTag)
 
 	// The S3 prefix used to upload static files served to public.
 	if ctx.StaticFilesS3Enable {
-		srv.StaticFilesS3Prefix = filepath.Join(targetEnv.AwsS3BucketPublicKeyPrefix, srv.ReleaseTag, "static")
+		srv.StaticFilesS3Prefix = filepath.Join(deployEnv.AwsS3BucketPublicKeyPrefix, srv.ReleaseTag, "static")
 	}
 
 	// Determine the Dockerfile for the service.
@@ -368,7 +404,7 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 		log.Printf("\t\tUsing docker file '%s'.", srv.Dockerfile)
 	} else {
 		var err error
-		srv.Dockerfile, err = devdeploy.FindServiceDockerFile(targetEnv.ProjectRoot, srv.ServiceName)
+		srv.Dockerfile, err = devdeploy.FindServiceDockerFile(deployEnv.ProjectRoot, srv.ServiceName)
 		if err != nil {
 			return nil, err
 		}
@@ -383,22 +419,22 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 
 	// Define the ECS Cluster used to host the serverless fargate tasks.
 	srv.AwsEcsCluster = &devdeploy.AwsEcsCluster{
-		ClusterName: targetEnv.ProjectName + "-" + targetEnv.Env,
+		ClusterName: deployEnv.ProjectName + "-" + deployEnv.Env,
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 		},
 	}
 
 	// Define the ECS task execution role. This role executes ECS actions such as pulling the image and storing the
 	// application logs in cloudwatch.
 	srv.AwsEcsExecutionRole = &devdeploy.AwsIamRole{
-		RoleName: fmt.Sprintf("ecsExecutionRole%s%s", targetEnv.ProjectNameCamel(), strcase.ToCamel(targetEnv.Env)),
-		Description:             fmt.Sprintf("Provides access to other AWS service resources that are required to run Amazon ECS tasks for %s. ", targetEnv.ProjectName),
+		RoleName: fmt.Sprintf("ecsExecutionRole%s%s", deployEnv.ProjectNameCamel(), strcase.ToCamel(deployEnv.Env)),
+		Description:             fmt.Sprintf("Provides access to other AWS service resources that are required to run Amazon ECS tasks for %s. ", deployEnv.ProjectName),
 		AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs-tasks.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}",
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 		},
 		AttachRolePolicyArns: []string{"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"},
 	}
@@ -406,12 +442,12 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 
 	// Define the ECS task role. This role is used by the task itself for calling other AWS services.
 	srv.AwsEcsTaskRole = &devdeploy.AwsIamRole{
-		RoleName: fmt.Sprintf("ecsTaskRole%s%s", targetEnv.ProjectNameCamel(), strcase.ToCamel(targetEnv.Env)),
-		Description:             fmt.Sprintf("Allows ECS tasks for %s to call AWS services on your behalf.", targetEnv.ProjectName),
+		RoleName: fmt.Sprintf("ecsTaskRole%s%s", deployEnv.ProjectNameCamel(), strcase.ToCamel(deployEnv.Env)),
+		Description:             fmt.Sprintf("Allows ECS tasks for %s to call AWS services on your behalf.", deployEnv.ProjectName),
 		AssumeRolePolicyDocument:"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ecs-tasks.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}",
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 		},
 	}
 	log.Printf("\t\tSet ECS Task Role Name to '%s'.", srv.AwsEcsTaskRole)
@@ -420,8 +456,8 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 	// the permissions required for deployed services to access AWS services. If the policy already exists, the
 	// statements will be used to add new required actions, but not for removal.
 	srv.AwsEcsTaskPolicy  = &devdeploy.AwsIamPolicy{
-		PolicyName: fmt.Sprintf("%s%sServices", targetEnv.ProjectNameCamel(), strcase.ToCamel(targetEnv.Env)),
-		Description: fmt.Sprintf("Defines access for %s services. ", targetEnv.ProjectName),
+		PolicyName: fmt.Sprintf("%s%sServices", deployEnv.ProjectNameCamel(), strcase.ToCamel(deployEnv.Env)),
+		Description: fmt.Sprintf("Defines access for %s services. ", deployEnv.ProjectName),
 		PolicyDocument:  devdeploy.AwsIamPolicyDocument{
 			Version: "2012-10-17",
 			Statement: []devdeploy.AwsIamStatementEntry{
@@ -495,10 +531,10 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 
 	// AwsCloudWatchLogGroup defines the name of the cloudwatch log group that will be used to store logs for the ECS tasks.
 	srv.AwsCloudWatchLogGroup = &devdeploy.AwsCloudWatchLogGroup {
-		LogGroupName: fmt.Sprintf("logs/env_%s/aws/ecs/cluster_%s/service_%s", targetEnv.Env, srv.AwsEcsCluster.ClusterName, srv.ServiceName),
+		LogGroupName: fmt.Sprintf("logs/env_%s/aws/ecs/cluster_%s/service_%s", deployEnv.Env, srv.AwsEcsCluster.ClusterName, srv.ServiceName),
 		Tags: []devdeploy.Tag{
-			{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-			{Key: awsTagNameEnv, Value: targetEnv.Env},
+			{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+			{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 		},
 	}
 	log.Printf("\t\tSet AWS Log Group Name to '%s'.", srv.AwsCloudWatchLogGroup.LogGroupName)
@@ -520,13 +556,13 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 	if ctx.EnableElb {
 		// AwsElbLoadBalancer defines if the service should use an elastic load balancer.
 		srv.AwsElbLoadBalancer = &devdeploy.AwsElbLoadBalancer{
-			Name: fmt.Sprintf("%s-%s-%s", targetEnv.Env, srv.AwsEcsCluster.ClusterName, srv.ServiceName),
+			Name: fmt.Sprintf("%s-%s-%s", deployEnv.Env, srv.AwsEcsCluster.ClusterName, srv.ServiceName),
 			IpAddressType: "ipv4",
 			Scheme: "internet-facing",
 			Type: "application",
 			Tags: []devdeploy.Tag{
-				{Key: awsTagNameProject, Value:  targetEnv.ProjectName},
-				{Key: awsTagNameEnv, Value: targetEnv.Env},
+				{Key: devdeploy.AwsTagNameProject, Value:  deployEnv.ProjectName},
+				{Key: devdeploy.AwsTagNameEnv, Value: deployEnv.Env},
 			},
 		}
 		log.Printf("\t\tSet ELB Name to '%s'.", srv.AwsElbLoadBalancer.Name)
@@ -551,7 +587,7 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 			srv.AwsElbLoadBalancer.TargetGroup .Name)
 
 		// Set ECS configs based on specified env.
-		if targetEnv.Env == "prod" {
+		if deployEnv.Env == "prod" {
 			srv.AwsElbLoadBalancer.EcsTaskDeregistrationDelay = 300
 		} else {
 			// Force staging to deploy immediately without waiting for connections to drain
@@ -574,7 +610,7 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 	}
 
 	// Set ECS configs based on specified env.
-	if targetEnv.Env == "prod" {
+	if deployEnv.Env == "prod" {
 		srv.AwsEcsService .DeploymentMinimumHealthyPercent =100
 		srv.AwsEcsService .DeploymentMaximumPercent = 200
 	} else {
@@ -582,9 +618,8 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 		srv.AwsEcsService .DeploymentMaximumPercent = 200
 	}
 
-
 	// Read the defined json task definition for the service.
-	dat, err := devdeploy.EcsReadTaskDefinition(ctx.ServiceDir, targetEnv.Env)
+	dat, err := devdeploy.EcsReadTaskDefinition(ctx.ServiceDir, deployEnv.Env)
 	if err != nil {
 		return  srv, err
 	}
@@ -605,13 +640,13 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 			{
 				// Load Datadog API key which can be either stored in an environment variable or in AWS Secrets Manager.
 				// 1. Check env vars for [DEV|STAGE|PROD]_DD_API_KEY and DD_API_KEY
-				datadogApiKey := devdeploy.GetTargetEnv(targetEnv.Env, "DD_API_KEY")
+				datadogApiKey := devdeploy.GetTargetEnv(deployEnv.Env, "DD_API_KEY")
 
 				// 2. Check AWS Secrets Manager for datadog entry prefixed with target environment.
 				if datadogApiKey == "" {
-					prefixedSecretId := secretID(targetEnv.ProjectName, targetEnv.Env, "datadog")
+					prefixedSecretId := deployEnv.SecretID("datadog/api-key")
 					var err error
-					datadogApiKey, err = devdeploy.GetAwsSecretValue(targetEnv.AwsCredentials, prefixedSecretId)
+					datadogApiKey, err = devdeploy.GetAwsSecretValue(deployEnv.AwsCredentials, prefixedSecretId)
 					if err != nil {
 						if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
 							return err
@@ -623,7 +658,7 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 				if datadogApiKey == "" {
 					secretId := "DATADOG"
 					var err error
-					datadogApiKey, err = devdeploy.GetAwsSecretValue(targetEnv.AwsCredentials, secretId)
+					datadogApiKey, err = devdeploy.GetAwsSecretValue(deployEnv.AwsCredentials, secretId)
 					if err != nil {
 						if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
 							return err
@@ -639,8 +674,6 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 
 				placeholders["{DATADOG_APIKEY}"] =       datadogApiKey
 
-
-
 				// When the datadog API key is empty, don't force the container to be essential have have the whole task fail.
 				if datadogApiKey != "" {
 					placeholders["{DATADOG_ESSENTIAL}"] = "true"
@@ -648,7 +681,6 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, targetEnv *devdepl
 					placeholders["{DATADOG_ESSENTIAL}"] = "false"
 				}
 			}
-
 
 			return nil
 		},

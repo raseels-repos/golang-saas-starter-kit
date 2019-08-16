@@ -62,7 +62,7 @@ delivered to clients.
 a knowledge of a completely different expertise - DevOps. This project provides a complete continuous build pipeline that 
 will push the code to production with minimal effort using serverless deployments to AWS Fargate with GitLab CI/CD.  
 5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
-facilitate exposing metrics, logs and request tracing to obversabe and validate your services are stable and responsive 
+facilitate exposing metrics, logs and request tracing to obverse and validate your services are stable and responsive 
  for your clients (hopefully paying clients). 
 
 
@@ -71,7 +71,7 @@ facilitate exposing metrics, logs and request tracing to obversabe and validate 
 The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
 direct client interaction via their web browsers. 
-* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-pary companies to develop deep 
+* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-party companies to develop deep 
 integrations with the project.
 
 The example project also provides these tools:
@@ -106,7 +106,7 @@ Accordingly, the project architecture is illustrated with the following diagram.
 With SaaS, a client subscribes to an online service you provide them. The example project provides functionality for 
 clients to subscribe and then once subscribed they can interact with your software service. 
 
-The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularily, this saas-starter-kit is based on their most recent experience building the
+The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularly, this saas-starter-kit is based on their most recent experience building the
 B2B SaaS for [standard operating procedure software](https://keeni.space) (written entirely in Golang). Please refer to the Keeni.Space website,
 its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web app is then available at 
 [app.keeni.space](https://app.keeni.space). They plan on leveraging this experience and build it into a simplified set 
@@ -175,7 +175,7 @@ $ git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
 $ cd saas-starter-kit/
 ```
 
-If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modulels disabled, see 
+If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modules disabled, see 
 the next section.
 
 
@@ -269,39 +269,133 @@ builds locally, update `docker-compose.yaml` to define a volume.
 
 ### Re-starting a specific Go service for development
 
-When writing code in an iterative fashion, it is nice to be able to restart a specific service so it will run updated 
-Go code. This decreases the overhead of stopping all services with `docker-compose down` and then re-starting all the 
-services again with 'docker-compose up'.
+When writing code in an iterative fashion, it is nice to have your change automatically rebuilt. This project uses 
+[github.com/gravityblast/fresh](https://github.com/gravityblast/fresh) to recompile your services that will include most
+changes. 
 
-To restart a specific service, first use `docker ps` to see the list of services running.
+    Fresh is a command line tool that builds and (re)starts your web application everytime you save a Go or template file. 
+     
+The (Fresh configuration file](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/fresh-auto-reload.conf) 
+is located in the project root. By default the following folders are watched by Fresh:
+- handlers
+- static
+- templates
 
-```bash
-$ docker ps
-CONTAINER ID        IMAGE                            COMMAND                  NAMES
-35043164fd0d        example-project/web-api:latest   "/gosrv"                 saas-starter-kit_web-api_1
-d34c8fc27f3b        example-project/web-app:latest   "/gosrv"                 saas-starter-kit_web-app_1
-fd844456243e        postgres:11-alpine               "docker-entrypoint.s…"   saas-starter-kit_postgres_1
-dda16bfbb8b5        redis:latest                     "redis-server --appe…"   saas-starter-kit_redis_1
-```
+Any changes to [internal/*](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal) or 
+additional project dependencies added to [go.mod](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/go.mod) 
+will require the service to be rebuilt. 
 
-Then use `docker-compose stop` for a specific service. In the command including the name of service in `docker-compose.yaml` file for the service 
-to shut down. In the example command, we will shut down the web-api service so we can start it again.
-
-```bash
-$ docker-compose stop web-app
-```
-
-If you are not in the directory for the service you want to restart then navigate to it. We will go to the directory for the 
-web-api.
 
 ```bash
-$ cd cmd/web-api/
+docker-compose up  --build -d web-app
 ```
 
-Then you can start the service again by running main.go
+
+### Forking your own copy 
+
+1. Checkout the project
+
+2. Update references.
 ```bash
-$ go run main.go
+flist=`grep -r "geeks-accelerator/oss/saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#geeks-accelerator/oss/saas-starter-kit#geeks-accelerator/oss/aurora-cam#g" $f; done
+
+
+flist=`grep -r "saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#saas-starter-kit#aurora-cam#g" $f; done
+
+
+flist=`grep -r "example-project" * | awk -F ':' '{print $1}' | sort | uniq`
+for f in $flist; do echo $f; sed -i "" -e "s#example-project#aurora-cam#g" $f; done
+
+
 ```
+
+3. Create a new AWS Policy with the following details:
+```
+Name:   SaasStarterKitDevServices 
+Description: Defines access for saas-starter-kit services. 
+Policy Document: {
+                     "Version": "2012-10-17",
+                     "Statement": [
+                         {
+                             "Sid": "DefaultServiceAccess",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "s3:HeadBucket",
+                                 "s3:ListObjects",
+                                 "s3:PutObject",
+                                 "s3:PutObjectAcl",
+                                 "cloudfront:ListDistributions",
+                                 "ec2:DescribeNetworkInterfaces",
+                                 "ec2:DeleteNetworkInterface",
+                                 "ecs:ListTasks",
+                                 "ecs:DescribeServices",
+                                 "ecs:DescribeTasks",
+                                 "ec2:DescribeNetworkInterfaces",
+                                 "route53:ListHostedZones",
+                                 "route53:ListResourceRecordSets",
+                                 "route53:ChangeResourceRecordSets",
+                                 "ecs:UpdateService",
+                                 "ses:SendEmail",
+                                 "ses:ListIdentities",
+                                 "ses:GetAccountSendingEnabled",
+                                 "secretsmanager:ListSecretVersionIds",
+                                 "secretsmanager:GetSecretValue",
+                                 "secretsmanager:CreateSecret",
+                                 "secretsmanager:UpdateSecret",
+                                 "secretsmanager:RestoreSecret",
+                                 "secretsmanager:DeleteSecret"
+                             ],
+                             "Resource": "*"
+                         },
+                         {
+                             "Sid": "ServiceInvokeLambda",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "iam:GetRole",
+                                 "lambda:InvokeFunction",
+                                 "lambda:ListVersionsByFunction",
+                                 "lambda:GetFunction",
+                                 "lambda:InvokeAsync",
+                                 "lambda:GetFunctionConfiguration",
+                                 "iam:PassRole",
+                                 "lambda:GetAlias",
+                                 "lambda:GetPolicy"
+                             ],
+                             "Resource": [
+                                 "arn:aws:iam:::role/*",
+                                 "arn:aws:lambda:::function:*"
+                             ]
+                         },
+                         {
+                             "Sid": "datadoglambda",
+                             "Effect": "Allow",
+                             "Action": [
+                                 "cloudwatch:Get*",
+                                 "cloudwatch:List*",
+                                 "ec2:Describe*",
+                                 "support:*",
+                                 "tag:GetResources",
+                                 "tag:GetTagKeys",
+                                 "tag:GetTagValues"
+                             ],
+                             "Resource": "*"
+                         }
+                     ]
+                 }
+```
+
+Create a new user with programmatic access and directly attach it the policy `SaasStarterKitDevServices`
+
+4. Create a new docker-compose config file
+```bash
+ cp sample.env_docker_compose .env_docker_compose 
+```
+
+5. Update .env_docker_compose with the Access key ID and Secret access key  
+
+6. Update `.gitlab-ci.yml` with relevant details. 
 
 
 ### Optional. Set AWS and Datadog Configs

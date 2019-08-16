@@ -2,8 +2,8 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"io"
 	"log"
 	"os"
@@ -13,9 +13,14 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/docker"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/jmoiron/sqlx"
+	"github.com/kelseyhightower/envconfig"
 )
 
 // Success and failure markers.
@@ -43,10 +48,72 @@ func New() *Test {
 
 	log := log.New(os.Stdout, "TEST : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
+	// =========================================================================
+	// Configuration
+	var cfg struct {
+		Aws struct {
+			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
+			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
+			Region          string `default:"us-west-2" envconfig:"AWS_REGION"`
+			UseRole         bool   `envconfig:"AWS_USE_ROLE"`
+		}
+	}
+
+	// For additional details refer to https://github.com/kelseyhightower/envconfig
+	if err := envconfig.Process("TESTS", &cfg); err != nil {
+		log.Fatalf("startup : Parsing Config : %+v", err)
+	}
+
+	// AWS access keys are required, if roles are enabled, remove any placeholders.
+	if cfg.Aws.UseRole {
+		cfg.Aws.AccessKeyID = ""
+		cfg.Aws.SecretAccessKey = ""
+
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		if cfg.Aws.Region == "" {
+			sess := session.Must(session.NewSession())
+			md := ec2metadata.New(sess)
+
+			var err error
+			cfg.Aws.Region, err = md.Region()
+			if err != nil {
+				log.Fatalf("startup : Load region of ecs metadata : %+v", err)
+			}
+		}
+	}
+
+	// Print the config for our logs. It's important to any credentials in the config
+	// that could expose a security risk are excluded from being json encoded by
+	// applying the tag `json:"-"` to the struct var.
+	{
+		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
+		if err != nil {
+			log.Fatalf("startup : Marshalling Config to JSON : %+v", err)
+		}
+		log.Printf("startup : Config : %v\n", string(cfgJSON))
+	}
+
 	// ============================================================
 	// Init AWS Session
+	var awsSession *session.Session
+	if cfg.Aws.UseRole {
+		// Get an AWS session from an implicit source if no explicit
+		// configuration is provided. This is useful for taking advantage of
+		// EC2/ECS instance roles.
+		awsSession = session.Must(session.NewSession())
+		if cfg.Aws.Region != "" {
+			awsSession.Config.WithRegion(cfg.Aws.Region)
+		}
 
-	awsSession := session.Must(session.NewSession())
+		log.Printf("startup : AWS : Using role.\n")
+	} else if cfg.Aws.AccessKeyID != "" {
+		creds := credentials.NewStaticCredentials(cfg.Aws.AccessKeyID, cfg.Aws.SecretAccessKey, "")
+		awsSession = session.New(&aws.Config{Region: aws.String(cfg.Aws.Region), Credentials: creds})
+
+		log.Printf("startup : AWS : Using static credentials\n")
+	}
 
 	// ============================================================
 	// Startup Postgres container
@@ -93,8 +160,16 @@ func New() *Test {
 			log.Fatalf("startup : Register DB : %v", err)
 		}
 
+		// Set the context with the required values to
+		// process the request.
+		v := webcontext.Values{
+			Now: time.Now(),
+			Env: webcontext.Env_Dev,
+		}
+		ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+
 		// Execute the migrations
-		if err = schema.Migrate(masterDB, log, true); err != nil {
+		if err = schema.Migrate(ctx, masterDB, log, true); err != nil {
 			log.Fatalf("main : Migrate : %v", err)
 		}
 		log.Printf("main : Migrate : Completed")

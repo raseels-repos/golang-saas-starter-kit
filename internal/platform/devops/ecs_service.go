@@ -96,6 +96,10 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 			return errors.Wrapf(err, "failed to list tasks for cluster '%s' service '%s'", ecsClusterName, ecsServiceName)
 		}
 
+		if len(servceTaskRes.TaskArns) == 0 {
+			continue
+		}
+
 		taskRes, err := svc.DescribeTasks(&ecs.DescribeTasksInput{
 			Cluster: aws.String(ecsClusterName),
 			Tasks:   servceTaskRes.TaskArns,
@@ -146,6 +150,10 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 		// Found no network interfaces, try again.
 		log.Println("Found no network interfaces.")
 		time.Sleep((time.Duration(a) * time.Second * 10) * time.Duration(a))
+	}
+
+	if len(networkInterfaceIds) == 0 {
+		return errors.New("Unable to update public IPs. No network interfaces found.")
 	}
 
 	log.Println("Get public IPs for network interface IDs.")
@@ -202,7 +210,11 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 			}
 
 			// Add all the A record names with the same set of public IPs.
+			addedNames := make(map[string]bool)
 			for _, aName := range aNames {
+				if addedNames[aName] {
+					continue
+				}
 				log.Printf("\t\tAdd A record for '%s'.\n", aName)
 
 				input.ChangeBatch.Changes = append(input.ChangeBatch.Changes, &route53.Change{
@@ -214,6 +226,7 @@ func RegisterEcsServiceTasksRoute53(log *log.Logger, awsSession *session.Session
 						Type:            aws.String("A"),
 					},
 				})
+				addedNames[aName] = true
 			}
 
 			_, err := svc.ChangeResourceRecordSets(input)

@@ -29,8 +29,9 @@ ENV GO111MODULE="on"
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
+RUN go get github.com/pilu/fresh
 
-FROM build_base_golang AS builder
+FROM build_base_golang AS dev
 
 ARG service
 ARG commit_ref=-
@@ -40,14 +41,21 @@ ARG swagInit
 COPY internal ./internal
 
 # Copy cmd specific packages.
-COPY cmd/${service} ./cmd/web-api
+COPY cmd/${service} ./cmd/${service}
 COPY cmd/${service}/templates /templates
 #COPY cmd/${service}/static /static
 
 # Copy the global templates.
 ADD resources/templates/shared /templates/shared
+ADD fresh-auto-reload.conf /runner.conf
+
+ENV TEMPLATE_DIR=/templates
 
 WORKDIR ./cmd/${service}
+
+ENTRYPOINT ["fresh", "-c", "/runner.conf"]
+
+FROM dev AS builder
 
 # Update the API documentation.
 # Disabled for the moment as it takes forever to run, rely on manual execution.

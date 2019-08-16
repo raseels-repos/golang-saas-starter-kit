@@ -66,8 +66,10 @@ func main() {
 
 	// =========================================================================
 	// Logging
+	log.SetFlags(log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	log.SetPrefix(service+" : ")
+	log := log.New(os.Stdout, log.Prefix() , log.Flags())
 
-	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	// =========================================================================
 	// Configuration
@@ -87,8 +89,8 @@ func main() {
 		Service struct {
 			Name              string   `default:"web-app" envconfig:"NAME"`
 			Project           string   `default:"" envconfig:"PROJECT"`
-			BaseUrl           string   `default:"" envconfig:"BASE_URL"  example:"http://eproc.tech"`
-			HostNames         []string `envconfig:"HOST_NAMES" example:"www.eproc.tech"`
+			BaseUrl           string   `default:"" envconfig:"BASE_URL"  example:"http://example.saasstartupkit.com"`
+			HostNames         []string `envconfig:"HOST_NAMES" example:"www.example.saasstartupkit.com"`
 			EnableHTTPS       bool     `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir       string   `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			SharedTemplateDir string   `default:"../../resources/templates/shared" envconfig:"SHARED_TEMPLATE_DIR"`
@@ -99,10 +101,10 @@ func main() {
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
-			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.eproc.tech"`
+			WebApiBaseUrl   string        `default:"http://127.0.0.1:3001" envconfig:"WEB_API_BASE_URL"  example:"http://api.example.saasstartupkit.com"`
 			SessionKey      string        `default:"" envconfig:"SESSION_KEY"`
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
-			EmailSender     string        `default:"test@eproc.tech" envconfig:"EMAIL_SENDER"`
+			EmailSender     string        `default:"test@example.saasstartupkit.com" envconfig:"EMAIL_SENDER"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 		}
@@ -774,6 +776,9 @@ func main() {
 		}
 
 		imgUrlFormatter = func(p string) string {
+			if strings.HasPrefix(p, "http") {
+				return p
+			}
 			baseUrl.Path = p
 			return baseUrl.String()
 		}
@@ -818,7 +823,12 @@ func main() {
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
 		imgUrl := imgUrlFormatter(p)
 		if cfg.Service.StaticFiles.ImgResizeEnabled {
-			imgUrl, _ = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
+			var rerr error
+			imgUrl, rerr = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
+			if rerr != nil {
+				imgUrl = "error"
+				log.Printf("main : S3ImgUrl : %s - %s\n", p, rerr)
+			}
 		}
 		return imgUrl
 	}
@@ -841,6 +851,10 @@ func main() {
 			if webErr, ok := er.(*weberror.Error); ok {
 				statusCode = webErr.Status
 			}
+		}
+
+		if web.RequestIsImage(r) {
+			return err
 		}
 
 		switch statusCode {

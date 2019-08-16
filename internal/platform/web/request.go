@@ -16,6 +16,7 @@ import (
 
 // Headers
 const (
+	HeaderAccept              = "Accept"
 	HeaderUpgrade             = "Upgrade"
 	HeaderXForwardedFor       = "X-Forwarded-For"
 	HeaderXForwardedProto     = "X-Forwarded-Proto"
@@ -125,6 +126,11 @@ func RequestIsTLS(r *http.Request) bool {
 func RequestIsWebSocket(r *http.Request) bool {
 	upgrade := r.Header.Get(HeaderUpgrade)
 	return strings.ToLower(upgrade) == "websocket"
+}
+
+func RequestIsImage(r *http.Request) bool {
+	accept := r.Header.Get(HeaderAccept)
+	return strings.HasPrefix(accept, "image/")
 }
 
 func RequestScheme(r *http.Request) string {

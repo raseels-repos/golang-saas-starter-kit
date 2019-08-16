@@ -26,7 +26,7 @@ in other configuration files. And since this project is open-source, we wanted t
 
 If you don't have an AWS account, signup for one now and then proceed with the deployment setup. 
 
-We assume that if you are deploying the SaaS Stater Kit, you are starting from scratch with no existing dependencies. 
+We assume that if you are deploying the SaaS Starter Kit, you are starting from scratch with no existing dependencies. 
 This however, excludes any domain names that you would like to use for resolving your services publicly. To use any 
 pre-purchased domain names, make sure they are added to Route 53 in the AWS account. Or you can let the deploy script 
 create a new zone is Route 53 and update the DNS for the domain name when your ready to make the transition. It is 
@@ -235,3 +235,10 @@ instance will be a dedicated host since we need it always up and running, thus i
     ```bash 
     sudo gitlab-runner restart
     ``` 
+    
+    
+## Examples 
+
+```bash
+go run main.go deploy -service=web-app -env=dev -enable_https=true -primary_host=example.saasstartupkit.com -host_names=example.saasstartupkit.com,dev.example.saasstartupkit.com -private_bucket=saas-starter-kit-private -public_bucket=saas-starter-kit-public -public_bucket_cloudfront=true -static_files_s3=true -static_files_img_resize=1 -recreate_service=0
+```    

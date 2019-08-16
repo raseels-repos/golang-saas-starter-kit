@@ -191,6 +191,10 @@ func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er
 	}
 	v.StatusCode = webErr.Status
 
+	if RequestIsImage(r) {
+		return nil
+	}
+
 	resp := webErr.Response(ctx, true)
 
 	data := map[string]interface{}{

@@ -489,7 +489,7 @@ For more details on this service, read [web-app readme](https://gitlab.com/geeks
 Schema is a minimalistic database migration helper that can manually be invoked via CLI. It provides schema versioning 
 and migration rollback. 
 
-To support POD architecture, the schema for the entire project is defined globally and is located inside internal: 
+The schema for the entire project is defined globally and is located inside internal: 
 [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema)
 
 Keeping a global schema helps ensure business logic can be decoupled across multiple packages. It is a firm belief that 

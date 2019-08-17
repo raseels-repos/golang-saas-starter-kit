@@ -3,6 +3,7 @@
 Copyright 2019, Geeks Accelerator 
 twins@geeksaccelerator.com
 
+Sponsored by Copper Valley Telecom
 
 The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
 preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 

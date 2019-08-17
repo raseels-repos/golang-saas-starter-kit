@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -19,7 +21,7 @@ import (
 
 // Projects represents the Projects API method handler set.
 type Projects struct {
-	ProjectRepo *project.Repository
+	ProjectRepo handlers.ProjectRepository
 	Redis       *redis.Client
 	Renderer    web.Renderer
 }

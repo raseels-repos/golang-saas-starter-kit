@@ -5,21 +5,33 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
 // Project represents the Project API method handler set.
-type Project struct {
-	*project.Repository
+type Projects struct {
+	Repository ProjectRepository
 
 	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
+}
+
+type ProjectRepository interface {
+	ReadByID(ctx context.Context, claims auth.Claims, id string) (*project.Project, error)
+	Find(ctx context.Context, claims auth.Claims, req project.ProjectFindRequest) (project.Projects, error)
+	Read(ctx context.Context, claims auth.Claims, req project.ProjectReadRequest) (*project.Project, error)
+	Create(ctx context.Context, claims auth.Claims, req project.ProjectCreateRequest, now time.Time) (*project.Project, error)
+	Update(ctx context.Context, claims auth.Claims, req project.ProjectUpdateRequest, now time.Time) error
+	Archive(ctx context.Context, claims auth.Claims, req project.ProjectArchiveRequest, now time.Time) error
+	Delete(ctx context.Context, claims auth.Claims, req project.ProjectDeleteRequest) error
 }
 
 // Find godoc
@@ -40,7 +52,7 @@ type Project struct {
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [get]
-func (h *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -133,7 +145,7 @@ func (h *Project) Find(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [get]
-func (h *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -181,7 +193,7 @@ func (h *Project) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [post]
-func (h *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -231,7 +243,7 @@ func (h *Project) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects [patch]
-func (h *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -282,7 +294,7 @@ func (h *Project) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/archive [patch]
-func (h *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -333,7 +345,7 @@ func (h *Project) Archive(ctx context.Context, w http.ResponseWriter, r *http.Re
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /projects/{id} [delete]
-func (h *Project) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Projects) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err

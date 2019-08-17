@@ -7,6 +7,7 @@ import (
 	"expvar"
 	"fmt"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -40,6 +41,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -443,6 +445,7 @@ func main() {
 	usrRepo := user.NewRepository(masterDb, projectRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
 	usrAccRepo := user_account.NewRepository(masterDb)
 	accRepo := account.NewRepository(masterDb)
+	geoRepo := geonames.NewRepository(masterDb)
 	accPrefRepo := account_preference.NewRepository(masterDb)
 	authRepo := user_auth.NewRepository(masterDb, authenticator, usrRepo, usrAccRepo, accPrefRepo)
 	signupRepo := signup.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo)
@@ -450,9 +453,9 @@ func main() {
 	prjRepo := project.NewRepository(masterDb)
 
 	appCtx := &handlers.AppContext{
-		Log:             log,
-		Env:             cfg.Env,
-		MasterDB:        masterDb,
+		Log: log,
+		Env: cfg.Env,
+		//MasterDB:        masterDb,
 		Redis:           redisClient,
 		TemplateDir:     cfg.Service.TemplateDir,
 		StaticDir:       cfg.Service.StaticFiles.Dir,
@@ -462,6 +465,7 @@ func main() {
 		AccountRepo:     accRepo,
 		AccountPrefRepo: accPrefRepo,
 		AuthRepo:        authRepo,
+		GeoRepo:         geoRepo,
 		SignupRepo:      signupRepo,
 		InviteRepo:      inviteRepo,
 		ProjectRepo:     prjRepo,

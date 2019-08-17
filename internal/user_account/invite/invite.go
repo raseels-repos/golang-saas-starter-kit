@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	//"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -40,7 +41,7 @@ func (repo *Repository) SendUserInvites(ctx context.Context, claims auth.Claims,
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = account.CanModifyAccount(ctx, claims, repo.DbConn, req.AccountID)
+	err = repo.Account.CanModifyAccount(ctx, claims, req.AccountID)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -20,8 +22,9 @@ import (
 
 // Signup represents the Signup API method handler set.
 type Signup struct {
-	SignupRepo *signup.Repository
-	AuthRepo   *user_auth.Repository
+	SignupRepo handlers.SignupRepository
+	AuthRepo   handlers.UserAuthRepository
+	GeoRepo    GeoRepository
 	MasterDB   *sqlx.DB
 	Renderer   web.Renderer
 }
@@ -108,7 +111,7 @@ func (h *Signup) Step1(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	data["geonameCountries"] = geonames.ValidGeonameCountries(ctx)
 
-	data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
+	data["countries"], err = h.GeoRepo.FindCountries(ctx, "name", "")
 	if err != nil {
 		return err
 	}

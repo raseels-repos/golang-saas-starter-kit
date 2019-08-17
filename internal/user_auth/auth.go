@@ -11,6 +11,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -100,7 +101,8 @@ func (repo *Repository) SwitchAccount(ctx context.Context, claims auth.Claims, r
 }
 
 // VirtualLogin allows users to mock being logged in as other users.
-func (repo *Repository) VirtualLogin(ctx context.Context, claims auth.Claims, req VirtualLoginRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) VirtualLogin(ctx context.Context, claims auth.Claims, req VirtualLoginRequest,
+	expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.VirtualLogin")
 	defer span.Finish()
 

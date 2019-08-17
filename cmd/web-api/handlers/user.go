@@ -13,6 +13,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -22,11 +23,34 @@ import (
 var sessionTtl = time.Hour * 24
 
 // User represents the User API method handler set.
-type User struct {
-	*user.Repository
-	Auth *user_auth.Repository
-
+type Users struct {
+	AuthRepo UserAuthRepository
+	UserRepo UserRepository
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
+}
+
+type UserAuthRepository interface {
+	SwitchAccount(ctx context.Context, claims auth.Claims, req user_auth.SwitchAccountRequest, expires time.Duration,
+		now time.Time, scopes ...string) (user_auth.Token, error)
+	Authenticate(ctx context.Context, req user_auth.AuthenticateRequest, expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
+	VirtualLogin(ctx context.Context, claims auth.Claims, req user_auth.VirtualLoginRequest,
+		expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
+	VirtualLogout(ctx context.Context, claims auth.Claims, expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
+}
+
+type UserRepository interface {
+	Find(ctx context.Context, claims auth.Claims, req user.UserFindRequest) (user.Users, error)
+	//FindByAccount(ctx context.Context, claims auth.Claims, req user.UserFindByAccountRequest) (user.Users, error)
+	Read(ctx context.Context, claims auth.Claims, req user.UserReadRequest) (*user.User, error)
+	ReadByID(ctx context.Context, claims auth.Claims, id string) (*user.User, error)
+	Create(ctx context.Context, claims auth.Claims, req user.UserCreateRequest, now time.Time) (*user.User, error)
+	Update(ctx context.Context, claims auth.Claims, req user.UserUpdateRequest, now time.Time) error
+	UpdatePassword(ctx context.Context, claims auth.Claims, req user.UserUpdatePasswordRequest, now time.Time) error
+	Archive(ctx context.Context, claims auth.Claims, req user.UserArchiveRequest, now time.Time) error
+	Restore(ctx context.Context, claims auth.Claims, req user.UserRestoreRequest, now time.Time) error
+	Delete(ctx context.Context, claims auth.Claims, req user.UserDeleteRequest) error
+	ResetPassword(ctx context.Context, req user.UserResetPasswordRequest, now time.Time) (string, error)
+	ResetConfirm(ctx context.Context, req user.UserResetConfirmRequest, now time.Time) (*user.User, error)
 }
 
 // Find godoc
@@ -46,7 +70,7 @@ type User struct {
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [get]
-func (h *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -113,7 +137,7 @@ func (h *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
 
-	res, err := h.Repository.Find(ctx, claims, req)
+	res, err := h.UserRepo.Find(ctx, claims, req)
 	if err != nil {
 		return err
 	}
@@ -139,7 +163,7 @@ func (h *User) Find(ctx context.Context, w http.ResponseWriter, r *http.Request,
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/{id} [get]
-func (h *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -156,7 +180,7 @@ func (h *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		includeArchived = b
 	}
 
-	res, err := h.Repository.Read(ctx, claims, user.UserReadRequest{
+	res, err := h.UserRepo.Read(ctx, claims, user.UserReadRequest{
 		ID:              params["id"],
 		IncludeArchived: includeArchived,
 	})
@@ -186,7 +210,7 @@ func (h *User) Read(ctx context.Context, w http.ResponseWriter, r *http.Request,
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [post]
-func (h *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -205,7 +229,7 @@ func (h *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	res, err := h.Repository.Create(ctx, claims, req, v.Now)
+	usr, err := h.UserRepo.Create(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -221,7 +245,7 @@ func (h *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	return web.RespondJson(ctx, w, res.Response(ctx), http.StatusCreated)
+	return web.RespondJson(ctx, w, usr.Response(ctx), http.StatusCreated)
 }
 
 // Read godoc
@@ -237,7 +261,7 @@ func (h *User) Create(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users [patch]
-func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -256,7 +280,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = h.Repository.Update(ctx, claims, req, v.Now)
+	err = h.UserRepo.Update(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -288,7 +312,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/password [patch]
-func (h *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -307,7 +331,7 @@ func (h *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = h.Repository.UpdatePassword(ctx, claims, req, v.Now)
+	err = h.UserRepo.UpdatePassword(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -341,7 +365,7 @@ func (h *User) UpdatePassword(ctx context.Context, w http.ResponseWriter, r *htt
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/archive [patch]
-func (h *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -360,7 +384,7 @@ func (h *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = h.Repository.Archive(ctx, claims, req, v.Now)
+	err = h.UserRepo.Archive(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -392,13 +416,13 @@ func (h *User) Archive(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/{id} [delete]
-func (h *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = h.Repository.Delete(ctx, claims,
+	err = h.UserRepo.Delete(ctx, claims,
 		user.UserDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)
@@ -431,7 +455,7 @@ func (h *User) Delete(ctx context.Context, w http.ResponseWriter, r *http.Reques
 // @Failure 401 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /users/switch-account/{account_id} [patch]
-func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -442,7 +466,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 		return err
 	}
 
-	tkn, err := h.Auth.SwitchAccount(ctx, claims, user_auth.SwitchAccountRequest{
+	tkn, err := h.AuthRepo.SwitchAccount(ctx, claims, user_auth.SwitchAccountRequest{
 		AccountID: params["account_id"],
 	}, sessionTtl, v.Now)
 	if err != nil {
@@ -478,7 +502,7 @@ func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 401 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /oauth/token [post]
-func (h *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Users) Token(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -533,7 +557,7 @@ func (h *User) Token(ctx context.Context, w http.ResponseWriter, r *http.Request
 		scopes = strings.Split(qv, ",")
 	}
 
-	tkn, err := h.Auth.Authenticate(ctx, authReq, sessionTtl, v.Now, scopes...)
+	tkn, err := h.AuthRepo.Authenticate(ctx, authReq, sessionTtl, v.Now, scopes...)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

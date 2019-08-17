@@ -9,20 +9,23 @@ import (
 	"path/filepath"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	//"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	//"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+
+	//"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
-	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -39,14 +42,15 @@ type AppContext struct {
 	Env               webcontext.Env
 	MasterDB          *sqlx.DB
 	Redis             *redis.Client
-	UserRepo          *user.Repository
-	UserAccountRepo   *user_account.Repository
-	AccountRepo       *account.Repository
-	AccountPrefRepo   *account_preference.Repository
-	AuthRepo          *user_auth.Repository
-	SignupRepo        *signup.Repository
-	InviteRepo        *invite.Repository
-	ProjectRepo       *project.Repository
+	UserRepo          handlers.UserRepository
+	UserAccountRepo   handlers.UserAccountRepository
+	AccountRepo       handlers.AccountRepository
+	AccountPrefRepo   handlers.AccountPrefRepository
+	AuthRepo          handlers.UserAuthRepository
+	SignupRepo        handlers.SignupRepository
+	InviteRepo        handlers.UserInviteRepository
+	ProjectRepo       handlers.ProjectRepository
+	GeoRepo           GeoRepository
 	Authenticator     *auth.Authenticator
 	StaticDir         string
 	TemplateDir       string
@@ -117,7 +121,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 		UserAccountRepo: appCtx.UserAccountRepo,
 		AuthRepo:        appCtx.AuthRepo,
 		InviteRepo:      appCtx.InviteRepo,
-		MasterDB:        appCtx.MasterDB,
+		GeoRepo:         appCtx.GeoRepo,
 		Redis:           appCtx.Redis,
 		Renderer:        appCtx.Renderer,
 	}
@@ -134,12 +138,12 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	app.Handle("GET", "/users", us.Index, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 
 	// Register user management and authentication endpoints.
-	u := User{
+	u := UserRepos{
 		UserRepo:        appCtx.UserRepo,
 		UserAccountRepo: appCtx.UserAccountRepo,
 		AccountRepo:     appCtx.AccountRepo,
 		AuthRepo:        appCtx.AuthRepo,
-		MasterDB:        appCtx.MasterDB,
+		GeoRepo:         appCtx.GeoRepo,
 		Renderer:        appCtx.Renderer,
 	}
 	app.Handle("POST", "/user/login", u.Login)
@@ -168,7 +172,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 		AccountPrefRepo: appCtx.AccountPrefRepo,
 		AuthRepo:        appCtx.AuthRepo,
 		Authenticator:   appCtx.Authenticator,
-		MasterDB:        appCtx.MasterDB,
+		GeoRepo:         appCtx.GeoRepo,
 		Renderer:        appCtx.Renderer,
 	}
 	app.Handle("POST", "/account/update", acc.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
@@ -180,7 +184,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	s := Signup{
 		SignupRepo: appCtx.SignupRepo,
 		AuthRepo:   appCtx.AuthRepo,
-		MasterDB:   appCtx.MasterDB,
+		GeoRepo:    appCtx.GeoRepo,
 		Renderer:   appCtx.Renderer,
 	}
 	// This route is not authenticated
@@ -197,8 +201,8 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
 	// Register geo
 	g := Geo{
-		MasterDB: appCtx.MasterDB,
-		Redis:    appCtx.Redis,
+		GeoRepo: appCtx.GeoRepo,
+		Redis:   appCtx.Redis,
 	}
 	app.Handle("GET", "/geo/regions/autocomplete", g.RegionsAutocomplete)
 	app.Handle("GET", "/geo/postal_codes/autocomplete", g.PostalCodesAutocomplete)

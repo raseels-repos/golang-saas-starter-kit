@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"net/http"
-	"time"
-
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
@@ -12,19 +10,21 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
+	"net/http"
+	"time"
+
 	"github.com/gorilla/schema"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
 // Account represents the Account API method handler set.
 type Account struct {
-	AccountRepo     *account.Repository
-	AccountPrefRepo *account_preference.Repository
-	AuthRepo        *user_auth.Repository
+	AccountRepo     handlers.AccountRepository
+	AccountPrefRepo handlers.AccountPrefRepository
+	AuthRepo        handlers.UserAuthRepository
+	GeoRepo         GeoRepository
 	Authenticator   *auth.Authenticator
-	MasterDB        *sqlx.DB
 	Renderer        web.Renderer
 }
 
@@ -248,14 +248,14 @@ func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 		data["account"] = acc.Response(ctx)
 
-		data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+		data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 		if err != nil {
 			return false, err
 		}
 
 		data["geonameCountries"] = geonames.ValidGeonameCountries(ctx)
 
-		data["countries"], err = geonames.FindCountries(ctx, h.MasterDB, "name", "")
+		data["countries"], err = h.GeoRepo.FindCountries(ctx, "name", "")
 		if err != nil {
 			return false, err
 		}

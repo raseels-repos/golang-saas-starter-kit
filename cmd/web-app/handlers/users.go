@@ -3,11 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"strings"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
@@ -17,6 +17,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/dustin/go-humanize/english"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
@@ -26,10 +27,12 @@ import (
 
 // Users represents the Users API method handler set.
 type Users struct {
-	UserRepo        *user.Repository
-	UserAccountRepo *user_account.Repository
-	AuthRepo        *user_auth.Repository
-	InviteRepo      *invite.Repository
+	UserRepo        handlers.UserRepository
+	AccountRepo     handlers.AccountRepository
+	UserAccountRepo handlers.UserAccountRepository
+	AuthRepo        handlers.UserAuthRepository
+	InviteRepo      handlers.UserInviteRepository
+	GeoRepo         GeoRepository
 	MasterDB        *sqlx.DB
 	Redis           *redis.Client
 	Renderer        web.Renderer
@@ -281,7 +284,7 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}
@@ -519,7 +522,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	data["user"] = usr.Response(ctx)
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}
@@ -798,7 +801,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}

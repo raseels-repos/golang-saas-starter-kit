@@ -12,8 +12,9 @@ import (
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
+	//	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sethgrid/pester"
 	"github.com/shopspring/decimal"
@@ -43,7 +44,7 @@ func ValidGeonameCountries(ctx context.Context) []string {
 }
 
 // FindGeonames ....
-func FindGeonames(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*Geoname, error) {
+func (repo *Repository) FindGeonames(ctx context.Context, orderBy, where string, args ...interface{}) ([]*Geoname, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindGeonames")
 	defer span.Finish()
 
@@ -61,11 +62,11 @@ func FindGeonames(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, a
 	}
 
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find regions failed")
@@ -93,7 +94,7 @@ func FindGeonames(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, a
 }
 
 // FindGeonamePostalCodes ....
-func FindGeonamePostalCodes(ctx context.Context, dbConn *sqlx.DB, where string, args ...interface{}) ([]string, error) {
+func (repo *Repository) FindGeonamePostalCodes(ctx context.Context, where string, args ...interface{}) ([]string, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindGeonamePostalCodes")
 	defer span.Finish()
 
@@ -106,11 +107,11 @@ func FindGeonamePostalCodes(ctx context.Context, dbConn *sqlx.DB, where string, 
 	}
 
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find regions failed")
@@ -138,7 +139,7 @@ func FindGeonamePostalCodes(ctx context.Context, dbConn *sqlx.DB, where string, 
 }
 
 // FindGeonameRegions ....
-func FindGeonameRegions(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*Region, error) {
+func (repo *Repository) FindGeonameRegions(ctx context.Context, orderBy, where string, args ...interface{}) ([]*Region, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindGeonameRegions")
 	defer span.Finish()
 
@@ -156,11 +157,11 @@ func FindGeonameRegions(ctx context.Context, dbConn *sqlx.DB, orderBy, where str
 	}
 
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find regions failed")
@@ -194,7 +195,7 @@ func FindGeonameRegions(ctx context.Context, dbConn *sqlx.DB, orderBy, where str
 // Possible types sent to the channel are limited to:
 // 		- error
 //		- GeoName
-func LoadGeonames(ctx context.Context, rr chan<- interface{}, countries ...string) {
+func (repo *Repository) LoadGeonames(ctx context.Context, rr chan<- interface{}, countries ...string) {
 	defer close(rr)
 
 	if len(countries) == 0 {

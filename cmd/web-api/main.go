@@ -35,6 +35,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -435,7 +436,7 @@ func main() {
 
 	projectRoute, err := project_route.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
 	if err != nil {
-		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
+		log.Fatalf("main : project routes : %s: %+v", cfg.Service.BaseUrl, err)
 	}
 
 	usrRepo := user.NewRepository(masterDb, projectRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)

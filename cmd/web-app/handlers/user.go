@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -17,6 +18,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -24,13 +26,15 @@ import (
 )
 
 // User represents the User API method handler set.
-type User struct {
-	UserRepo        *user.Repository
-	AuthRepo        *user_auth.Repository
-	UserAccountRepo *user_account.Repository
-	AccountRepo     *account.Repository
+type UserRepos struct {
+	UserRepo        handlers.UserRepository
+	AuthRepo        handlers.UserAuthRepository
+	UserAccountRepo handlers.UserAccountRepository
+	AccountRepo     handlers.AccountRepository
+	GeoRepo         GeoRepository
 	MasterDB        *sqlx.DB
 	Renderer        web.Renderer
+	SecretKey       string
 }
 
 func urlUserVirtualLogin(userID string) string {
@@ -44,7 +48,7 @@ type UserLoginRequest struct {
 }
 
 // Login handles authenticating a user into the system.
-func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h UserRepos) Login(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -132,7 +136,7 @@ func (h *User) Login(ctx context.Context, w http.ResponseWriter, r *http.Request
 }
 
 // Logout handles removing authentication for the user.
-func (h *User) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	sess := webcontext.ContextSession(ctx)
 
@@ -148,7 +152,7 @@ func (h *User) Logout(ctx context.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // ResetPassword allows a user to perform forgot password.
-func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -208,7 +212,7 @@ func (h *User) ResetPassword(ctx context.Context, w http.ResponseWriter, r *http
 }
 
 // ResetConfirm handles changing a users password after they have clicked on the link emailed.
-func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	resetHash := params["hash"]
 
@@ -278,7 +282,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
-		_, err = h.UserRepo.ParseResetHash(ctx, resetHash, ctxValues.Now)
+		_, err = user.ParseResetHash(ctx, h.SecretKey, resetHash, ctxValues.Now)
 		if err != nil {
 			switch errors.Cause(err) {
 			case user.ErrResetExpired:
@@ -316,7 +320,7 @@ func (h *User) ResetConfirm(ctx context.Context, w http.ResponseWriter, r *http.
 }
 
 // View handles displaying the current user profile.
-func (h *User) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	data := make(map[string]interface{})
 	f := func() error {
@@ -356,7 +360,7 @@ func (h *User) View(ctx context.Context, w http.ResponseWriter, r *http.Request,
 }
 
 // Update handles allowing the current user to update their profile.
-func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -453,7 +457,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 
 	data["user"] = usr.Response(ctx)
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}
@@ -472,7 +476,7 @@ func (h *User) Update(ctx context.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // Account handles displaying the Account for the current user.
-func (h *User) Account(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) Account(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	data := make(map[string]interface{})
 	f := func() error {
@@ -499,7 +503,7 @@ func (h *User) Account(ctx context.Context, w http.ResponseWriter, r *http.Reque
 }
 
 // VirtualLogin handles switching the scope of the context to another user.
-func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -634,7 +638,7 @@ func (h *User) VirtualLogin(ctx context.Context, w http.ResponseWriter, r *http.
 }
 
 // VirtualLogout handles switching the scope back to the user who initiated the virtual login.
-func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -708,7 +712,7 @@ func (h *User) VirtualLogout(ctx context.Context, w http.ResponseWriter, r *http
 }
 
 // VirtualLogin handles switching the scope of the context to another user.
-func (h *User) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserRepos) SwitchAccount(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {

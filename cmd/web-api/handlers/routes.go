@@ -5,21 +5,14 @@ import (
 	"net/http"
 	"os"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
@@ -29,14 +22,14 @@ type AppContext struct {
 	Env               webcontext.Env
 	MasterDB          *sqlx.DB
 	Redis             *redis.Client
-	UserRepo          *user.Repository
-	UserAccountRepo   *user_account.Repository
-	AccountRepo       *account.Repository
-	AccountPrefRepo   *account_preference.Repository
-	AuthRepo          *user_auth.Repository
-	SignupRepo        *signup.Repository
-	InviteRepo        *invite.Repository
-	ProjectRepo       *project.Repository
+	UserRepo          UserRepository
+	UserAccountRepo   UserAccountRepository
+	AccountRepo       AccountRepository
+	AccountPrefRepo   AccountPrefRepository
+	AuthRepo          UserAuthRepository
+	SignupRepo        SignupRepository
+	InviteRepo        UserInviteRepository
+	ProjectRepo       ProjectRepository
 	Authenticator     *auth.Authenticator
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
@@ -79,9 +72,9 @@ func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	app.Handle("GET", "/v1/examples/error-response", ex.ErrorResponse)
 
 	// Register user management and authentication endpoints.
-	u := User{
-		Repository: appCtx.UserRepo,
-		Auth:       appCtx.AuthRepo,
+	u := Users{
+		UserRepo: appCtx.UserRepo,
+		AuthRepo: appCtx.AuthRepo,
 	}
 	app.Handle("GET", "/v1/users", u.Find, mid.AuthenticateHeader(appCtx.Authenticator))
 	app.Handle("POST", "/v1/users", u.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
@@ -107,7 +100,7 @@ func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	app.Handle("DELETE", "/v1/user_accounts", ua.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register account endpoints.
-	a := Account{
+	a := Accounts{
 		Repository: appCtx.AccountRepo,
 	}
 	app.Handle("GET", "/v1/accounts/:id", a.Read, mid.AuthenticateHeader(appCtx.Authenticator))
@@ -120,7 +113,7 @@ func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	app.Handle("POST", "/v1/signup", s.Signup)
 
 	// Register project.
-	p := Project{
+	p := Projects{
 		Repository: appCtx.ProjectRepo,
 	}
 	app.Handle("GET", "/v1/projects", p.Find, mid.AuthenticateHeader(appCtx.Authenticator))

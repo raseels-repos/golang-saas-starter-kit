@@ -7,13 +7,14 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"github.com/pkg/errors"
 	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 // Example represents the Example API method handler set.
 type Example struct {
-	Project *project.Repository
+	Project ProjectRepository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }

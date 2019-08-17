@@ -8,14 +8,25 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
-	"github.com/jmoiron/sqlx"
+
+	//"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
 // Check provides support for orchestration geo endpoints.
 type Geo struct {
-	MasterDB *sqlx.DB
-	Redis    *redis.Client
+	Redis   *redis.Client
+	GeoRepo GeoRepository
+}
+
+type GeoRepository interface {
+	FindGeonames(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Geoname, error)
+	FindGeonamePostalCodes(ctx context.Context, where string, args ...interface{}) ([]string, error)
+	FindGeonameRegions(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Region, error)
+	FindCountries(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Country, error)
+	FindCountryTimezones(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.CountryTimezone, error)
+	ListTimezones(ctx context.Context) ([]string, error)
+	LoadGeonames(ctx context.Context, rr chan<- interface{}, countries ...string)
 }
 
 // GeonameByPostalCode...
@@ -39,7 +50,7 @@ func (h *Geo) GeonameByPostalCode(ctx context.Context, w http.ResponseWriter, r 
 
 	where := strings.Join(filters, " AND ")
 
-	res, err := geonames.FindGeonames(ctx, h.MasterDB, "postal_code", where, args...)
+	res, err := h.GeoRepo.FindGeonames(ctx, "postal_code", where, args...)
 	if err != nil {
 		fmt.Printf("%+v", err)
 		return web.RespondJsonError(ctx, w, err)
@@ -74,7 +85,7 @@ func (h *Geo) PostalCodesAutocomplete(ctx context.Context, w http.ResponseWriter
 
 	where := strings.Join(filters, " AND ")
 
-	res, err := geonames.FindGeonamePostalCodes(ctx, h.MasterDB, where, args...)
+	res, err := h.GeoRepo.FindGeonamePostalCodes(ctx, where, args...)
 	if err != nil {
 		return web.RespondJsonError(ctx, w, err)
 	}
@@ -101,7 +112,7 @@ func (h *Geo) RegionsAutocomplete(ctx context.Context, w http.ResponseWriter, r 
 
 	where := strings.Join(filters, " AND ")
 
-	res, err := geonames.FindGeonameRegions(ctx, h.MasterDB, "state_name", where, args...)
+	res, err := h.GeoRepo.FindGeonameRegions(ctx, "state_name", where, args...)
 	if err != nil {
 		fmt.Printf("%+v", err)
 		return web.RespondJsonError(ctx, w, err)
@@ -144,7 +155,7 @@ func (h *Geo) CountryTimezones(ctx context.Context, w http.ResponseWriter, r *ht
 
 	where := strings.Join(filters, " AND ")
 
-	res, err := geonames.FindCountryTimezones(ctx, h.MasterDB, "timezone_id", where, args...)
+	res, err := h.GeoRepo.FindCountryTimezones(ctx, "timezone_id", where, args...)
 	if err != nil {
 		return web.RespondJsonError(ctx, w, err)
 	}

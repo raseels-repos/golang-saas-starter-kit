@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
+
 	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -19,6 +20,7 @@ import (
 // migrationList returns a list of migrations to be executed. If the id of the
 // migration already exists in the migrations table it will be skipped.
 func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate.Migration {
+	geoRepo := geonames.NewRepository(db)
 	return []*sqlxmigrate.Migration{
 		// Create table users.
 		{
@@ -253,7 +255,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 
 				} else {
 					resChan := make(chan interface{})
-					go geonames.LoadGeonames(ctx, resChan)
+					go geoRepo.LoadGeonames(ctx, resChan)
 
 					for r := range resChan {
 						switch v := r.(type) {

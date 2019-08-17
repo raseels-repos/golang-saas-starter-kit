@@ -4,21 +4,43 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	accountref "geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
 // Account represents the Account API method handler set.
-type Account struct {
-	*account.Repository
+type Accounts struct {
+	Repository AccountRepository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
+}
+
+type AccountRepository interface {
+	//CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error
+	Find(ctx context.Context, claims auth.Claims, req account.AccountFindRequest) (account.Accounts, error)
+	Create(ctx context.Context, claims auth.Claims, req account.AccountCreateRequest, now time.Time) (*account.Account, error)
+	ReadByID(ctx context.Context, claims auth.Claims, id string) (*account.Account, error)
+	Read(ctx context.Context, claims auth.Claims, req account.AccountReadRequest) (*account.Account, error)
+	Update(ctx context.Context, claims auth.Claims, req account.AccountUpdateRequest, now time.Time) error
+	Archive(ctx context.Context, claims auth.Claims, req account.AccountArchiveRequest, now time.Time) error
+	Delete(ctx context.Context, claims auth.Claims, req account.AccountDeleteRequest) error
+}
+type AccountPrefRepository interface {
+	Find(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceFindRequest) ([]*accountref.AccountPreference, error)
+	FindByAccountID(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceFindByAccountIDRequest) ([]*accountref.AccountPreference, error)
+	Read(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceReadRequest) (*accountref.AccountPreference, error)
+	Set(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceSetRequest, now time.Time) error
+	Archive(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceArchiveRequest, now time.Time) error
+	Delete(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceDeleteRequest) error
 }
 
 // Read godoc
@@ -34,7 +56,7 @@ type Account struct {
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /accounts/{id} [get]
-func (h *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Accounts) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -81,7 +103,7 @@ func (h *Account) Read(ctx context.Context, w http.ResponseWriter, r *http.Reque
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /accounts [patch]
-func (h *Account) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *Accounts) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {

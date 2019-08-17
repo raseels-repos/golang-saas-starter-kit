@@ -2,8 +2,8 @@ package geonames
 
 import (
 	"context"
+
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -14,7 +14,7 @@ const (
 )
 
 // FindCountryTimezones ....
-func FindCountryTimezones(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*CountryTimezone, error) {
+func (repo *Repository) FindCountryTimezones(ctx context.Context, orderBy, where string, args ...interface{}) ([]*CountryTimezone, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindCountryTimezones")
 	defer span.Finish()
 
@@ -32,11 +32,11 @@ func FindCountryTimezones(ctx context.Context, dbConn *sqlx.DB, orderBy, where s
 	}
 
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// Fetch all country timezones from the db.
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find country timezones failed")
@@ -64,8 +64,8 @@ func FindCountryTimezones(ctx context.Context, dbConn *sqlx.DB, orderBy, where s
 	return resp, nil
 }
 
-func ListTimezones(ctx context.Context, dbConn *sqlx.DB) ([]string, error) {
-	res, err := FindCountryTimezones(ctx, dbConn, "timezone_id", "")
+func (repo *Repository) ListTimezones(ctx context.Context) ([]string, error) {
+	res, err := repo.FindCountryTimezones(ctx, "timezone_id", "")
 	if err != nil {
 		return nil, err
 	}

@@ -187,6 +187,25 @@ http://127.0.0.1:3000/signup?local=fr
 - nl - Dutch
 - zh - Chinese
 
+### HTTP Pipeline (Middleware)
+In any production ready web application there're many concerns that should be handle it correctly such as:
+* logging
+* tracing
+* error handling
+* observability metrics
+* security
+
+All these responsabilities are orthogonal between each other, and in particular, to the business logic. In `saas-starter-kit` these responsabilities are handeled in a chained set of middlewares which allow a clear separation of concerns and it avoids polluting business-rule code.
+
+We can separate existing middlewares in two dimensions: cross-cutting application middlewares, and middlewares for particular routes. Middlewares such as tracing, error handling, and metrics belong to the former category, whereas authentication/authorization to the latter.
+
+If you want to dig into the details regarding these configurations, refer to `handlers/routes.go` where you can find the application middleware chaining, and the particular middlewares per route when adding handlers with `app.Handle(...)`.
+
+### Routes
+Every valid URL route can be found in `handlers/route.go`.
+
+Notice that every handler is grouped by business-context (`Projects`, `Users`, `Account`) compared to sharing a single big struct. This allows to limit the scope of action of handlers regarding other actions that are far from its reponsability, and facilitates testing since less mockups will be necessary to test the handlers.
+
 ### Future Functionality
 
 

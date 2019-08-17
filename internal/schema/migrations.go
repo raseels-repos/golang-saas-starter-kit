@@ -7,12 +7,10 @@ import (
 	"encoding/csv"
 	"log"
 	"strings"
+	"time"
+	"fmt"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
-
-	"fmt"
-	"time"
-
 	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -23,6 +21,8 @@ import (
 // migrationList returns a list of migrations to be executed. If the id of the
 // migration already exists in the migrations table it will be skipped.
 func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate.Migration {
+	geoRepo := geonames.NewRepository(db)
+
 	return []*sqlxmigrate.Migration{
 		// Create table users.
 		{
@@ -217,7 +217,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Load new geonames table.
 		{
-			ID: "20190731-02h",
+			ID: "20190731-02l",
 			Migrate: func(tx *sql.Tx) error {
 
 				schemas := []string{
@@ -246,7 +246,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 
 				countries := geonames.ValidGeonameCountries(ctx)
 				if isUnittest {
-
+					countries = []string{"US"}
 				}
 
 				ncol := 12
@@ -288,7 +288,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				start := time.Now()
 				for _, country := range countries {
 					//fmt.Println("LoadGeonames: start country: ", country)
-					v, err := geonames.GetGeonameCountry(context.Background(), country)
+					v, err := geoRepo.GetGeonameCountry(context.Background(), country)
 					if err != nil {
 						return errors.WithStack(err)
 					}
@@ -328,7 +328,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					//fmt.Println("Insert Geoname took: ", time.Since(start))
 					//fmt.Println("LoadGeonames: end country: ", country)
 				}
-				fmt.Println("Total Geonames population took: ", time.Since(start))
+				log.Println("Total Geonames population took: ", time.Since(start))
 
 				queries := []string{
 					`create index idx_geonames_country_code on geonames (country_code)`,

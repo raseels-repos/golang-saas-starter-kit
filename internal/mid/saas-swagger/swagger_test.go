@@ -9,6 +9,7 @@ import (
 
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger/example/docs"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +18,7 @@ func TestWrapHandler(t *testing.T) {
 	log := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	log.SetOutput(ioutil.Discard)
 
-	app := web.NewApp(nil, log)
+	app := web.NewApp(nil, log, webcontext.Env_Dev)
 	app.Handle("GET", "/swagger/*", WrapHandler)
 
 	w1 := performRequest("GET", "/swagger/index.html", app)

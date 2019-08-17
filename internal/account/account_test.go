@@ -17,7 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -27,6 +30,9 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	repo = NewRepository(test.MasterDB)
+
 	return m.Run()
 }
 
@@ -184,7 +190,7 @@ func TestCreateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				res, err := repo.Create(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -239,7 +245,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		}
-		account1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		account1, err := repo.Create(ctx, auth.Claims{}, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -255,7 +261,7 @@ func TestCreateValidationNameUnique(t *testing.T) {
 			Zipcode:  "99686",
 		}
 		expectedErr := errors.New("Key: 'AccountCreateRequest.name' Error:Field validation for 'name' failed on the 'unique' tag")
-		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		_, err = repo.Create(ctx, auth.Claims{}, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -349,7 +355,7 @@ func TestCreateClaims(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				_, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				_, err := repo.Create(ctx, auth.Claims{}, tt.req, now)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)
@@ -396,7 +402,7 @@ func TestUpdateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				err := Update(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				err := repo.Update(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -440,7 +446,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		}
-		account1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		account1, err := repo.Create(ctx, auth.Claims{}, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -455,7 +461,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			Country:  "USA",
 			Zipcode:  "99686",
 		}
-		account2, err := Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		account2, err := repo.Create(ctx, auth.Claims{}, req2, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -467,7 +473,7 @@ func TestUpdateValidationNameUnique(t *testing.T) {
 			Name: &account1.Name,
 		}
 		expectedErr := errors.New("Key: 'AccountUpdateRequest.name' Error:Field validation for 'name' failed on the 'unique' tag")
-		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
+		err = repo.Update(ctx, auth.Claims{}, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
@@ -728,7 +734,7 @@ func TestCrud(t *testing.T) {
 
 				// Always create the new account with empty claims, testing claims for create account
 				// will be handled separately.
-				account, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.create, now)
+				account, err := repo.Create(ctx, auth.Claims{}, tt.create, now)
 				if err != nil {
 					t.Log("\t\tGot :", err)
 					t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -744,7 +750,7 @@ func TestCrud(t *testing.T) {
 
 				// Update the account.
 				updateReq := tt.update(account)
-				err = Update(ctx, tt.claims(account, userId), test.MasterDB, updateReq, now)
+				err = repo.Update(ctx, tt.claims(account, userId), updateReq, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
@@ -753,7 +759,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUpdate ok.", tests.Success)
 
 				// Find the account and make sure the updates where made.
-				findRes, err := ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
+				findRes, err := repo.ReadByID(ctx, tt.claims(account, userId), account.ID)
 				if err != nil && errors.Cause(err) != tt.findErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.findErr)
@@ -767,14 +773,14 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the account.
-				err = Archive(ctx, tt.claims(account, userId), test.MasterDB, AccountArchiveRequest{ID: account.ID}, now)
+				err = repo.Archive(ctx, tt.claims(account, userId), AccountArchiveRequest{ID: account.ID}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived account with the includeArchived false should result in not found.
-					_, err = ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
+					_, err = repo.ReadByID(ctx, tt.claims(account, userId), account.ID)
 					if err != nil && errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -782,7 +788,7 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived account with the includeArchived true should result no error.
-					_, err = Read(ctx, tt.claims(account, userId), test.MasterDB,
+					_, err = repo.Read(ctx, tt.claims(account, userId),
 						AccountReadRequest{ID: account.ID, IncludeArchived: true})
 					if err != nil {
 						t.Log("\t\tGot :", err)
@@ -792,14 +798,14 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
 				// Delete (hard-delete) the account.
-				err = Delete(ctx, tt.claims(account, userId), test.MasterDB, AccountDeleteRequest{ID: account.ID})
+				err = repo.Delete(ctx, tt.claims(account, userId), AccountDeleteRequest{ID: account.ID})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted account with the includeArchived true should result in not found.
-					_, err = ReadByID(ctx, tt.claims(account, userId), test.MasterDB, account.ID)
+					_, err = repo.ReadByID(ctx, tt.claims(account, userId), account.ID)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -822,7 +828,7 @@ func TestFind(t *testing.T) {
 
 	var accounts []*Account
 	for i := 0; i <= 4; i++ {
-		account, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, AccountCreateRequest{
+		account, err := repo.Create(tests.Context(), auth.Claims{}, AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "103 East Main St",
 			Address2: "Unit 546",
@@ -935,7 +941,7 @@ func TestFind(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Find(ctx, auth.Claims{}, test.MasterDB, tt.req)
+				res, err := repo.Find(ctx, auth.Claims{}, tt.req)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)

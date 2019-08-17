@@ -1,7 +1,6 @@
 package user_account
 
 import (
-	"github.com/lib/pq"
 	"math/rand"
 	"os"
 	"strings"
@@ -13,11 +12,15 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -27,6 +30,9 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	repo = NewRepository(test.MasterDB)
+
 	return m.Run()
 }
 
@@ -226,7 +232,7 @@ func TestCreateValidation(t *testing.T) {
 					t.Fatalf("\t%s\tMock account failed.", tests.Failed)
 				}
 
-				res, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				res, err := repo.Create(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -294,7 +300,7 @@ func TestCreateExistingEntry(t *testing.T) {
 			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
 		}
-		ua1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		ua1, err := repo.Create(ctx, auth.Claims{}, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
@@ -307,7 +313,7 @@ func TestCreateExistingEntry(t *testing.T) {
 			AccountID: req1.AccountID,
 			Roles:     []UserAccountRole{UserAccountRole_Admin},
 		}
-		ua2, err := Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		ua2, err := repo.Create(ctx, auth.Claims{}, req2, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
@@ -316,7 +322,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Now archive the user account to test trying to create a new entry for an archived entry
-		err = Archive(tests.Context(), auth.Claims{}, test.MasterDB, UserAccountArchiveRequest{
+		err = repo.Archive(tests.Context(), auth.Claims{}, UserAccountArchiveRequest{
 			UserID:    req1.UserID,
 			AccountID: req1.AccountID,
 		}, now)
@@ -326,7 +332,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Find the archived user account
-		arcRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB,
+		arcRes, err := repo.Read(tests.Context(), auth.Claims{},
 			UserAccountReadRequest{UserID: req1.UserID, AccountID: req1.AccountID, IncludeArchived: true})
 		if err != nil || arcRes == nil {
 			t.Log("\t\tGot :", err)
@@ -341,7 +347,7 @@ func TestCreateExistingEntry(t *testing.T) {
 			AccountID: req1.AccountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
 		}
-		ua3, err := Create(ctx, auth.Claims{}, test.MasterDB, req3, now)
+		ua3, err := repo.Create(ctx, auth.Claims{}, req3, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
@@ -350,7 +356,7 @@ func TestCreateExistingEntry(t *testing.T) {
 		}
 
 		// Ensure the user account has archived_at empty
-		findRes, err := Read(tests.Context(), auth.Claims{}, test.MasterDB,
+		findRes, err := repo.Read(tests.Context(), auth.Claims{},
 			UserAccountReadRequest{UserID: req1.UserID, AccountID: req1.AccountID})
 		if err != nil || arcRes == nil {
 			t.Log("\t\tGot :", err)
@@ -408,7 +414,7 @@ func TestUpdateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				err := Update(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				err := repo.Update(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -558,7 +564,7 @@ func TestCrud(t *testing.T) {
 					AccountID: accountID,
 					Roles:     []UserAccountRole{UserAccountRole_User},
 				}
-				ua, err := Create(tests.Context(), tt.claims(userID, accountID), test.MasterDB, createReq, now)
+				ua, err := repo.Create(tests.Context(), tt.claims(userID, accountID), createReq, now)
 				if err != nil && errors.Cause(err) != tt.createErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.createErr)
@@ -571,7 +577,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				if tt.createErr == ErrForbidden {
-					ua, err = Create(tests.Context(), auth.Claims{}, test.MasterDB, createReq, now)
+					ua, err = repo.Create(tests.Context(), auth.Claims{}, createReq, now)
 					if err != nil && errors.Cause(err) != tt.createErr {
 						t.Logf("\t\tGot : %+v", err)
 						t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
@@ -584,7 +590,7 @@ func TestCrud(t *testing.T) {
 					AccountID: accountID,
 					Roles:     &UserAccountRoles{UserAccountRole_Admin},
 				}
-				err = Update(tests.Context(), tt.claims(userID, accountID), test.MasterDB, updateReq, now)
+				err = repo.Update(tests.Context(), tt.claims(userID, accountID), updateReq, now)
 				if err != nil {
 					if errors.Cause(err) != tt.updateErr {
 						t.Logf("\t\tGot : %+v", err)
@@ -598,7 +604,7 @@ func TestCrud(t *testing.T) {
 
 				// Find the account for the user to verify the updates where made. There should only
 				// be one account associated with the user for this test.
-				findRes, err := Find(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountFindRequest{
+				findRes, err := repo.Find(tests.Context(), tt.claims(userID, accountID), UserAccountFindRequest{
 					Where: "user_id = ? or account_id = ?",
 					Args:  []interface{}{userID, accountID},
 					Order: []string{"created_at"},
@@ -626,7 +632,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user account.
-				err = Archive(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountArchiveRequest{
+				err = repo.Archive(tests.Context(), tt.claims(userID, accountID), UserAccountArchiveRequest{
 					UserID:    userID,
 					AccountID: accountID,
 				}, now)
@@ -636,7 +642,7 @@ func TestCrud(t *testing.T) {
 					t.Fatalf("\t%s\tArchive user account failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result in not found.
-					_, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, false)
+					_, err = repo.FindByUserID(tests.Context(), tt.claims(userID, accountID), userID, false)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -644,7 +650,7 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived user with the includeArchived true should result no error.
-					findRes, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, true)
+					findRes, err = repo.FindByUserID(tests.Context(), tt.claims(userID, accountID), userID, true)
 					if err != nil {
 						t.Logf("\t\tGot : %+v", err)
 						t.Fatalf("\t%s\tVerify archive user account failed when including archived.", tests.Failed)
@@ -669,7 +675,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive user account ok.", tests.Success)
 
 				// Delete (hard-delete) the user account.
-				err = Delete(tests.Context(), tt.claims(userID, accountID), test.MasterDB, UserAccountDeleteRequest{
+				err = repo.Delete(tests.Context(), tt.claims(userID, accountID), UserAccountDeleteRequest{
 					UserID:    userID,
 					AccountID: accountID,
 				})
@@ -679,7 +685,7 @@ func TestCrud(t *testing.T) {
 					t.Fatalf("\t%s\tDelete user account failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted user with the includeArchived true should result in not found.
-					_, err = FindByUserID(tests.Context(), tt.claims(userID, accountID), test.MasterDB, userID, true)
+					_, err = repo.FindByUserID(tests.Context(), tt.claims(userID, accountID), userID, true)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -719,7 +725,7 @@ func TestFind(t *testing.T) {
 		}
 
 		// Execute Create that will associate the user with the account.
-		ua, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, UserAccountCreateRequest{
+		ua, err := repo.Create(tests.Context(), auth.Claims{}, UserAccountCreateRequest{
 			UserID:    userID,
 			AccountID: accountID,
 			Roles:     []UserAccountRole{UserAccountRole_User},
@@ -830,7 +836,7 @@ func TestFind(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Find(ctx, auth.Claims{}, test.MasterDB, tt.req)
+				res, err := repo.Find(ctx, auth.Claims{}, tt.req)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)

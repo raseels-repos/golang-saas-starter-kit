@@ -66,10 +66,9 @@ func main() {
 
 	// =========================================================================
 	// Logging
-	log.SetFlags(log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-	log.SetPrefix(service+" : ")
-	log := log.New(os.Stdout, log.Prefix() , log.Flags())
-
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.SetPrefix(service + " : ")
+	log := log.New(os.Stdout, log.Prefix(), log.Flags())
 
 	// =========================================================================
 	// Configuration

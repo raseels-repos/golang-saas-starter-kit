@@ -100,7 +100,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			var v datatable.ColumnValue
 			switch col.Field {
 			case "id":
-				v.Value = fmt.Sprintf("%d", q.ID)
+				v.Value = fmt.Sprintf("%s", q.ID)
 			case "name":
 				if strings.TrimSpace(q.Name) == "" {
 					v.Value = q.Email

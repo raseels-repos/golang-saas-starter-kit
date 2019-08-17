@@ -66,10 +66,9 @@ func main() {
 
 	// =========================================================================
 	// Logging
-	log.SetFlags(log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-	log.SetPrefix(service+" : ")
-	log := log.New(os.Stdout, log.Prefix() , log.Flags())
-
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.SetPrefix(service + " : ")
+	log := log.New(os.Stdout, log.Prefix(), log.Flags())
 
 	// =========================================================================
 	// Configuration
@@ -474,7 +473,7 @@ func main() {
 	// URL Formatter
 	projectRoutes, err := project_routes.New(cfg.Service.WebApiBaseUrl, cfg.Service.BaseUrl)
 	if err != nil {
-		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
+		log.Fatalf("main : project routes : %s : %+v", cfg.Service.BaseUrl, err)
 	}
 
 	// s3UrlFormatter is a help function used by to convert an s3 key to

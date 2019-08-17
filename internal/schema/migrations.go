@@ -217,7 +217,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Load new geonames table.
 		{
-			ID: "20190731-02h",
+			ID: "20190731-02l",
 			Migrate: func(tx *sql.Tx) error {
 
 				schemas := []string{
@@ -246,7 +246,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 
 				countries := geonames.ValidGeonameCountries(ctx)
 				if isUnittest {
-
+					countries = []string{"US"}
 				}
 
 				ncol := 12
@@ -287,7 +287,6 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 				start := time.Now()
 				for _, country := range countries {
-					//fmt.Println("LoadGeonames: start country: ", country)
 					v, err := geonames.GetGeonameCountry(context.Background(), country)
 					if err != nil {
 						return errors.WithStack(err)
@@ -316,7 +315,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 							}
 						}
 						if len(v)%batch > 0 {
-							fmt.Println("Remain part: ", len(v)-n*batch)
+							log.Println("Remain part: ", len(v)-n*batch)
 							vn := v[n*batch:]
 							err := fn(vn)
 							if err != nil {
@@ -324,11 +323,8 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 							}
 						}
 					}
-
-					//fmt.Println("Insert Geoname took: ", time.Since(start))
-					//fmt.Println("LoadGeonames: end country: ", country)
 				}
-				fmt.Println("Total Geonames population took: ", time.Since(start))
+				log.Println("Total Geonames population took: ", time.Since(start))
 
 				queries := []string{
 					`create index idx_geonames_country_code on geonames (country_code)`,

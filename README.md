@@ -3,6 +3,7 @@
 Copyright 2019, Geeks Accelerator 
 twins@geeksaccelerator.com
 
+Sponsored by Copper Valley Telecom
 
 The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
 preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
@@ -62,7 +63,7 @@ delivered to clients.
 a knowledge of a completely different expertise - DevOps. This project provides a complete continuous build pipeline that 
 will push the code to production with minimal effort using serverless deployments to AWS Fargate with GitLab CI/CD.  
 5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
-facilitate exposing metrics, logs and request tracing to obversabe and validate your services are stable and responsive 
+facilitate exposing metrics, logs and request tracing to obverse and validate your services are stable and responsive 
  for your clients (hopefully paying clients). 
 
 
@@ -71,7 +72,7 @@ facilitate exposing metrics, logs and request tracing to obversabe and validate 
 The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
 direct client interaction via their web browsers. 
-* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-pary companies to develop deep 
+* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-party companies to develop deep 
 integrations with the project.
 
 The example project also provides these tools:
@@ -106,7 +107,7 @@ Accordingly, the project architecture is illustrated with the following diagram.
 With SaaS, a client subscribes to an online service you provide them. The example project provides functionality for 
 clients to subscribe and then once subscribed they can interact with your software service. 
 
-The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularily, this saas-starter-kit is based on their most recent experience building the
+The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularly, this saas-starter-kit is based on their most recent experience building the
 B2B SaaS for [standard operating procedure software](https://keeni.space) (written entirely in Golang). Please refer to the Keeni.Space website,
 its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web app is then available at 
 [app.keeni.space](https://app.keeni.space). They plan on leveraging this experience and build it into a simplified set 
@@ -175,7 +176,7 @@ $ git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
 $ cd saas-starter-kit/
 ```
 
-If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modulels disabled, see 
+If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modules disabled, see 
 the next section.
 
 
@@ -386,7 +387,7 @@ Policy Document: {
                  }
 ```
 
-Create a new user with programic access and directly attach it the policy `SaasStarterKitDevServices`
+Create a new user with programmatic access and directly attach it the policy `SaasStarterKitDevServices`
 
 4. Create a new docker-compose config file
 ```bash
@@ -395,7 +396,7 @@ Create a new user with programic access and directly attach it the policy `SaasS
 
 5. Update .env_docker_compose with the Access key ID and Secret access key  
 
-6. Update `.gitlab-ci.yml` with relevent details. 
+6. Update `.gitlab-ci.yml` with relevant details. 
 
 
 ### Optional. Set AWS and Datadog Configs
@@ -489,7 +490,7 @@ For more details on this service, read [web-app readme](https://gitlab.com/geeks
 Schema is a minimalistic database migration helper that can manually be invoked via CLI. It provides schema versioning 
 and migration rollback. 
 
-To support POD architecture, the schema for the entire project is defined globally and is located inside internal: 
+The schema for the entire project is defined globally and is located inside internal: 
 [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema)
 
 Keeping a global schema helps ensure business logic can be decoupled across multiple packages. It is a firm belief that 

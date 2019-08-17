@@ -7,9 +7,10 @@ import (
 	"encoding/csv"
 	"log"
 	"strings"
+	"time"
+	"fmt"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
-
 	"github.com/geeks-accelerator/sqlxmigrate"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -21,6 +22,7 @@ import (
 // migration already exists in the migrations table it will be skipped.
 func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest bool) []*sqlxmigrate.Migration {
 	geoRepo := geonames.NewRepository(db)
+
 	return []*sqlxmigrate.Migration{
 		// Create table users.
 		{
@@ -215,7 +217,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Load new geonames table.
 		{
-			ID: "20190731-02h",
+			ID: "20190731-02l",
 			Migrate: func(tx *sql.Tx) error {
 
 				schemas := []string{
@@ -242,33 +244,91 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					}
 				}
 
-				q := "insert into geonames " +
-					"(country_code,postal_code,place_name,state_name,state_code,county_name,county_code,community_name,community_code,latitude,longitude,accuracy) " +
-					"values(?,?,?,?,?,?,?,?,?,?,?,?)"
-				q = db.Rebind(q)
-				stmt, err := db.Prepare(q)
-				if err != nil {
-					return errors.WithMessagef(err, "Failed to prepare sql query '%s'", q)
+				countries := geonames.ValidGeonameCountries(ctx)
+				if isUnittest {
+					countries = []string{"US"}
 				}
 
-				if isUnittest {
+				ncol := 12
+				fn := func(geoNames []geonames.Geoname) error {
+					valueStrings := make([]string, 0, len(geoNames))
+					valueArgs := make([]interface{}, 0, len(geoNames)*ncol)
+					for _, geoname := range geoNames {
+						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
-				} else {
-					resChan := make(chan interface{})
-					go geoRepo.LoadGeonames(ctx, resChan)
+						valueArgs = append(valueArgs, geoname.CountryCode)
+						valueArgs = append(valueArgs, geoname.PostalCode)
+						valueArgs = append(valueArgs, geoname.PlaceName)
 
-					for r := range resChan {
-						switch v := r.(type) {
-						case geonames.Geoname:
-							_, err = stmt.Exec(v.CountryCode, v.PostalCode, v.PlaceName, v.StateName, v.StateCode, v.CountyName, v.CountyCode, v.CommunityName, v.CommunityCode, v.Latitude, v.Longitude, v.Accuracy)
+						valueArgs = append(valueArgs, geoname.StateName)
+						valueArgs = append(valueArgs, geoname.StateCode)
+						valueArgs = append(valueArgs, geoname.CountyName)
+
+						valueArgs = append(valueArgs, geoname.CountyCode)
+						valueArgs = append(valueArgs, geoname.CommunityName)
+						valueArgs = append(valueArgs, geoname.CommunityCode)
+
+						valueArgs = append(valueArgs, geoname.Latitude)
+						valueArgs = append(valueArgs, geoname.Longitude)
+						valueArgs = append(valueArgs, geoname.Accuracy)
+					}
+					insertStmt := fmt.Sprintf("insert into geonames "+
+						"(country_code,postal_code,place_name,state_name,state_code,county_name,county_code,community_name,community_code,latitude,longitude,accuracy) "+
+						"VALUES %s", strings.Join(valueStrings, ","))
+					insertStmt = db.Rebind(insertStmt)
+
+					stmt, err := db.Prepare(insertStmt)
+					if err != nil {
+						return errors.WithMessagef(err, "Failed to prepare sql query '%s'", insertStmt)
+					}
+
+					_, err = stmt.Exec(valueArgs...)
+					return err
+				}
+				start := time.Now()
+				for _, country := range countries {
+					//fmt.Println("LoadGeonames: start country: ", country)
+					v, err := geoRepo.GetGeonameCountry(context.Background(), country)
+					if err != nil {
+						return errors.WithStack(err)
+					}
+					//fmt.Println("Geoname records: ", len(v))
+					// Max argument values of Postgres is about 54460. So the batch size for bulk insert is selected 4500*12 (ncol)
+					batch := 4500
+					n := len(v) / batch
+
+					//fmt.Println("Number of batch: ", n)
+
+					if n == 0 {
+						err := fn(v)
+						if err != nil {
+							return errors.WithStack(err)
+						}
+					} else {
+						for i := 0; i < n; i++ {
+							vn := v[i*batch : (i+1)*batch]
+							err := fn(vn)
 							if err != nil {
 								return errors.WithStack(err)
 							}
-						case error:
-							return v
+							if n > 0 && n%25 == 0 {
+								time.Sleep(200)
+							}
+						}
+						if len(v)%batch > 0 {
+							fmt.Println("Remain part: ", len(v)-n*batch)
+							vn := v[n*batch:]
+							err := fn(vn)
+							if err != nil {
+								return errors.WithStack(err)
+							}
 						}
 					}
+
+					//fmt.Println("Insert Geoname took: ", time.Since(start))
+					//fmt.Println("LoadGeonames: end country: ", country)
 				}
+				log.Println("Total Geonames population took: ", time.Since(start))
 
 				queries := []string{
 					`create index idx_geonames_country_code on geonames (country_code)`,

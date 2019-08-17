@@ -26,7 +26,6 @@ type GeoRepository interface {
 	FindCountries(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Country, error)
 	FindCountryTimezones(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.CountryTimezone, error)
 	ListTimezones(ctx context.Context) ([]string, error)
-	LoadGeonames(ctx context.Context, rr chan<- interface{}, countries ...string)
 }
 
 // GeonameByPostalCode...

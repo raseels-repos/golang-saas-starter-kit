@@ -74,7 +74,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 			var v datatable.ColumnValue
 			switch col.Field {
 			case "id":
-				v.Value = fmt.Sprintf("%d", q.ID)
+				v.Value = fmt.Sprintf("%s", q.ID)
 			case "name":
 				v.Value = q.Name
 				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlProjectsView(q.ID), v.Value)

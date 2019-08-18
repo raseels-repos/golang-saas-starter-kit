@@ -30,16 +30,13 @@ http://127.0.0.1:3000/
 
 ## Web App functionality 
 
-
-This example Web App allows customers and their users to manage projects. Users with role of admin will be allowed to 
-create new projects. Users with access to the project can perform CRUD operations on the record. 
-
+This example web app allows customers to subscribe to the SaaS. Once subscribed they can authenticate with the web app 
+and the business value can be delivered as a service. The business value of the example web app allows users to manage 
+projects. Users with access to the project can perform CRUD operations on the record. 
 
 This web-app service includes the following pages and corresponding functionality:
 
 [![Example Golang web app deployed](../../resources/images/saas-starter-kit-go-web-app-pages.png)](../../resources/images/saas-starter-kit-go-web-app-pages.png)
-
-
 
 
 ### landing pages
@@ -47,12 +44,12 @@ This web-app service includes the following pages and corresponding functionalit
 The example web-app service in the SaaS Startup Kit includes typical pages for new customers to learn about your 
 service. It allows new customers to review a pricing page as well as signup. Existing customers of your SaaS can login 
 or connect with your support resources. The static web page for your SaaS website also includes a page for your web API 
-service.
+service. These are working example pages that a typical SaaS product usually include.
 
 [![Golang landing page of Go pricing page](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-pricing.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-pricing.png)
 
 
-### Signup 
+### signup 
 
 In order for your SaaS offering to deliver its value to your customer, they need to subscribe first. Users can subscribe 
 using this signup page. 
@@ -61,6 +58,7 @@ using this signup page.
 
 The signup page creates an account and a user associated with the new account. This signup page 
 also uses some cool inline validation.
+
 
 ### authentication
 
@@ -77,51 +75,58 @@ and user.
 
 Once a user is logged in, then RBAC is enforced and users only can access projects they have access to. 
 
-The web-app service also includes functionality for logout and forgot password.
+The web-app service also includes functionality for logout and forgot password. The forgot password functionality 
+send an email to the user with a link to web page that allows them to change their password. 
 
 
 ### projects
 
-The example code for the web app service in the SaaS Startup Kit exposes business value to authenticated users. The example 
-web app show how the SaaS Starter Kit provides Go boilerplate code to perform CRUD operations on an object.
+The example code for the web-app service exposes business value to authenticated users. This business value is coded into 
+various business logic packages. One example business logic package is the one to create and manage Projects. In the 
+SaaS Startup Kit, projects represent the highest level of business value. Users can perform CRUD on project records. 
 
-One example business logic package is the one to create and manage Projects. In the SaaS Startup Kit, projects represent 
-the highest level of business value. Users can perform CRUD on project records. 
-
-The web app includes this index page that lists all records. This index page then allows users to view, update and delete an object.
+The web app includes this index page that lists all records for projects. This index page uses Datatables to demonstrate 
+providing advanced interactivity to HTML tables. This index page then allows users to view, update and delete an object.
  
 [![Golang web app object list and Go app object search](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-projects.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-projects.png)
 
-From the projects index page, users can click the button to create a new record. This create page demonstrates how a new record can be created for projects and also demonstrates inline validation.
+From the projects index page, users can click the button to create a new record. This create page demonstrates how a new 
+record can be created for projects and also demonstrates inline validation.
 
-The view page for an object displays the fields for the object as read-only. The page then includes links to edit or archive the object. The archive functionality demonstrates how a soft-delete can be performed. While the web app does not expose functionality to delete a record, the internal API does support the delete operation.
+The view page for an object displays the fields for the object as read-only. The page then includes links to edit or 
+archive the object. The archive functionality demonstrates how a soft-delete can be performed. While the web app does 
+not expose functionality to delete a record, the internal API does support the delete operation.
 
 [![Golang web app object list and Go app object search](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-project-view.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-project-view.png)
 
-You can easily modify the projects package to support your own requirements. If you were providing a software-as-a-service similar to Github, Projects could be changed to be 'repositories'. If you were providing software-as-a-service similar to Slack, Projects could be modified to be 'channels', etc.
+You can easily modify the projects package to support your own requirements. If you were providing a software-as-a-service 
+similar to Github, Projects could be changed to be 'repositories'. If you were providing software-as-a-service similar 
+to Slack, Projects could be modified to be 'channels', etc.
 
 
 ### user (profile)
 
-After users authenticate with the web app, there is example code for them to view their user details - view their profile. 
+After users authenticate with the web app, there is example code for them to view their user details (view their profile). 
 
 [![Golang web app authentication and Go web app login](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-profile-view2.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-profile-view2.png)
  
-A user can then update the details for the record of their user as another example demonstration the update operation. There 
-is also functionality for the user to change their password.
+A user can then update the details for the record of their user. This another example demonstration the update operation. 
+There is also functionality for the user to change their password.
 
 
 ### account (management)
 
-Once a user signups to your SaaS via the web app, an account is created. Authenticated users can then view the details 
-of their account (demonstrating the read operation of CRUD).
+When a user signups to your SaaS via the web app, an account is created. Authenticated users can then view the details 
+of their account.
 
 [![Golang app account management and Go web app update account](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-account-update2.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-account-update2.png)
  
-Users with role of admin can view and update the details of their account, while non-admins can only view the details of their account.
+Users with role of admin can view and update the details of their account, while non-admins can only view the details 
+of their account.
 
     
 ### users (management)
+
 Users with role of admin have access to functionality that allows them to manage the users associated with their account. 
 This index page uses Datatables to demonstrate providing advanced interactivity to HTML tables.
 
@@ -132,11 +137,12 @@ a new record can be created for users. The create functionality also allows one 
 
 [![Golang app create user and Go web app create user](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users-create.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users-create.png)
  
-If the admin would rather the new users provide their own user details, there is Go code demonstrating how users can be invited. The invite functionality allows users to specifiy one or more email addresses. Once submitted, the web app will send email invites to allow the users to activate their user.
+If the admin would rather the new users provide their own user details, there is Go code demonstrating how users can be 
+invited. The invite functionality allows users to specifiy one or more email addresses. Once submitted, the web app will 
+send email invites to allow the users to activate their user.
 
-From the users index page, admins for an account can view users details. This page also provides access to update the user as well as archive it.
-
-A user can then update the details for the record of their user as another example demonstration the update operation. As part of ACL, the roles for a user can be added or removed.
+From the users index page, admins for an account can view users details. This page also provides access to update the 
+user as well as archive it.
 
 
 ## Local Installation

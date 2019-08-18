@@ -4,8 +4,8 @@ Copyright 2019, Geeks Accelerator
 twins@geeksaccelerator.com
 
 
-The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
-preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
+The [SaaS Starter Kit](https://saasstartupkit.com/) is a set of libraries in Go and boilerplate Golang code for building 
+scalable software-as-a-service (SaaS) applications. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
 and ready to onboard enterprise clients. It uses minimal dependencies, implements idiomatic code and follows Golang 
 best practices. Collectively, the toolkit lays out everything logically to minimize guess work and enable engineers to 
@@ -24,7 +24,7 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 
 *You are welcome to add comments to the Google Slides.*
 
-[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
+[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://saasstartupkit.com/)
 
 
 ## Motivation

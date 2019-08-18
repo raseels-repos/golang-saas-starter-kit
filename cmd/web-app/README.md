@@ -1,20 +1,25 @@
 # SaaS Web App 
 
 Copyright 2019, Geeks Accelerator  
-accelerator@geeksinthewoods.com
+twins@geeksaccelerator.com
 
 
 ## Description
 
 Responsive web application that renders HTML using the `html/template` package from the standard library to enable 
 direct interaction with clients and their users. It allows clients to sign up new accounts and provides user 
-authentication with HTTP sessions. To see screen captures of the web app, check out this Google Slides deck:
+authentication with HTTP sessions. 
+
+The web-app service is a fully functioning example. To see screen captures of the Golang web app, check out this Google 
+Slides deck:
 https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
 
 *You are welcome to add comments to the Google Slides.*
 
-[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
+We have also deployed this example Go web app to production here:
+https://example.saasstartupkit.com
 
+[![Example Golang web app deployed](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-projects.png)](https://example.saasstartupkit.com)
 
 The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
@@ -22,11 +27,116 @@ Once the web-app service is running it will be available on port 3000.
 
 http://127.0.0.1:3000/
 
-While the web-api service has 
-significant functionality, this web-app service is still in development. Currently this web-app services only resizes 
-an image and displays resized versions of it on the index page. See section below on Future Functionality. 
 
-If you would like to help, please email twins@geeksinthewoods.com.
+## Web App functionality 
+
+
+This example Web App allows customers and their users to manage projects. Users with role of admin will be allowed to 
+create new projects. Users with access to the project can perform CRUD operations on the record. 
+
+
+This web-app service includes the following pages and corresponding functionality:
+
+[![Example Golang web app deployed](../../resources/images/saas-starter-kit-go-web-app-pages.png)](../../resources/images/saas-starter-kit-go-web-app-pages.png)
+
+
+
+
+### landing pages
+
+The example web-app service in the SaaS Startup Kit includes typical pages for new customers to learn about your 
+service. It allows new customers to review a pricing page as well as signup. Existing customers of your SaaS can login 
+or connect with your support resources. The static web page for your SaaS website also includes a page for your web API 
+service.
+
+[![Golang landing page of Go pricing page](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-pricing.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-pricing.png)
+
+
+### Signup 
+
+In order for your SaaS offering to deliver its value to your customer, they need to subscribe first. Users can subscribe 
+using this signup page. 
+
+[![Golang web app signup and Go SaaS app sign up](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-signup.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-signup.png)
+
+The signup page creates an account and a user associated with the new account. This signup page 
+also uses some cool inline validation.
+
+### authentication
+
+Software-as-a-Service usually provides its service after a user has created an account and authenticated. After a user 
+has an account, they can login to your web app. Once logged in they will have access to all pages that require 
+authentication. This login page also uses some cool inline validation.
+
+[![Golang web app authentication and Go web app login](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-login.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-website-login.png)
+
+The GO web app implements Role-based access control (RBAC). The example web app has two basic roles for users: admin 
+and user. 
+* The role of admin provides the ability to perform all CRUD actions on projects and users. 
+* The role of user limits users to only view projects and users.
+
+Once a user is logged in, then RBAC is enforced and users only can access projects they have access to. 
+
+The web-app service also includes functionality for logout and forgot password.
+
+
+### projects
+
+The example code for the web app service in the SaaS Startup Kit exposes business value to authenticated users. The example 
+web app show how the SaaS Starter Kit provides Go boilerplate code to perform CRUD operations on an object.
+
+One example business logic package is the one to create and manage Projects. In the SaaS Startup Kit, projects represent 
+the highest level of business value. Users can perform CRUD on project records. 
+
+The web app includes this index page that lists all records. This index page then allows users to view, update and delete an object.
+ 
+[![Golang web app object list and Go app object search](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-projects.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-projects.png)
+
+From the projects index page, users can click the button to create a new record. This create page demonstrates how a new record can be created for projects and also demonstrates inline validation.
+
+The view page for an object displays the fields for the object as read-only. The page then includes links to edit or archive the object. The archive functionality demonstrates how a soft-delete can be performed. While the web app does not expose functionality to delete a record, the internal API does support the delete operation.
+
+[![Golang web app object list and Go app object search](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-project-view.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-project-view.png)
+
+You can easily modify the projects package to support your own requirements. If you were providing a software-as-a-service similar to Github, Projects could be changed to be 'repositories'. If you were providing software-as-a-service similar to Slack, Projects could be modified to be 'channels', etc.
+
+
+### user (profile)
+
+After users authenticate with the web app, there is example code for them to view their user details - view their profile. 
+
+[![Golang web app authentication and Go web app login](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-profile-view2.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-profile-view2.png)
+ 
+A user can then update the details for the record of their user as another example demonstration the update operation. There 
+is also functionality for the user to change their password.
+
+
+### account (management)
+
+Once a user signups to your SaaS via the web app, an account is created. Authenticated users can then view the details 
+of their account (demonstrating the read operation of CRUD).
+
+[![Golang app account management and Go web app update account](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-account-update2.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-account-update2.png)
+ 
+Users with role of admin can view and update the details of their account, while non-admins can only view the details of their account.
+
+    
+### users (management)
+Users with role of admin have access to functionality that allows them to manage the users associated with their account. 
+This index page uses Datatables to demonstrate providing advanced interactivity to HTML tables.
+
+[![Golang app users management and Go web app update user](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users.png)
+ 
+From the users index page, users can access the functionality to create a new record. This create page demonstrates how 
+a new record can be created for users. The create functionality also allows one or more roles to be applied for ACLs.
+
+[![Golang app create user and Go web app create user](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users-create.png)](https://dzuyel7n94hma.cloudfront.net/img/saas-startup-example-golang-project-webapp-users-create.png)
+ 
+If the admin would rather the new users provide their own user details, there is Go code demonstrating how users can be invited. The invite functionality allows users to specifiy one or more email addresses. Once submitted, the web app will send email invites to allow the users to activate their user.
+
+From the users index page, admins for an account can view users details. This page also provides access to update the user as well as archive it.
+
+A user can then update the details for the record of their user as another example demonstration the update operation. As part of ACL, the roles for a user can be added or removed.
 
 
 ## Local Installation
@@ -39,7 +149,6 @@ go build .
 ### Docker 
 
 To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
-
 
 ```bash
 docker build -f cmd/web-app/Dockerfile -t saas-web-app .
@@ -72,46 +181,6 @@ Test a specific language by appending the locale to the request URL.
 - zh - Chinese
 
 ### Future Functionality
-
-This example Web App is going to allow users to manage checklists. Users with role of admin will be allowed to 
-create new checklists (projects). Each checklist will have tasks (items) associated with it. Tasks can be assigned to 
-users with access to the checklist. Users can then update the status of a task. 
-
-We are referring to "checklists" as "projects" and "tasks" as "items" so this example web-app service will be generic 
-enough for you to leverage and build upon without lots of renaming.
-
-The initial contributors to this project created a similar service like this: [standard operating procedure software](https://keeni.space/procedures/software)
-for Keeni.Space. Its' Golang web app for [standard operating procedures software](https://keeni.space/procedures/software) is available at [app.keeni.space](https://app.keeni.space) They plan on leveraging this experience and boil it down into a simplified set of functionality 
-and corresponding web pages that will be a solid examples for building enterprise SaaS web apps with Golang. 
-
-This web-app service eventually will include the following:
-- authentication
-    - signup (creates user and account records)
-    - login
-        - with role-based access
-    - logout
-    - forgot password
-    - user management
-        - update user and password
-    - account management
-        - update account
-        - manage user
-            - view user
-            - create and invite user
-            - update user
-- projects (checklists)
-    - index of projects
-        - browse, filter, search
-    - manage projects
-        - view project
-            - with project items
-        - create project
-        - update project
-            - user access
-    - project items (tasks)
-        - view item
-        - create item (adds task to checklist)
-        - update item
 
 
 

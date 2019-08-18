@@ -1,21 +1,25 @@
 # SaaS Web API 
 
 Copyright 2019, Geeks Accelerator  
-accelerator@geeksinthewoods.com.com
+twins@geeksaccelerator.com
 
 
 ## Description
 
-Web API is a client facing API. Standard response format is JSON. 
+Web API is a client facing API. Standard response format is JSON. The example web-api service includes API documentation.
 
-While the web app is meant for humans to experience and requires
-a friendly UI, the web API is meant for customers or third-party partners of your SaaS to programmatically integrate. To 
-help show the similarities and differences between the pages in the web app and similar endpoints in the web API, we 
-have created this diagram below. Since it is very detailed, you can click on the image to see the larger version. 
+
+While the web app is meant for humans to experience and requires a friendly UI, the web API is meant for customers or 
+third-party partners of your SaaS to programmatically integrate. To help show the similarities and differences between 
+the pages in the web app and similar endpoints in the web API, we have created this diagram below. Since it is 
+very detailed, you can click on the image to see the larger version. 
 
 [![Diagram of pages in web app and endpoints in web API](resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/resources/images/saas-starter-kit-pages-and-endpoints-800x600.png)
 
-
+This web-api service is not directly used by the web-app service to prevent locking the functionally required for 
+internally development of the web-app service to the same functionality exposed to clients via this web-api service. 
+This separate web-api service can be exposed to clients and be maintained in a more rigid/structured process to manage 
+client expectations.
 
 **Not all CRUD methods are exposed as endpoints.** Only endpoints that clients may need should be exposed. Internal 
 services should communicate directly with the business logic packages or a new API should be created to support it. This 
@@ -36,11 +40,17 @@ initial admin user must first be created. The initial admin user can easily be c
 
 ## API Documentation
 
-Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). Once this
-web-api service is running, it can be accessed at /docs
+Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). 
+The Swag Go project also provides a web UI to allow you and your customers of your SaaS to explore your API - its exposed 
+business logic - as well as easily try our that exposed functionality. 
 
+Once this web-api service is running, the Swagger API documentation for the service can be accessed at /docs:
 http://127.0.0.1:3001/docs/
 
+You can refer to the example of the API documentation that we have deployed on production for you here:
+https://api.example.saasstartupkit.com/docs/
+
+[![Example Golang web app deployed](https://dzuyel7n94hma.cloudfront.net/saasstartupkit/assets/images/responsive/img/saas-startup-example-golang-project-web-api-documentation-swagger-ui.png/9334f34bf028e0656f73aeb9d931e726/saas-startup-example-golang-project-web-api-documentation-swagger-ui-320w-480w-800w.png)](https://api.example.saasstartupkit.com/docs/)
 
 
 

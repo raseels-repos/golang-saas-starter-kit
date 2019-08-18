@@ -2,8 +2,8 @@ package geonames
 
 import (
 	"context"
+
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -14,7 +14,7 @@ const (
 )
 
 // FindCountries ....
-func FindCountries(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, args ...interface{}) ([]*Country, error) {
+func (repo *Repository) FindCountries(ctx context.Context, orderBy, where string, args ...interface{}) ([]*Country, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.geonames.FindCountries")
 	defer span.Finish()
 
@@ -32,11 +32,11 @@ func FindCountries(ctx context.Context, dbConn *sqlx.DB, orderBy, where string, 
 	}
 
 	queryStr, queryArgs := query.Build()
-	queryStr = dbConn.Rebind(queryStr)
+	queryStr = repo.DbConn.Rebind(queryStr)
 	args = append(args, queryArgs...)
 
 	// fetch all places from the db
-	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
+	rows, err := repo.DbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "find countries failed")

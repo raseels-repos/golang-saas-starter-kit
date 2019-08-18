@@ -5,3 +5,4 @@ aws.*
 local.env
 .DS_Store
 tmp
+.devops.json

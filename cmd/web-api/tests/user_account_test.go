@@ -14,7 +14,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/pborman/uuid"
 )
@@ -22,12 +21,12 @@ import (
 // newMockUserAccount creates a new user user for testing and associates it with the supplied account ID.
 func newMockUserAccount(accountID string, role user_account.UserAccountRole) *user_account.UserAccount {
 	req := mockUserCreateRequest()
-	u, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
+	u, err := appCtx.UserRepo.Create(tests.Context(), auth.Claims{}, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}
 
-	ua, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+	ua, err := appCtx.UserAccountRepo.Create(tests.Context(), auth.Claims{}, user_account.UserAccountCreateRequest{
 		UserID:    u.ID,
 		AccountID: accountID,
 		Roles:     []user_account.UserAccountRole{role},
@@ -65,7 +64,7 @@ func TestUserAccountCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-		newUser, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, mockUserCreateRequest(), time.Now().UTC().AddDate(-1, -1, -1))
+		newUser, err := appCtx.UserRepo.Create(tests.Context(), auth.Claims{}, mockUserCreateRequest(), time.Now().UTC().AddDate(-1, -1, -1))
 		if err != nil {
 			t.Fatalf("\t%s\tCreate new user failed.", tests.Failed)
 		}

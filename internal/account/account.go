@@ -64,6 +64,11 @@ func CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, ac
 	return nil
 }
 
+// CanReadAccount determines if claims has the authority to access the specified account ID.
+func (repo *Repository) CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
+	return repo.CanReadAccount(ctx, claims, repo.DbConn, accountID)
+}
+
 // CanModifyAccount determines if claims has the authority to modify the specified account ID.
 func CanModifyAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error {
 	// If the request has claims from a specific account, ensure that the claims
@@ -103,6 +108,11 @@ func CanModifyAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, 
 	}
 
 	return nil
+}
+
+// CanModifyAccount determines if claims has the authority to modify the specified account ID.
+func (repo *Repository) CanModifyAccount(ctx context.Context, claims auth.Claims, accountID string) error {
+	return CanModifyAccount(ctx, claims, repo.DbConn, accountID)
 }
 
 // applyClaimsSelect applies a sub-query to the provided query to enforce ACL based on
@@ -150,7 +160,7 @@ func selectQuery() *sqlbuilder.SelectBuilder {
 // Find gets all the accounts from the database based on the request params.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountFindRequest) (Accounts, error) {
+func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req AccountFindRequest) (Accounts, error) {
 	query := selectQuery()
 
 	if req.Where != "" {
@@ -166,7 +176,7 @@ func Find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountF
 		query.Offset(int(*req.Offset))
 	}
 
-	return find(ctx, claims, dbConn, query, req.Args, req.IncludeArchived)
+	return find(ctx, claims, repo.DbConn, query, req.Args, req.IncludeArchived)
 }
 
 // find internal method for getting all the accounts from the database using a select query.
@@ -242,14 +252,14 @@ func UniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (b
 }
 
 // Create inserts a new account into the database.
-func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountCreateRequest, now time.Time) (*Account, error) {
+func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req AccountCreateRequest, now time.Time) (*Account, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Create")
 	defer span.Finish()
 
 	v := webcontext.Validator()
 
 	// Validation account name is unique in the database.
-	uniq, err := UniqueName(ctx, dbConn, req.Name, "")
+	uniq, err := UniqueName(ctx, repo.DbConn, req.Name, "")
 	if err != nil {
 		return nil, err
 	}
@@ -310,8 +320,8 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessage(err, "create account failed")
@@ -322,15 +332,15 @@ func Create(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 }
 
 // ReadByID gets the specified user by ID from the database.
-func ReadByID(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, id string) (*Account, error) {
-	return Read(ctx, claims, dbConn, AccountReadRequest{
+func (repo *Repository) ReadByID(ctx context.Context, claims auth.Claims, id string) (*Account, error) {
+	return repo.Read(ctx, claims, AccountReadRequest{
 		ID:              id,
 		IncludeArchived: false,
 	})
 }
 
 // Read gets the specified account from the database.
-func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountReadRequest) (*Account, error) {
+func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req AccountReadRequest) (*Account, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Read")
 	defer span.Finish()
 
@@ -345,7 +355,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountR
 	query := sqlbuilder.NewSelectBuilder()
 	query.Where(query.Equal("id", req.ID))
 
-	res, err := find(ctx, claims, dbConn, query, []interface{}{}, req.IncludeArchived)
+	res, err := find(ctx, claims, repo.DbConn, query, []interface{}{}, req.IncludeArchived)
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
@@ -358,7 +368,7 @@ func Read(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountR
 }
 
 // Update replaces an account in the database.
-func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountUpdateRequest, now time.Time) error {
+func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req AccountUpdateRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Update")
 	defer span.Finish()
 
@@ -366,7 +376,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	if req.Name != nil {
 		// Validation account name is unique in the database.
-		uniq, err := UniqueName(ctx, dbConn, *req.Name, req.ID)
+		uniq, err := UniqueName(ctx, repo.DbConn, *req.Name, req.ID)
 		if err != nil {
 			return err
 		}
@@ -382,7 +392,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = CanModifyAccount(ctx, claims, dbConn, req.ID)
+	err = CanModifyAccount(ctx, claims, repo.DbConn, req.ID)
 	if err != nil {
 		return err
 	}
@@ -460,8 +470,8 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "update account %s failed", req.ID)
@@ -472,7 +482,7 @@ func Update(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 }
 
 // Archive soft deleted the account from the database.
-func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountArchiveRequest, now time.Time) error {
+func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req AccountArchiveRequest, now time.Time) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Archive")
 	defer span.Finish()
 
@@ -484,7 +494,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = CanModifyAccount(ctx, claims, dbConn, req.ID)
+	err = CanModifyAccount(ctx, claims, repo.DbConn, req.ID)
 	if err != nil {
 		return err
 	}
@@ -511,8 +521,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
-	_, err = dbConn.ExecContext(ctx, sql, args...)
+	sql = repo.DbConn.Rebind(sql)
+	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		err = errors.WithMessagef(err, "archive account %s failed", req.ID)
@@ -531,8 +541,8 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
-		_, err = dbConn.ExecContext(ctx, sql, args...)
+		sql = repo.DbConn.Rebind(sql)
+		_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			err = errors.WithMessagef(err, "archive users for account %s failed", req.ID)
@@ -544,7 +554,7 @@ func Archive(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accou
 }
 
 // Delete removes an account from the database.
-func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req AccountDeleteRequest) error {
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req AccountDeleteRequest) error {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.account.Delete")
 	defer span.Finish()
 
@@ -556,13 +566,13 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 	}
 
 	// Ensure the claims can modify the account specified in the request.
-	err = CanModifyAccount(ctx, claims, dbConn, req.ID)
+	err = CanModifyAccount(ctx, claims, repo.DbConn, req.ID)
 	if err != nil {
 		return err
 	}
 
 	// Start a new transaction to handle rollbacks on error.
-	tx, err := dbConn.Begin()
+	tx, err := repo.DbConn.Begin()
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -579,7 +589,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
+		sql = repo.DbConn.Rebind(sql)
 		_, err = tx.ExecContext(ctx, sql, args...)
 		if err != nil {
 			tx.Rollback()
@@ -602,7 +612,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 		// Execute the query with the provided context.
 		sql, args := query.Build()
-		sql = dbConn.Rebind(sql)
+		sql = repo.DbConn.Rebind(sql)
 		_, err = tx.ExecContext(ctx, sql, args...)
 		if err != nil {
 			tx.Rollback()
@@ -620,7 +630,7 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 
 	// Execute the query with the provided context.
 	sql, args := query.Build()
-	sql = dbConn.Rebind(sql)
+	sql = repo.DbConn.Rebind(sql)
 	_, err = tx.ExecContext(ctx, sql, args...)
 	if err != nil {
 		tx.Rollback()
@@ -642,6 +652,10 @@ func Delete(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, req Accoun
 func MockAccount(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*Account, error) {
 	s := AccountStatus_Active
 
+	repo := &Repository{
+		DbConn: dbConn,
+	}
+
 	req := AccountCreateRequest{
 		Name:     uuid.NewRandom().String(),
 		Address1: "103 East Main St",
@@ -652,5 +666,5 @@ func MockAccount(ctx context.Context, dbConn *sqlx.DB, now time.Time) (*Account,
 		Zipcode:  "99686",
 		Status:   &s,
 	}
-	return Create(ctx, auth.Claims{}, dbConn, req, now)
+	return repo.Create(ctx, auth.Claims{}, req, now)
 }

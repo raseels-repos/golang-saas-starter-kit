@@ -2,16 +2,29 @@ package user_account
 
 import (
 	"context"
-	"database/sql/driver"
 	"strings"
 	"time"
 
+	"database/sql/driver"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
+
+// Repository defines the required dependencies for UserAccount.
+type Repository struct {
+	DbConn *sqlx.DB
+}
+
+// NewRepository creates a new Repository that defines dependencies for UserAccount.
+func NewRepository(db *sqlx.DB) *Repository {
+	return &Repository{
+		DbConn: db,
+	}
+}
 
 // UserAccount defines the one to many relationship of an user to an account. This
 // will enable a single user access to multiple accounts without having duplicate

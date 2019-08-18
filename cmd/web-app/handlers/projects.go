@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"strings"
 
@@ -12,17 +13,17 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+
 	"github.com/gorilla/schema"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
 // Projects represents the Projects API method handler set.
 type Projects struct {
-	MasterDB *sqlx.DB
-	Redis    *redis.Client
-	Renderer web.Renderer
+	ProjectRepo handlers.ProjectRepository
+	Redis       *redis.Client
+	Renderer    web.Renderer
 }
 
 func urlProjectsIndex() string {
@@ -73,7 +74,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 			var v datatable.ColumnValue
 			switch col.Field {
 			case "id":
-				v.Value = fmt.Sprintf("%d", q.ID)
+				v.Value = fmt.Sprintf("%s", q.ID)
 			case "name":
 				v.Value = q.Name
 				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlProjectsView(q.ID), v.Value)
@@ -110,7 +111,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	loadFunc := func(ctx context.Context, sorting string, fields []datatable.DisplayField) (resp [][]datatable.ColumnValue, err error) {
-		res, err := project.Find(ctx, claims, h.MasterDB, project.ProjectFindRequest{
+		res, err := h.ProjectRepo.Find(ctx, claims, project.ProjectFindRequest{
 			Where: "account_id = ?",
 			Args:  []interface{}{claims.Audience},
 			Order: strings.Split(sorting, ","),
@@ -186,7 +187,7 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 			}
 			req.AccountID = claims.Audience
 
-			usr, err := project.Create(ctx, claims, h.MasterDB, *req, ctxValues.Now)
+			usr, err := h.ProjectRepo.Create(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -251,7 +252,7 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 			switch r.PostForm.Get("action") {
 			case "archive":
-				err = project.Archive(ctx, claims, h.MasterDB, project.ProjectArchiveRequest{
+				err = h.ProjectRepo.Archive(ctx, claims, project.ProjectArchiveRequest{
 					ID: projectID,
 				}, ctxValues.Now)
 				if err != nil {
@@ -276,7 +277,7 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return nil
 	}
 
-	prj, err := project.ReadByID(ctx, claims, h.MasterDB, projectID)
+	prj, err := h.ProjectRepo.ReadByID(ctx, claims, projectID)
 	if err != nil {
 		return err
 	}
@@ -320,7 +321,7 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 			}
 			req.ID = projectID
 
-			err = project.Update(ctx, claims, h.MasterDB, *req, ctxValues.Now)
+			err = h.ProjectRepo.Update(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -351,7 +352,7 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return nil
 	}
 
-	prj, err := project.ReadByID(ctx, claims, h.MasterDB, projectID)
+	prj, err := h.ProjectRepo.ReadByID(ctx, claims, projectID)
 	if err != nil {
 		return err
 	}

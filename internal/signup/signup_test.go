@@ -1,19 +1,26 @@
 package signup
 
 import (
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"os"
 	"testing"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -23,6 +30,13 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	userRepo := user.MockRepository(test.MasterDB)
+	userAccRepo := user_account.NewRepository(test.MasterDB)
+	accRepo := account.NewRepository(test.MasterDB)
+
+	repo = NewRepository(test.MasterDB, userRepo, userAccRepo, accRepo)
+
 	return m.Run()
 }
 
@@ -63,7 +77,7 @@ func TestSignupValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Signup(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				res, err := repo.Signup(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -127,9 +141,12 @@ func TestSignupFull(t *testing.T) {
 
 	tknGen := &auth.MockTokenGenerator{}
 
+	accPrefRepo := account_preference.NewRepository(test.MasterDB)
+	authRepo := user_auth.NewRepository(test.MasterDB, tknGen, repo.User, repo.UserAccount, accPrefRepo)
+
 	t.Log("Given the need to ensure signup works.")
 	{
-		res, err := Signup(ctx, auth.Claims{}, test.MasterDB, req, now)
+		res, err := repo.Signup(ctx, auth.Claims{}, req, now)
 		if err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tSignup failed.", tests.Failed)
@@ -162,7 +179,7 @@ func TestSignupFull(t *testing.T) {
 		t.Logf("\t%s\tSignup ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = user_auth.Authenticate(ctx, test.MasterDB, tknGen, user_auth.AuthenticateRequest{
+		_, err = authRepo.Authenticate(ctx, user_auth.AuthenticateRequest{
 			Email:    res.User.Email,
 			Password: req.User.Password,
 		}, time.Hour, now)

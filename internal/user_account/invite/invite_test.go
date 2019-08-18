@@ -1,7 +1,6 @@
 package invite
 
 import (
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"os"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"github.com/dgrijalva/jwt-go"
@@ -18,7 +18,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -28,6 +31,20 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	userRepo := user.MockRepository(test.MasterDB)
+	userAccRepo := user_account.NewRepository(test.MasterDB)
+	accRepo := account.NewRepository(test.MasterDB)
+
+	// Mock the methods needed to make an invite.
+	resetUrl := func(string) string {
+		return ""
+	}
+	notify := &notify.MockEmail{}
+	secretKey := "6368616e676520746869732070613434"
+
+	repo = NewRepository(test.MasterDB, userRepo, userAccRepo, accRepo, resetUrl, notify, secretKey)
+
 	return m.Run()
 }
 
@@ -42,7 +59,7 @@ func TestSendUserInvites(t *testing.T) {
 
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
-		u, err := user.Create(ctx, auth.Claims{}, test.MasterDB, user.UserCreateRequest{
+		u, err := repo.User.Create(ctx, auth.Claims{}, user.UserCreateRequest{
 			FirstName:       "Lee",
 			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -54,7 +71,7 @@ func TestSendUserInvites(t *testing.T) {
 			t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
 		}
 
-		a, err := account.Create(ctx, auth.Claims{}, test.MasterDB, account.AccountCreateRequest{
+		a, err := repo.Account.Create(ctx, auth.Claims{}, account.AccountCreateRequest{
 			Name:     uuid.NewRandom().String(),
 			Address1: "101 E Main",
 			City:     "Valdez",
@@ -68,7 +85,7 @@ func TestSendUserInvites(t *testing.T) {
 		}
 
 		uRoles := []user_account.UserAccountRole{user_account.UserAccountRole_Admin}
-		_, err = user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		_, err = repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    u.ID,
 			AccountID: a.ID,
 			Roles:     uRoles,
@@ -91,21 +108,13 @@ func TestSendUserInvites(t *testing.T) {
 			claims.Roles = append(claims.Roles, r.String())
 		}
 
-		// Mock the methods needed to make a password reset.
-		resetUrl := func(string) string {
-			return ""
-		}
-		notify := &notify.MockEmail{}
-
-		secretKey := "6368616e676520746869732070617373"
-
 		// Ensure validation is working by trying ResetPassword with an empty request.
 		{
 			expectedErr := errors.New("Key: 'SendUserInvitesRequest.account_id' Error:Field validation for 'account_id' failed on the 'required' tag\n" +
 				"Key: 'SendUserInvitesRequest.user_id' Error:Field validation for 'user_id' failed on the 'required' tag\n" +
 				"Key: 'SendUserInvitesRequest.emails' Error:Field validation for 'emails' failed on the 'required' tag\n" +
 				"Key: 'SendUserInvitesRequest.roles' Error:Field validation for 'roles' failed on the 'required' tag")
-			_, err = SendUserInvites(ctx, claims, test.MasterDB, resetUrl, notify, SendUserInvitesRequest{}, secretKey, now)
+			_, err = repo.SendUserInvites(ctx, claims, SendUserInvitesRequest{}, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tInviteUsers failed.", tests.Failed)
@@ -129,13 +138,13 @@ func TestSendUserInvites(t *testing.T) {
 		}
 
 		// Make the reset password request.
-		inviteHashes, err := SendUserInvites(ctx, claims, test.MasterDB, resetUrl, notify, SendUserInvitesRequest{
+		inviteHashes, err := repo.SendUserInvites(ctx, claims, SendUserInvitesRequest{
 			UserID:    u.ID,
 			AccountID: a.ID,
 			Emails:    inviteEmails,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
 			TTL:       ttl,
-		}, secretKey, now)
+		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tInviteUsers failed.", tests.Failed)
@@ -154,7 +163,7 @@ func TestSendUserInvites(t *testing.T) {
 				"Key: 'AcceptInviteUserRequest.last_name' Error:Field validation for 'last_name' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteUserRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
 				"Key: 'AcceptInviteUserRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{}, secretKey, now)
+			_, err = repo.AcceptInviteUser(ctx, AcceptInviteUserRequest{}, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -174,14 +183,14 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure the TTL is enforced.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
+			_, err = repo.AcceptInviteUser(ctx, AcceptInviteUserRequest{
 				InviteHash:      inviteHashes[0],
 				Email:           inviteEmails[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
 				PasswordConfirm: newPass,
-			}, secretKey, now.UTC().Add(ttl*2))
+			}, now.UTC().Add(ttl*2))
 			if errors.Cause(err) != ErrInviteExpired {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
 				t.Logf("\t\tWant: %+v", ErrInviteExpired)
@@ -194,14 +203,14 @@ func TestSendUserInvites(t *testing.T) {
 		for idx, inviteHash := range inviteHashes {
 
 			newPass := uuid.NewRandom().String()
-			hash, err := AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
+			hash, err := repo.AcceptInviteUser(ctx, AcceptInviteUserRequest{
 				InviteHash:      inviteHash,
 				Email:           inviteEmails[idx],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
 				PasswordConfirm: newPass,
-			}, secretKey, now)
+			}, now)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tInviteAccept failed.", tests.Failed)
@@ -227,14 +236,14 @@ func TestSendUserInvites(t *testing.T) {
 		// Ensure the reset hash does not work after its used.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = AcceptInviteUser(ctx, test.MasterDB, AcceptInviteUserRequest{
+			_, err = repo.AcceptInviteUser(ctx, AcceptInviteUserRequest{
 				InviteHash:      inviteHashes[0],
 				Email:           inviteEmails[0],
 				FirstName:       "Foo",
 				LastName:        "Bar",
 				Password:        newPass,
 				PasswordConfirm: newPass,
-			}, secretKey, now)
+			}, now)
 			if errors.Cause(err) != ErrUserAccountActive {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
 				t.Logf("\t\tWant: %+v", ErrUserAccountActive)

@@ -27,7 +27,7 @@ func mockProjectCreateRequest(accountID string) project.ProjectCreateRequest {
 // mockProject creates a new project for testing and associates it with the supplied account ID.
 func newMockProject(accountID string) *project.Project {
 	req := mockProjectCreateRequest(accountID)
-	p, err := project.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
+	p, err := appCtx.ProjectRepo.Create(tests.Context(), auth.Claims{}, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}

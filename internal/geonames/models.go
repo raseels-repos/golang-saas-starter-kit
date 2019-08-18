@@ -1,6 +1,18 @@
 package geonames
 
 import "github.com/shopspring/decimal"
+import "github.com/jmoiron/sqlx"
+
+type Repository struct {
+	DbConn *sqlx.DB
+}
+
+// NewRepository creates a new Repository that defines dependencies for Project.
+func NewRepository(db *sqlx.DB) *Repository {
+	return &Repository{
+		DbConn: db,
+	}
+}
 
 type Geoname struct {
 	CountryCode   string          // US

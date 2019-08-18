@@ -3,12 +3,13 @@ package logger
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 )
 
 // WithContext manual injects context values to log message including Trace ID
 func WithContext(ctx context.Context, msg string) string {
-	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	v, ok := ctx.Value(webcontext.KeyValues).(*webcontext.Values)
 	if !ok {
 		return msg
 	}

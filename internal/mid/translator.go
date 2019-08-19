@@ -6,11 +6,14 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+
 	httpext "github.com/go-playground/pkg/net/http"
 	ut "github.com/go-playground/universal-translator"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
+// Translator enables configuration of a language translator configured by
+// query parameter or accept language header.
 func Translator(utrans *ut.UniversalTranslator) web.Middleware {
 
 	// This is the actual middleware function to be executed.
@@ -21,34 +24,17 @@ func Translator(utrans *ut.UniversalTranslator) web.Middleware {
 			span, ctx := tracer.StartSpanFromContext(ctx, "internal.mid.Translator")
 			defer span.Finish()
 
-			m := func() error {
-				locale, _ := params["locale"]
+			var t ut.Translator
+			var queryLocaleFound bool
+			if locale := r.URL.Query().Get("locale"); locale != "" {
+				t, queryLocaleFound = utrans.GetTranslator(locale)
+			}
 
-				var t ut.Translator
-				if len(locale) > 0 {
-
-					var found bool
-
-					if t, found = utrans.GetTranslator(locale); found {
-						goto END
-					}
-				}
-
-				// get and parse the "Accept-Language" http header and return an array
+			if !queryLocaleFound {
 				t, _ = utrans.FindTranslator(httpext.AcceptedLanguages(r)...)
-			END:
-
-				ctx = webcontext.ContextWithTranslator(ctx, t)
-
-				return nil
 			}
 
-			if err := m(); err != nil {
-				if web.RequestIsJson(r) {
-					return web.RespondJsonError(ctx, w, err)
-				}
-				return err
-			}
+			ctx = webcontext.ContextWithTranslator(ctx, t)
 
 			return after(ctx, w, r, params)
 		}

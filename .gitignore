@@ -3,5 +3,6 @@ aws.lee
 aws.*
 .env_docker_compose
 local.env
+.local.env
 .DS_Store
 tmp

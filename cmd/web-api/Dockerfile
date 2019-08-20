@@ -1,4 +1,4 @@
-FROM golang:1.12.6-alpine3.9 AS build_base_golang
+FROM golang:1.12.9-alpine3.9 AS build_base_golang
 
 LABEL maintainer="lee@geeksinthewoods.com"
 

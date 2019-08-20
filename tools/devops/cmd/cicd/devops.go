@@ -682,6 +682,15 @@ func DefineDeployService(log *log.Logger, ctx ServiceContext, deployEnv *devdepl
 				}
 			}
 
+
+			// Support for resizing static images files to be responsive.
+			if ctx.StaticFilesImgResizeEnable {
+				placeholders["{STATIC_FILES_IMG_RESIZE_ENABLED}"] = "true"
+			} else {
+				placeholders["{STATIC_FILES_IMG_RESIZE_ENABLED}"] = "false"
+			}
+
+
 			return nil
 		},
 	}

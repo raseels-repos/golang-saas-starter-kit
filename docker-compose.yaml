@@ -76,10 +76,6 @@ services:
       main:
         aliases:
           - web-app
-    links:
-      - postgres
-      - redis
-      - datadog
     env_file:
       - .env_docker_compose
     environment:
@@ -115,10 +111,6 @@ services:
       main:
         aliases:
           - web-api
-    links:
-      - postgres
-      - redis
-      - datadog
     env_file:
       - .env_docker_compose
     environment:

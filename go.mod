@@ -15,7 +15,6 @@ require (
 	github.com/go-playground/pkg v0.0.0-20190522230805-792a755e6910
 	github.com/go-playground/universal-translator v0.16.0
 	github.com/go-redis/redis v6.15.2+incompatible
-	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.3.1
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/schema v1.1.0
@@ -29,20 +28,17 @@ require (
 	github.com/lib/pq v1.2.0
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/onsi/ginkgo v1.8.0 // indirect
-	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
 	github.com/sethgrid/pester v0.0.0-20190127155807-68a33a018ad0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/sudo-suhas/symcrypto v1.0.0
 	github.com/urfave/cli v1.21.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	gitlab.com/geeks-accelerator/oss/devops v0.0.0-20190815180027-17c30c1f4c9e
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
-	golang.org/x/tools v0.0.0-20190807223507-b346f7fd45de // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.16.1
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1

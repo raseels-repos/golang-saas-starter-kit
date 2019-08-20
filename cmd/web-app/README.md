@@ -23,7 +23,7 @@ https://example.saasstartupkit.com
 
 The web app relies on the Golang business logic packages developed to provide an API for internal requests. 
 
-Once the web-app service is running it will be available on port 3000.
+Once the web-app service is running, it will be available on port 3000.
 
 http://127.0.0.1:3000/
 
@@ -154,7 +154,8 @@ go build .
 
 ### Docker 
 
-To build using the docker file, need to be in the project root directory. `Dockerfile` references go.mod in root directory.
+To build using the docker file, you need to be in the project root directory since the `Dockerfile` references 
+Go Modules that are located there.
 
 ```bash
 docker build -f cmd/web-app/Dockerfile -t saas-web-app .
@@ -175,7 +176,7 @@ http://127.0.0.1:3000/signup?test-web-error=1
 ### Localization 
 
 Test a specific language by appending the locale to the request URL.
-127.0.0.1:3000/signup?local=fr
+http://127.0.0.1:3000/signup?local=fr
 
 
 [github.com/go-playground/validator](https://github.com/go-playground/validator) supports the following languages.
@@ -185,6 +186,25 @@ Test a specific language by appending the locale to the request URL.
 - ja - Japanese
 - nl - Dutch
 - zh - Chinese
+
+### HTTP Pipeline (Middleware)
+In any production ready web application there're many concerns that should be handle it correctly such as:
+* logging
+* tracing
+* error handling
+* observability metrics
+* security
+
+All these responsabilities are orthogonal between each other, and in particular, to the business logic. In `saas-starter-kit` these responsabilities are handeled in a chained set of middlewares which allow a clear separation of concerns and it avoids polluting business-rule code.
+
+We can separate existing middlewares in two dimensions: cross-cutting application middlewares, and middlewares for particular routes. Middlewares such as tracing, error handling, and metrics belong to the former category, whereas authentication/authorization to the latter.
+
+If you want to dig into the details regarding these configurations, refer to `handlers/routes.go` where you can find the application middleware chaining, and the particular middlewares per route when adding handlers with `app.Handle(...)`.
+
+### Routes
+Every valid URL route can be found in `handlers/route.go`.
+
+Notice that every handler is grouped by business-context (`Projects`, `Users`, `Account`) compared to sharing a single big struct. This allows to limit the scope of action of handlers regarding other actions that are far from its reponsability, and facilitates testing since less mockups will be necessary to test the handlers.
 
 ### Future Functionality
 

@@ -31,9 +31,8 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 When getting started building SaaS, we believe that is important for both the frontend web experience and the backend 
 business logic (business value) be developed in the same codebase - using the same language for the frontend and backend
 development in the same single repository. We believe this for two main reasons:
-1. Lower barrier for and accelerate onboarding of new engineers developing the SaaS by making it easy for them
-to load a complete mental model of the codebase.
-2. Minimize cross project/team coordination 
+1. Keeps the product codebase simple and thus easy to load complete mental model.
+2. Minimize cross project/team coordination
 
 Once the SaaS product has gained market traction and the core set of functionality has been identified to achieve 
 product-market fit, the functionality could be re-written with a language that would improve user experience or 
@@ -48,17 +47,17 @@ There are five areas of expertise that an engineer or engineering team must do f
 Based on our experience, a few core decisions were made for each of these areas that help you focus initially on 
 building the business logic.
 1. Micro level - The semantics that cover how data is defined, the relationships and how the data is being captured. This 
-project tries to minimize the connection between packages on the same horizontally later. Data models should not be part 
-of feature functionality. Hopefully these micro level decisions help prevent cases where 30K lines of code rely on a 
-single data model which makes simple one line changes potentially high risk. 
+project aims for packages to be developed distinct levels that are loosely coupled and highly cohesive. Data models 
+should not be part of feature functionality. It's easy for early products to be overly dependent on single models that 
+starts to introduce significant risk to product stability and slows development considerably. We want to avoid 
+situations were a 1 change can affect 30k lines of code.
 2. Macro level - The architecture and its design provides basic project structure and the foundation for development. 
-This project provides a good set of examples that demonstrate where different types of code can reside. 
+This project provides a good set of examples for a variety of common product needs.  
 3. Business logic - The code for the business logic facilitates value generating activities for the business. This 
-project provides an example Golang package that helps illustrate the implementation of business logic and how it can be 
+project provides an example Golang package that helps illustrate how business logic can be implemented and delivered 
 delivered to clients.
-4. Deployment and Operations - Get the code to production! This sometimes can be a challenging task as it requires 
-a knowledge of a completely different expertise - DevOps. This project provides a complete continuous build pipeline that 
-will push the code to production with minimal effort using serverless deployments to AWS Fargate with GitLab CI/CD.  
+4. Deployment and Operations - Get the code to production! This usually requires an entirely separate expertise. 
+Instead a comprehensive CI pipeline is provided to create scaleable serverless infrastructure. 
 5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
 facilitate exposing metrics, logs and request tracing to obverse and validate your services are stable and responsive 
  for your clients (hopefully paying clients). 
@@ -147,7 +146,7 @@ have created this diagram below. Since it is very detailed, you can click on the
 
 ## Local Installation
 
-Docker is required to run this project on your local machine. This project uses multiple third-party services that will 
+Docker is required to run this project on your local machine. This project uses multiple open-source services that will 
 be hosted locally via Docker. 
 * Postgres - Transactional database to handle persistence of all data.
 * Redis - Key / value storage for sessions and other data. Used only as ephemeral storage.
@@ -211,7 +210,6 @@ following services will run:
 - web-api
 - web-app 
 - postgres
-- mysql
 
 
 ### Running the project
@@ -296,15 +294,15 @@ docker-compose up  --build -d web-app
 2. Update references.
 ```bash
 flist=`grep -r "geeks-accelerator/oss/saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
-for f in $flist; do echo $f; sed -i "" -e "s#geeks-accelerator/oss/saas-starter-kit#geeks-accelerator/oss/aurora-cam#g" $f; done
+for f in $flist; do echo $f; sed -i "" -e "s|geeks-accelerator/oss/saas-starter-kit|geeks-accelerator/oss/aurora-cam|g" $f; done
 
 
 flist=`grep -r "saas-starter-kit" * | awk -F ':' '{print $1}' | sort | uniq`
-for f in $flist; do echo $f; sed -i "" -e "s#saas-starter-kit#aurora-cam#g" $f; done
+for f in $flist; do echo $f; sed -i "" -e "s|saas-starter-kit|aurora-cam|g" $f; done
 
 
 flist=`grep -r "example-project" * | awk -F ':' '{print $1}' | sort | uniq`
-for f in $flist; do echo $f; sed -i "" -e "s#example-project#aurora-cam#g" $f; done
+for f in $flist; do echo $f; sed -i "" -e "s|example-project|aurora-cam|g" $f; done
 
 
 ```
@@ -546,7 +544,10 @@ shared=# \dt
  public | users          | table | postgres
  public | users_accounts | table | postgres
 (5 rows)
-```
+``` 
+
+An alternative option would be to install [pgcli](https://www.pgcli.com/) locally on your machine and connect to the 
+database running inside the docker container. 
 
 
 ## Deployment 
@@ -607,11 +608,6 @@ can set a single env variable.
 DD_EXPVAR=service_name=web-app env=dev url=http://web-app:4000/debug/vars|service_name=web-api env=dev url=http://web-api:4001/debug/vars
 ```
 
-### Postgres and future MySQL support
-
-Postgres is only supported based on its dependency of sqlxmigrate. MySQL should be easy to add to sqlxmigrate after 
-determining a better method for abstracting the create table and other SQL statements from the main testing logic.
-
 ### SQLx bindvars
 
 When making new packages that use sqlx, bind vars for mysql are `?` where as postgres is `$1`.
@@ -629,7 +625,7 @@ For additional details refer to [bindvars](https://jmoiron.github.io/sqlx/#bindv
 ## What's Next
 
 We are in the process of writing more documentation about this code. We welcome you to make enhancements to this 
-documentation or just send us your feedback and suggestions ; ) 
+documentation or just send us your feedback and suggestions :wink:
 
 
 ## Join us on Gopher Slack

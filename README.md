@@ -33,8 +33,7 @@ business logic (business value) be developed in the same codebase - using the sa
 development in the same single repository. We believe this for two main reasons:
 1. Lower barrier for and accelerate onboarding of new engineers developing the SaaS by making it easy for them
 to load a complete mental model of the codebase.
-2. Minimize potential bottlenecks and eliminate complexities of coordinating development across repositories, with 
-potentially different teams responsible for the different repositories. 
+2. Minimize cross project/team coordination 
 
 Once the SaaS product has gained market traction and the core set of functionality has been identified to achieve 
 product-market fit, the functionality could be re-written with a language that would improve user experience or 

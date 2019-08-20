@@ -306,7 +306,3 @@ Ensure the `pkg` directory used for go module cache has the correct permissions.
 sudo chown -R $(whoami):staff ${HOME}/go/pkg
 sudo chmod -R 755 ${HOME}/go/pkg 
 ```
- 
- 
- 
-

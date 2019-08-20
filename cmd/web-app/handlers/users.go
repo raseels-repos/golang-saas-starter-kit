@@ -3,37 +3,39 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	"net/http"
+	"strings"
+	"time"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/dustin/go-humanize/english"
 	"github.com/gorilla/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
-	"net/http"
-	"strings"
-	"time"
 )
 
 // Users represents the Users API method handler set.
 type Users struct {
-	MasterDB      *sqlx.DB
-	Redis         *redis.Client
-	Renderer      web.Renderer
-	Authenticator *auth.Authenticator
-	ProjectRoutes project_routes.ProjectRoutes
-	NotifyEmail   notify.Email
-	SecretKey     string
+	UserRepo        handlers.UserRepository
+	AccountRepo     handlers.AccountRepository
+	UserAccountRepo handlers.UserAccountRepository
+	AuthRepo        handlers.UserAuthRepository
+	InviteRepo      handlers.UserInviteRepository
+	GeoRepo         GeoRepository
+	MasterDB        *sqlx.DB
+	Redis           *redis.Client
+	Renderer        web.Renderer
 }
 
 func urlUsersIndex() string {
@@ -100,7 +102,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 			var v datatable.ColumnValue
 			switch col.Field {
 			case "id":
-				v.Value = fmt.Sprintf("%d", q.ID)
+				v.Value = fmt.Sprintf("%s", q.ID)
 			case "name":
 				if strings.TrimSpace(q.Name) == "" {
 					v.Value = q.Email
@@ -144,7 +146,7 @@ func (h *Users) Index(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	}
 
 	loadFunc := func(ctx context.Context, sorting string, fields []datatable.DisplayField) (resp [][]datatable.ColumnValue, err error) {
-		res, err := user_account.UserFindByAccount(ctx, claims, h.MasterDB, user_account.UserFindByAccountRequest{
+		res, err := h.UserAccountRepo.UserFindByAccount(ctx, claims, user_account.UserFindByAccountRequest{
 			AccountID: claims.Audience,
 			Order:     strings.Split(sorting, ","),
 		})
@@ -232,7 +234,7 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				}
 			}
 
-			usr, err := user.Create(ctx, claims, h.MasterDB, req.UserCreateRequest, ctxValues.Now)
+			usr, err := h.UserRepo.Create(ctx, claims, req.UserCreateRequest, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -246,7 +248,7 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			uaStatus := user_account.UserAccountStatus_Active
-			_, err = user_account.Create(ctx, claims, h.MasterDB, user_account.UserAccountCreateRequest{
+			_, err = h.UserAccountRepo.Create(ctx, claims, user_account.UserAccountCreateRequest{
 				UserID:    usr.ID,
 				AccountID: claims.Audience,
 				Roles:     req.Roles,
@@ -282,7 +284,7 @@ func (h *Users) Create(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}
@@ -327,7 +329,7 @@ func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request
 
 			switch r.PostForm.Get("action") {
 			case "archive":
-				err = user.Archive(ctx, claims, h.MasterDB, user.UserArchiveRequest{
+				err = h.UserRepo.Archive(ctx, claims, user.UserArchiveRequest{
 					ID: userID,
 				}, ctxValues.Now)
 				if err != nil {
@@ -352,14 +354,14 @@ func (h *Users) View(ctx context.Context, w http.ResponseWriter, r *http.Request
 		return nil
 	}
 
-	usr, err := user.ReadByID(ctx, claims, h.MasterDB, userID)
+	usr, err := h.UserRepo.ReadByID(ctx, claims, userID)
 	if err != nil {
 		return err
 	}
 
 	data["user"] = usr.Response(ctx)
 
-	usrAccs, err := user_account.FindByUserID(ctx, claims, h.MasterDB, userID, false)
+	usrAccs, err := h.UserAccountRepo.FindByUserID(ctx, claims, userID, false)
 	if err != nil {
 		return err
 	}
@@ -425,7 +427,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				}
 			}
 
-			err = user.Update(ctx, claims, h.MasterDB, req.UserUpdateRequest, ctxValues.Now)
+			err = h.UserRepo.Update(ctx, claims, req.UserUpdateRequest, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -439,7 +441,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			}
 
 			if req.Roles != nil {
-				err = user_account.Update(ctx, claims, h.MasterDB, user_account.UserAccountUpdateRequest{
+				err = h.UserAccountRepo.Update(ctx, claims, user_account.UserAccountUpdateRequest{
 					UserID:    userID,
 					AccountID: claims.Audience,
 					Roles:     &req.Roles,
@@ -465,7 +467,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 				}
 				pwdReq.ID = userID
 
-				err = user.UpdatePassword(ctx, claims, h.MasterDB, *pwdReq, ctxValues.Now)
+				err = h.UserRepo.UpdatePassword(ctx, claims, *pwdReq, ctxValues.Now)
 				if err != nil {
 					switch errors.Cause(err) {
 					default:
@@ -497,12 +499,12 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	usr, err := user.ReadByID(ctx, claims, h.MasterDB, userID)
+	usr, err := h.UserRepo.ReadByID(ctx, claims, userID)
 	if err != nil {
 		return err
 	}
 
-	usrAcc, err := user_account.Read(ctx, claims, h.MasterDB, user_account.UserAccountReadRequest{
+	usrAcc, err := h.UserAccountRepo.Read(ctx, claims, user_account.UserAccountReadRequest{
 		UserID:    userID,
 		AccountID: claims.Audience,
 	})
@@ -520,7 +522,7 @@ func (h *Users) Update(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	data["user"] = usr.Response(ctx)
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}
@@ -577,7 +579,7 @@ func (h *Users) Invite(ctx context.Context, w http.ResponseWriter, r *http.Reque
 			req.UserID = claims.Subject
 			req.AccountID = claims.Audience
 
-			res, err := invite.SendUserInvites(ctx, claims, h.MasterDB, h.ProjectRoutes.UserInviteAccept, h.NotifyEmail, *req, h.SecretKey, ctxValues.Now)
+			res, err := h.InviteRepo.SendUserInvites(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -661,7 +663,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			// Append the query param value to the request.
 			req.InviteHash = inviteHash
 
-			hash, err := invite.AcceptInviteUser(ctx, h.MasterDB, *req, h.SecretKey, ctxValues.Now)
+			hash, err := h.InviteRepo.AcceptInviteUser(ctx, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				case invite.ErrInviteExpired:
@@ -699,13 +701,13 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Load the user without any claims applied.
-			usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, hash.UserID)
+			usr, err := h.UserRepo.ReadByID(ctx, auth.Claims{}, hash.UserID)
 			if err != nil {
 				return false, err
 			}
 
 			// Authenticated the user. Probably should use the default session TTL from UserLogin.
-			token, err := user_auth.Authenticate(ctx, h.MasterDB, h.Authenticator, user_auth.AuthenticateRequest{
+			token, err := h.AuthRepo.Authenticate(ctx, user_auth.AuthenticateRequest{
 				Email:     usr.Email,
 				Password:  req.Password,
 				AccountID: hash.AccountID,
@@ -720,7 +722,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			}
 
 			// Add the token to the users session.
-			err = handleSessionToken(ctx, h.MasterDB, w, r, token)
+			err = handleSessionToken(ctx, w, r, token)
 			if err != nil {
 				return false, err
 			}
@@ -729,9 +731,9 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 			return true, web.Redirect(ctx, w, r, "/", http.StatusFound)
 		}
 
-		usrAcc, err := invite.AcceptInvite(ctx, h.MasterDB, invite.AcceptInviteRequest{
+		usrAcc, err := h.InviteRepo.AcceptInvite(ctx, invite.AcceptInviteRequest{
 			InviteHash: inviteHash,
-		}, h.SecretKey, ctxValues.Now)
+		}, ctxValues.Now)
 		if err != nil {
 
 			switch errors.Cause(err) {
@@ -776,7 +778,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 		}
 
 		// Read user by ID with no claims.
-		usr, err := user.ReadByID(ctx, auth.Claims{}, h.MasterDB, usrAcc.UserID)
+		usr, err := h.UserRepo.ReadByID(ctx, auth.Claims{}, usrAcc.UserID)
 		if err != nil {
 			return false, err
 		}
@@ -799,7 +801,7 @@ func (h *Users) InviteAccept(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
-	data["timezones"], err = geonames.ListTimezones(ctx, h.MasterDB)
+	data["timezones"], err = h.GeoRepo.ListTimezones(ctx)
 	if err != nil {
 		return err
 	}

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -18,7 +18,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -28,6 +31,15 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	tknGen := &auth.MockTokenGenerator{}
+
+	userRepo := user.MockRepository(test.MasterDB)
+	userAccRepo := user_account.NewRepository(test.MasterDB)
+	accPrefRepo := account_preference.NewRepository(test.MasterDB)
+
+	repo = NewRepository(test.MasterDB, tknGen, userRepo, userAccRepo, accPrefRepo)
+
 	return m.Run()
 }
 
@@ -41,14 +53,12 @@ func TestAuthenticate(t *testing.T) {
 		{
 			ctx := tests.Context()
 
-			tknGen := &auth.MockTokenGenerator{}
-
 			// Auth tokens are valid for an our and is verified against current time.
 			// Issue the token one hour ago.
 			now := time.Now().Add(time.Hour * -1)
 
 			// Try to authenticate an invalid user.
-			_, err := Authenticate(ctx, test.MasterDB, tknGen,
+			_, err := repo.Authenticate(ctx,
 				AuthenticateRequest{
 					Email:    "doesnotexist@gmail.com",
 					Password: "xy7",
@@ -82,7 +92,7 @@ func TestAuthenticate(t *testing.T) {
 			// is always greater than the first user_account entry created so it will
 			// be returned consistently back in the same order, last.
 			account2Role := auth.RoleUser
-			_, err = user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			_, err = repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 				UserID:    usrAcc.UserID,
 				AccountID: acc2.ID,
 				Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(account2Role)},
@@ -92,7 +102,7 @@ func TestAuthenticate(t *testing.T) {
 			now = now.Add(time.Minute * 5)
 
 			// Try to authenticate valid user with invalid password.
-			_, err = Authenticate(ctx, test.MasterDB, tknGen,
+			_, err = repo.Authenticate(ctx,
 				AuthenticateRequest{
 					Email:    usrAcc.User.Email,
 					Password: "xy7",
@@ -106,7 +116,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tAuthenticate user w/invalid password ok.", tests.Success)
 
 			// Verify that the user can be authenticated with the created user.
-			tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+			tkn1, err := repo.Authenticate(ctx,
 				AuthenticateRequest{
 					Email:    usrAcc.User.Email,
 					Password: usrAcc.User.Password,
@@ -118,7 +128,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tAuthenticate user ok.", tests.Success)
 
 			// Ensure the token string was correctly generated.
-			claims1, err := tknGen.ParseClaims(tkn1.AccessToken)
+			claims1, err := repo.TknGen.ParseClaims(tkn1.AccessToken)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -135,7 +145,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tAuthenticate parse claims from token ok.", tests.Success)
 
 			// Try switching to a second account using the first set of claims.
-			tkn2, err := SwitchAccount(ctx, test.MasterDB, tknGen, claims1,
+			tkn2, err := repo.SwitchAccount(ctx, claims1,
 				SwitchAccountRequest{AccountID: acc2.ID}, time.Hour, now)
 			if err != nil {
 				t.Log("\t\tGot :", err)
@@ -144,7 +154,7 @@ func TestAuthenticate(t *testing.T) {
 			t.Logf("\t%s\tSwitchAccount user ok.", tests.Success)
 
 			// Ensure the token string was correctly generated.
-			claims2, err := tknGen.ParseClaims(tkn2.AccessToken)
+			claims2, err := repo.TknGen.ParseClaims(tkn2.AccessToken)
 			if err != nil {
 				t.Log("\t\tGot :", err)
 				t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -172,8 +182,6 @@ func TestUserUpdatePassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		tknGen := &auth.MockTokenGenerator{}
-
 		// Create a new user for testing.
 		usrAcc, err := user_account.MockUserAccount(ctx, test.MasterDB, now, user_account.UserAccountRole_User)
 		if err != nil {
@@ -183,7 +191,7 @@ func TestUserUpdatePassword(t *testing.T) {
 		t.Logf("\t%s\tCreate user account ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the created user.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+		_, err = repo.Authenticate(ctx,
 			AuthenticateRequest{
 				Email:    usrAcc.User.Email,
 				Password: usrAcc.User.Password,
@@ -195,7 +203,7 @@ func TestUserUpdatePassword(t *testing.T) {
 
 		// Update the users password.
 		newPass := uuid.NewRandom().String()
-		err = user.UpdatePassword(ctx, auth.Claims{}, test.MasterDB, user.UserUpdatePasswordRequest{
+		err = repo.User.UpdatePassword(ctx, auth.Claims{}, user.UserUpdatePasswordRequest{
 			ID:              usrAcc.UserID,
 			Password:        newPass,
 			PasswordConfirm: newPass,
@@ -207,7 +215,7 @@ func TestUserUpdatePassword(t *testing.T) {
 		t.Logf("\t%s\tUpdatePassword ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+		_, err = repo.Authenticate(ctx,
 			AuthenticateRequest{
 				Email:    usrAcc.User.Email,
 				Password: newPass,
@@ -229,8 +237,6 @@ func TestUserResetPassword(t *testing.T) {
 
 		now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-		tknGen := &auth.MockTokenGenerator{}
-
 		// Create a new user for testing.
 		usrAcc, err := user_account.MockUserAccount(ctx, test.MasterDB, now, user_account.UserAccountRole_User)
 		if err != nil {
@@ -239,21 +245,13 @@ func TestUserResetPassword(t *testing.T) {
 		}
 		t.Logf("\t%s\tCreate user account ok.", tests.Success)
 
-		// Mock the methods needed to make a password reset.
-		resetUrl := func(string) string {
-			return ""
-		}
-		notify := &notify.MockEmail{}
-
-		secretKey := "6368616e676520746869732070617373"
-
 		ttl := time.Hour
 
 		// Make the reset password request.
-		resetHash, err := user.ResetPassword(ctx, test.MasterDB, resetUrl, notify, user.UserResetPasswordRequest{
+		resetHash, err := repo.User.ResetPassword(ctx, user.UserResetPasswordRequest{
 			Email: usrAcc.User.Email,
 			TTL:   ttl,
-		}, secretKey, now)
+		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tResetPassword failed.", tests.Failed)
@@ -262,11 +260,11 @@ func TestUserResetPassword(t *testing.T) {
 
 		// Assuming we have received the email and clicked the link, we now can ensure confirm works.
 		newPass := uuid.NewRandom().String()
-		reset, err := user.ResetConfirm(ctx, test.MasterDB, user.UserResetConfirmRequest{
+		reset, err := repo.User.ResetConfirm(ctx, user.UserResetConfirmRequest{
 			ResetHash:       resetHash,
 			Password:        newPass,
 			PasswordConfirm: newPass,
-		}, secretKey, now)
+		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -278,7 +276,7 @@ func TestUserResetPassword(t *testing.T) {
 		t.Logf("\t%s\tResetConfirm ok.", tests.Success)
 
 		// Verify that the user can be authenticated with the updated password.
-		_, err = Authenticate(ctx, test.MasterDB, tknGen,
+		_, err = repo.Authenticate(ctx,
 			AuthenticateRequest{
 				Email:    usrAcc.User.Email,
 				Password: newPass,
@@ -340,7 +338,7 @@ func TestSwitchAccount(t *testing.T) {
 			}
 
 			// Associate the second account with root user.
-			usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 				UserID:    usrAcc.UserID,
 				AccountID: acc2.ID,
 				Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(roles[1])},
@@ -359,7 +357,7 @@ func TestSwitchAccount(t *testing.T) {
 			}
 
 			// Associate the third account with root user.
-			usrAcc3, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+			usrAcc3, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 				UserID:    usrAcc.UserID,
 				AccountID: acc3.ID,
 				Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(roles[2])},
@@ -426,7 +424,7 @@ func TestSwitchAccount(t *testing.T) {
 		}
 
 		// Associate the second account with root user.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usrAcc.UserID,
 			AccountID: acc2.ID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_Admin},
@@ -445,7 +443,7 @@ func TestSwitchAccount(t *testing.T) {
 		}
 
 		// Associate the third account with root user.
-		usrAcc3, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc3, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usrAcc.UserID,
 			AccountID: acc3.ID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
@@ -472,8 +470,6 @@ func TestSwitchAccount(t *testing.T) {
 	// Add 30 minutes to now to simulate time passing.
 	now = now.Add(time.Minute * 5)
 
-	tknGen := &auth.MockTokenGenerator{}
-
 	t.Log("Given the need to switch accounts.")
 	{
 		for i, authTest := range authTests {
@@ -481,7 +477,7 @@ func TestSwitchAccount(t *testing.T) {
 			{
 				// Verify that the user can be authenticated with the created user.
 				var claims1 auth.Claims
-				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+				tkn1, err := repo.Authenticate(ctx,
 					AuthenticateRequest{
 						Email:    authTest.root.User.Email,
 						Password: authTest.root.User.Password,
@@ -491,7 +487,7 @@ func TestSwitchAccount(t *testing.T) {
 					t.Fatalf("\t%s\tAuthenticate user failed.", tests.Failed)
 				} else {
 					// Ensure the token string was correctly generated.
-					claims1, err = tknGen.ParseClaims(tkn1.AccessToken)
+					claims1, err = repo.TknGen.ParseClaims(tkn1.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -511,7 +507,7 @@ func TestSwitchAccount(t *testing.T) {
 
 				// Try to switch to account 2.
 				var claims2 auth.Claims
-				tkn2, err := SwitchAccount(ctx, test.MasterDB, tknGen, claims1, authTest.switch1Req, time.Hour, now, authTest.switch1Scopes...)
+				tkn2, err := repo.SwitchAccount(ctx, claims1, authTest.switch1Req, time.Hour, now, authTest.switch1Scopes...)
 				if err != authTest.switch1Err {
 					if errors.Cause(err) != authTest.switch1Err {
 						t.Log("\t\tExpected :", authTest.switch1Err)
@@ -520,7 +516,7 @@ func TestSwitchAccount(t *testing.T) {
 					}
 				} else {
 					// Ensure the token string was correctly generated.
-					claims2, err = tknGen.ParseClaims(tkn2.AccessToken)
+					claims2, err = repo.TknGen.ParseClaims(tkn2.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -549,7 +545,7 @@ func TestSwitchAccount(t *testing.T) {
 				}
 
 				// Try to switch to account 3.
-				tkn3, err := SwitchAccount(ctx, test.MasterDB, tknGen, claims2, authTest.switch2Req, time.Hour, now, authTest.switch2Scopes...)
+				tkn3, err := repo.SwitchAccount(ctx, claims2, authTest.switch2Req, time.Hour, now, authTest.switch2Scopes...)
 				if err != authTest.switch2Err {
 					if errors.Cause(err) != authTest.switch2Err {
 						t.Log("\t\tExpected :", authTest.switch2Err)
@@ -558,7 +554,7 @@ func TestSwitchAccount(t *testing.T) {
 					}
 				} else {
 					// Ensure the token string was correctly generated.
-					claims3, err := tknGen.ParseClaims(tkn3.AccessToken)
+					claims3, err := repo.TknGen.ParseClaims(tkn3.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -610,7 +606,7 @@ func TestVirtualLogin(t *testing.T) {
 	var authTests []authTest
 
 	// Root admin -> role admin -> role admin
-	if true {
+	{
 		// Create a new user for testing.
 		usrAcc, err := user_account.MockUserAccount(ctx, test.MasterDB, now, user_account.UserAccountRole_Admin)
 		if err != nil {
@@ -625,7 +621,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr2.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_Admin)},
@@ -642,7 +638,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc3, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc3, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr3.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_Admin)},
@@ -687,7 +683,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr2.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_Admin)},
@@ -704,7 +700,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc3, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc3, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr3.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_User)},
@@ -749,7 +745,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr2.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_User)},
@@ -766,7 +762,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc3, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc3, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr3.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_Admin)},
@@ -811,7 +807,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr2.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_Admin)},
@@ -850,7 +846,7 @@ func TestVirtualLogin(t *testing.T) {
 		}
 
 		// Associate second user with basic role associated with the same account.
-		usrAcc2, err := user_account.Create(ctx, auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		usrAcc2, err := repo.UserAccount.Create(ctx, auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    usr2.ID,
 			AccountID: usrAcc.AccountID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole(user_account.UserAccountRole_User)},
@@ -876,8 +872,6 @@ func TestVirtualLogin(t *testing.T) {
 	// Add 30 minutes to now to simulate time passing.
 	now = now.Add(time.Minute * 5)
 
-	tknGen := &auth.MockTokenGenerator{}
-
 	t.Log("Given the need to virtual login.")
 	{
 		for i, authTest := range authTests {
@@ -885,7 +879,7 @@ func TestVirtualLogin(t *testing.T) {
 			{
 				// Verify that the user can be authenticated with the created user.
 				var claims1 auth.Claims
-				tkn1, err := Authenticate(ctx, test.MasterDB, tknGen,
+				tkn1, err := repo.Authenticate(ctx,
 					AuthenticateRequest{
 						Email:    authTest.root.User.Email,
 						Password: authTest.root.User.Password,
@@ -895,7 +889,7 @@ func TestVirtualLogin(t *testing.T) {
 					t.Fatalf("\t%s\tAuthenticate user failed.", tests.Failed)
 				} else {
 					// Ensure the token string was correctly generated.
-					claims1, err = tknGen.ParseClaims(tkn1.AccessToken)
+					claims1, err = repo.TknGen.ParseClaims(tkn1.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -915,7 +909,7 @@ func TestVirtualLogin(t *testing.T) {
 
 				// Try virtual login to user 2.
 				var claims2 auth.Claims
-				tkn2, err := VirtualLogin(ctx, test.MasterDB, tknGen, claims1, authTest.login1Req, time.Hour, now)
+				tkn2, err := repo.VirtualLogin(ctx, claims1, authTest.login1Req, time.Hour, now)
 				if err != authTest.login1Err {
 					if errors.Cause(err) != authTest.login1Err {
 						t.Log("\t\tExpected :", authTest.login1Err)
@@ -924,7 +918,7 @@ func TestVirtualLogin(t *testing.T) {
 					}
 				} else {
 					// Ensure the token string was correctly generated.
-					claims2, err = tknGen.ParseClaims(tkn2.AccessToken)
+					claims2, err = repo.TknGen.ParseClaims(tkn2.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -948,7 +942,7 @@ func TestVirtualLogin(t *testing.T) {
 				}
 
 				// Try virtual login to user 3.
-				tkn3, err := VirtualLogin(ctx, test.MasterDB, tknGen, claims2, authTest.login2Req, time.Hour, now)
+				tkn3, err := repo.VirtualLogin(ctx, claims2, authTest.login2Req, time.Hour, now)
 				if err != authTest.login2Err {
 					if errors.Cause(err) != authTest.login2Err {
 						t.Log("\t\tExpected :", authTest.login2Err)
@@ -957,7 +951,7 @@ func TestVirtualLogin(t *testing.T) {
 					}
 				} else {
 					// Ensure the token string was correctly generated.
-					claims3, err := tknGen.ParseClaims(tkn3.AccessToken)
+					claims3, err := repo.TknGen.ParseClaims(tkn3.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)
@@ -976,14 +970,14 @@ func TestVirtualLogin(t *testing.T) {
 				t.Logf("\t%s\tVirtualLogin user 2 with role %s ok.", tests.Success, authTest.login2Role)
 
 				if authTest.login2Logout {
-					tknOut, err := VirtualLogout(ctx, test.MasterDB, tknGen, claims2, time.Hour, now)
+					tknOut, err := repo.VirtualLogout(ctx, claims2, time.Hour, now)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tVirtualLogout user 2 failed.", tests.Failed)
 					}
 
 					// Ensure the token string was correctly generated.
-					claimsOut, err := tknGen.ParseClaims(tknOut.AccessToken)
+					claimsOut, err := repo.TknGen.ParseClaims(tknOut.AccessToken)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tParse claims from token failed.", tests.Failed)

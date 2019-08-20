@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"net/http"
 	"os"
@@ -135,7 +136,7 @@ func main() {
 func API(shutdown chan os.Signal, log *log.Logger) http.Handler {
 
 	// Construct the web.App which holds all routes as well as common Middleware.
-	app := web.NewApp(shutdown, log, mid.Trace(), mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics())
+	app := web.NewApp(shutdown, log, webcontext.Env_Dev, mid.Logger(log))
 
 	app.Handle("GET", "/swagger/", saasSwagger.WrapHandler)
 	app.Handle("GET", "/swagger/*", saasSwagger.WrapHandler)

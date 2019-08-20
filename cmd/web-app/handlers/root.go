@@ -8,9 +8,8 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sethgrid/pester"
 	"io/ioutil"
@@ -19,10 +18,9 @@ import (
 
 // Root represents the Root API method handler set.
 type Root struct {
-	MasterDB      *sqlx.DB
-	Renderer      web.Renderer
-	Sitemap       *stm.Sitemap
-	ProjectRoutes project_routes.ProjectRoutes
+	Renderer     web.Renderer
+	Sitemap      *stm.Sitemap
+	ProjectRoute project_route.ProjectRoute
 }
 
 // Index determines if the user has authentication and loads the associated page.
@@ -57,7 +55,7 @@ func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		tmpName = "site-api.gohtml"
 
 		// http://127.0.0.1:3001/docs/doc.json
-		swaggerJsonUrl := h.ProjectRoutes.ApiDocsJson()
+		swaggerJsonUrl := h.ProjectRoute.ApiDocsJson()
 
 		// Load the json file from the API service.
 		res, err := pester.Get(swaggerJsonUrl)
@@ -93,8 +91,8 @@ func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 			return errors.WithStack(err)
 		}
 
-		data["urlApiBaseUri"] = h.ProjectRoutes.WebApiUrl(doc.BasePath)
-		data["urlApiDocs"] = h.ProjectRoutes.ApiDocs()
+		data["urlApiBaseUri"] = h.ProjectRoute.WebApiUrl(doc.BasePath)
+		data["urlApiDocs"] = h.ProjectRoute.ApiDocs()
 
 	case "/pricing":
 		tmpName = "site-pricing.gohtml"
@@ -123,7 +121,7 @@ func (h *Root) RobotTxt(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return web.RespondText(ctx, w, txt, http.StatusOK)
 	}
 
-	sitemapUrl := h.ProjectRoutes.WebAppUrl("/sitemap.xml")
+	sitemapUrl := h.ProjectRoute.WebAppUrl("/sitemap.xml")
 
 	txt := fmt.Sprintf("User-agent: *\nDisallow: /ping\nDisallow: /status\nDisallow: /debug/\nSitemap: %s", sitemapUrl)
 	return web.RespondText(ctx, w, txt, http.StatusOK)

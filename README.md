@@ -1,11 +1,10 @@
-# SaaS Starter Kit
+# SaaS Startup Kit
 
 Copyright 2019, Geeks Accelerator 
 twins@geeksaccelerator.com
 
-
-The SaaS Starter Kit is a set of libraries for building scalable software-as-a-service (SaaS) applications that helps 
-preventing both misuse and fraud. The goal of this project is to provide a proven starting point for new 
+The [SaaS Startup Kit](https://saasstartupkit.com/) is a set of libraries in Go and boilerplate Golang code for building 
+scalable software-as-a-service (SaaS) applications. The goal of this project is to provide a proven starting point for new 
 projects that reduces the repetitive tasks in getting a new project launched to production that can easily be scaled 
 and ready to onboard enterprise clients. It uses minimal dependencies, implements idiomatic code and follows Golang 
 best practices. Collectively, the toolkit lays out everything logically to minimize guess work and enable engineers to 
@@ -24,7 +23,7 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 
 *You are welcome to add comments to the Google Slides.*
 
-[![Google Slides of Screen Captures for SaaS Starter Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p)
+[![Google Slides of Screen Captures for SaaS Startup Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://saasstartupkit.com/)
 
 
 ## Motivation
@@ -68,11 +67,11 @@ facilitate exposing metrics, logs and request tracing to obverse and validate yo
 
 ## Description
 
-The example project is a complete starter kit for building SasS with GoLang. It provides two example services:
+The example project is a complete startup kit for building SasS with GoLang. It provides two example services:
 * Web App - Responsive web application to provide service to clients. Includes user signup and user authentication for 
 direct client interaction via their web browsers. 
-* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-party companies to develop deep 
-integrations with the project.
+* Web API - REST API with JWT authentication that renders results as JSON. This allows clients and other third-party 
+companies to develop deep integrations with the project.
 
 The example project also provides these tools:
 * Schema - Creating, initializing tables of Postgres database and handles schema migration. 
@@ -98,29 +97,29 @@ It contains the following features:
 * Integration with GitLab for enterprise-level CI/CD.
 
 Accordingly, the project architecture is illustrated with the following diagram. 
-![alt text](resources/images/saas-stater-kit-diagram.png "SaaS Starter Kit diagram")
+![SaaS Startup Kit diagram](resources/images/saas-stater-kit-diagram.png)
 
 
 ### Example project 
 
-With SaaS, a client subscribes to an online service you provide them. The example project provides functionality for 
-clients to subscribe and then once subscribed they can interact with your software service. 
+With SaaS, a customer subscribes to an online service you provide them. The example project provides functionality for 
+customers to subscribe. Once subscribed, they can interact with your software service. 
 
-The initial contributors to this project are building this saas-starter-kit based on their years of experience building enterprise B2B SaaS. Particularly, this saas-starter-kit is based on their most recent experience building the
-B2B SaaS for [standard operating procedure software](https://keeni.space) (written entirely in Golang). Please refer to the Keeni.Space website,
-its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web app is then available at 
-[app.keeni.space](https://app.keeni.space). They plan on leveraging this experience and build it into a simplified set 
-example services for both a web API and a web app for SaaS businesses. 
+The initial contributors to this project are building this SaaS Startup Kit based on their years of experience building 
+enterprise B2B SaaS. Particularly, this SaaS Startup Kit is based on their most recent experience building the
+B2B SaaS for [standard operating procedure software](https://keeni.space) (written entirely in Golang). Please refer 
+to the Keeni.Space website, its [SOP software pricing](https://keeni.space/pricing) and its signup process. The SaaS web 
+app is then available at [app.keeni.space](https://app.keeni.space). They are leveraging this most recent experience to 
+build a simplified set example services for both a web API and a web app for SaaS businesses. 
 
-For this example, *projects* 
-will be the single business logic package that will be exposed to users for management based on their role. Additional 
-business logic packages can be added to support your project. It’s important at the beginning to minimize the connection 
-between business logic packages on the same horizontal level. 
+For this example, *projects* will be the single business logic package that will be exposed to users for management 
+based on their role. Additional business logic packages can be added to support your project. It's important at the 
+beginning to minimize the connection between business logic packages on the same horizontal level. 
 
 
 This project provides the following functionality to users:
 
-New clients can sign up which creates an account and a user with role of admin.
+New customers can sign up which creates an account and a user with role of admin.
 * Users with the role of admin can manage users for their account. 
 * Authenticated users can manage their projects based on RBAC.
 
@@ -218,7 +217,7 @@ following services will run:
 
 ### Running the project
 
-Use the `docker-compose.yaml` to run all of the services, including the 3rd party services. The first time to run this 
+Use the `docker-compose.yaml` to run all of the services, including the third-party services. The first time to run this 
 command, Docker will download the required images for the 3rd party services.
 
 ```bash
@@ -263,7 +262,7 @@ $ docker-compose down
 Running `docker-compose down` will properly stop and terminate the Docker Compose session.
 
 Note: None of the containers are setup by default with volumes and all data will be lost with `docker-compose down`. 
-This is specifically important to remember regarding the postgres container. If you would like data to be persisted across 
+This is specifically important to remember regarding the Postgres container. If you would like data to be persisted across 
 builds locally, update `docker-compose.yaml` to define a volume. 
 
 
@@ -451,18 +450,23 @@ internally development of the web-app service to the same functionality exposed 
 This separate web-api service can be exposed to clients and be maintained in a more rigid/structured process to manage 
 client expectations.
 
-The web-app will have its own internal API, similar to this external web-api service, but not exposed for third-party 
+The web-app has its own internal API, similar to this external web-api service, but not exposed for third-party 
 integrations. It is believed that in the beginning, having to define an additional API for internal purposes is worth 
-for the additional effort as the internal API can handle more flexible updates. 
+for the additional effort as the internal API can support increased release velocity and handle more flexible updates. 
 
 For more details on this service, read [web-api readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-api/README.md)
 
 ### API Documentation
 
-Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). Once this
-web-api service is running, it can be accessed at /docs
+Documentation for this API service is automatically generated using [swag](https://github.com/geeks-accelerator/swag). 
 
+Once the web-api service is running, it can be accessed at /docs
 http://127.0.0.1:3001/docs/
+
+You can see an example of this Golang web-api service and the API documentation running here:
+https://api.example.saasstartupkit.com/docs/
+
+[![Example Golang web app deployed](https://dzuyel7n94hma.cloudfront.net/saasstartupkit/assets/images/responsive/img/saas-startup-example-golang-project-web-api-documentation-swagger-ui.png/9334f34bf028e0656f73aeb9d931e726/saas-startup-example-golang-project-web-api-documentation-swagger-ui-320w-480w-800w.png)](https://api.example.saasstartupkit.com/docs/)
 
 
 ## Web App
@@ -476,9 +480,16 @@ for internal requests.
 Once the web-app service is running it will be available on port 3000. 
 http://127.0.0.1:3000/
 
-While the web-api service is rocking, this web-app service is still in development. Only the signup functionality works 
-in order for a user to create the initial user with role of admin and a corresponding account for their organization. 
-If you would like to help, please email twins@geeksinthewoods.com.
+The web-app service is a fully functioning example. You can see an example of this Golang web-app service running here:
+https://example.saasstartupkit.com
+
+[![Example Golang web app deployed](https://dzuyel7n94hma.cloudfront.net/saasstartupkit/assets/images/responsive/img/saas-startup-example-golang-project-webapp-projects.png/e3686cbd2515887375535a64cf101184/saas-startup-example-golang-project-webapp-projects-320w-480w-800w.png)](https://example.saasstartupkit.com)
+
+
+The example web-app service includes complete working example of a responsible mobile-first web app for 
+software-as-a-service and example business logic Go packages facilitating create, read, update and delete operations.
+It also includes signup for customers to subscribe to your SaaS, user auth for login/logout, and admin functionality  
+of user management. 
 
 For more details on this service, read [web-app readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-app/README.md)
 
@@ -489,7 +500,7 @@ For more details on this service, read [web-app readme](https://gitlab.com/geeks
 Schema is a minimalistic database migration helper that can manually be invoked via CLI. It provides schema versioning 
 and migration rollback. 
 
-To support POD architecture, the schema for the entire project is defined globally and is located inside internal: 
+The schema for the entire project is defined globally and is located inside internal: 
 [internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema)
 
 Keeping a global schema helps ensure business logic can be decoupled across multiple packages. It is a firm belief that 
@@ -498,13 +509,17 @@ code dependencies. Structs for the same database table can be defined by package
 dependencies. 
 
 The example schema package provides two separate methods for handling schema migration:
+
 * [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/migrations.go) -
 List of direct SQL statements for each migration with defined version ID. A database table is created to persist 
 executed migrations. Upon run of each schema migration run, the migraction logic checks the migration database table to 
-check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a function to enable complex migrations so results from query manipulated before being piped to the next query. 
+check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a 
+function to enable complex migrations so results from query manipulated before being piped to the next query. 
+
 * [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/internal/schema/init_schema.go) - 
 If you have a lot of migrations, it can be a pain to run all them. For example, when you are deploying a new instance of 
-the app into a clean database. To prevent this, use the initSchema function that will run as-if no migration was run before (in a new clean database). 
+the app into a clean database. To prevent this, use the initSchema function that will run as-if no migration was run 
+before (in a new clean database). 
 
 Another bonus with the globally defined schema is that it enables the testing package to spin up database containers 
 on-demand and automatically include all the migrations. This allows the testing package to programmatically execute 
@@ -513,7 +528,7 @@ schema migrations before running any unit tests.
 
 ### Accessing Postgres 
 
-To login to the local Postgres container, use the following command:
+To login to the local Postgres container and query the database tables, use the following command:
 ```bash
 docker exec -it saas-starter-kit_postgres_1 /bin/bash
 bash-5.0# psql -U postgres shared
@@ -537,9 +552,16 @@ shared=# \dt
 
 ## Deployment 
 
-This project includes a complete build pipeline that relies on AWS and GitLab. The presentation "[SaaS Starter Kit - Setup GitLab CI / CD](https://docs.google.com/presentation/d/1sRFQwipziZlxBtN7xuF-ol8vtUqD55l_4GE-4_ns-qM/edit#slide=id.p)" 
+This project includes a complete build pipeline that relies on AWS and GitLab. The presentation 
+"[SaaS Startup Kit - Setup GitLab CI / CD](https://docs.google.com/presentation/d/1sRFQwipziZlxBtN7xuF-ol8vtUqD55l_4GE-4_ns-qM/edit#slide=id.p)" 
 has been made available on Google Docs that provides a step by step guide to setting up a build pipeline using your own 
 AWS and GitLab accounts.  
+
+Google Slides on Setting Up Gitlab CI/CD for SaaS Startup Kit:
+https://docs.google.com/presentation/d/1sRFQwipziZlxBtN7xuF-ol8vtUqD55l_4GE-4_ns-qM/edit#slide=id.p
+
+*You are welcome to add comments to the Google Slides.*
+
 
 The `.gitlab-ci.yaml` file includes the following build 
 stages: 

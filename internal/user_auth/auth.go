@@ -3,7 +3,6 @@ package user_auth
 import (
 	"context"
 	"database/sql"
-	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"strings"
 	"time"
 
@@ -11,8 +10,9 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
@@ -40,7 +40,7 @@ const (
 // Authenticate finds a user by their email and verifies their password. On success
 // it returns a Token that can be used to authenticate access to the application in
 // the future.
-func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, req AuthenticateRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) Authenticate(ctx context.Context, req AuthenticateRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.Authenticate")
 	defer span.Finish()
 
@@ -51,7 +51,7 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, r
 		return Token{}, err
 	}
 
-	u, err := user.ReadByEmail(ctx, auth.Claims{}, dbConn, req.Email, false)
+	u, err := repo.User.ReadByEmail(ctx, auth.Claims{}, req.Email, false)
 	if err != nil {
 		if errors.Cause(err) == user.ErrNotFound {
 			err = errors.WithStack(ErrAuthenticationFailure)
@@ -73,11 +73,11 @@ func Authenticate(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, r
 	}
 
 	// The user is successfully authenticated with the supplied email and password.
-	return generateToken(ctx, dbConn, tknGen, auth.Claims{}, u.ID, req.AccountID, expires, now, scopes...)
+	return repo.generateToken(ctx, auth.Claims{}, u.ID, req.AccountID, expires, now, scopes...)
 }
 
 // SwitchAccount allows users to switch between multiple accounts, this changes the claim audience.
-func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, req SwitchAccountRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) SwitchAccount(ctx context.Context, claims auth.Claims, req SwitchAccountRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.SwitchAccount")
 	defer span.Finish()
 
@@ -97,11 +97,12 @@ func SwitchAccount(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	// Generate a token for the user ID in supplied in claims as the Subject. Pass
 	// in the supplied claims as well to enforce ACLs when finding the current
 	// list of accounts for the user.
-	return generateToken(ctx, dbConn, tknGen, claims, claims.Subject, req.AccountID, expires, now, scopes...)
+	return repo.generateToken(ctx, claims, claims.Subject, req.AccountID, expires, now, scopes...)
 }
 
 // VirtualLogin allows users to mock being logged in as other users.
-func VirtualLogin(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, req VirtualLoginRequest, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) VirtualLogin(ctx context.Context, claims auth.Claims, req VirtualLoginRequest,
+	expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.VirtualLogin")
 	defer span.Finish()
 
@@ -113,7 +114,7 @@ func VirtualLogin(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, c
 	}
 
 	// Find all the accounts that the current user has access to.
-	usrAccs, err := user_account.FindByUserID(ctx, claims, dbConn, claims.Subject, false)
+	usrAccs, err := repo.UserAccount.FindByUserID(ctx, claims, claims.Subject, false)
 	if err != nil {
 		return Token{}, err
 	}
@@ -142,23 +143,23 @@ func VirtualLogin(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, c
 	// Generate a token for the user ID in supplied in claims as the Subject. Pass
 	// in the supplied claims as well to enforce ACLs when finding the current
 	// list of accounts for the user.
-	return generateToken(ctx, dbConn, tknGen, claims, req.UserID, req.AccountID, expires, now, scopes...)
+	return repo.generateToken(ctx, claims, req.UserID, req.AccountID, expires, now, scopes...)
 }
 
 // VirtualLogout allows switch back to their root user/account.
-func VirtualLogout(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) VirtualLogout(ctx context.Context, claims auth.Claims, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "internal.user_auth.VirtualLogout")
 	defer span.Finish()
 
 	// Generate a token for the user ID in supplied in claims as the Subject. Pass
 	// in the supplied claims as well to enforce ACLs when finding the current
 	// list of accounts for the user.
-	return generateToken(ctx, dbConn, tknGen, claims, claims.RootUserID, claims.RootAccountID, expires, now, scopes...)
+	return repo.generateToken(ctx, claims, claims.RootUserID, claims.RootAccountID, expires, now, scopes...)
 }
 
 // generateToken generates claims for the supplied user ID and account ID and then
 // returns the token for the generated claims used for authentication.
-func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, claims auth.Claims, userID, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
+func (repo *Repository) generateToken(ctx context.Context, claims auth.Claims, userID, accountID string, expires time.Duration, now time.Time, scopes ...string) (Token, error) {
 
 	type userAccount struct {
 		AccountID       string
@@ -184,8 +185,8 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 
 		// fetch all places from the db
 		queryStr, queryArgs := query.Build()
-		queryStr = dbConn.Rebind(queryStr)
-		rows, err := dbConn.QueryContext(ctx, queryStr, queryArgs...)
+		queryStr = repo.DbConn.Rebind(queryStr)
+		rows, err := repo.DbConn.QueryContext(ctx, queryStr, queryArgs...)
 		if err != nil {
 			err = errors.Wrapf(err, "query - %s", query.String())
 			return nil, err
@@ -339,7 +340,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 			tz, _ = time.LoadLocation(account.AccountTimezone.String)
 		}
 
-		prefs, err := account_preference.FindByAccountID(ctx, auth.Claims{}, dbConn, account_preference.AccountPreferenceFindByAccountIDRequest{
+		prefs, err := repo.AccountPreference.FindByAccountID(ctx, auth.Claims{}, account_preference.AccountPreferenceFindByAccountIDRequest{
 			AccountID: accountID,
 		})
 		if err != nil {
@@ -393,7 +394,7 @@ func generateToken(ctx context.Context, dbConn *sqlx.DB, tknGen TokenGenerator, 
 	newClaims.RootUserID = claims.RootUserID
 
 	// Generate a token for the user with the defined claims.
-	tknStr, err := tknGen.GenerateToken(newClaims)
+	tknStr, err := repo.TknGen.GenerateToken(newClaims)
 	if err != nil {
 		return Token{}, errors.Wrap(err, "generating token")
 	}

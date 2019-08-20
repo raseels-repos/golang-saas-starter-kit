@@ -1,13 +1,13 @@
 package account_preference
 
 import (
-	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -17,7 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -27,6 +30,9 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	repo = NewRepository(test.MasterDB)
+
 	return m.Run()
 }
 
@@ -66,7 +72,7 @@ func TestSetValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				err := Set(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				err := repo.Set(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -225,7 +231,7 @@ func TestCrud(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				err := Set(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, tt.set, now)
+				err := repo.Set(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), tt.set, now)
 				if err != nil && errors.Cause(err) != tt.writeErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.writeErr)
@@ -234,7 +240,7 @@ func TestCrud(t *testing.T) {
 
 				// If user doesn't have access to set, create one anyways to test the other endpoints.
 				if tt.writeErr != nil {
-					err := Set(ctx, auth.Claims{}, test.MasterDB, tt.set, now)
+					err := repo.Set(ctx, auth.Claims{}, tt.set, now)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -242,7 +248,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Find the account and make sure the set where made.
-				readRes, err := Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceReadRequest{
+				readRes, err := repo.Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceReadRequest{
 					AccountID: tt.set.AccountID,
 					Name:      tt.set.Name,
 				})
@@ -266,7 +272,7 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the account.
-				err = Archive(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceArchiveRequest{
+				err = repo.Archive(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceArchiveRequest{
 					AccountID: tt.set.AccountID,
 					Name:      tt.set.Name,
 				}, now)
@@ -276,7 +282,7 @@ func TestCrud(t *testing.T) {
 					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.findErr == nil {
 					// Trying to find the archived account with the includeArchived false should result in not found.
-					_, err = Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceReadRequest{
+					_, err = repo.Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceReadRequest{
 						AccountID: tt.set.AccountID,
 						Name:      tt.set.Name,
 					})
@@ -287,7 +293,7 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived account with the includeArchived true should result no error.
-					_, err = Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceReadRequest{
+					_, err = repo.Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceReadRequest{
 						AccountID:       tt.set.AccountID,
 						Name:            tt.set.Name,
 						IncludeArchived: true,
@@ -300,7 +306,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
 				// Delete (hard-delete) the account.
-				err = Delete(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceDeleteRequest{
+				err = repo.Delete(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceDeleteRequest{
 					AccountID: tt.set.AccountID,
 					Name:      tt.set.Name,
 				})
@@ -310,7 +316,7 @@ func TestCrud(t *testing.T) {
 					t.Fatalf("\t%s\tDelete failed.", tests.Failed)
 				} else if tt.writeErr == nil {
 					// Trying to find the deleted account with the includeArchived true should result in not found.
-					_, err = Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), test.MasterDB, AccountPreferenceReadRequest{
+					_, err = repo.Read(ctx, tt.claims(usrAcc.AccountID, usrAcc.UserID), AccountPreferenceReadRequest{
 						AccountID:       tt.set.AccountID,
 						Name:            tt.set.Name,
 						IncludeArchived: true,
@@ -362,14 +368,14 @@ func TestFind(t *testing.T) {
 
 	var prefs []*AccountPreference
 	for idx, req := range reqs {
-		err = Set(tests.Context(), auth.Claims{}, test.MasterDB, req, now.Add(time.Second*time.Duration(idx)))
+		err = repo.Set(tests.Context(), auth.Claims{}, req, now.Add(time.Second*time.Duration(idx)))
 		if err != nil {
 			t.Logf("\t\tGot : %+v", err)
 			t.Logf("\t\tRequest : %+v", req)
 			t.Fatalf("\t%s\tSet failed.", tests.Failed)
 		}
 
-		pref, err := Read(tests.Context(), auth.Claims{}, test.MasterDB, AccountPreferenceReadRequest{
+		pref, err := repo.Read(tests.Context(), auth.Claims{}, AccountPreferenceReadRequest{
 			AccountID: req.AccountID,
 			Name:      req.Name,
 		})
@@ -479,7 +485,7 @@ func TestFind(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Find(ctx, auth.Claims{}, test.MasterDB, tt.req)
+				res, err := repo.Find(ctx, auth.Claims{}, tt.req)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)

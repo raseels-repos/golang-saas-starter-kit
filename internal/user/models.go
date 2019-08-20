@@ -4,16 +4,36 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"github.com/pkg/errors"
-	"github.com/sudo-suhas/symcrypto"
 	"strconv"
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
+	"github.com/sudo-suhas/symcrypto"
 )
+
+// Repository defines the required dependencies for User.
+type Repository struct {
+	DbConn    *sqlx.DB
+	ResetUrl  func(string) string
+	Notify    notify.Email
+	secretKey string
+}
+
+// NewRepository creates a new Repository that defines dependencies for User.
+func NewRepository(db *sqlx.DB, resetUrl func(string) string, notify notify.Email, secretKey string) *Repository {
+	return &Repository{
+		DbConn:    db,
+		ResetUrl:  resetUrl,
+		Notify:    notify,
+		secretKey: secretKey,
+	}
+}
 
 // User represents someone with access to our system.
 type User struct {
@@ -251,4 +271,9 @@ func ParseResetHash(ctx context.Context, secretKey string, str string, now time.
 	}
 
 	return &hash, nil
+}
+
+// ParseResetHash extracts the details encrypted in the hash string.
+func (repo *Repository) ParseResetHash(ctx context.Context, str string, now time.Time) (*ResetHash, error) {
+	return ParseResetHash(ctx, repo.secretKey, str, now)
 }

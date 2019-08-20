@@ -2,9 +2,30 @@ package signup
 
 import (
 	"context"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"github.com/jmoiron/sqlx"
 )
+
+// Repository defines the required dependencies for Signup.
+type Repository struct {
+	DbConn      *sqlx.DB
+	User        *user.Repository
+	UserAccount *user_account.Repository
+	Account     *account.Repository
+}
+
+// NewRepository creates a new Repository that defines dependencies for Signup.
+func NewRepository(db *sqlx.DB, user *user.Repository, userAccount *user_account.Repository, account *account.Repository) *Repository {
+	return &Repository{
+		DbConn:      db,
+		User:        user,
+		UserAccount: userAccount,
+		Account:     account,
+	}
+}
 
 // SignupRequest contains information needed perform signup.
 type SignupRequest struct {

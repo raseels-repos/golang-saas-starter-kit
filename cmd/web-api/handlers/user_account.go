@@ -5,22 +5,42 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
-	"github.com/jmoiron/sqlx"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
 // UserAccount represents the UserAccount API method handler set.
 type UserAccount struct {
-	MasterDB *sqlx.DB
-
+	UserInvite UserInviteRepository
+	Repository UserAccountRepository
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
+}
+
+type UserAccountRepository interface {
+	Find(ctx context.Context, claims auth.Claims, req user_account.UserAccountFindRequest) (user_account.UserAccounts, error)
+	FindByUserID(ctx context.Context, claims auth.Claims, userID string, includedArchived bool) (user_account.UserAccounts, error)
+	UserFindByAccount(ctx context.Context, claims auth.Claims, req user_account.UserFindByAccountRequest) (user_account.Users, error)
+	Create(ctx context.Context, claims auth.Claims, req user_account.UserAccountCreateRequest, now time.Time) (*user_account.UserAccount, error)
+	Read(ctx context.Context, claims auth.Claims, req user_account.UserAccountReadRequest) (*user_account.UserAccount, error)
+	Update(ctx context.Context, claims auth.Claims, req user_account.UserAccountUpdateRequest, now time.Time) error
+	Archive(ctx context.Context, claims auth.Claims, req user_account.UserAccountArchiveRequest, now time.Time) error
+	Delete(ctx context.Context, claims auth.Claims, req user_account.UserAccountDeleteRequest) error
+}
+
+type UserInviteRepository interface {
+	SendUserInvites(ctx context.Context, claims auth.Claims, req invite.SendUserInvitesRequest, now time.Time) ([]string, error)
+	AcceptInvite(ctx context.Context, req invite.AcceptInviteRequest, now time.Time) (*user_account.UserAccount, error)
+	AcceptInviteUser(ctx context.Context, req invite.AcceptInviteUserRequest, now time.Time) (*user_account.UserAccount, error)
 }
 
 // Find godoc
@@ -41,7 +61,7 @@ type UserAccount struct {
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [get]
-func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -108,7 +128,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 	//	return  web.RespondJsonError(ctx, w, err)
 	//}
 
-	res, err := user_account.Find(ctx, claims, u.MasterDB, req)
+	res, err := h.Repository.Find(ctx, claims, req)
 	if err != nil {
 		return err
 	}
@@ -134,7 +154,7 @@ func (u *UserAccount) Find(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts/{user_id}/{account_id} [get]
-func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -151,7 +171,7 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 		includeArchived = b
 	}
 
-	res, err := user_account.Read(ctx, claims, u.MasterDB, user_account.UserAccountReadRequest{
+	res, err := h.Repository.Read(ctx, claims, user_account.UserAccountReadRequest{
 		UserID:          params["user_id"],
 		AccountID:       params["account_id"],
 		IncludeArchived: includeArchived,
@@ -183,7 +203,7 @@ func (u *UserAccount) Read(ctx context.Context, w http.ResponseWriter, r *http.R
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [post]
-func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -202,7 +222,7 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	res, err := user_account.Create(ctx, claims, u.MasterDB, req, v.Now)
+	res, err := h.Repository.Create(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -234,7 +254,7 @@ func (u *UserAccount) Create(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [patch]
-func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -253,7 +273,7 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user_account.Update(ctx, claims, u.MasterDB, req, v.Now)
+	err = h.Repository.Update(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -285,7 +305,7 @@ func (u *UserAccount) Update(ctx context.Context, w http.ResponseWriter, r *http
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts/archive [patch]
-func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -304,7 +324,7 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user_account.Archive(ctx, claims, u.MasterDB, req, v.Now)
+	err = h.Repository.Archive(ctx, claims, req, v.Now)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
@@ -336,7 +356,7 @@ func (u *UserAccount) Archive(ctx context.Context, w http.ResponseWriter, r *htt
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
 // @Router /user_accounts [delete]
-func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+func (h *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
@@ -350,7 +370,7 @@ func (u *UserAccount) Delete(ctx context.Context, w http.ResponseWriter, r *http
 		return web.RespondJsonError(ctx, w, err)
 	}
 
-	err = user_account.Delete(ctx, claims, u.MasterDB, req)
+	err = h.Repository.Delete(ctx, claims, req)
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {

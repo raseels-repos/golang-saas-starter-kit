@@ -1,5 +1,27 @@
 package notify
 
+/*
+	// Alternative to use AWS SES with SMTP
+	import "gopkg.in/gomail.v2"
+
+	var cfg struct {
+		...
+		SMTP struct {
+			Host string `default:"localhost" envconfig:"HOST"`
+			Port int    `default:"25" envconfig:"PORT"`
+			User string `default:"" envconfig:"USER"`
+			Pass string `default:"" envconfig:"PASS" json:"-"` // don't print
+		},
+	}
+
+	d := gomail.Dialer{
+		Host:     cfg.SMTP.Host,
+		Port:     cfg.SMTP.Port,
+		Username: cfg.SMTP.User,
+		Password: cfg.SMTP.Pass}
+	notifyEmail, err = notify.NewEmailSmtp(d, cfg.Service.SharedTemplateDir, cfg.Service.EmailSender)
+*/
+
 import (
 	"context"
 	"github.com/pkg/errors"

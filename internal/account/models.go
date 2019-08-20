@@ -5,13 +5,26 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
+
+// Repository defines the required dependencies for Account.
+type Repository struct {
+	DbConn *sqlx.DB
+}
+
+// NewRepository creates a new Repository that defines dependencies for Account.
+func NewRepository(db *sqlx.DB) *Repository {
+	return &Repository{
+		DbConn: db,
+	}
+}
 
 // Account represents someone with access to our system.
 type Account struct {

@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -31,9 +36,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-var a http.Handler
-var test *tests.Test
-var authenticator *auth.Authenticator
+var (
+	a             http.Handler
+	test          *tests.Test
+	authenticator *auth.Authenticator
+	appCtx        *handlers.AppContext
+)
 
 // Information about the users we have created for testing.
 type roleTest struct {
@@ -84,18 +92,51 @@ func testMain(m *testing.M) int {
 
 	log := test.Log
 	log.SetOutput(ioutil.Discard)
-	a = handlers.API(shutdown, log, webcontext.Env_Dev, test.MasterDB, nil, authenticator)
+
+	projectRoute, err := project_route.New("http://web-api.com", "http://web-app.com")
+	if err != nil {
+		panic(err)
+	}
+
+	notifyEmail := notify.NewEmailDisabled()
+
+	usrRepo := user.MockRepository(test.MasterDB)
+	usrAccRepo := user_account.NewRepository(test.MasterDB)
+	accRepo := account.NewRepository(test.MasterDB)
+	accPrefRepo := account_preference.NewRepository(test.MasterDB)
+	authRepo := user_auth.NewRepository(test.MasterDB, authenticator, usrRepo, usrAccRepo, accPrefRepo)
+	signupRepo := signup.NewRepository(test.MasterDB, usrRepo, usrAccRepo, accRepo)
+	inviteRepo := invite.NewRepository(test.MasterDB, usrRepo, usrAccRepo, accRepo, projectRoute.UserInviteAccept, notifyEmail, "6368616e676520746869732070613434")
+	prjRepo := project.NewRepository(test.MasterDB)
+
+	appCtx = &handlers.AppContext{
+		Log:             log,
+		Env:             webcontext.Env_Dev,
+		MasterDB:        test.MasterDB,
+		Redis:           nil,
+		UserRepo:        usrRepo,
+		UserAccountRepo: usrAccRepo,
+		AccountRepo:     accRepo,
+		AccountPrefRepo: accPrefRepo,
+		AuthRepo:        authRepo,
+		SignupRepo:      signupRepo,
+		InviteRepo:      inviteRepo,
+		ProjectRepo:     prjRepo,
+		Authenticator:   authenticator,
+	}
+
+	a = handlers.API(shutdown, appCtx)
 
 	// Create a new account directly business logic. This creates an
 	// initial account and user that we will use for admin validated endpoints.
 	signupReq1 := mockSignupRequest()
-	signup1, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq1, now)
+	signup1, err := signupRepo.Signup(tests.Context(), auth.Claims{}, signupReq1, now)
 	if err != nil {
 		panic(err)
 	}
 
 	expires := time.Now().UTC().Sub(signup1.User.CreatedAt) + time.Hour
-	adminTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+	adminTkn, err := authRepo.Authenticate(tests.Context(), user_auth.AuthenticateRequest{
 		Email:    signupReq1.User.Email,
 		Password: signupReq1.User.Password,
 	}, expires, now)
@@ -110,7 +151,7 @@ func testMain(m *testing.M) int {
 
 	// Create a second account that the first account user should not have access to.
 	signupReq2 := mockSignupRequest()
-	signup2, err := signup.Signup(tests.Context(), auth.Claims{}, test.MasterDB, signupReq2, now)
+	signup2, err := signupRepo.Signup(tests.Context(), auth.Claims{}, signupReq2, now)
 	if err != nil {
 		panic(err)
 	}
@@ -134,12 +175,12 @@ func testMain(m *testing.M) int {
 		Password:        "akTechFr0n!ier",
 		PasswordConfirm: "akTechFr0n!ier",
 	}
-	usr, err := user.Create(tests.Context(), adminClaims, test.MasterDB, userReq, now)
+	usr, err := usrRepo.Create(tests.Context(), adminClaims, userReq, now)
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = user_account.Create(tests.Context(), adminClaims, test.MasterDB, user_account.UserAccountCreateRequest{
+	_, err = usrAccRepo.Create(tests.Context(), adminClaims, user_account.UserAccountCreateRequest{
 		UserID:    usr.ID,
 		AccountID: signup1.Account.ID,
 		Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
@@ -149,7 +190,7 @@ func testMain(m *testing.M) int {
 		panic(err)
 	}
 
-	userTkn, err := user_auth.Authenticate(tests.Context(), test.MasterDB, authenticator, user_auth.AuthenticateRequest{
+	userTkn, err := authRepo.Authenticate(tests.Context(), user_auth.AuthenticateRequest{
 		Email:    usr.Email,
 		Password: userReq.Password,
 	}, expires, now)

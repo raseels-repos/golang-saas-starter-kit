@@ -17,6 +17,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
+
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
@@ -371,6 +372,8 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 		terr = errors.WithMessage(terr, "Error message")
 		data["error"] = terr
 	}
+
+	data["trans"] = webcontext.ContextTranslator(ctx)
 
 	// Append request data map to render data last so any previous value can be overwritten.
 	if data != nil {

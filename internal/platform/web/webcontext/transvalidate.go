@@ -2,6 +2,7 @@ package webcontext
 
 import (
 	"context"
+	"log"
 	"reflect"
 	"strings"
 
@@ -63,6 +64,16 @@ func init() {
 	// Provide one or more arguments for additional supported locales.
 	uniTrans = ut.New(en, en, fr, id, ja, nl, zh)
 
+	err := uniTrans.Import(ut.FormatJSON, "templates/content/translations")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = uniTrans.VerifyTranslations()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// this is usually know or extracted from http 'Accept-Language' header
 	// also see uni.FindTranslator(...)
 	transEn, _ := uniTrans.GetTranslator(en.Locale())
@@ -71,15 +82,6 @@ func init() {
 	transJa, _ := uniTrans.GetTranslator(ja.Locale())
 	transNl, _ := uniTrans.GetTranslator(nl.Locale())
 	transZh, _ := uniTrans.GetTranslator(zh.Locale())
-
-	transEn.Add("{{name}}", "Name", false)
-	transFr.Add("{{name}}", "Nom", false)
-
-	transEn.Add("{{first_name}}", "First Name", false)
-	transFr.Add("{{first_name}}", "Prénom", false)
-
-	transEn.Add("{{last_name}}", "Last Name", false)
-	transFr.Add("{{last_name}}", "Nom de famille", false)
 
 	validate = newValidator()
 
@@ -90,23 +92,22 @@ func init() {
 	nl_translations.RegisterDefaultTranslations(validate, transNl)
 	zh_translations.RegisterDefaultTranslations(validate, transZh)
 
-	/*
-		validate.RegisterTranslation("unique", transEn, func(ut ut.Translator) error {
-			return ut.Add("unique", "{0} must be unique", true) // see universal-translator for details
-		}, func(ut ut.Translator, fe validator.FieldError) string {
-			t, _ := ut.T("unique", fe.Field())
+	validate.RegisterTranslation("unique", transEn, func(ut ut.Translator) error {
+		return nil
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("unique", fe.Field())
 
-			return t
-		})
+		return t
+	})
 
-		validate.RegisterTranslation("unique", transFr, func(ut ut.Translator) error {
-			return ut.Add("unique", "{0} must be unique", true) // see universal-translator for details
-		}, func(ut ut.Translator, fe validator.FieldError) string {
-			t, _ := ut.T("unique", fe.Field())
+	validate.RegisterTranslation("unique", transFr, func(ut ut.Translator) error {
+		return nil
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("unique", fe.Field())
 
-			return t
-		})
-	*/
+		return t
+	})
+
 }
 
 // ctxKeyTagUnique represents the type of unique value for the context key used by the validation function.

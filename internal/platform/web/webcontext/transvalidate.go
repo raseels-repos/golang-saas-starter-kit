@@ -3,6 +3,7 @@ package webcontext
 import (
 	"context"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 
@@ -64,14 +65,16 @@ func init() {
 	// Provide one or more arguments for additional supported locales.
 	uniTrans = ut.New(en, en, fr, id, ja, nl, zh)
 
-	err := uniTrans.Import(ut.FormatJSON, "templates/content/translations")
-	if err != nil {
-		log.Fatal(err)
-	}
+	if _, err := os.Stat("templates/content/translations"); !os.IsNotExist(err) {
+		err := uniTrans.Import(ut.FormatJSON, "templates/content/translations")
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	err = uniTrans.VerifyTranslations()
-	if err != nil {
-		log.Fatal(err)
+		err = uniTrans.VerifyTranslations()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// this is usually know or extracted from http 'Accept-Language' header

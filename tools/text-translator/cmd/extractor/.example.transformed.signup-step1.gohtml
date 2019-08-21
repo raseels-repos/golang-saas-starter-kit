@@ -1,0 +1,251 @@
+{{define "title"}}{{ $.trans.T "signup-step1-title" }}{{end}}
+{{define "description"}}{{ $.trans.T "signup-step1-description" }}{{end}}
+{{define "style"}}
+
+{{end}}
+{{ define "partials/app-wrapper" }}
+    <div class="container" id="page-content">
+
+        <div class="card o-hidden border-0 shadow-lg my-5">
+            <div class="card-body p-0">
+                <!-- Nested Row within Card Body -->
+                <div class="row">
+                    <div class="col-lg-5 d-none d-lg-block bg-register-image"></div>
+                    <div class="col-lg-7">
+                        <div class="p-5">
+                            {{ template "app-flashes" . }}
+
+                            <div class="text-center">
+                                <h1 class="h4 text-gray-900 mb-4">{{ $.trans.T "signup-step1-create-an-account" }}</h1>
+                            </div>
+
+                            {{ template "validation-error" . }}
+
+                            <hr>
+                            <form class="user" method="post" novalidate>
+
+                                <div>
+                                    <h2 class="h5 text-gray-900 mt-3 mb-3">{{ $.trans.T "signup-step1-your-organization-details" }}</h2>
+                                </div>
+
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Name" }}"
+                                               name="Account.Name" value="{{ $.form.Account.Name }}" placeholder="{{ $.trans.T "signup-step1-company-name" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Name" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address1" }}"
+                                               name="Account.Address1" value="{{ $.form.Account.Address1 }}" placeholder="{{ $.trans.T "signup-step1-address-line-1" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Address1" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Address2" }}"
+                                               name="Account.Address2" value="{{ $.form.Account.Address2 }}" placeholder="{{ $.trans.T "signup-step1-address-line-2" }}">
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Address2" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <div class="form-control-select-wrapper">
+                                            <select id="selectAccountCountry" name="Account.Country" placeholder="{{ $.trans.T "signup-step1-country" }}" required
+                                                     class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Account.Country" }}">
+                                                {{ range $i := $.countries }}
+                                                    {{ $hasGeonames := false }}
+                                                    {{ range $c := $.geonameCountries }}
+                                                        {{ if eq $c $i.Code }}{{ $hasGeonames = true }}{{ end }}
+                                                    {{ end }}
+                                                    <option value="{{ $i.Code }}" data-geonames="{{ if $hasGeonames  }}1{{ else }}0{{ end }}" {{ if eq $.form.Account.Country $i.Code }}selected="selected"{{ end }}>{{ $i.Name }}</option>
+                                                {{ end }}
+                                            </select>
+                                            {{template "invalid-feedback" dict "fieldName" "Account.Country" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <div id="divAccountZipcode"></div>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Zipcode" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <div id="divAccountRegion"></div>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Region" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                </div>
+                                <div class="form-group row mb-4">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text" id="inputAccountCity"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.City" }}"
+                                               name="Account.City" value="{{ $.form.Account.City }}" placeholder="{{ $.trans.T "signup-step1-city" }}" required>
+                                        {{template "invalid-feedback" dict "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors "fieldName" "Account.City" }}
+                                    </div>
+                                    <!-- div class="col-sm-6 mb-3 mb-sm-0">
+                                        <select class="form-control {{ ValidationFieldClass $.validationErrors "Account.Timezone" }}" id="selectAccountTimezone" name="Account.Timezone" placeholder="Timezone"></select>
+                                        {{template "invalid-feedback" dict "fieldName" "Account.Timezone" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div -->
+                                </div>
+
+                                <hr>
+
+                                <div>
+                                    <h2 class="h5 text-gray-900 mt-3 mb-3">{{ $.trans.T "signup-step1-your-user-details" }}</h2>
+                                </div>
+
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.FirstName" }}"
+                                               name="User.FirstName" value="{{ $.form.User.FirstName }}" placeholder="{{ $.trans.T "signup-step1-first-name" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.FirstName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="text"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.LastName" }}"
+                                               name="User.LastName" value="{{ $.form.User.LastName }}" placeholder="{{ $.trans.T "signup-step1-last-name" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.LastName" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <input type="email"
+                                           class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Email" }}"
+                                           name="User.Email" value="{{ $.form.User.Email }}" placeholder="{{ $.trans.T "signup-step1-email-address" }}" required>
+                                    {{template "invalid-feedback" dict "fieldName" "User.Email" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-sm-6 mb-3 mb-sm-0">
+                                        <input type="password"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.Password" }}"
+                                               name="User.Password" value="{{ $.form.User.Password }}" placeholder="{{ $.trans.T "signup-step1-password" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.Password" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="password"
+                                               class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "User.PasswordConfirm" }}"
+                                               name="User.PasswordConfirm" value="{{ $.form.User.PasswordConfirm }}" placeholder="{{ $.trans.T "signup-step1-repeat-password" }}" required>
+                                        {{template "invalid-feedback" dict "fieldName" "User.PasswordConfirm" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-primary btn-user btn-block">
+                                    {{ $.trans.T "signup-step1-register-account" }}
+                                </button>
+
+                            </form>
+                            <hr>
+                            <div class="text-center">
+                                <a class="small" href="/user/login">{{ $.trans.T "signup-step1-already-have-an-account" }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+    <script src="https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.2.2/dist/latest/bootstrap-autocomplete.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            $(document).find('body').addClass('bg-gradient-primary');
+
+            $('#selectAccountCountry').on('change', function () {
+
+                // When a country has data-geonames, then we can perform autocomplete on zipcode and
+                // populate a list of valid regions.
+                if ($(this).find('option:selected').attr('data-geonames') == 1) {
+
+                    // Replace the existing region with an empty dropdown.
+                    $('#divAccountRegion').html('<div class="form-control-select-wrapper"><select class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Account.Region" }}" id="inputAccountRegion" name="Account.Region" value="{{ $.form.Account.Region }}" placeholder="Region" required></select></div>');
+
+                    // Query the API for a list of regions for the selected
+                    // country and populate the region dropdown.
+                    $.ajax({
+                        type: 'GET',
+                        contentType: 'application/json',
+                        url: '/geo/regions/autocomplete',
+                        data: {country_code: $(this).val(), select: true},
+                        dataType: 'json'
+                    }).done(function (res) {
+                        if (res !== undefined && res !== null) {
+                            for (var c in res) {
+                                $('#inputAccountRegion').append('<option value="'+res[c].value+'">'+res[c].text+'</option>');
+                            }
+                        }
+                    });
+
+                    /*
+                    // Remove all the existing items from the timezone dropdown and repopulate it.
+                    $('#selectAccountTimezone').find('option').remove().end()
+                    $.ajax({
+                        type: 'GET',
+                        contentType: 'application/json',
+                        url: '/geo/country/'+$(this).val()+'/timezones',
+                        data: {},
+                        dataType: 'json'
+                    }).done(function (res) {
+                        if (res !== undefined && res !== null) {
+                            for (var c in res) {
+                                $('#selectAccountTimezone').append('<option value="'+res[c]+'">'+res[c]+'</option>');
+                            }
+                        }
+                    });
+                    */
+
+                    // Replace the existing zipcode text input with a new one that will supports autocomplete.
+                    $('#divAccountZipcode').html('<input class="form-control  form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Account.Zipcode" value="{{ $.form.Account.Zipcode }}" placeholder="Zipcode" required>');
+                    $('#inputAccountZipcode').autoComplete({
+                        minLength: 2,
+                        events: {
+                            search: function (qry, callback) {
+                                $.ajax({
+                                    type: 'GET',
+                                    contentType: 'application/json',
+                                    url: '/geo/postal_codes/autocomplete',
+                                    data: {query: qry, country_code: $('#selectAccountCountry').val()},
+                                    dataType: 'json'
+                                }).done(function (res) {
+                                    callback(res)
+                                });
+                            }
+                        }
+                    });
+
+                    // When the value of zipcode changes, try to find an exact match for the zipcode and
+                    // can therefore set the correct region and city.
+                    $('#inputAccountZipcode').on('change', function() {
+                        $.ajax({
+                            type: 'GET',
+                            contentType: 'application/json',
+                            url: '/geo/geonames/postal_code/'+$(this).val(),
+                            data: {country_code: $('#selectAccountCountry').val()},
+                            dataType: 'json'
+                        }).done(function (res) {
+                            if (res !== undefined && res !== null && res.PostalCode !== undefined) {
+                                $('#inputAccountCity').val(res.PlaceName);
+                                $('#inputAccountRegion').val(res.StateCode);
+                            }
+                        });
+                    });
+
+                } else {
+
+                    // Replace the existing zipcode input with no autocomplete.
+                    $('#divAccountZipcode').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Zipcode" }}" id="inputAccountZipcode"  name="Account.Zipcode" value="{{ $.form.Account.Zipcode }}" placeholder="Zipcode" required>');
+
+                    // Replace the existing region select with a text input.
+                    $('#divAccountRegion').html('<input type="text" class="form-control form-control-user {{ ValidationFieldClass $.validationErrors "Account.Region" }}" id="inputAccountRegion" name="Account.Region" value="{{ $.form.Account.Region }}" placeholder="Region" required>');
+
+                }
+            }).change();
+
+            hideDuplicateValidationFieldErrors();
+
+        });
+    </script>
+{{end}}

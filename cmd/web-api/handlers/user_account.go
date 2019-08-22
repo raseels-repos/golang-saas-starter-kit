@@ -5,13 +5,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 
@@ -21,26 +19,10 @@ import (
 
 // UserAccount represents the UserAccount API method handler set.
 type UserAccount struct {
-	UserInvite UserInviteRepository
-	Repository UserAccountRepository
+	UserInvite *invite.Repository
+	Repository *user_account.Repository
+
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
-}
-
-type UserAccountRepository interface {
-	Find(ctx context.Context, claims auth.Claims, req user_account.UserAccountFindRequest) (user_account.UserAccounts, error)
-	FindByUserID(ctx context.Context, claims auth.Claims, userID string, includedArchived bool) (user_account.UserAccounts, error)
-	UserFindByAccount(ctx context.Context, claims auth.Claims, req user_account.UserFindByAccountRequest) (user_account.Users, error)
-	Create(ctx context.Context, claims auth.Claims, req user_account.UserAccountCreateRequest, now time.Time) (*user_account.UserAccount, error)
-	Read(ctx context.Context, claims auth.Claims, req user_account.UserAccountReadRequest) (*user_account.UserAccount, error)
-	Update(ctx context.Context, claims auth.Claims, req user_account.UserAccountUpdateRequest, now time.Time) error
-	Archive(ctx context.Context, claims auth.Claims, req user_account.UserAccountArchiveRequest, now time.Time) error
-	Delete(ctx context.Context, claims auth.Claims, req user_account.UserAccountDeleteRequest) error
-}
-
-type UserInviteRepository interface {
-	SendUserInvites(ctx context.Context, claims auth.Claims, req invite.SendUserInvitesRequest, now time.Time) ([]string, error)
-	AcceptInvite(ctx context.Context, req invite.AcceptInviteRequest, now time.Time) (*user_account.UserAccount, error)
-	AcceptInviteUser(ctx context.Context, req invite.AcceptInviteUserRequest, now time.Time) (*user_account.UserAccount, error)
 }
 
 // Find godoc

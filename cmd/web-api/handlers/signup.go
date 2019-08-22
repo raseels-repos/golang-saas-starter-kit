@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"net/http"
-	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -11,6 +9,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
@@ -18,13 +17,9 @@ import (
 
 // Signup represents the Signup API method handler set.
 type Signup struct {
-	Repository SignupRepository
+	Repository *signup.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
-}
-
-type SignupRepository interface {
-	Signup(ctx context.Context, claims auth.Claims, req signup.SignupRequest, now time.Time) (*signup.SignupResult, error)
 }
 
 // Signup godoc

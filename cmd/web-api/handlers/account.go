@@ -4,10 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	accountref "geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -19,28 +17,9 @@ import (
 
 // Account represents the Account API method handler set.
 type Accounts struct {
-	Repository AccountRepository
+	Repository     *account.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
-}
-
-type AccountRepository interface {
-	//CanReadAccount(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, accountID string) error
-	Find(ctx context.Context, claims auth.Claims, req account.AccountFindRequest) (account.Accounts, error)
-	Create(ctx context.Context, claims auth.Claims, req account.AccountCreateRequest, now time.Time) (*account.Account, error)
-	ReadByID(ctx context.Context, claims auth.Claims, id string) (*account.Account, error)
-	Read(ctx context.Context, claims auth.Claims, req account.AccountReadRequest) (*account.Account, error)
-	Update(ctx context.Context, claims auth.Claims, req account.AccountUpdateRequest, now time.Time) error
-	Archive(ctx context.Context, claims auth.Claims, req account.AccountArchiveRequest, now time.Time) error
-	Delete(ctx context.Context, claims auth.Claims, req account.AccountDeleteRequest) error
-}
-type AccountPrefRepository interface {
-	Find(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceFindRequest) ([]*accountref.AccountPreference, error)
-	FindByAccountID(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceFindByAccountIDRequest) ([]*accountref.AccountPreference, error)
-	Read(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceReadRequest) (*accountref.AccountPreference, error)
-	Set(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceSetRequest, now time.Time) error
-	Archive(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceArchiveRequest, now time.Time) error
-	Delete(ctx context.Context, claims auth.Claims, req accountref.AccountPreferenceDeleteRequest) error
 }
 
 // Read godoc

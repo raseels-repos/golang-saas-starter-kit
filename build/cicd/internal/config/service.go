@@ -203,7 +203,7 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 	// Define the ServiceContext for the web-app that will be used for build and deploy.
 	case ServiceWebApp:
 
-		ctx := &ServiceContext{
+		ctx = &ServiceContext{
 			ServiceConfig: webAppCfg,
 		}
 
@@ -310,7 +310,7 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 	// Define the ServiceContext for the web-api that will be used for build and deploy.
 	case ServiceWebApi:
 
-		ctx := &ServiceContext{
+		ctx = &ServiceContext{
 			ServiceConfig: webApiCfg,
 		}
 

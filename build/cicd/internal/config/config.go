@@ -361,7 +361,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 			}
 			defer masterDb.Close()
 
-			return schema.Migrate(context.Background(), masterDb, log, false)
+			return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
 		},
 	}
 

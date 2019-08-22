@@ -59,12 +59,8 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190522-01c",
 			Migrate: func(tx *sql.Tx) error {
-				if err := dropTypeIfExists(tx, "account_status_t"); err != nil {
+				if err := createTypeIfNotExists(tx, "account_status_t", "enum('active','pending','disabled')"); err != nil {
 					return err
-				}
-				q1 := `CREATE TYPE account_status_t as enum('active','pending','disabled')`
-				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
 				q2 := `CREATE TABLE IF NOT EXISTS accounts (
@@ -108,23 +104,15 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190522-01e",
 			Migrate: func(tx *sql.Tx) error {
-				if err := dropTypeIfExists(tx, "user_account_role_t"); err != nil {
+				if err := createTypeIfNotExists(tx, "user_account_role_t", "enum('admin', 'user')"); err != nil {
 					return err
 				}
-				q1 := `CREATE TYPE user_account_role_t as enum('admin', 'user')`
-				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q1)
-				}
 
-				if err := dropTypeIfExists(tx, "user_account_status_t"); err != nil {
+				if err := createTypeIfNotExists(tx, "user_account_status_t", "enum('active', 'invited','disabled'"); err != nil {
 					return err
 				}
-				q2 := `CREATE TYPE user_account_status_t as enum('active', 'invited','disabled')`
-				if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q2)
-				}
 
-				q3 := `CREATE TABLE IF NOT EXISTS users_accounts (
+				q1 := `CREATE TABLE IF NOT EXISTS users_accounts (
 					  id char(36) NOT NULL,
 					  account_id char(36) NOT NULL  REFERENCES accounts(id) ON DELETE NO ACTION,
 					  user_id char(36) NOT NULL  REFERENCES users(id) ON DELETE NO ACTION,
@@ -136,19 +124,19 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  PRIMARY KEY (id),
 					  CONSTRAINT user_account UNIQUE (user_id,account_id) 
 					)`
-				if _, err := tx.Exec(q3); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q3)
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
-				q1 := `DROP TYPE user_account_role_t`
+				q1 := `DROP TYPE IF EXISTS user_account_role_t`
 				if _, err := tx.Exec(q1); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
-				q2 := `DROP TYPE user_account_status_t`
+				q2 := `DROP TYPE IF EXISTS user_account_status_t`
 				if _, err := tx.Exec(q2); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q2)
 				}
@@ -165,16 +153,11 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190622-01",
 			Migrate: func(tx *sql.Tx) error {
-				if err := dropTypeIfExists(tx, "project_status_t"); err != nil {
+				if err := createTypeIfNotExists(tx, "project_status_t", "enum('active','disabled')"); err != nil {
 					return err
 				}
 
-				q1 := `CREATE TYPE project_status_t as enum('active','disabled')`
-				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q1)
-				}
-
-				q2 := `CREATE TABLE IF NOT EXISTS projects (
+				q1 := `CREATE TABLE IF NOT EXISTS projects (
 					  id char(36) NOT NULL,
 					  account_id char(36) NOT NULL REFERENCES accounts(id) ON DELETE SET NULL,
 					  name varchar(255) NOT NULL,
@@ -184,13 +167,13 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  archived_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 					  PRIMARY KEY (id)
 					)`
-				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
-				q1 := `DROP TYPE project_status_t`
+				q1 := `DROP TYPE IF EXISTS project_status_t`
 				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
@@ -688,6 +671,41 @@ func dropTypeIfExists(tx *sql.Tx, name string) error {
 	if _, err := tx.Exec(q); err != nil && !errorIsAlreadyExists(err) {
 		return errors.WithMessagef(err, "Query failed %s", q)
 	}
+	return nil
+}
+
+// createTypeIfNotExists checks to ensure a type doesn't exist before creating.
+func createTypeIfNotExists(tx *sql.Tx, name, val string) error {
+
+	q1 := "select exists (select 1 from pg_type where typname = '"+name+"')"
+	rows, err := tx.Query(q1)
+	if err != nil {
+		return errors.WithMessagef(err, "Query failed %s", q1)
+	}
+	defer rows.Close()
+
+	var exists bool
+	for rows.Next() {
+		err := rows.Scan(&exists)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if exists {
+		return nil
+	}
+
+
+	q2 := `CREATE TYPE "+name+" AS `+val
+	if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
+		return errors.WithMessagef(err, "Query failed %s", q2)
+	}
+
 	return nil
 }
 

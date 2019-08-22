@@ -3,8 +3,32 @@ package user_auth
 import (
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"github.com/jmoiron/sqlx"
 )
+
+// Repository defines the required dependencies for User Auth.
+type Repository struct {
+	DbConn            *sqlx.DB
+	TknGen            TokenGenerator
+	User              *user.Repository
+	UserAccount       *user_account.Repository
+	AccountPreference *account_preference.Repository
+}
+
+// NewRepository creates a new Repository that defines dependencies for User Auth.
+func NewRepository(db *sqlx.DB, tknGen TokenGenerator, user *user.Repository, usrAcc *user_account.Repository, accPref *account_preference.Repository) *Repository {
+	return &Repository{
+		DbConn:            db,
+		TknGen:            tknGen,
+		User:              user,
+		UserAccount:       usrAcc,
+		AccountPreference: accPref,
+	}
+}
 
 // AuthenticateRequest defines what information is required to authenticate a user.
 type AuthenticateRequest struct {

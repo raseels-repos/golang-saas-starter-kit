@@ -38,12 +38,12 @@ func mockUserCreateRequest() user.UserCreateRequest {
 // mockUser creates a new user for testing and associates it with the supplied account ID.
 func newMockUser(accountID string, role user_account.UserAccountRole) mockUser {
 	req := mockUserCreateRequest()
-	u, err := user.Create(tests.Context(), auth.Claims{}, test.MasterDB, req, time.Now().UTC().AddDate(-1, -1, -1))
+	u, err := appCtx.UserRepo.Create(tests.Context(), auth.Claims{}, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+	_, err = appCtx.UserAccountRepo.Create(tests.Context(), auth.Claims{}, user_account.UserAccountCreateRequest{
 		UserID:    u.ID,
 		AccountID: accountID,
 		Roles:     []user_account.UserAccountRole{role},
@@ -126,7 +126,7 @@ func TestUserCRUDAdmin(t *testing.T) {
 		t.Logf("\t%s\tReceived expected result.", tests.Success)
 
 		// Only for user creation do we need to do this.
-		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		_, err := appCtx.UserAccountRepo.Create(tests.Context(), auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    actual.ID,
 			AccountID: tr.Account.ID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
@@ -401,7 +401,7 @@ func TestUserCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		_, err := appCtx.UserAccountRepo.Create(tests.Context(), auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    tr.User.ID,
 			AccountID: newAccount.ID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},
@@ -805,7 +805,7 @@ func TestUserCRUDUser(t *testing.T) {
 		}
 		t.Logf("\tTest: %s - %s %s", rt.name, rt.method, rt.url)
 
-		_, err := user_account.Create(tests.Context(), auth.Claims{}, test.MasterDB, user_account.UserAccountCreateRequest{
+		_, err := appCtx.UserAccountRepo.Create(tests.Context(), auth.Claims{}, user_account.UserAccountCreateRequest{
 			UserID:    tr.User.ID,
 			AccountID: newAccount.ID,
 			Roles:     []user_account.UserAccountRole{user_account.UserAccountRole_User},

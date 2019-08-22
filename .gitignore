@@ -4,3 +4,4 @@
 .aws-deploy.env
 .DS_Store
 tmp
+.devops.json

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
@@ -18,7 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var test *tests.Test
+var (
+	test *tests.Test
+	repo *Repository
+)
 
 // TestMain is the entry point for testing.
 func TestMain(m *testing.M) {
@@ -28,6 +30,9 @@ func TestMain(m *testing.M) {
 func testMain(m *testing.M) int {
 	test = tests.New()
 	defer test.TearDown()
+
+	repo = MockRepository(test.MasterDB)
+
 	return m.Run()
 }
 
@@ -219,7 +224,7 @@ func TestCreateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Create(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				res, err := repo.Create(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -272,7 +277,7 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		}
-		user1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		user1, err := repo.Create(ctx, auth.Claims{}, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -286,7 +291,7 @@ func TestCreateValidationEmailUnique(t *testing.T) {
 			PasswordConfirm: "W0rkL1fe#",
 		}
 		expectedErr := errors.New("Key: 'UserCreateRequest.email' Error:Field validation for 'email' failed on the 'unique' tag")
-		_, err = Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		_, err = repo.Create(ctx, auth.Claims{}, req2, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -374,7 +379,7 @@ func TestCreateClaims(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				_, err := Create(ctx, tt.claims, test.MasterDB, tt.req, now)
+				_, err := repo.Create(ctx, tt.claims, tt.req, now)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)
@@ -421,7 +426,7 @@ func TestUpdateValidation(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				err := Update(ctx, auth.Claims{}, test.MasterDB, tt.req, now)
+				err := repo.Update(ctx, auth.Claims{}, tt.req, now)
 				if err != tt.error {
 					// TODO: need a better way to handle validation errors as they are
 					// 		 of type interface validator.ValidationErrorsTranslations
@@ -463,7 +468,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			Password:        "akTechFr0n!ier",
 			PasswordConfirm: "akTechFr0n!ier",
 		}
-		user1, err := Create(ctx, auth.Claims{}, test.MasterDB, req1, now)
+		user1, err := repo.Create(ctx, auth.Claims{}, req1, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -476,7 +481,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			Password:        "W0rkL1fe#",
 			PasswordConfirm: "W0rkL1fe#",
 		}
-		user2, err := Create(ctx, auth.Claims{}, test.MasterDB, req2, now)
+		user2, err := repo.Create(ctx, auth.Claims{}, req2, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tCreate failed.", tests.Failed)
@@ -488,7 +493,7 @@ func TestUpdateValidationEmailUnique(t *testing.T) {
 			Email: &user1.Email,
 		}
 		expectedErr := errors.New("Key: 'UserUpdateRequest.email' Error:Field validation for 'email' failed on the 'unique' tag")
-		err = Update(ctx, auth.Claims{}, test.MasterDB, updateReq, now)
+		err = repo.Update(ctx, auth.Claims{}, updateReq, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
@@ -518,7 +523,7 @@ func TestUpdatePassword(t *testing.T) {
 
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
-		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
+		user, err := repo.Create(ctx, auth.Claims{}, UserCreateRequest{
 			FirstName:       "Lee",
 			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -549,7 +554,7 @@ func TestUpdatePassword(t *testing.T) {
 		expectedErr := errors.New("Key: 'UserUpdatePasswordRequest.id' Error:Field validation for 'id' failed on the 'required' tag\n" +
 			"Key: 'UserUpdatePasswordRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
 			"Key: 'UserUpdatePasswordRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{}, now)
+		err = repo.UpdatePassword(ctx, auth.Claims{}, UserUpdatePasswordRequest{}, now)
 		if err == nil {
 			t.Logf("\t\tWant: %+v", expectedErr)
 			t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
@@ -567,7 +572,7 @@ func TestUpdatePassword(t *testing.T) {
 
 		// Update the users password.
 		newPass := uuid.NewRandom().String()
-		err = UpdatePassword(ctx, auth.Claims{}, test.MasterDB, UserUpdatePasswordRequest{
+		err = repo.UpdatePassword(ctx, auth.Claims{}, UserUpdatePasswordRequest{
 			ID:              user.ID,
 			Password:        newPass,
 			PasswordConfirm: newPass,
@@ -800,7 +805,7 @@ func TestCrud(t *testing.T) {
 
 				// Always create the new user with empty claims, testing claims for create user
 				// will be handled separately.
-				user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, tt.create, now)
+				user, err := repo.Create(tests.Context(), auth.Claims{}, tt.create, now)
 				if err != nil {
 					t.Log("\t\tGot :", err)
 					t.Fatalf("\t%s\tCreate user failed.", tests.Failed)
@@ -823,7 +828,7 @@ func TestCrud(t *testing.T) {
 
 				// Update the user.
 				updateReq := tt.update(user)
-				err = Update(ctx, tt.claims(user, accountId), test.MasterDB, updateReq, now)
+				err = repo.Update(ctx, tt.claims(user, accountId), updateReq, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
@@ -832,7 +837,7 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUpdate ok.", tests.Success)
 
 				// Find the user and make sure the updates where made.
-				findRes, err := ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
+				findRes, err := repo.ReadByID(ctx, tt.claims(user, accountId), user.ID)
 				if err != nil && errors.Cause(err) != tt.findErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.findErr)
@@ -846,14 +851,14 @@ func TestCrud(t *testing.T) {
 				}
 
 				// Archive (soft-delete) the user.
-				err = Archive(ctx, tt.claims(user, accountId), test.MasterDB, UserArchiveRequest{ID: user.ID, force: true}, now)
+				err = repo.Archive(ctx, tt.claims(user, accountId), UserArchiveRequest{ID: user.ID, force: true}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tArchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result in not found.
-					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
+					_, err = repo.ReadByID(ctx, tt.claims(user, accountId), user.ID)
 					if err != nil && errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -861,7 +866,7 @@ func TestCrud(t *testing.T) {
 					}
 
 					// Trying to find the archived user with the includeArchived true should result no error.
-					_, err = Read(ctx, tt.claims(user, accountId), test.MasterDB,
+					_, err = repo.Read(ctx, tt.claims(user, accountId),
 						UserReadRequest{ID: user.ID, IncludeArchived: true})
 					if err != nil {
 						t.Log("\t\tGot :", err)
@@ -871,14 +876,14 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tArchive ok.", tests.Success)
 
 				// Restore (un-delete) the user.
-				err = Restore(ctx, tt.claims(user, accountId), test.MasterDB, UserRestoreRequest{ID: user.ID}, now)
+				err = repo.Restore(ctx, tt.claims(user, accountId), UserRestoreRequest{ID: user.ID}, now)
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUnarchive failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the archived user with the includeArchived false should result no error.
-					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
+					_, err = repo.ReadByID(ctx, tt.claims(user, accountId), user.ID)
 					if err != nil {
 						t.Log("\t\tGot :", err)
 						t.Fatalf("\t%s\tUnarchive Read failed.", tests.Failed)
@@ -887,14 +892,14 @@ func TestCrud(t *testing.T) {
 				t.Logf("\t%s\tUnarchive ok.", tests.Success)
 
 				// Delete (hard-delete) the user.
-				err = Delete(ctx, tt.claims(user, accountId), test.MasterDB, UserDeleteRequest{ID: user.ID, force: true})
+				err = repo.Delete(ctx, tt.claims(user, accountId), UserDeleteRequest{ID: user.ID, force: true})
 				if err != nil && errors.Cause(err) != tt.updateErr {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.updateErr)
 					t.Fatalf("\t%s\tUpdate failed.", tests.Failed)
 				} else if tt.updateErr == nil {
 					// Trying to find the deleted user with the includeArchived true should result in not found.
-					_, err = ReadByID(ctx, tt.claims(user, accountId), test.MasterDB, user.ID)
+					_, err = repo.ReadByID(ctx, tt.claims(user, accountId), user.ID)
 					if errors.Cause(err) != ErrNotFound {
 						t.Logf("\t\tGot : %+v", err)
 						t.Logf("\t\tWant: %+v", ErrNotFound)
@@ -917,7 +922,7 @@ func TestFind(t *testing.T) {
 
 	var users []*User
 	for i := 0; i <= 4; i++ {
-		user, err := Create(tests.Context(), auth.Claims{}, test.MasterDB, UserCreateRequest{
+		user, err := repo.Create(tests.Context(), auth.Claims{}, UserCreateRequest{
 			FirstName:       "Lee",
 			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -1029,7 +1034,7 @@ func TestFind(t *testing.T) {
 			{
 				ctx := tests.Context()
 
-				res, err := Find(ctx, auth.Claims{}, test.MasterDB, tt.req)
+				res, err := repo.Find(ctx, auth.Claims{}, tt.req)
 				if errors.Cause(err) != tt.error {
 					t.Logf("\t\tGot : %+v", err)
 					t.Logf("\t\tWant: %+v", tt.error)
@@ -1064,7 +1069,7 @@ func TestResetPassword(t *testing.T) {
 
 		// Create a new user for testing.
 		initPass := uuid.NewRandom().String()
-		user, err := Create(ctx, auth.Claims{}, test.MasterDB, UserCreateRequest{
+		user, err := repo.Create(ctx, auth.Claims{}, UserCreateRequest{
 			FirstName:       "Lee",
 			LastName:        "Brown",
 			Email:           uuid.NewRandom().String() + "@geeksinthewoods.com",
@@ -1091,18 +1096,10 @@ func TestResetPassword(t *testing.T) {
 			t.Fatalf("\t%s\tCreate user account failed.", tests.Failed)
 		}
 
-		// Mock the methods needed to make a password reset.
-		resetUrl := func(string) string {
-			return ""
-		}
-		notify := &notify.MockEmail{}
-
-		secretKey := "6368616e676520746869732070617373"
-
 		// Ensure validation is working by trying ResetPassword with an empty request.
 		{
 			expectedErr := errors.New("Key: 'UserResetPasswordRequest.email' Error:Field validation for 'email' failed on the 'required' tag")
-			_, err = ResetPassword(ctx, test.MasterDB, resetUrl, notify, UserResetPasswordRequest{}, secretKey, now)
+			_, err = repo.ResetPassword(ctx, UserResetPasswordRequest{}, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetPassword failed.", tests.Failed)
@@ -1122,10 +1119,10 @@ func TestResetPassword(t *testing.T) {
 		ttl := time.Hour
 
 		// Make the reset password request.
-		resetHash, err := ResetPassword(ctx, test.MasterDB, resetUrl, notify, UserResetPasswordRequest{
+		resetHash, err := repo.ResetPassword(ctx, UserResetPasswordRequest{
 			Email: user.Email,
 			TTL:   ttl,
-		}, secretKey, now)
+		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tResetPassword failed.", tests.Failed)
@@ -1133,7 +1130,7 @@ func TestResetPassword(t *testing.T) {
 		t.Logf("\t%s\tResetPassword ok.", tests.Success)
 
 		// Read the user to ensure the password_reset field was set.
-		user, err = ReadByID(ctx, auth.Claims{}, test.MasterDB, user.ID)
+		user, err = repo.ReadByID(ctx, auth.Claims{}, user.ID)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tRead failed.", tests.Failed)
@@ -1146,7 +1143,7 @@ func TestResetPassword(t *testing.T) {
 			expectedErr := errors.New("Key: 'UserResetConfirmRequest.reset_hash' Error:Field validation for 'reset_hash' failed on the 'required' tag\n" +
 				"Key: 'UserResetConfirmRequest.password' Error:Field validation for 'password' failed on the 'required' tag\n" +
 				"Key: 'UserResetConfirmRequest.password_confirm' Error:Field validation for 'password_confirm' failed on the 'required' tag")
-			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{}, secretKey, now)
+			_, err = repo.ResetConfirm(ctx, UserResetConfirmRequest{}, now)
 			if err == nil {
 				t.Logf("\t\tWant: %+v", expectedErr)
 				t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -1166,11 +1163,11 @@ func TestResetPassword(t *testing.T) {
 		// Ensure the TTL is enforced.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+			_, err = repo.ResetConfirm(ctx, UserResetConfirmRequest{
 				ResetHash:       resetHash,
 				Password:        newPass,
 				PasswordConfirm: newPass,
-			}, secretKey, now.UTC().Add(ttl*2))
+			}, now.UTC().Add(ttl*2))
 			if errors.Cause(err) != ErrResetExpired {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
 				t.Logf("\t\tWant: %+v", ErrResetExpired)
@@ -1181,11 +1178,11 @@ func TestResetPassword(t *testing.T) {
 
 		// Assuming we have received the email and clicked the link, we now can ensure confirm works.
 		newPass := uuid.NewRandom().String()
-		reset, err := ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+		reset, err := repo.ResetConfirm(ctx, UserResetConfirmRequest{
 			ResetHash:       resetHash,
 			Password:        newPass,
 			PasswordConfirm: newPass,
-		}, secretKey, now)
+		}, now)
 		if err != nil {
 			t.Log("\t\tGot :", err)
 			t.Fatalf("\t%s\tResetConfirm failed.", tests.Failed)
@@ -1199,11 +1196,11 @@ func TestResetPassword(t *testing.T) {
 		// Ensure the reset hash does not work after its used.
 		{
 			newPass := uuid.NewRandom().String()
-			_, err = ResetConfirm(ctx, test.MasterDB, UserResetConfirmRequest{
+			_, err = repo.ResetConfirm(ctx, UserResetConfirmRequest{
 				ResetHash:       resetHash,
 				Password:        newPass,
 				PasswordConfirm: newPass,
-			}, secretKey, now)
+			}, now)
 			if errors.Cause(err) != ErrNotFound {
 				t.Logf("\t\tGot : %+v", errors.Cause(err))
 				t.Logf("\t\tWant: %+v", ErrNotFound)

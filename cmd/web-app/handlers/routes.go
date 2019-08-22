@@ -9,13 +9,23 @@ import (
 	"path/filepath"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	//"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	//"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	project_routes "geeks-accelerator/oss/saas-starter-kit/internal/project-routes"
+
+	//"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	// "geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -27,30 +37,59 @@ const (
 	TmplContentErrorGeneric = "error-generic.gohtml"
 )
 
+type AppContext struct {
+	Log               *log.Logger
+	Env               webcontext.Env
+	MasterDB          *sqlx.DB
+	Redis             *redis.Client
+	UserRepo          handlers.UserRepository
+	UserAccountRepo   handlers.UserAccountRepository
+	AccountRepo       handlers.AccountRepository
+	AccountPrefRepo   handlers.AccountPrefRepository
+	AuthRepo          handlers.UserAuthRepository
+	SignupRepo        handlers.SignupRepository
+	InviteRepo        handlers.UserInviteRepository
+	ProjectRepo       handlers.ProjectRepository
+	GeoRepo           GeoRepository
+	Authenticator     *auth.Authenticator
+	StaticDir         string
+	TemplateDir       string
+	Renderer          web.Renderer
+	ProjectRoute      project_route.ProjectRoute
+	PreAppMiddleware  []web.Middleware
+	PostAppMiddleware []web.Middleware
+}
+
 // API returns a handler for a set of routes.
-func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir, templateDir string, masterDB *sqlx.DB, redis *redis.Client, authenticator *auth.Authenticator, projectRoutes project_routes.ProjectRoutes, secretKey string, notifyEmail notify.Email, renderer web.Renderer, globalMids ...web.Middleware) http.Handler {
+func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
-	// Define base middlewares applied to all requests.
-	middlewares := []web.Middleware{
-		mid.Trace(), mid.Logger(log), mid.Errors(log, renderer), mid.Metrics(), mid.Panics(),
-	}
+	// Include the pre middlewares first.
+	middlewares := appCtx.PreAppMiddleware
 
-	// Append any global middlewares if they were included.
-	if len(globalMids) > 0 {
-		middlewares = append(middlewares, globalMids...)
+	// Define app middlewares applied to all requests.
+	middlewares = append(middlewares,
+		mid.Trace(),
+		mid.Logger(appCtx.Log),
+		mid.Errors(appCtx.Log, appCtx.Renderer),
+		mid.Metrics(),
+		mid.Panics())
+
+	// Append any global middlewares that should be included after the app middlewares.
+	if len(appCtx.PostAppMiddleware) > 0 {
+		middlewares = append(middlewares, appCtx.PostAppMiddleware...)
 	}
 
 	// Construct the web.App which holds all routes as well as common Middleware.
-	app := web.NewApp(shutdown, log, env, middlewares...)
+	app := web.NewApp(shutdown, appCtx.Log, appCtx.Env, middlewares...)
 
 	// Build a sitemap.
 	sm := stm.NewSitemap(1)
 	sm.SetVerbose(false)
-	sm.SetDefaultHost(projectRoutes.WebAppUrl(""))
+	sm.SetDefaultHost(appCtx.ProjectRoute.WebAppUrl(""))
 	sm.Create()
 
 	smLocAddModified := func(loc stm.URL, filename string) {
-		contentPath := filepath.Join(templateDir, "content", filename)
+		contentPath := filepath.Join(appCtx.TemplateDir, "content", filename)
 
 		file, err := os.Stat(contentPath)
 		if err != nil {
@@ -64,48 +103,48 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register project management pages.
 	p := Projects{
-		MasterDB: masterDB,
-		Redis:    redis,
-		Renderer: renderer,
+		ProjectRepo: appCtx.ProjectRepo,
+		Redis:       appCtx.Redis,
+		Renderer:    appCtx.Renderer,
 	}
-	app.Handle("POST", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("POST", "/projects/create", p.Create, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/create", p.Create, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects", p.Index, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("POST", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("POST", "/projects/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/projects/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/projects", p.Index, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 
 	// Register user management pages.
 	us := Users{
-		MasterDB:      masterDB,
-		Redis:         redis,
-		Renderer:      renderer,
-		Authenticator: authenticator,
-		ProjectRoutes: projectRoutes,
-		NotifyEmail:   notifyEmail,
-		SecretKey:     secretKey,
+		UserRepo:        appCtx.UserRepo,
+		UserAccountRepo: appCtx.UserAccountRepo,
+		AuthRepo:        appCtx.AuthRepo,
+		InviteRepo:      appCtx.InviteRepo,
+		GeoRepo:         appCtx.GeoRepo,
+		Redis:           appCtx.Redis,
+		Renderer:        appCtx.Renderer,
 	}
-	app.Handle("POST", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("POST", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/:user_id/update", us.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/:user_id", us.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 	app.Handle("POST", "/users/invite/:hash", us.InviteAccept)
 	app.Handle("GET", "/users/invite/:hash", us.InviteAccept)
-	app.Handle("POST", "/users/invite", us.Invite, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/users/invite", us.Invite, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/users/create", us.Create, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/users/create", us.Create, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/users", us.Index, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("POST", "/users/invite", us.Invite, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/invite", us.Invite, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/users/create", us.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users/create", us.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/users", us.Index, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 
 	// Register user management and authentication endpoints.
-	u := User{
-		MasterDB:      masterDB,
-		Renderer:      renderer,
-		Authenticator: authenticator,
-		ProjectRoutes: projectRoutes,
-		NotifyEmail:   notifyEmail,
-		SecretKey:     secretKey,
+	u := UserRepos{
+		UserRepo:        appCtx.UserRepo,
+		UserAccountRepo: appCtx.UserAccountRepo,
+		AccountRepo:     appCtx.AccountRepo,
+		AuthRepo:        appCtx.AuthRepo,
+		GeoRepo:         appCtx.GeoRepo,
+		Renderer:        appCtx.Renderer,
 	}
 	app.Handle("POST", "/user/login", u.Login)
 	app.Handle("GET", "/user/login", u.Login)
@@ -114,35 +153,39 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 	app.Handle("GET", "/user/reset-password/:hash", u.ResetConfirm)
 	app.Handle("POST", "/user/reset-password", u.ResetPassword)
 	app.Handle("GET", "/user/reset-password", u.ResetPassword)
-	app.Handle("POST", "/user/update", u.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user/update", u.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user/account", u.Account, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user/virtual-login/:user_id", u.VirtualLogin, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/user/virtual-login", u.VirtualLogin, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/user/virtual-login", u.VirtualLogin, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/user/virtual-logout", u.VirtualLogout, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user/switch-account/:account_id", u.SwitchAccount, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("POST", "/user/switch-account", u.SwitchAccount, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user/switch-account", u.SwitchAccount, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("POST", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
-	app.Handle("GET", "/user", u.View, mid.AuthenticateSessionRequired(authenticator), mid.HasAuth())
+	app.Handle("POST", "/user/update", u.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/update", u.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/account", u.Account, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/virtual-login/:user_id", u.VirtualLogin, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/user/virtual-login", u.VirtualLogin, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/user/virtual-login", u.VirtualLogin, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/user/virtual-logout", u.VirtualLogout, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/switch-account/:account_id", u.SwitchAccount, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("POST", "/user/switch-account", u.SwitchAccount, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user/switch-account", u.SwitchAccount, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("POST", "/user", u.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("GET", "/user", u.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 
 	// Register account management endpoints.
 	acc := Account{
-		MasterDB:      masterDB,
-		Renderer:      renderer,
-		Authenticator: authenticator,
+		AccountRepo:     appCtx.AccountRepo,
+		AccountPrefRepo: appCtx.AccountPrefRepo,
+		AuthRepo:        appCtx.AuthRepo,
+		Authenticator:   appCtx.Authenticator,
+		GeoRepo:         appCtx.GeoRepo,
+		Renderer:        appCtx.Renderer,
 	}
-	app.Handle("POST", "/account/update", acc.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/account/update", acc.Update, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/account", acc.View, mid.AuthenticateSessionRequired(authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/account/update", acc.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/account/update", acc.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/account", acc.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/account", acc.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
-	// Register user management and authentication endpoints.
+	// Register signup endpoints.
 	s := Signup{
-		MasterDB:      masterDB,
-		Renderer:      renderer,
-		Authenticator: authenticator,
+		SignupRepo: appCtx.SignupRepo,
+		AuthRepo:   appCtx.AuthRepo,
+		GeoRepo:    appCtx.GeoRepo,
+		Renderer:   appCtx.Renderer,
 	}
 	// This route is not authenticated
 	app.Handle("POST", "/signup", s.Step1)
@@ -150,16 +193,16 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register example endpoints.
 	ex := Examples{
-		Renderer: renderer,
+		Renderer: appCtx.Renderer,
 	}
-	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(authenticator))
-	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(authenticator))
-	app.Handle("GET", "/examples/images", ex.Images, mid.AuthenticateSessionOptional(authenticator))
+	app.Handle("POST", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(appCtx.Authenticator))
+	app.Handle("GET", "/examples/flash-messages", ex.FlashMessages, mid.AuthenticateSessionOptional(appCtx.Authenticator))
+	app.Handle("GET", "/examples/images", ex.Images, mid.AuthenticateSessionOptional(appCtx.Authenticator))
 
 	// Register geo
 	g := Geo{
-		MasterDB: masterDB,
-		Redis:    redis,
+		GeoRepo: appCtx.GeoRepo,
+		Redis:   appCtx.Redis,
 	}
 	app.Handle("GET", "/geo/regions/autocomplete", g.RegionsAutocomplete)
 	app.Handle("GET", "/geo/postal_codes/autocomplete", g.PostalCodesAutocomplete)
@@ -168,17 +211,16 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register root
 	r := Root{
-		MasterDB:      masterDB,
-		Renderer:      renderer,
-		ProjectRoutes: projectRoutes,
-		Sitemap:       sm,
+		Renderer:     appCtx.Renderer,
+		ProjectRoute: appCtx.ProjectRoute,
+		Sitemap:      sm,
 	}
 	app.Handle("GET", "/api", r.SitePage)
 	app.Handle("GET", "/pricing", r.SitePage)
 	app.Handle("GET", "/support", r.SitePage)
 	app.Handle("GET", "/legal/privacy", r.SitePage)
 	app.Handle("GET", "/legal/terms", r.SitePage)
-	app.Handle("GET", "/", r.Index, mid.AuthenticateSessionOptional(authenticator))
+	app.Handle("GET", "/", r.Index, mid.AuthenticateSessionOptional(appCtx.Authenticator))
 	app.Handle("GET", "/index.html", r.IndexHtml)
 	app.Handle("GET", "/robots.txt", r.RobotTxt)
 	app.Handle("GET", "/sitemap.xml", r.SitemapXml)
@@ -193,14 +235,14 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 
 	// Register health check endpoint. This route is not authenticated.
 	check := Check{
-		MasterDB: masterDB,
-		Redis:    redis,
+		MasterDB: appCtx.MasterDB,
+		Redis:    appCtx.Redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
 
 	// Handle static files/pages. Render a custom 404 page when file not found.
 	static := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
-		err := web.StaticHandler(ctx, w, r, params, staticDir, "")
+		err := web.StaticHandler(ctx, w, r, params, appCtx.StaticDir, "")
 		if err != nil {
 			if os.IsNotExist(err) {
 				rmsg := fmt.Sprintf("%s %s not found", r.Method, r.RequestURI)
@@ -209,7 +251,7 @@ func APP(shutdown chan os.Signal, log *log.Logger, env webcontext.Env, staticDir
 				err = weberror.NewError(ctx, err, http.StatusInternalServerError)
 			}
 
-			return web.RenderError(ctx, w, r, err, renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
+			return web.RenderError(ctx, w, r, err, appCtx.Renderer, TmplLayoutBase, TmplContentErrorGeneric, web.MIMETextHTMLCharsetUTF8)
 		}
 
 		return nil

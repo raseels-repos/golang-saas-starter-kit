@@ -1,17 +1,17 @@
-package project_routes
+package project_route
 
 import (
 	"github.com/pkg/errors"
 	"net/url"
 )
 
-type ProjectRoutes struct {
+type ProjectRoute struct {
 	webAppUrl url.URL
 	webApiUrl url.URL
 }
 
-func New(apiBaseUrl, appBaseUrl string) (ProjectRoutes, error) {
-	var r ProjectRoutes
+func New(apiBaseUrl, appBaseUrl string) (ProjectRoute, error) {
+	var r ProjectRoute
 
 	apiUrl, err := url.Parse(apiBaseUrl)
 	if err != nil {
@@ -28,37 +28,37 @@ func New(apiBaseUrl, appBaseUrl string) (ProjectRoutes, error) {
 	return r, nil
 }
 
-func (r ProjectRoutes) WebAppUrl(urlPath string) string {
+func (r ProjectRoute) WebAppUrl(urlPath string) string {
 	u := r.webAppUrl
 	u.Path = urlPath
 	return u.String()
 }
 
-func (r ProjectRoutes) WebApiUrl(urlPath string) string {
+func (r ProjectRoute) WebApiUrl(urlPath string) string {
 	u := r.webApiUrl
 	u.Path = urlPath
 	return u.String()
 }
 
-func (r ProjectRoutes) UserResetPassword(resetHash string) string {
+func (r ProjectRoute) UserResetPassword(resetHash string) string {
 	u := r.webAppUrl
 	u.Path = "/user/reset-password/" + resetHash
 	return u.String()
 }
 
-func (r ProjectRoutes) UserInviteAccept(inviteHash string) string {
+func (r ProjectRoute) UserInviteAccept(inviteHash string) string {
 	u := r.webAppUrl
 	u.Path = "/users/invite/" + inviteHash
 	return u.String()
 }
 
-func (r ProjectRoutes) ApiDocs() string {
+func (r ProjectRoute) ApiDocs() string {
 	u := r.webApiUrl
 	u.Path = "/docs"
 	return u.String()
 }
 
-func (r ProjectRoutes) ApiDocsJson() string {
+func (r ProjectRoute) ApiDocsJson() string {
 	u := r.webApiUrl
 	u.Path = "/docs/doc.json"
 	return u.String()

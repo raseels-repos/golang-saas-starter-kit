@@ -6,11 +6,40 @@ import (
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sudo-suhas/symcrypto"
 )
+
+// Repository defines the required dependencies for User Invite.
+type Repository struct {
+	DbConn      *sqlx.DB
+	User        *user.Repository
+	UserAccount *user_account.Repository
+	Account     *account.Repository
+	ResetUrl    func(string) string
+	Notify      notify.Email
+	secretKey   string
+}
+
+// NewRepository creates a new Repository that defines dependencies for User Invite.
+func NewRepository(db *sqlx.DB, user *user.Repository, userAccount *user_account.Repository, account *account.Repository,
+	resetUrl func(string) string, notify notify.Email, secretKey string) *Repository {
+	return &Repository{
+		DbConn:      db,
+		User:        user,
+		UserAccount: userAccount,
+		Account:     account,
+		ResetUrl:    resetUrl,
+		Notify:      notify,
+		secretKey:   secretKey,
+	}
+}
 
 // SendUserInvitesRequest defines the data needed to make an invite request.
 type SendUserInvitesRequest struct {

@@ -277,13 +277,12 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 						"VALUES %s", strings.Join(valueStrings, ","))
 					insertStmt = db.Rebind(insertStmt)
 
-					stmt, err := db.Prepare(insertStmt)
+					_, err := db.Exec(insertStmt, valueArgs...)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to prepare sql query '%s'", insertStmt)
+						return errors.WithMessagef(err, "Failed to execute sql query '%s'", insertStmt)
 					}
 
-					_, err = stmt.Exec(valueArgs...)
-					return err
+					return nil
 				}
 				start := time.Now()
 				for _, country := range countries {

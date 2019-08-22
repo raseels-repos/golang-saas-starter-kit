@@ -59,41 +59,36 @@ func main() {
 					Name: "env",
 					Usage: fmt.Sprintf("target environment, one of [%s]",
 						strings.Join(webcontext.EnvNames, ", ")),
-					Required: true,
+					Value: "dev",
 					EnvVar: "ENV",
 				},
 				cli.StringFlag{
 					Name:     "host",
 					Usage:    "host",
-					Required: true,
 					Value:"127.0.0.1:5433",
 					EnvVar: "SCHEMA_DB_HOST",
 				},
 				cli.StringFlag{
 					Name:     "user",
 					Usage:    "username",
-					Required: true,
 					Value: "postgres",
 					EnvVar: "SCHEMA_DB_USER",
 				},
 				cli.StringFlag{
 					Name:     "pass",
 					Usage:    "password",
-					Required: true,
 					Value: "postgres",
 					EnvVar: "SCHEMA_DB_PASS",
 				},
 				cli.StringFlag{
 					Name:     "database",
 					Usage:    "name of the default",
-					Required: true,
 					Value: "shared",
 					EnvVar: "SCHEMA_DB_DATABASE",
 				},
 				cli.StringFlag{
 					Name:     "driver",
 					Usage:    "database drive to use for connection",
-					Required: true,
 					Value: "postgres",
 					EnvVar: "SCHEMA_DB_DRIVER",
 				},
@@ -124,7 +119,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("%+v", err)
 	}
-
 }
 
 // runMigrate executes the schema migration against the provided database connection details.

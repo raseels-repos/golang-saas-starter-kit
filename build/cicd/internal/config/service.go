@@ -66,7 +66,7 @@ func NewServiceConfig(serviceName string, cfg *devdeploy.Config) (ServiceConfig,
 		Name:               serviceName,
 		DesiredCount:       1,
 		DockerBuildContext: ".",
-		ServiceDir:         filepath.Join(cfg.ProjectRoot, "examples", serviceName),
+		ServiceDir:         filepath.Join(cfg.ProjectRoot, "cmd", serviceName),
 
 		// Set the release tag for the image to use include env + service name + commit hash/tag.
 		ReleaseTag: devdeploy.GitLabCiReleaseTag(cfg.Env, serviceName),

@@ -88,6 +88,7 @@ webapp:deploy:prod:
     TARGET_TYPE: 'service'
     TARGET_REF: 'web-app'
     AWS_USE_ROLE: 'true'
+  #when: manual
 
 webapi:build:prod:
   <<: *build_tmpl
@@ -120,6 +121,7 @@ webapi:deploy:prod:
     TARGET_TYPE: 'service'
     TARGET_REF: 'web-api'
     AWS_USE_ROLE: 'true'
+  #when: manual
 
 ddlogscollector:build:prod:
   <<: *build_tmpl
@@ -152,4 +154,5 @@ ddlogscollector:deploy:prod:
     TARGET_TYPE: 'function'
     TARGET_REF: 'ddlogscollector'
     AWS_USE_ROLE: 'true'
+  #when: manual
 

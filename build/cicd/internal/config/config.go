@@ -395,6 +395,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 						"ecs:UpdateService",
 						"ses:SendEmail",
 						"ses:ListIdentities",
+						"ses:GetAccountSendingEnabled",
 						"secretsmanager:ListSecretVersionIds",
 						"secretsmanager:GetSecretValue",
 						"secretsmanager:CreateSecret",

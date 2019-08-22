@@ -311,6 +311,8 @@ gitlab.com/geeks-accelerator/oss/devops v0.0.0-20190822001238-2bc33b036611 h1:uv
 gitlab.com/geeks-accelerator/oss/devops v0.0.0-20190822001238-2bc33b036611/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
 gitlab.com/geeks-accelerator/oss/devops v1.0.0 h1:5XMS1NO34ZJbrSN8/yOwukCP9NeuDY1JLMyWr5bwzng=
 gitlab.com/geeks-accelerator/oss/devops v1.0.0/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
+gitlab.com/geeks-accelerator/oss/devops v1.0.2 h1:LqME1zTc9bgB+J/tw7tv1WDjvgmrgl2OZdKcRToleqg=
+gitlab.com/geeks-accelerator/oss/devops v1.0.2/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

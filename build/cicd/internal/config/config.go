@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"log"
 	"os"
 	"path/filepath"
@@ -33,13 +34,13 @@ const (
 type Env = string
 
 var (
-	EnvDev   Env = "dev"
-	EnvStage Env = "stage"
-	EnvProd  Env = "prod"
+	EnvDev   Env = webcontext.Env_Dev
+	EnvStage Env =  webcontext.Env_Stage
+	EnvProd  Env = webcontext.Env_Prod
 )
 
 // List of env names used by main.go for help.
-var EnvNames = []Function{
+var EnvNames = []Env{
 	EnvDev,
 	EnvStage,
 	EnvProd,

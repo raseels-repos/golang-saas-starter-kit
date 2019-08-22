@@ -684,7 +684,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 
 // dropTypeIfExists executes drop type.
 func dropTypeIfExists(tx *sql.Tx, name string) error {
-	q := "DROP TYPE IF EXISTS" + name
+	q := "DROP TYPE IF EXISTS " + name
 	if _, err := tx.Exec(q); err != nil && !errorIsAlreadyExists(err) {
 		return errors.WithMessagef(err, "Query failed %s", q)
 	}

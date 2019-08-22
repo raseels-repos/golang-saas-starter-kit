@@ -377,10 +377,10 @@ Access/Secret Keys are required
     --dry-run                         print out the deploy details
     ``` 
             
-* `schema` - Runs the database migration using credentials from AWS Secrets Manager. 
+* `schema migrate` - Runs the database migration using credentials from AWS Secrets Manager. 
 
     ```bash
-    $ cicd -env [dev|stage|prod] schema
+    $ cicd -env [dev|stage|prod] schema migrate
     ``` 
     
 * `help` - Shows a list of commands
@@ -398,12 +398,12 @@ Access/Secret Keys are required
 
 Build the example service _web-app_ 
 ```bash
-$ cicid --env=dev build service --name=web-app --release-tag=testv1 --dry-run=false
+$ cicid --env=prod build service --name=web-app --release-tag=testv1 --dry-run=false
 ```
 
 Deploy the example service _web-app_ 
 ```bash
-$ cicid --env=dev deploy service --name=web-app --release-tag=testv1 --dry-run=false
+$ cicid --env=prod deploy service --name=web-app --release-tag=testv1 --dry-run=false
 ```
 
 

@@ -26,7 +26,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 	return []*sqlxmigrate.Migration{
 		// Create table users.
 		{
-			ID: "20190522-01a",
+			ID: "20190522-01b",
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `CREATE TABLE IF NOT EXISTS users (
 					  id char(36) NOT NULL,
@@ -57,10 +57,10 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Create new table accounts.
 		{
-			ID: "20190522-01b",
+			ID: "20190522-01c",
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `CREATE TYPE account_status_t as enum('active','pending','disabled')`
-				if _, err := tx.Exec(q1); err != nil {
+				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
@@ -103,15 +103,15 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Create new table user_accounts.
 		{
-			ID: "20190522-01d",
+			ID: "20190522-01e",
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `CREATE TYPE user_account_role_t as enum('admin', 'user')`
-				if _, err := tx.Exec(q1); err != nil {
+				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
 				q2 := `CREATE TYPE user_account_status_t as enum('active', 'invited','disabled')`
-				if _, err := tx.Exec(q2); err != nil {
+				if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q2)
 				}
 
@@ -157,7 +157,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			ID: "20190622-01",
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `CREATE TYPE project_status_t as enum('active','disabled')`
-				if _, err := tx.Exec(q1); err != nil {
+				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
@@ -178,12 +178,12 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			},
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TYPE project_status_t`
-				if _, err := tx.Exec(q1); err != nil {
+				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
 				q2 := `DROP TABLE IF EXISTS projects`
-				if _, err := tx.Exec(q2); err != nil {
+				if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q2)
 				}
 				return nil
@@ -667,4 +667,12 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			},
 		},
 	}
+}
+
+// errorIsAlreadyExists checks an error message for the error "already exists"
+func errorIsAlreadyExists(err error) bool {
+	if strings.Contains(err.Error(), "already exists") {
+		return true
+	}
+	return false
 }

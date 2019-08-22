@@ -201,6 +201,8 @@ github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 h1:zzrxE1FKn5ryB
 github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2/go.mod h1:hzfGeIUDq/j97IG+FhNqkowIyEcD88LrW6fyU3K3WqY=
 gitlab.com/geeks-accelerator/oss/devops v1.0.2 h1:LqME1zTc9bgB+J/tw7tv1WDjvgmrgl2OZdKcRToleqg=
 gitlab.com/geeks-accelerator/oss/devops v1.0.2/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
+gitlab.com/geeks-accelerator/oss/devops v1.0.3 h1:SE2ZD4Csvmm3t/50RoJkVLjDcwXKHayQYawSkpOSqIw=
+gitlab.com/geeks-accelerator/oss/devops v1.0.3/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=

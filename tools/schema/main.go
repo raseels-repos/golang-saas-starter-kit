@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
@@ -163,7 +162,7 @@ func runMigrate(log *log.Logger, targetEnv string, dbInfo DB) error {
 	ctx := context.Background()
 
 	// Execute the migrations
-	if err = schema.Migrate(ctx, env, masterDb, log, false); err != nil {
+	if err = schema.Migrate(ctx, targetEnv, masterDb, log, false); err != nil {
 		return err
 	}
 

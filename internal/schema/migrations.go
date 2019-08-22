@@ -5,10 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
+	"fmt"
 	"log"
 	"strings"
 	"time"
-	"fmt"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"github.com/geeks-accelerator/sqlxmigrate"

@@ -14,8 +14,8 @@ import (
 type Function = string
 
 var (
-	Function_Ddlogscollector       = "ddlogscollector"
-	Function_YourNewFunction       = "your-new-function"
+	Function_Ddlogscollector = "ddlogscollector"
+	Function_YourNewFunction = "your-new-function"
 )
 
 // List of function names used by main.go for help.

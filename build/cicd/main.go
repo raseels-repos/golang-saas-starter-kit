@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/urfave/cli"
 	"geeks-accelerator/oss/saas-starter-kit/build/cicd/internal/config"
+	"github.com/urfave/cli"
 	"gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy"
 )
 

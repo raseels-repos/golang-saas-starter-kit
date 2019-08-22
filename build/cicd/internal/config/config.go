@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
@@ -18,7 +19,6 @@ import (
 	"github.com/iancoleman/strcase"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy"
 )
 
@@ -35,7 +35,7 @@ type Env = string
 
 var (
 	EnvDev   Env = webcontext.Env_Dev
-	EnvStage Env =  webcontext.Env_Stage
+	EnvStage Env = webcontext.Env_Stage
 	EnvProd  Env = webcontext.Env_Prod
 )
 

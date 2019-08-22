@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
 	"gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy"
 	"gopkg.in/go-playground/validator.v9"
 )
@@ -33,12 +33,12 @@ var ServiceNames = []Service{
 // ServiceConfig defines the settings for a service.
 type ServiceConfig struct {
 	// Required flags.
-	Name                 string `validate:"required" example:"web-api"`
-	ServiceHostPrimary  string   `validate:"required" example:"example-project.com"`
-	DesiredCount        int      `validate:"required" example:"2"`
-	ServiceDir          string   `validate:"required"`
-	Dockerfile          string   `validate:"required" example:"./cmd/web-api/Dockerfile"`
-	ReleaseTag          string   `validate:"required"`
+	Name               string `validate:"required" example:"web-api"`
+	ServiceHostPrimary string `validate:"required" example:"example-project.com"`
+	DesiredCount       int    `validate:"required" example:"2"`
+	ServiceDir         string `validate:"required"`
+	Dockerfile         string `validate:"required" example:"./cmd/web-api/Dockerfile"`
+	ReleaseTag         string `validate:"required"`
 
 	// Optional flags.
 	ServiceHostNames    []string `validate:"omitempty" example:"subdomain.example-project.com"`
@@ -89,7 +89,7 @@ func NewServiceConfig(serviceName string, cfg *devdeploy.Config) (ServiceConfig,
 
 		// Set the hostnames for the service.
 		if cfg.Env == EnvProd {
-			srv.ServiceHostPrimary  = "example.saasstartupkit.com"
+			srv.ServiceHostPrimary = "example.saasstartupkit.com"
 
 			// Any hostname listed here that doesn't match the primary hostname will be updated in Route 53 but the
 			// service itself will redirect any requests back to the primary hostname.
@@ -97,7 +97,7 @@ func NewServiceConfig(serviceName string, cfg *devdeploy.Config) (ServiceConfig,
 				fmt.Sprintf("%s.example.saasstartupkit.com", cfg.Env),
 			}
 		} else {
-			srv.ServiceHostPrimary  = fmt.Sprintf("%s.example.saasstartupkit.com", cfg.Env)
+			srv.ServiceHostPrimary = fmt.Sprintf("%s.example.saasstartupkit.com", cfg.Env)
 		}
 
 	case ServiceWebApi:
@@ -111,8 +111,8 @@ func NewServiceConfig(serviceName string, cfg *devdeploy.Config) (ServiceConfig,
 
 	default:
 		return ServiceConfig{}, errors.Wrapf(devdeploy.ErrInvalidService,
-		"No service config defined for service '%s'",
-		serviceName)
+			"No service config defined for service '%s'",
+			serviceName)
 	}
 
 	// Set the docker file if no custom one has been defined for the service.
@@ -139,7 +139,6 @@ func (c ServiceConfig) BaseUrl() string {
 	}
 	return fmt.Sprintf("%s://%s/", schema, c.ServiceHostPrimary)
 }
-
 
 // NewServiceContext returns the ServiceContext for a service that is configured for the target deployment env.
 func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceContext, error) {
@@ -192,7 +191,6 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 			ecsKeyValuePair("EMAIL_SENDER", "lee+saas-starter-kit@geeksinthewoods.com"),
 		}
 	}
-
 
 	// =========================================================================
 	// Service dependant settings.
@@ -305,7 +303,6 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 
 			return def, nil
 		}
-
 
 	// Define the ServiceContext for the web-api that will be used for build and deploy.
 	case ServiceWebApi:

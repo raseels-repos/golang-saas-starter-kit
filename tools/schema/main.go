@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/urfave/cli"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	"github.com/urfave/cli"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
 )
@@ -59,54 +59,54 @@ func main() {
 					Name: "env",
 					Usage: fmt.Sprintf("target environment, one of [%s]",
 						strings.Join(webcontext.EnvNames, ", ")),
-					Value: "dev",
+					Value:  "dev",
 					EnvVar: "ENV",
 				},
 				cli.StringFlag{
-					Name:     "host",
-					Usage:    "host",
-					Value:"127.0.0.1:5433",
+					Name:   "host",
+					Usage:  "host",
+					Value:  "127.0.0.1:5433",
 					EnvVar: "SCHEMA_DB_HOST",
 				},
 				cli.StringFlag{
-					Name:     "user",
-					Usage:    "username",
-					Value: "postgres",
+					Name:   "user",
+					Usage:  "username",
+					Value:  "postgres",
 					EnvVar: "SCHEMA_DB_USER",
 				},
 				cli.StringFlag{
-					Name:     "pass",
-					Usage:    "password",
-					Value: "postgres",
+					Name:   "pass",
+					Usage:  "password",
+					Value:  "postgres",
 					EnvVar: "SCHEMA_DB_PASS",
 				},
 				cli.StringFlag{
-					Name:     "database",
-					Usage:    "name of the default",
-					Value: "shared",
+					Name:   "database",
+					Usage:  "name of the default",
+					Value:  "shared",
 					EnvVar: "SCHEMA_DB_DATABASE",
 				},
 				cli.StringFlag{
-					Name:     "driver",
-					Usage:    "database drive to use for connection",
-					Value: "postgres",
+					Name:   "driver",
+					Usage:  "database drive to use for connection",
+					Value:  "postgres",
 					EnvVar: "SCHEMA_DB_DRIVER",
 				},
 				cli.BoolTFlag{
-					Name:  "disable-tls",
-					Usage: "disable TLS for the database connection",
+					Name:   "disable-tls",
+					Usage:  "disable TLS for the database connection",
 					EnvVar: "SCHEMA_DB_DISABLE_TLS",
 				},
 			},
 			Action: func(c *cli.Context) error {
-				targetEnv :=  c.String("env")
-				var dbInfo = DB {
-					Host  : c.String("host"),
-					User    : c.String("user"),
-					Pass : c.String("pass"),
-					Database : c.String("database"),
+				targetEnv := c.String("env")
+				var dbInfo = DB{
+					Host:     c.String("host"),
+					User:     c.String("user"),
+					Pass:     c.String("pass"),
+					Database: c.String("database"),
 
-					Driver : c.String("driver"),
+					Driver:     c.String("driver"),
 					DisableTLS: c.Bool("disable-tls"),
 				}
 
@@ -160,16 +160,10 @@ func runMigrate(log *log.Logger, targetEnv string, dbInfo DB) error {
 	// =========================================================================
 	// Start Migrations
 
-	// Set the context with the required values to
-	// process the request.
-	v := webcontext.Values{
-		Now: time.Now(),
-		Env: targetEnv,
-	}
-	ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+	ctx := context.Background()
 
 	// Execute the migrations
-	if err = schema.Migrate(ctx, masterDb, log, false); err != nil {
+	if err = schema.Migrate(ctx, env, masterDb, log, false); err != nil {
 		return err
 	}
 

@@ -23,7 +23,7 @@ import (
 type Signup struct {
 	SignupRepo *signup.Repository
 	AuthRepo   *user_auth.Repository
-	GeoRepo     *geonames.Repository
+	GeoRepo    *geonames.Repository
 	MasterDB   *sqlx.DB
 	Renderer   web.Renderer
 }

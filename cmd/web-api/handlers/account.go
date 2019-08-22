@@ -17,7 +17,7 @@ import (
 
 // Account represents the Account API method handler set.
 type Accounts struct {
-	Repository     *account.Repository
+	Repository *account.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }

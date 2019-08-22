@@ -4,13 +4,13 @@ import (
 	"context"
 	"log"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy"
 )
 
-// RunSchemaMigrationsForTargetEnv executes the build commands for a target service.
+// RunSchemaMigrationsForTargetEnv executes schema migrations for the target environment.
 func RunSchemaMigrationsForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, isUnittest bool) error {
 
 	cfgCtx, err := NewConfigContext(targetEnv, awsCredentials)
@@ -34,5 +34,5 @@ func RunSchemaMigrationsForTargetEnv(log *log.Logger, awsCredentials devdeploy.A
 	}
 	defer masterDb.Close()
 
-	return schema.Migrate(context.Background(), masterDb, log, false)
+	return schema.Migrate(context.Background(), targetEnv, masterDb, log, false)
 }

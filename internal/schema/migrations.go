@@ -294,7 +294,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					}
 					//fmt.Println("Geoname records: ", len(v))
 					// Max argument values of Postgres is about 54460. So the batch size for bulk insert is selected 4500*12 (ncol)
-					batch := 4500
+					batch := 1000
 					n := len(v) / batch
 
 					//fmt.Println("Number of batch: ", n)

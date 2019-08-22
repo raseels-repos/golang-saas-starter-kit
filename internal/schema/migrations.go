@@ -59,6 +59,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190522-01c",
 			Migrate: func(tx *sql.Tx) error {
+				if err := dropTypeIfExists(tx, "account_status_t"); err != nil {
+					return err
+				}
 				q1 := `CREATE TYPE account_status_t as enum('active','pending','disabled')`
 				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
@@ -89,7 +92,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
-				q1 := `DROP TYPE account_status_t`
+				q1 := `DROP TYPE IF EXISTS account_status_t`
 				if _, err := tx.Exec(q1); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
@@ -105,11 +108,17 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190522-01e",
 			Migrate: func(tx *sql.Tx) error {
+				if err := dropTypeIfExists(tx, "user_account_role_t"); err != nil {
+					return err
+				}
 				q1 := `CREATE TYPE user_account_role_t as enum('admin', 'user')`
 				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
+				if err := dropTypeIfExists(tx, "user_account_status_t"); err != nil {
+					return err
+				}
 				q2 := `CREATE TYPE user_account_status_t as enum('active', 'invited','disabled')`
 				if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q2)
@@ -139,7 +148,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					return errors.WithMessagef(err, "Query failed %s", q1)
 				}
 
-				q2 := `DROP TYPE userr_account_status_t`
+				q2 := `DROP TYPE user_account_status_t`
 				if _, err := tx.Exec(q2); err != nil {
 					return errors.WithMessagef(err, "Query failed %s", q2)
 				}
@@ -156,6 +165,10 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		{
 			ID: "20190622-01",
 			Migrate: func(tx *sql.Tx) error {
+				if err := dropTypeIfExists(tx, "project_status_t"); err != nil {
+					return err
+				}
+
 				q1 := `CREATE TYPE project_status_t as enum('active','disabled')`
 				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
 					return errors.WithMessagef(err, "Query failed %s", q1)
@@ -667,6 +680,15 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			},
 		},
 	}
+}
+
+// dropTypeIfExists executes drop type.
+func dropTypeIfExists(tx *sql.Tx, name string) error {
+	q := "DROP TYPE IF EXISTS" + name
+	if _, err := tx.Exec(q); err != nil && !errorIsAlreadyExists(err) {
+		return errors.WithMessagef(err, "Query failed %s", q)
+	}
+	return nil
 }
 
 // errorIsAlreadyExists checks an error message for the error "already exists"

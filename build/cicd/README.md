@@ -249,7 +249,7 @@ the install instructions for Go](http://golang.org/doc/install.html).
 
 To install _cicd_, simply run:
 ```
-$ go get geeks-accelerator/oss/saas-starter-kit/build/cicd
+$ go get -v geeks-accelerator/oss/saas-starter-kit/build/cicd
 ```
 
 Make sure your `PATH` includes the `$GOPATH/bin` directory so your commands can

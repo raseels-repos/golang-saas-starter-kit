@@ -616,7 +616,7 @@ so each job is dependant on the previous or run jobs for each target environment
 
 A build tool called [devops](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/devops) has 
 been included apart of this project. _Devops_ handles creating AWS resources and deploying your services with minimal 
-additional configuration. You can customizing any of the configuration in the code. While AWS is already a core part of 
+additional configuration. You can customize any of the configuration in the code. While AWS is already a core part of 
 the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
 project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 

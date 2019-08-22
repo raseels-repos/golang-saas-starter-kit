@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
-
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -27,11 +26,11 @@ import (
 
 // User represents the User API method handler set.
 type UserRepos struct {
-	UserRepo        handlers.UserRepository
-	AuthRepo        handlers.UserAuthRepository
-	UserAccountRepo handlers.UserAccountRepository
-	AccountRepo     handlers.AccountRepository
-	GeoRepo         GeoRepository
+	UserRepo        *user.Repository
+	AuthRepo        *user_auth.Repository
+	UserAccountRepo *user_account.Repository
+	AccountRepo     *account.Repository
+	GeoRepo         *geonames.Repository
 	MasterDB        *sqlx.DB
 	Renderer        web.Renderer
 	SecretKey       string

@@ -3,11 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"strings"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
@@ -27,12 +28,12 @@ import (
 
 // Users represents the Users API method handler set.
 type Users struct {
-	UserRepo        handlers.UserRepository
-	AccountRepo     handlers.AccountRepository
-	UserAccountRepo handlers.UserAccountRepository
-	AuthRepo        handlers.UserAuthRepository
-	InviteRepo      handlers.UserInviteRepository
-	GeoRepo         GeoRepository
+	UserRepo        *user.Repository
+	AccountRepo     *account.Repository
+	UserAccountRepo *user_account.Repository
+	AuthRepo        *user_auth.Repository
+	InviteRepo      *invite.Repository
+	GeoRepo         *geonames.Repository
 	MasterDB        *sqlx.DB
 	Redis           *redis.Client
 	Renderer        web.Renderer

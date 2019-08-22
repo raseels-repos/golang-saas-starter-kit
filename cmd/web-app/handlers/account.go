@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
+	"net/http"
+	"time"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
@@ -10,9 +12,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-
-	"net/http"
-	"time"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
@@ -20,10 +20,10 @@ import (
 
 // Account represents the Account API method handler set.
 type Account struct {
-	AccountRepo     handlers.AccountRepository
-	AccountPrefRepo handlers.AccountPrefRepository
-	AuthRepo        handlers.UserAuthRepository
-	GeoRepo         GeoRepository
+	AccountRepo     *account.Repository
+	AccountPrefRepo *account_preference.Repository
+	AuthRepo        *user_auth.Repository
+	GeoRepo         *geonames.Repository
 	Authenticator   *auth.Authenticator
 	Renderer        web.Renderer
 }

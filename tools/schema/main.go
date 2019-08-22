@@ -2,25 +2,20 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"expvar"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
-	"time"
+	"strings"
 
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
-	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	"github.com/urfave/cli"
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	sqlxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jmoiron/sqlx"
 )
-
-// build is the git version of this program. It is set using build flags in the makefile.
-var build = "develop"
 
 // service is the name of the program used for logging, tracing and the
 // the prefix used for loading env variables
@@ -38,57 +33,95 @@ type DB struct {
 }
 
 func main() {
+
 	// =========================================================================
 	// Logging
-
-	log := log.New(os.Stdout, service+" : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-
-	// =========================================================================
-	// Configuration
-	var cfg struct {
-		Env string `default:"dev" envconfig:"ENV"`
-		DB  struct {
-			Host       string `default:"127.0.0.1:5433" envconfig:"HOST"`
-			User       string `default:"postgres" envconfig:"USER"`
-			Pass       string `default:"postgres" envconfig:"PASS" json:"-"` // don't print
-			Database   string `default:"shared" envconfig:"DATABASE"`
-			Driver     string `default:"postgres" envconfig:"DRIVER"`
-			Timezone   string `default:"utc" envconfig:"TIMEZONE"`
-			DisableTLS bool   `default:"true" envconfig:"DISABLE_TLS"`
-		}
-	}
-
-	// For additional details refer to https://github.com/kelseyhightower/envconfig
-	if err := envconfig.Process(service, &cfg); err != nil {
-		log.Fatalf("main : Parsing Config : %v", err)
-	}
-
-	if err := flag.Process(&cfg); err != nil {
-		if err != flag.ErrHelp {
-			log.Fatalf("main : Parsing Command Line : %v", err)
-		}
-		return // We displayed help.
-	}
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.SetPrefix(service + " : ")
+	log := log.New(os.Stdout, log.Prefix(), log.Flags())
 
 	// =========================================================================
-	// Log App Info
+	// New CLI application.
+	app := cli.NewApp()
+	app.Name = "schema"
+	app.Version = "1.0.0"
+	app.Author = "Lee Brown"
+	app.Email = "lee@geeksinthewoods.com"
 
-	// Print the build version for our logs. Also expose it under /debug/vars.
-	expvar.NewString("build").Set(build)
-	log.Printf("main : Started : Application Initializing version %q", build)
-	defer log.Println("main : Completed")
+	app.Commands = []cli.Command{
+		{
+			Name:    "migrate",
+			Aliases: []string{"m"},
+			Usage:   "run schema migration",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "env",
+					Usage: fmt.Sprintf("target environment, one of [%s]",
+						strings.Join(webcontext.EnvNames, ", ")),
+					Value:  "dev",
+					EnvVar: "ENV",
+				},
+				cli.StringFlag{
+					Name:   "host",
+					Usage:  "host",
+					Value:  "127.0.0.1:5433",
+					EnvVar: "SCHEMA_DB_HOST",
+				},
+				cli.StringFlag{
+					Name:   "user",
+					Usage:  "username",
+					Value:  "postgres",
+					EnvVar: "SCHEMA_DB_USER",
+				},
+				cli.StringFlag{
+					Name:   "pass",
+					Usage:  "password",
+					Value:  "postgres",
+					EnvVar: "SCHEMA_DB_PASS",
+				},
+				cli.StringFlag{
+					Name:   "database",
+					Usage:  "name of the default",
+					Value:  "shared",
+					EnvVar: "SCHEMA_DB_DATABASE",
+				},
+				cli.StringFlag{
+					Name:   "driver",
+					Usage:  "database drive to use for connection",
+					Value:  "postgres",
+					EnvVar: "SCHEMA_DB_DRIVER",
+				},
+				cli.BoolTFlag{
+					Name:   "disable-tls",
+					Usage:  "disable TLS for the database connection",
+					EnvVar: "SCHEMA_DB_DISABLE_TLS",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				targetEnv := c.String("env")
+				var dbInfo = DB{
+					Host:     c.String("host"),
+					User:     c.String("user"),
+					Pass:     c.String("pass"),
+					Database: c.String("database"),
 
-	// Print the config for our logs. It's important to any credentials in the config
-	// that could expose a security risk are excluded from being json encoded by
-	// applying the tag `json:"-"` to the struct var.
-	{
-		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
-		if err != nil {
-			log.Fatalf("main : Marshalling Config to JSON : %v", err)
-		}
-		log.Printf("main : Config : %v\n", string(cfgJSON))
+					Driver:     c.String("driver"),
+					DisableTLS: c.Bool("disable-tls"),
+				}
+
+				return runMigrate(log, targetEnv, dbInfo)
+			},
+		},
 	}
 
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
+}
+
+// runMigrate executes the schema migration against the provided database connection details.
+func runMigrate(log *log.Logger, targetEnv string, dbInfo DB) error {
 	// =========================================================================
 	// Start Database
 	var dbUrl url.URL
@@ -97,20 +130,18 @@ func main() {
 		var q url.Values = make(map[string][]string)
 
 		// Handle SSL Mode
-		if cfg.DB.DisableTLS {
+		if dbInfo.DisableTLS {
 			q.Set("sslmode", "disable")
 		} else {
 			q.Set("sslmode", "require")
 		}
 
-		q.Set("timezone", cfg.DB.Timezone)
-
 		// Construct url.
 		dbUrl = url.URL{
-			Scheme:   cfg.DB.Driver,
-			User:     url.UserPassword(cfg.DB.User, cfg.DB.Pass),
-			Host:     cfg.DB.Host,
-			Path:     cfg.DB.Database,
+			Scheme:   dbInfo.Driver,
+			User:     url.UserPassword(dbInfo.User, dbInfo.Pass),
+			Host:     dbInfo.Host,
+			Path:     dbInfo.Database,
 			RawQuery: q.Encode(),
 		}
 	}
@@ -118,27 +149,23 @@ func main() {
 	// Register informs the sqlxtrace package of the driver that we will be using in our program.
 	// It uses a default service name, in the below case "postgres.db". To use a custom service
 	// name use RegisterWithServiceName.
-	sqltrace.Register(cfg.DB.Driver, &pq.Driver{}, sqltrace.WithServiceName(service))
-	masterDb, err := sqlxtrace.Open(cfg.DB.Driver, dbUrl.String())
+	sqltrace.Register(dbInfo.Driver, &pq.Driver{}, sqltrace.WithServiceName(service))
+	masterDb, err := sqlxtrace.Open(dbInfo.Driver, dbUrl.String())
 	if err != nil {
-		log.Fatalf("main : Register DB : %s : %v", cfg.DB.Driver, err)
+		log.Fatalf("main : Register DB : %s : %v", dbInfo.Driver, err)
 	}
 	defer masterDb.Close()
 
 	// =========================================================================
 	// Start Migrations
 
-	// Set the context with the required values to
-	// process the request.
-	v := webcontext.Values{
-		Now: time.Now(),
-		Env: cfg.Env,
-	}
-	ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
+	ctx := context.Background()
 
 	// Execute the migrations
-	if err = schema.Migrate(ctx, masterDb, log, false); err != nil {
-		log.Fatalf("main : Migrate : %v", err)
+	if err = schema.Migrate(ctx, targetEnv, masterDb, log, false); err != nil {
+		return err
 	}
+
 	log.Printf("main : Migrate : Completed")
+	return nil
 }

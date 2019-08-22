@@ -48,7 +48,7 @@ services:
         aliases:
           - datadog
     env_file:
-      - .env_docker_compose
+      - configs/.env_docker_compose
     environment:
       - DD_LOGS_ENABLED=true
       - DD_APM_ENABLED=true
@@ -76,12 +76,8 @@ services:
       main:
         aliases:
           - web-app
-    links:
-      - postgres
-      - redis
-      - datadog
     env_file:
-      - .env_docker_compose
+      - configs/.env_docker_compose
     environment:
       - WEB_APP_HTTP_HOST=:3000
       - WEB_APP_APP_BASE_URL=http://127.0.0.1:3000
@@ -115,12 +111,8 @@ services:
       main:
         aliases:
           - web-api
-    links:
-      - postgres
-      - redis
-      - datadog
     env_file:
-      - .env_docker_compose
+      - configs/.env_docker_compose
     environment:
       - WEB_API_HTTP_HOST=:3001
       - WEB_API_APP_BASE_URL=http://127.0.0.1:3001

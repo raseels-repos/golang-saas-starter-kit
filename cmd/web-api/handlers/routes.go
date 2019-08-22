@@ -5,13 +5,20 @@ import (
 	"net/http"
 	"os"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	_ "geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -22,14 +29,14 @@ type AppContext struct {
 	Env               webcontext.Env
 	MasterDB          *sqlx.DB
 	Redis             *redis.Client
-	UserRepo          UserRepository
-	UserAccountRepo   UserAccountRepository
-	AccountRepo       AccountRepository
-	AccountPrefRepo   AccountPrefRepository
-	AuthRepo          UserAuthRepository
-	SignupRepo        SignupRepository
-	InviteRepo        UserInviteRepository
-	ProjectRepo       ProjectRepository
+	UserRepo          *user.Repository
+	UserAccountRepo   *user_account.Repository
+	AccountRepo       *account.Repository
+	AccountPrefRepo   *account_preference.Repository
+	AuthRepo          *user_auth.Repository
+	SignupRepo        *signup.Repository
+	InviteRepo        *invite.Repository
+	ProjectRepo       *project.Repository
 	Authenticator     *auth.Authenticator
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware

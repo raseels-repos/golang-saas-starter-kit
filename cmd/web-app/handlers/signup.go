@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"time"
 
@@ -22,9 +21,9 @@ import (
 
 // Signup represents the Signup API method handler set.
 type Signup struct {
-	SignupRepo handlers.SignupRepository
-	AuthRepo   handlers.UserAuthRepository
-	GeoRepo    GeoRepository
+	SignupRepo *signup.Repository
+	AuthRepo   *user_auth.Repository
+	GeoRepo    *geonames.Repository
 	MasterDB   *sqlx.DB
 	Renderer   web.Renderer
 }

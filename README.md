@@ -1,7 +1,7 @@
 # SaaS Startup Kit
+[![Build Status](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/badges/master/pipeline.svg)](https://gitlab.com/geeks-accelerator/oss/devops/pipelines) 
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/geeks-accelerator/oss/saas-starter-kit?style=flat-square)](https://goreportcard.com/report/gitlab.com/geeks-accelerator/oss/devops)
 
-Copyright 2019, Geeks Accelerator 
-twins@geeksaccelerator.com
 
 The [SaaS Startup Kit](https://saasstartupkit.com/) is a set of libraries in Go and boilerplate Golang code for building 
 scalable software-as-a-service (SaaS) applications. The goal of this project is to provide a proven starting point for new 
@@ -24,6 +24,38 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 *You are welcome to add comments to the Google Slides.*
 
 [![Google Slides of Screen Captures for SaaS Startup Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://saasstartupkit.com/)
+
+
+
+<!-- toc -->
+
+- [Motivation](#motivation)
+- [Description](#description)
+    * [Example project](#example-project)
+- [Local Installation](#local-installation)
+    * [Getting the project](#getting-the-project) 
+    * [Go Modules](#go-modules) 
+    * [Installing Docker](#installing-docker)
+- [Getting started](#getting-started)
+    * [Running the project](#running-the-project) 
+    * [How we run the project](#how-we-run-the-project) 
+    * [Stopping the project](#stopping-the-project) 
+    * [Re-starting a specific Go service for development](#re-starting-a-specific-go-service-for-development) 
+    * [Forking your own copy](#forking-your-own-copy) 
+    * [Optional. Set AWS and Datadog Configs](#optional-set-aws-and-datadog-configs) 
+- [Web API](#web-api)   
+    * [API Documentation](#api-documentation) 
+- [Web App](#web-app)
+- [Schema](#schema)
+    * [Accessing Postgres](#accessing-postgres) 
+- [Deployment](#deployment)
+- [Development Notes](#development-notes)
+- [What's Next](#whats-next)
+- [Join us on Gopher Slack](#join-us-on-gopher-slack)
+- [License](#license)
+
+<!-- tocstop -->
+
 
 
 ## Motivation
@@ -199,8 +231,8 @@ Docker is a critical component and required to run this project.
 
 https://docs.docker.com/install/
 
-
-## Running The Project
+    
+## Getting started
 
 There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a 
 `dockerfile`.
@@ -490,6 +522,7 @@ of user management.
 
 For more details on this service, read [web-app readme](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/cmd/web-app/README.md)
 
+ 
 
 ## Schema 
 [cmd/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/cmd/schema)
@@ -583,7 +616,7 @@ so each job is dependant on the previous or run jobs for each target environment
 
 A build tool called [devops](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/devops) has 
 been included apart of this project. _Devops_ handles creating AWS resources and deploying your services with minimal 
-additional configuration. You can customizing any of the configuration in the code. While AWS is already a core part of 
+additional configuration. You can customize any of the configuration in the code. While AWS is already a core part of 
 the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
 project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 
@@ -622,13 +655,37 @@ sqlQueryStr = db.Rebind(sqlQueryStr)
 For additional details refer to [bindvars](https://jmoiron.github.io/sqlx/#bindvars)
 
 
+
 ## What's Next
 
 We are in the process of writing more documentation about this code. We welcome you to make enhancements to this 
 documentation or just send us your feedback and suggestions :wink:
 
 
+
+## Contributions
+
+We :heart: contributions.
+
+Have you had a good experience with SaaS Startup Kit? Why not share some love and contribute code?
+
+Thank you to all those that have contributed to this project and are using it in their projects. You can find a 
+CONTRIBUTORS file where we keep a list of contributors to the project. If you contribute a PR please consider adding 
+your name there. 
+
+
+
 ## Join us on Gopher Slack
 
 If you are having problems installing, troubles getting the project running or would like to contribute, join the 
-channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/)
+channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/) 
+
+
+
+## License
+
+Please read the [LICENSE](./LICENSE) file here.
+
+
+Copyright 2019, Geeks Accelerator 
+twins@geeksaccelerator.com

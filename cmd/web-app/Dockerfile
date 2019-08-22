@@ -30,7 +30,7 @@ COPY cmd/${service}/static /static
 
 # Copy the global templates.
 ADD resources/templates/shared /templates/shared
-ADD fresh-auto-reload.conf /runner.conf
+ADD configs/fresh-auto-reload.conf /runner.conf
 
 ENV TEMPLATE_DIR=/templates
 

@@ -189,6 +189,7 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 			ecsKeyValuePair("CI_PIPELINE_URL", ciPipelineURL),
 			ecsKeyValuePair("WEB_APP_BASE_URL", webAppCfg.BaseUrl()),
 			ecsKeyValuePair("WEB_API_BASE_URL", webApiCfg.BaseUrl()),
+			ecsKeyValuePair("EMAIL_SENDER", "lee+saas-starter-kit@geeksinthewoods.com"),
 		}
 	}
 

@@ -13,8 +13,8 @@ driven deployment.
     * [Services](#services)
     * [Functions](#functions)
     * [Schema Migrations](#schema-migrations)
-- [Installation](#installation)
 - [Getting Started](#getting-started)
+- [Installing locally](#installing-locally)
 - [Usage](#usage)
     * [Commands](#commands)
     * [Examples](#examples)
@@ -132,14 +132,14 @@ in the compiled binary resulting in a docker container that is around 50mbs excl
 possible to swap out `alpine:3.9` with [busybox](https://willschenk.com/articles/2019/building_a_slimmer_go_docker_container/) 
 for an even small resulting docker image. 
 
-A service is built using the defined Dockerfile. The resulting image is pushed to 
+A service is built using the defined service Dockerfile. The resulting image is pushed to 
 [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/). 
 
     Amazon Elastic Container Registry (ECR) is a fully-managed Docker container registry that makes it easy for 
     developers to store, manage, and deploy Docker container images. Amazon ECR is integrated with Amazon Elastic 
     Container Service (ECS) simplifying the development to production workflow. 
  
-A service is configured for deployment in [services.go](https://gitlab.com/saas-starter-kit/oss/devops/blob/master/build/cicd/internal/config/service.go).
+A service is configured for deployment in [services.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/oss/devops/blob/master/build/cicd/internal/config/service.go).
 Services are deployed to [AWS Fargate](https://aws.amazon.com/fargate/) based on the defined task definition. 
     
     AWS Fargate is a compute engine for Amazon ECS that allows you to run containers without having to manage servers or 
@@ -155,66 +155,93 @@ image is tagged with the go.mod hash and pushed to the projects
 
 
 
-
-
 ### Functions 
 
 Functions are applications that can be executed in short period of time. The configured function is:
 
-* 
+*[Datadog Log Collection](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/deployments/ddlogscollector) - 
+Python script used to ship logs from AWS Cloudwatch to Datadog. 
 
 
-
-An python script for 
-[Datadog Log Collection](https://gitlab.com/geeks-accelerator/oss/devops/tree/master/examples/aws-lambda-python-ddlogs) 
-deployed as a function is provided by the devops project in 
-[examples]((https://gitlab.com/geeks-accelerator/oss/devops/tree/master/examples). 
-
-A function is built using the defined 
-[Dockerfile](https://gitlab.com/geeks-accelerator/oss/devops/blob/master/examples/aws-lambda-python-ddlogs/Dockerfile).
-
- The `Dockerfile` should use a [lambdaci image](https://hub.docker.com/r/lambci/lambda/) as the base image. 
+A function is built using the defined Dockerfile. The `Dockerfile` for a function should use a 
+[lambdaci image](https://hub.docker.com/r/lambci/lambda/) as the base image. 
   
   Lambdaci images provide a sandboxed local environment that replicates the live AWS Lambda environment almost 
   identically – including installed software and libraries, file structure and permissions, environment variables, 
   context objects and behaviors – even the user and running process are the same.
   
 The build command then uses `docker cp` to extract all files from the resulting container image that are located in 
-`/var/task`. These files are zipped and uploaded to AWS S3 for deployment. 
+`/var/task`. These files are zipped and uploaded to the private AWS S3 bucket for deployment. 
 
-A function is configured for deployment in [functions.go](https://gitlab.com/geeks-accelerator/oss/devops/blob/master/build/cicd/internal/config/function.go).
+A function is configured for deployment in [functions.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/oss/devops/blob/master/build/cicd/internal/config/function.go).
 Functions are deployed to [AWS Lambda](https://aws.amazon.com/lambda/).
 
     AWS Lambda lets you run code without provisioning or managing servers. You pay only for the compute time you consume 
     - there is no charge when your code is not running. 
 
 
+
 ### Schema Migrations 
 
 _cicd_ includes a minimalistic database migration script that implements 
 [github.com/geeks-accelerator/sqlxmigrate](https://godoc.org/github.com/geeks-accelerator/sqlxmigrate). It provides 
-schema versioning and migration rollback. The schema for the entire project is defined globally and is located inside 
-internal: [internal/schema](https://gitlab.com/geeks-accelerator/oss/devops/tree/master/build/cicd/internal/schema) 
+schema versioning and migration rollback. The schema for the entire project is defined globally and is located at 
+[internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/issue8/datadog-lambda-func/internal/schema) 
 
 The example schema package provides two separate methods for handling schema migration:
-* [Migrations](https://gitlab.com/geeks-accelerator/oss/devops/blob/master/build/cicd/internal/schema/migrations.go) -
+* [Migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/issue8/datadog-lambda-func/internal/schema/migrations.go) -
 List of direct SQL statements for each migration with defined version ID. A database table is created to persist 
 executed migrations. Upon run of each schema migration run, the migration logic checks the migration database table to 
 check if it’s already been executed. Thus, schema migrations are only ever executed once. Migrations are defined as a 
 function to enable complex migrations so results from query manipulated before being piped to the next query. 
 
-* [Init Schema](https://gitlab.com/geeks-accelerator/oss/devops/blob/master/build/cicd/internal/schema/init_schema.go) - 
+* [Init Schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/issue8/datadog-lambda-func/internal/schema/init_schema.go) - 
 If you have a lot of migrations, it can be a pain to run all them. For example, when you are deploying a new instance of 
 the app into a clean database. To prevent this, use the initSchema function that will run as-if no migration was run 
 before (in a new clean database). 
 
-Another bonus with the globally defined schema is that it enables your testing package the ability to dynamically spin 
-up database containers on-demand and automatically include all the migrations. This allows the testing package to 
-programmatically execute schema migrations before running any unit tests. 
+Another bonus with the globally defined schema is that it enables your testing package the ability to dynamically [spin 
+up database containers](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/issue8/datadog-lambda-func/internal/platform/tests/main.go#L127) 
+on-demand and automatically include all the migrations. This allows the testing package to 
+[programmatically execute schema migrations](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/issue8/datadog-lambda-func/internal/platform/tests/main.go#L172) 
+before running any unit tests. 
 
 
 
-## Installation
+## Getting Started  
+
+One of the philosophies behind the SaaS Startup Kit is that building and deploying SaaS product offers should be easy 
+allowing you focus on what's most important, writing the business logic. Below outline the steps needed to get a 
+full build pipeline that includes both continious integration and continious deployment. 
+
+1. Configure your AWS infrastructure in [config.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/build/cicd/internal/config/config.go) 
+ 
+2. Define your services in [service.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/build/cicd/internal/config/service.go) 
+that will be deployed to AWS Fargate. This includes settings for your [AWS ECS Cluster](https://godoc.org/gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy#AwsEcsCluster), 
+the associated [AWS ECS Service](https://godoc.org/gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy#AwsEcsService) 
+and [AWS ECS Task Definition](https://godoc.org/gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy#AwsEcsTaskDefinition). 
+
+3. Define your functions in [function.go](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/build/cicd/internal/config/function.go) 
+that will be deployed to AWS Lambda. This includes settings for the runtime, amount of memory, and timeout.
+ 
+4. Ensure your [schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema) is ready 
+for deployment. You should already be using the 
+[schema tool](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/schema) for maintaining 
+database schemas for local development, so no additional effort should be required for this step. 
+
+5. Update the [.gitlab-ci.yml](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/.gitlab-ci.yml) in 
+the project root to include the services and functions you have configured here. `.gitlab-ci.yml` will be used by GitLab 
+to determine which services and functions should be built and deployed. 
+
+6. Setup a GitLab runner in your AWS account. This will allow the _cicd_ tool to execute database migration since the 
+database deployed by default is not publicly available. GitLab does provide shared runners, but these will not be able 
+to access your database. 
+[Follow the instructions here](https://gitlab.com/geeks-accelerator/oss/devops/blob/master/README.md#gitlab-cicd) for 
+setting up a GitLab Runner. 
+
+
+
+## Installing locally 
 
 Make sure you have a working Go environment.  Go version 1.2+ is supported.  [See
 the install instructions for Go](http://golang.org/doc/install.html).
@@ -231,12 +258,8 @@ be easily used:
 export PATH=$PATH:$GOPATH/bin
 ```
 
-
-
-## Getting Started 
-
 _cicd_ requires AWS permissions to be executed locally. For the GitLab CI/CD build pipeline, AWS roles will be used. This 
-user is only nessissary for running _cicd_ locally. 
+user is only necessary for running _cicd_ locally. 
 
 1. You will need an existing AWS account or create a new AWS account.
 
@@ -248,16 +271,15 @@ the statement is stored in the devops repo at
 
 3. Create new [AWS User](https://console.aws.amazon.com/iam/home?region=us-west-2#/users$new?step=details) 
 called `saas-starter-kit-deploy` with _Programmatic Access_ and _Attach existing policies directly_ with the policy 
-created from step 1 `saas-starter-kit-deploy`
+created from step 2 `saas-starter-kit-deploy`
 
-4. Try running the build for a single service. 
+4. Set your AWS credentials as [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html). 
+These can also be passed into _cicd_ as command line options. 
 ```bash
-cicd --env=dev build service --name=aws-ecs-go-web-api --release-tag=testv1
-```
-
-4. Try running the deploy for a single service. 
-```bash
-cicd --env=dev deploy service --name=aws-ecs-go-web-api --release-tag=testv1
+export AWS_ACCESS_KEY_ID=XXXXXXXXX
+export AWS_SECRET_ACCESS_KEY=XXXXXXXXX
+export AWS_REGION="us-west-2"
+export AWS_USE_ROLE=false
 ```
 
 
@@ -355,7 +377,7 @@ Access/Secret Keys are required
     --dry-run                         print out the deploy details
     ``` 
             
-* `schema` - Runs the database migration
+* `schema` - Runs the database migration using credentials from AWS Secrets Manager. 
 
     ```bash
     $ cicd -env [dev|stage|prod] schema
@@ -374,14 +396,14 @@ Access/Secret Keys are required
 
 ### Examples
 
-Build the example service _aws-ecs-go-web-api_ 
+Build the example service _web-app_ 
 ```bash
-$ cicid --env=dev build service --name=aws-ecs-go-web-api --release-tag=testv1 --dry-run=false
+$ cicid --env=dev build service --name=web-app --release-tag=testv1 --dry-run=false
 ```
 
-Deploy the example service _aws-ecs-go-web-api_ 
+Deploy the example service _web-app_ 
 ```bash
-$ cicid --env=dev deploy service --name=aws-ecs-go-web-api --release-tag=testv1 --dry-run=false
+$ cicid --env=dev deploy service --name=web-app --release-tag=testv1 --dry-run=false
 ```
 
 

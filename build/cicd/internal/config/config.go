@@ -117,15 +117,14 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	// their name is calculated with the go.mod path. Since the name-scope of AWS resources is region/global scope,
 	// it will fail to create appropriate resources for the account of the forked user.
 	if cfg.ProjectName == "saas-starter-kit" {
-		remoteUser := gitRemoteUser( modDetails.ProjectRoot)
+		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
 
 		// Its a true fork from the origin repo.
-		if  remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
+		if remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
 			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
 
-
-			log.Println("switching project name to ", cfg.ProjectName  )
+			log.Println("switching project name to ", cfg.ProjectName)
 		}
 	}
 
@@ -612,6 +611,6 @@ func gitRemoteUser(projectRoot string) string {
 	}
 
 	remoteUser := strings.Split(remoteUrl, "/")[0]
-	
+
 	return remoteUser
 }

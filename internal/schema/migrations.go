@@ -102,7 +102,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 		},
 		// Create new table user_accounts.
 		{
-			ID: "20190522-01e",
+			ID: "20190522-02e",
 			Migrate: func(tx *sql.Tx) error {
 				if err := createTypeIfNotExists(tx, "user_account_role_t", "enum('admin', 'user')"); err != nil {
 					return err

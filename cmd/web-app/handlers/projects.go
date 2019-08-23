@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"net/http"
 	"strings"
 
@@ -21,7 +20,7 @@ import (
 
 // Projects represents the Projects API method handler set.
 type Projects struct {
-	ProjectRepo handlers.ProjectRepository
+	ProjectRepo *project.Repository
 	Redis       *redis.Client
 	Renderer    web.Renderer
 }

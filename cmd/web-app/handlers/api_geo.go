@@ -16,16 +16,7 @@ import (
 // Check provides support for orchestration geo endpoints.
 type Geo struct {
 	Redis   *redis.Client
-	GeoRepo GeoRepository
-}
-
-type GeoRepository interface {
-	FindGeonames(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Geoname, error)
-	FindGeonamePostalCodes(ctx context.Context, where string, args ...interface{}) ([]string, error)
-	FindGeonameRegions(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Region, error)
-	FindCountries(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.Country, error)
-	FindCountryTimezones(ctx context.Context, orderBy, where string, args ...interface{}) ([]*geonames.CountryTimezone, error)
-	ListTimezones(ctx context.Context) ([]string, error)
+	GeoRepo *geonames.Repository
 }
 
 // GeonameByPostalCode...

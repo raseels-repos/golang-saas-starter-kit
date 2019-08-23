@@ -1,68 +1,103 @@
-# SaaS Schema 
-
-Copyright 2019, Geeks Accelerator  
-accelerator@geeksinthewoods.com.com
 
 
-## Description
+schema  
+=== 
 
-Service is handles the schema migration for the project.
+_schema_ is a command line tool for local development that executes database migrations. 
 
 
-## Local Installation
+<!-- toc -->
 
-### Build 
+- [Overview](#overview)
+- [Installation](#installation)
+- [Usage](#usage)
+    * [Commands](#commands)
+    * [Examples](#examples)
+- [Join us on Gopher Slack](#join-us-on-gopher-slack)
+
+<!-- tocstop -->
+
+
+
+## Overview
+
+The command line tool that executes the database migrations defined in 
+[internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema). This tool 
+should be used to test and deploy schema migrations against your local development database (hosted by docker). 
+
+For additional details regarding this tool, refer to 
+[build/cicd](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/build/cicd#schema-migrations)
+
+
+
+## Installation
+
+Make sure you have a working Go environment.  Go version 1.2+ is supported.  [See
+the install instructions for Go](http://golang.org/doc/install.html).
+
+
+
+## Usage 
+
 ```bash
-go build .
+$ go run main.go [global options] command [command options] [arguments...]
 ```
 
-### Usage 
-```bash
-./schema -h
+### Global Options 
 
-Usage of ./schema
---env string  <dev>
---db_host string  <127.0.0.1:5433>
---db_user string  <postgres>
---db_pass string  <postgres>
---db_database string  <shared>
---db_driver string  <postgres>
---db_timezone string  <utc>
---db_disabletls bool  <false>
+
+* Show help 
+
+    `--help, -h`  
+
+* Print the version 
+
+   `--version, -v`  
+
+### Commands
+
+* `migrate` - Executes the database migrations defined in 
+[internal/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/internal/schema) for local 
+development. Default values are set for all command options that target the Postgres database running via 
+[docker compose](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/docker-compose.yaml#L11). 
+Environment variables can be set as an alternative to passing in the command line options. 
+   
+    ```bash
+    $ go run main.go migrate [command options]
+    ``` 
+    
+    Options: 
+    ```bash
+    --env value       target environment, one of [dev, stage, prod] (default: "dev") [$ENV]
+   --host value      host (default: "127.0.0.1:5433") [$SCHEMA_DB_HOST]
+   --user value      username (default: "postgres") [$SCHEMA_DB_USER]
+   --pass value      password (default: "postgres") [$SCHEMA_DB_PASS]
+   --database value  name of the default (default: "shared") [$SCHEMA_DB_DATABASE]
+   --driver value    database drive to use for connection (default: "postgres") [$SCHEMA_DB_DRIVER]
+   --disable-tls     disable TLS for the database connection [$SCHEMA_DB_DISABLE_TLS]
+    ``` 
+    
+* `help` - Shows a list of commands
+       
+    ```bash
+    $ go run main.go help
+    ```
+        
+    Or for one command:    
+    ```bash
+    $ go run main.go help migrate
+    ```
+
+
+### Examples
+
+Execute the database migrations against the local Postgres database. 
+```bash
+$ go run main.go migrate 
 ```
 
-### Execution
-Manually execute binary after build
-```bash
-./schema 
-Schema : 2019/05/25 08:20:08.152557 main.go:64: main : Started : Application Initializing version "develop"
-Schema : 2019/05/25 08:20:08.152814 main.go:75: main : Config : {
-    "Env": "dev",
-    "DB": {
-        "Host": "127.0.0.1:5433",
-        "User": "postgres",
-        "Database": "shared",
-        "Driver": "postgres",
-        "Timezone": "utc",
-        "DisableTLS": true
-    }
-}
-Schema : 2019/05/25 08:20:08.158270 sqlxmigrate.go:478: HasTable migrations - SELECT 1 FROM migrations
-Schema : 2019/05/25 08:20:08.164275 sqlxmigrate.go:413: Migration SCHEMA_INIT - SELECT count(0) FROM migrations WHERE id = $1
-Schema : 2019/05/25 08:20:08.166391 sqlxmigrate.go:368: Migration 20190522-01a - checking
-Schema : 2019/05/25 08:20:08.166405 sqlxmigrate.go:413: Migration 20190522-01a - SELECT count(0) FROM migrations WHERE id = $1
-Schema : 2019/05/25 08:20:08.168066 sqlxmigrate.go:375: Migration 20190522-01a - already ran
-Schema : 2019/05/25 08:20:08.168078 sqlxmigrate.go:368: Migration 20190522-01b - checking
-Schema : 2019/05/25 08:20:08.168084 sqlxmigrate.go:413: Migration 20190522-01b - SELECT count(0) FROM migrations WHERE id = $1
-Schema : 2019/05/25 08:20:08.170297 sqlxmigrate.go:375: Migration 20190522-01b - already ran
-Schema : 2019/05/25 08:20:08.170319 sqlxmigrate.go:368: Migration 20190522-01c - checking
-Schema : 2019/05/25 08:20:08.170327 sqlxmigrate.go:413: Migration 20190522-01c - SELECT count(0) FROM migrations WHERE id = $1
-Schema : 2019/05/25 08:20:08.172044 sqlxmigrate.go:375: Migration 20190522-01c - already ran
-Schema : 2019/05/25 08:20:08.172831 main.go:130: main : Migrate : Completed
-Schema : 2019/05/25 08:20:08.172935 main.go:131: main : Completed
-```
 
-Or alternative use the make file
-```bash
-make run
-```
+## Join us on Gopher Slack
+
+If you are having problems installing, troubles getting the project running or would like to contribute, join the 
+channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/) 

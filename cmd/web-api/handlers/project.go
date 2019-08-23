@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
@@ -19,19 +18,9 @@ import (
 
 // Project represents the Project API method handler set.
 type Projects struct {
-	Repository ProjectRepository
+	Repository *project.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
-}
-
-type ProjectRepository interface {
-	ReadByID(ctx context.Context, claims auth.Claims, id string) (*project.Project, error)
-	Find(ctx context.Context, claims auth.Claims, req project.ProjectFindRequest) (project.Projects, error)
-	Read(ctx context.Context, claims auth.Claims, req project.ProjectReadRequest) (*project.Project, error)
-	Create(ctx context.Context, claims auth.Claims, req project.ProjectCreateRequest, now time.Time) (*project.Project, error)
-	Update(ctx context.Context, claims auth.Claims, req project.ProjectUpdateRequest, now time.Time) error
-	Archive(ctx context.Context, claims auth.Claims, req project.ProjectArchiveRequest, now time.Time) error
-	Delete(ctx context.Context, claims auth.Claims, req project.ProjectDeleteRequest) error
 }
 
 // Find godoc

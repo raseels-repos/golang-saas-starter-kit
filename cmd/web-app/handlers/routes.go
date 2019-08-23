@@ -9,22 +9,21 @@ import (
 	"path/filepath"
 	"time"
 
-	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
-	//"geeks-accelerator/oss/saas-starter-kit/internal/account"
-	//"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-
-	//"geeks-accelerator/oss/saas-starter-kit/internal/project"
+	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
-	// "geeks-accelerator/oss/saas-starter-kit/internal/signup"
-	// "geeks-accelerator/oss/saas-starter-kit/internal/user"
-	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account"
-	// "geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
-	// "geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
+	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
@@ -42,15 +41,15 @@ type AppContext struct {
 	Env               webcontext.Env
 	MasterDB          *sqlx.DB
 	Redis             *redis.Client
-	UserRepo          handlers.UserRepository
-	UserAccountRepo   handlers.UserAccountRepository
-	AccountRepo       handlers.AccountRepository
-	AccountPrefRepo   handlers.AccountPrefRepository
-	AuthRepo          handlers.UserAuthRepository
-	SignupRepo        handlers.SignupRepository
-	InviteRepo        handlers.UserInviteRepository
-	ProjectRepo       handlers.ProjectRepository
-	GeoRepo           GeoRepository
+	UserRepo          *user.Repository
+	UserAccountRepo   *user_account.Repository
+	AccountRepo       *account.Repository
+	AccountPrefRepo   *account_preference.Repository
+	AuthRepo          *user_auth.Repository
+	SignupRepo        *signup.Repository
+	InviteRepo        *invite.Repository
+	ProjectRepo       *project.Repository
+	GeoRepo           *geonames.Repository
 	Authenticator     *auth.Authenticator
 	StaticDir         string
 	TemplateDir       string

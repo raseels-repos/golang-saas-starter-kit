@@ -1,8 +1,7 @@
 .idea
-aws.lee
-aws.*
 .env_docker_compose
-local.env
+.local.env
+.aws-deploy.env
 .DS_Store
 tmp
 .devops.json

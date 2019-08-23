@@ -24,33 +24,10 @@ var sessionTtl = time.Hour * 24
 
 // User represents the User API method handler set.
 type Users struct {
-	AuthRepo UserAuthRepository
-	UserRepo UserRepository
+	AuthRepo *user_auth.Repository
+	UserRepo *user.Repository
+
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
-}
-
-type UserAuthRepository interface {
-	SwitchAccount(ctx context.Context, claims auth.Claims, req user_auth.SwitchAccountRequest, expires time.Duration,
-		now time.Time, scopes ...string) (user_auth.Token, error)
-	Authenticate(ctx context.Context, req user_auth.AuthenticateRequest, expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
-	VirtualLogin(ctx context.Context, claims auth.Claims, req user_auth.VirtualLoginRequest,
-		expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
-	VirtualLogout(ctx context.Context, claims auth.Claims, expires time.Duration, now time.Time, scopes ...string) (user_auth.Token, error)
-}
-
-type UserRepository interface {
-	Find(ctx context.Context, claims auth.Claims, req user.UserFindRequest) (user.Users, error)
-	//FindByAccount(ctx context.Context, claims auth.Claims, req user.UserFindByAccountRequest) (user.Users, error)
-	Read(ctx context.Context, claims auth.Claims, req user.UserReadRequest) (*user.User, error)
-	ReadByID(ctx context.Context, claims auth.Claims, id string) (*user.User, error)
-	Create(ctx context.Context, claims auth.Claims, req user.UserCreateRequest, now time.Time) (*user.User, error)
-	Update(ctx context.Context, claims auth.Claims, req user.UserUpdateRequest, now time.Time) error
-	UpdatePassword(ctx context.Context, claims auth.Claims, req user.UserUpdatePasswordRequest, now time.Time) error
-	Archive(ctx context.Context, claims auth.Claims, req user.UserArchiveRequest, now time.Time) error
-	Restore(ctx context.Context, claims auth.Claims, req user.UserRestoreRequest, now time.Time) error
-	Delete(ctx context.Context, claims auth.Claims, req user.UserDeleteRequest) error
-	ResetPassword(ctx context.Context, req user.UserResetPasswordRequest, now time.Time) (string, error)
-	ResetConfirm(ctx context.Context, req user.UserResetConfirmRequest, now time.Time) (*user.User, error)
 }
 
 // Find godoc

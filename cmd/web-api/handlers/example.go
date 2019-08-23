@@ -2,19 +2,20 @@ package handlers
 
 import (
 	"context"
+	"net/http"
+
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"net/http"
 
 	"github.com/pkg/errors"
 )
 
 // Example represents the Example API method handler set.
 type Example struct {
-	Project ProjectRepository
+	Project *project.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }

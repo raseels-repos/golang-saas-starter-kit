@@ -45,6 +45,13 @@ var (
 	Env_Prod  Env = "prod"
 )
 
+// List of env names.
+var EnvNames = []Env{
+	Env_Dev,
+	Env_Stage,
+	Env_Prod,
+}
+
 func ContextEnv(ctx context.Context) string {
 	cv := ctx.Value(KeyValues).(*Values)
 	if cv != nil {

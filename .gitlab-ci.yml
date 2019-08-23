@@ -7,7 +7,7 @@ variables:
   DOCKER_TLS_CERTDIR: ""
 
 before_script:
-  - './tools/devops/scripts/build.sh'
+  - 'go install ./build/cicd'
 
 stages:
   - build:dev
@@ -32,136 +32,127 @@ cache:
 .build_tmpl: &build_tmpl
   <<: *job_tmpl
   script:
-    - './devops build -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - 'cicd --env=${TARGET_ENV} build ${TARGET_TYPE} --name=${TARGET_REF}'
 
 .deploy_tmpl: &deploy_tmpl
   <<: *job_tmpl
   script:
-    - './devops deploy -service=${SERVICE} -project=${PROJECT_NAME} -env=${TARGET_ENV} -enable_https=${ENABLE_HTTPS} -enable_elb=${ENABLE_ELB} -primary_host=${PRIMARY_HOST} -host_names=${HOST_NAMES} -private_bucket=${S3_BUCKET_PRIVATE} -public_bucket=${S3_BUCKET_PUBLIC} -public_bucket_cloudfront=${S3_BUCKET_PUBLIC_CLOUDFRONT}  -static_files_s3=${STATIC_FILES_S3} -static_files_img_resize=${STATIC_FILES_IMG_RESIZE}'
+    - 'cicd --env=${TARGET_ENV} deploy ${TARGET_TYPE} --name=${TARGET_REF}'
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl
   script:
-    - './devops migrate -project=${PROJECT_NAME} -env=${TARGET_ENV}'
+    - 'cicd --env=${TARGET_ENV} schema migrate'
 
-db:migrate:dev:
+db:migrate:prod:
   <<: *migrate_tmpl
-  stage: migrate:dev
+  stage: migrate:prod
   tags:
-    - dev
+    - prod
   only:
     - master
-    - dev
-    - /^dev-.*$/
+    - prod
+    - /^prod-.*$/
   variables:
-    TARGET_ENV: 'dev'
+    TARGET_ENV: 'prod'
     AWS_USE_ROLE: 'true'
 
-webapp:build:dev:
+webapp:build:prod:
   <<: *build_tmpl
-  stage: build:dev
+  stage: build:prod
   tags:
-    - dev
+    - prod
   only:
     - master
-    - dev
-    - dev-web-app
+    - prod
+    - prod-web-app
   variables:
-    TARGET_ENV: 'dev'
-    SERVICE: 'web-app'
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'service'
+    TARGET_REF: 'web-app'
     AWS_USE_ROLE: 'true'
-webapp:deploy:dev:
+webapp:deploy:prod:
   <<: *deploy_tmpl
-  stage: deploy:dev
+  stage: deploy:prod
   tags:
-    - dev
+    - prod
   only:
     - master
-    - dev
-    - dev-web-app
+    - prod
+    - prod-web-app
   dependencies:
-    - 'webapp:build:dev'
-    - 'db:migrate:dev'
+    - 'webapp:build:prod'
+    - 'db:migrate:prod'
   variables:
-    TARGET_ENV: 'dev'
-    SERVICE: 'web-app'
-    ENABLE_HTTPS: 1
-    ENABLE_ELB: 0
-    PRIMARY_HOST: 'example.saasstartupkit.com'
-    HOST_NAMES: 'example.saasstartupkit.com,dev.example.saasstartupkit.com'
-    S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
-    S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
-    S3_BUCKET_PUBLIC_CLOUDFRONT: 'true'
-    STATIC_FILES_S3: 'true'
-    STATIC_FILES_IMG_RESIZE: 'true'
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'service'
+    TARGET_REF: 'web-app'
     AWS_USE_ROLE: 'true'
-    EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
-    WEB_API_BASE_URL: https://api.example.saasstartupkit.com
+  #when: manual
 
-webapi:build:dev:
+webapi:build:prod:
   <<: *build_tmpl
-  stage: build:dev
+  stage: build:prod
   tags:
-    - dev
+    - prod
   only:
     - master
-    - dev
-    - dev-web-api
+    - prod
+    - prod-web-api
   variables:
-    TARGET_ENV: 'dev'
-    SERVICE: 'web-api'
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'service'
+    TARGET_REF: 'web-api'
     AWS_USE_ROLE: 'true'
-webapi:deploy:dev:
+webapi:deploy:prod:
   <<: *deploy_tmpl
-  stage: deploy:dev
+  stage: deploy:prod
   tags:
-    - dev
+    - prod
   only:
     - master
-    - dev
-    - dev-web-api
+    - prod
+    - prod-web-api
   dependencies:
-    - 'webapi:build:dev'
-    - 'db:migrate:dev'
+    - 'webapi:build:prod'
+    - 'db:migrate:prod'
   variables:
-    TARGET_ENV: 'dev'
-    SERVICE: 'web-api'
-    ENABLE_HTTPS: 1
-    ENABLE_ELB: 0
-    PRIMARY_HOST: 'api.example.saasstartupkit.com'
-    HOST_NAMES: 'api.dev.example.saasstartupkit.com'
-    S3_BUCKET_PRIVATE: 'saas-starter-kit-private'
-    S3_BUCKET_PUBLIC: 'saas-starter-kit-public'
-    S3_BUCKET_PUBLIC_CLOUDFRONT: 'false'
-    STATIC_FILES_S3: 'false'
-    STATIC_FILES_IMG_RESIZE: 'false'
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'service'
+    TARGET_REF: 'web-api'
     AWS_USE_ROLE: 'true'
-    EMAIL_SENDER: 'lee+saas-starter-kit@geeksinthewoods.com'
-    WEB_APP_BASE_URL: https://example.saasstartupkit.com
+  #when: manual
 
-#ddlogscollector:deploy:stage:
-#  <<: *deploy_stage_tmpl
-#  variables:
-#    TARGET_ENV: 'stage'
-#    ECS_CLUSTER: '${ECS_CLUSTER}'
-#    SERVICE: 'ddlogscollector'
-#    S3_BUCKET: 'keenispace-services-stage'
-#    S3_KEY: 'aws/lambda/ddlogscollector/src/ddlogscollector-stage.zip'
-#    ENABLE_VPC: 0
-#  only:
-#    - master
-#    - stage
-#ddlogscollector:deploy:prod:
-#  <<: *deploy_prod_tmpl
-#  variables:
-#    TARGET_ENV: 'prod'
-#    ECS_CLUSTER: '${ECS_CLUSTER}'
-#    SERVICE: 'ddlogscollector'
-#    S3_BUCKET: 'keenispace-services-prod'
-#    S3_KEY: 'aws/lambda/ddlogscollector/src/ddlogscollector-prod.zip'
-#    ENABLE_VPC: 0
-#  only:
-#    - master
-#    - prod
-#  #dependencies:
-#  #  - 'ddlogscollector:deploy:stage'
+ddlogscollector:build:prod:
+  <<: *build_tmpl
+  stage: build:prod
+  tags:
+    - prod
+  only:
+    - master
+    - prod
+    - prod-ddlogs
+  variables:
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'function'
+    TARGET_REF: 'ddlogscollector'
+    AWS_USE_ROLE: 'true'
+ddlogscollector:deploy:prod:
+  <<: *deploy_tmpl
+  stage: deploy:prod
+  tags:
+    - prod
+  only:
+    - master
+    - prod
+    - prod-ddlogs
+  dependencies:
+    - 'ddlogscollector:build:prod'
+    - 'db:migrate:prod'
+  variables:
+    TARGET_ENV: 'prod'
+    TARGET_TYPE: 'function'
+    TARGET_REF: 'ddlogscollector'
+    AWS_USE_ROLE: 'true'
+  #when: manual
+

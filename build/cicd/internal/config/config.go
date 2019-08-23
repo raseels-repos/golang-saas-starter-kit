@@ -3,12 +3,13 @@ package config
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -96,7 +97,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	// Get the current working directory. This should be somewhere contained within the project.
 	workDir, err := os.Getwd()
 	if err != nil {
-		return cfg, errors.WithMessage(err, "Failed to get current working directory.")
+		return cfg, errors.Wrap(err, "Failed to get current working directory.")
 	}
 
 	// Set the project root directory and project name. This is current set by finding the go.mod file for the project
@@ -116,9 +117,11 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	// their name is calculated with the go.mod path. Since the name-scope of AWS resources is region/global scope,
 	// it will fail to create appropriate resources for the account of the forked user.
 	if cfg.ProjectName == "saas-starter-kit" {
-
-		// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
-		cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
+		// Its a true fork from the origin repo.
+		if gitRemoteUser( modDetails.ProjectRoot) != "geeks-accelerator" {
+			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
+			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
+		}
 	}
 
 	// Set default AWS ECR Repository Name.
@@ -404,13 +407,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 
 				return nil
 			},
-			AfterCreate: func(res *rds.DBCluster, dbInfo *devdeploy.DBConnInfo) error {
-				masterDb, err := sqlx.Open(dbInfo.Driver, dbInfo.URL())
-				if err != nil {
-					return errors.WithMessage(err, "Failed to connect to db for schema migration.")
-				}
-				defer masterDb.Close()
-
+			AfterCreate: func(res *rds.DBCluster, dbInfo *devdeploy.DBConnInfo, masterDb *sqlx.DB) error {
 				return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
 			},
 		}
@@ -432,13 +429,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 				{Key: devdeploy.AwsTagNameProject, Value: cfg.ProjectName},
 				{Key: devdeploy.AwsTagNameEnv, Value: cfg.Env},
 			},
-			AfterCreate: func(res *rds.DBInstance, dbInfo *devdeploy.DBConnInfo) error {
-				masterDb, err := sqlx.Open(dbInfo.Driver, dbInfo.URL())
-				if err != nil {
-					return errors.WithMessage(err, "Failed to connect to db for schema migration.")
-				}
-				defer masterDb.Close()
-
+			AfterCreate: func(res *rds.DBInstance, dbInfo *devdeploy.DBConnInfo, masterDb *sqlx.DB) error {
 				return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
 			},
 		}
@@ -576,4 +567,35 @@ func getCommitRef() string {
 	}
 
 	return commitRef
+}
+
+// gitRemoteUser returns the git username/organization for the git repo
+func gitRemoteUser(projectRoot string) string {
+	dat, err := ioutil.ReadFile(filepath.Join(projectRoot, ".git/config"))
+	if err != nil {
+		return ""
+	}
+
+	var remoteUrl string
+	lines := strings.Split(string(dat), "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if strings.HasPrefix(l, "url =") {
+			remoteUrl = l
+			break
+		}
+	}
+
+	if remoteUrl == "" {
+		return ""
+	}
+	remoteUrl = strings.TrimSpace(strings.Split(remoteUrl, "=")[1])
+
+	if !strings.Contains(remoteUrl, ":") {
+		return ""
+	}
+	remoteUser := strings.Split(remoteUrl, ":")[1]
+	remoteUser = strings.Split(remoteUser, "/")[0]
+
+	return remoteUser
 }

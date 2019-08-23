@@ -30,7 +30,7 @@ func RunSchemaMigrationsForTargetEnv(log *log.Logger, awsCredentials devdeploy.A
 
 	masterDb, err := sqlx.Open(cfg.DBConnInfo.Driver, cfg.DBConnInfo.URL())
 	if err != nil {
-		return errors.WithMessage(err, "Failed to connect to db for schema migration.")
+		return errors.Wrap(err, "Failed to connect to db for schema migration.")
 	}
 	defer masterDb.Close()
 

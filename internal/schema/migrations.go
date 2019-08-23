@@ -108,7 +108,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					return err
 				}
 
-				if err := createTypeIfNotExists(tx, "user_account_status_t", "enum('active', 'invited','disabled'"); err != nil {
+				if err := createTypeIfNotExists(tx, "user_account_status_t", "enum('active', 'invited','disabled')"); err != nil {
 					return err
 				}
 

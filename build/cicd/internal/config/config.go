@@ -119,11 +119,8 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	if cfg.ProjectName == "saas-starter-kit" {
 		remoteUser := gitRemoteUser( modDetails.ProjectRoot)
 
-		log.Println("cfg.ProjectName ", cfg.ProjectName )
-		log.Println("remoteUser ", remoteUser )
-
 		// Its a true fork from the origin repo.
-		if remoteUser != "geeks-accelerator" && remoteUser != "oss" {
+		if  remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
 			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
 
@@ -579,18 +576,28 @@ func getCommitRef() string {
 
 // gitRemoteUser returns the git username/organization for the git repo
 func gitRemoteUser(projectRoot string) string {
-	dat, err := ioutil.ReadFile(filepath.Join(projectRoot, ".git/config"))
-	if err != nil {
-		return ""
-	}
 
 	var remoteUrl string
-	lines := strings.Split(string(dat), "\n")
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if strings.HasPrefix(l, "url =") {
-			remoteUrl = l
-			break
+	if ev := os.Getenv("CI_PROJECT_PATH"); ev != "" {
+		if strings.Contains(ev, "/") {
+			remoteUrl = strings.Split(ev, "/")[1]
+			remoteUrl = strings.Split(remoteUrl, "/")[0]
+		} else {
+			remoteUrl = ev
+		}
+	} else {
+		dat, err := ioutil.ReadFile(filepath.Join(projectRoot, ".git/config"))
+		if err != nil {
+			return ""
+		}
+
+		lines := strings.Split(string(dat), "\n")
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if strings.HasPrefix(l, "url =") {
+				remoteUrl = l
+				break
+			}
 		}
 	}
 

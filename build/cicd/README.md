@@ -200,6 +200,13 @@ If you have a lot of migrations, it can be a pain to run all them. For example, 
 the app into a clean database. To prevent this, use the initSchema function that will run as-if no migration was run 
 before (in a new clean database). 
 
+
+**Migrations should be backwards compatible with the existing deployed code.** Refrain from `drop table`. Instead of 
+renaming columns, add a new column and copy the data from the old column using an `update`. 
+
+Ideally migrations should be idempotent to avoid possible data loss since data could have been generated between 
+migration runs.
+
 Another bonus with the globally defined schema is that it enables your testing package the ability to dynamically [spin 
 up database containers](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/issue8/datadog-lambda-func/internal/platform/tests/main.go#L127) 
 on-demand and automatically include all the migrations. This allows the testing package to 

@@ -567,11 +567,13 @@ func main() {
 	// Need defined functions below since they require config values, able to add additional functions
 	// here to extend functionality.
 	tmplFuncs := template.FuncMap{
+		// BuildInfo returns the specific key from BuildInfo set in the current config.
 		"BuildInfo": func(k string) string {
 			r := reflect.ValueOf(cfg.BuildInfo)
 			f := reflect.Indirect(r).FieldByName(k)
 			return f.String()
 		},
+		// SiteBaseUrl returns the absolute URL for a relative path using the base site URL set in the config.
 		"SiteBaseUrl": func(p string) string {
 			u, err := url.Parse(cfg.Service.BaseUrl)
 			if err != nil {
@@ -580,21 +582,10 @@ func main() {
 			u.Path = p
 			return u.String()
 		},
-		"AssetUrl": func(p string) string {
-			var u string
-			if staticUrlFormatter != nil {
-				u = staticUrlFormatter(p)
-			} else {
-				if !strings.HasPrefix(p, "/") {
-					p = "/" + p
-				}
-				u = p
-			}
-
-			u = browserCacheBusterFunc(u)
-
-			return u
-		},
+		// SiteAssetUrl returns the absolute URL for a relative path that either served locally, from the public S3
+		// bucket or from Cloudfront depending on the current config settings for StaticFiles. The defined static asset
+		// prefix to the path defined in the current config settings for StaticFiles. The response URL includes a cache
+		// busting query param based on the current commit.
 		"SiteAssetUrl": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
@@ -610,6 +601,8 @@ func main() {
 
 			return u
 		},
+		// SiteS3Url returns the URL that for an S3 Key path that has been uploaded to S3 to the specific public s3 key
+		// prefix that returns the absolute S3 URL or the CloudFront equivalent if enabled.
 		"SiteS3Url": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
@@ -619,6 +612,8 @@ func main() {
 			}
 			return u
 		},
+		// S3Url returns the URL that for an S3 Key path that has been uploaded to S3 to the public s3 key
+		// prefix that returns the absolute S3 URL or the CloudFront equivalent if enabled.
 		"S3Url": func(p string) string {
 			var u string
 			if staticUrlFormatter != nil {
@@ -628,6 +623,7 @@ func main() {
 			}
 			return u
 		},
+		// ValidationErrorHasField checks if the error is a validation error and has an error for the specified field.
 		"ValidationErrorHasField": func(err interface{}, fieldName string) bool {
 			if err == nil {
 				return false
@@ -643,6 +639,7 @@ func main() {
 			}
 			return false
 		},
+		// ValidationFieldErrors returns the list of validation field errors.
 		"ValidationFieldErrors": func(err interface{}, fieldName string) []weberror.FieldError {
 			if err == nil {
 				return []weberror.FieldError{}
@@ -659,6 +656,7 @@ func main() {
 			}
 			return l
 		},
+		// ValidationFieldClass returns a CSS class for validation if the field exists in the validation errors.
 		"ValidationFieldClass": func(err interface{}, fieldName string) string {
 			if err == nil {
 				return ""
@@ -675,6 +673,7 @@ func main() {
 			}
 			return "is-valid"
 		},
+		// ErrorMessage returns the error message that is formatted as a response for end users to consume.
 		"ErrorMessage": func(ctx context.Context, err error) string {
 			werr, ok := err.(*weberror.Error)
 			if ok {
@@ -685,6 +684,7 @@ func main() {
 			}
 			return fmt.Sprintf("%s", err)
 		},
+		// ErrorDetails returns the full error for dev and stage envs to help with debugging.
 		"ErrorDetails": func(ctx context.Context, err error) string {
 			var displayFullError bool
 			switch webcontext.ContextEnv(ctx) {
@@ -707,8 +707,7 @@ func main() {
 
 			return fmt.Sprintf("%+v", err)
 		},
-		// Returns the current user from the session.
-		// @TODO: Need to add logging for the errors.
+		// ContextUser returns the current user and caches the result.
 		"ContextUser": func(ctx context.Context) *user.UserResponse {
 			sess := webcontext.ContextSession(ctx)
 
@@ -716,6 +715,7 @@ func main() {
 
 			u := &user.UserResponse{}
 			if err := redisClient.Get(cacheKey).Scan(u); err != nil && err != redis.Nil {
+				log.Printf("main : ContextUser : Redis Get failed - %+v ", err.Error())
 				return nil
 			}
 
@@ -737,13 +737,13 @@ func main() {
 
 			err = redisClient.Set(cacheKey, u, time.Hour).Err()
 			if err != nil {
+				log.Printf("main : ContextAccount : Redis Set failed - %+v ", err.Error())
 				return nil
 			}
 
 			return u
 		},
-		// Returns the current account from the session.
-		// @TODO: Need to add logging for the errors.
+		// ContextAccount returns the account for current context user with auth is using and caches the result.
 		"ContextAccount": func(ctx context.Context) *account.AccountResponse {
 			sess := webcontext.ContextSession(ctx)
 
@@ -751,6 +751,7 @@ func main() {
 
 			a := &account.AccountResponse{}
 			if err := redisClient.Get(cacheKey).Scan(a); err != nil && err != redis.Nil {
+				log.Printf("main : ContextAccount : Redis Get failed - %+v ", err.Error())
 				return nil
 			}
 
@@ -772,11 +773,13 @@ func main() {
 
 			err = redisClient.Set(cacheKey, a, time.Hour).Err()
 			if err != nil {
+				log.Printf("main : ContextAccount : Redis Set failed - %+v ", err.Error())
 				return nil
 			}
 
 			return a
 		},
+		// ContextCanSwitchAccount returns if the current context user has multiple accounts.
 		"ContextCanSwitchAccount": func(ctx context.Context) bool {
 			claims, err := auth.ClaimsFromContext(ctx)
 			if err != nil || len(claims.AccountIDs) < 2 {
@@ -784,6 +787,7 @@ func main() {
 			}
 			return true
 		},
+		// ContextIsVirtualSession returns true if the current context user with auth is in a virtual session.
 		"ContextIsVirtualSession": func(ctx context.Context) bool {
 			claims, err := auth.ClaimsFromContext(ctx)
 			if err != nil {
@@ -796,6 +800,63 @@ func main() {
 				return true
 			}
 			return false
+		},
+		// T creates the translation for the locale given the 'key' and params passed in.
+		"T": func(ctx context.Context, key string, params ...string) string {
+			trns := webcontext.ContextTranslator(ctx)
+			if trns == nil {
+				return key
+			}
+
+			res, err :=  trns.T(key, params...)
+			if err != nil {
+				log.Printf("main : Translate.T : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
+				return key
+			}
+			return res
+		},
+		// C creates the cardinal translation for the locale given the 'key', 'num' and 'digit' arguments and param passed in
+		"C": func(ctx context.Context, key string, num float64, digits uint64, param string) string {
+			trns := webcontext.ContextTranslator(ctx)
+			if trns == nil {
+				return key
+			}
+
+			res, err :=  trns.C(key, num, digits, param)
+			if err != nil {
+				log.Printf("main : Translate.C : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
+				return key
+			}
+			return res
+		},
+		// O creates the ordinal translation for the locale given the 'key', 'num' and 'digit' arguments and param passed in
+		"O": func(ctx context.Context, key string,  num float64, digits uint64, param string) string {
+			trns := webcontext.ContextTranslator(ctx)
+			if trns == nil {
+				return key
+			}
+
+			res, err :=  trns.O(key,  num, digits, param)
+			if err != nil {
+				log.Printf("main : Translate.O : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
+				return key
+			}
+			return res
+		},
+		//  R creates the range translation for the locale given the 'key', 'num1', 'digit1', 'num2' and 'digit2'
+		//  arguments and 'param1' and 'param2' passed in
+		"R": func(ctx context.Context, key string, num1 float64, digits1 uint64, num2 float64, digits2 uint64, param1, param2 string) string {
+			trns := webcontext.ContextTranslator(ctx)
+			if trns == nil {
+				return key
+			}
+
+			res, err :=  trns.R(key, num1, digits1, num2, digits2, param1, param2)
+			if err != nil {
+				log.Printf("main : Translate.R : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
+				return key
+			}
+			return res
 		},
 	}
 

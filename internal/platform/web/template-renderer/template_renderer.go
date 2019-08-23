@@ -373,8 +373,6 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 		data["error"] = terr
 	}
 
-	data["trans"] = webcontext.ContextTranslator(ctx)
-
 	// Append request data map to render data last so any previous value can be overwritten.
 	if data != nil {
 		for k, v := range data {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -65,8 +66,24 @@ func init() {
 	// Provide one or more arguments for additional supported locales.
 	uniTrans = ut.New(en, en, fr, id, ja, nl, zh)
 
-	if _, err := os.Stat("templates/content/translations"); !os.IsNotExist(err) {
-		err := uniTrans.Import(ut.FormatJSON, "templates/content/translations")
+	// Try to load the Template directory from an environment variable for release images else it's local development.
+	var transDir string
+	if ev := os.Getenv("TRANSLATIONS_DIR"); ev != "" {
+		transDir = ev
+	} else {
+		if ev := os.Getenv("SHARED_TEMPLATE_DIR"); ev != "" {
+			transDir = ev
+		} else if ev := os.Getenv("TEMPLATE_DIR"); ev != "" {
+			transDir = ev
+		} else {
+			transDir = "./templates"
+		}
+
+		transDir = filepath.Join(transDir, "translations")
+	}
+
+	if _, err := os.Stat(transDir); !os.IsNotExist(err) {
+		err := uniTrans.Import(ut.FormatJSON, transDir)
 		if err != nil {
 			log.Fatal(err)
 		}

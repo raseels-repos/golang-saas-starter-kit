@@ -38,7 +38,7 @@ services:
   datadog:
     image: example-project/datadog:latest
     build:
-      context: docker/datadog-agent
+      context: build/docker/datadog-agent
       dockerfile: Dockerfile
     ports:
       - 8125:8125 # metrics

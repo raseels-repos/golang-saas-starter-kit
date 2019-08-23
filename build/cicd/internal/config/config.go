@@ -581,7 +581,6 @@ func gitRemoteUser(projectRoot string) string {
 	if ev := os.Getenv("CI_PROJECT_PATH"); ev != "" {
 		if strings.Contains(ev, "/") {
 			remoteUrl = strings.Split(ev, "/")[1]
-			remoteUrl = strings.Split(remoteUrl, "/")[0]
 		} else {
 			remoteUrl = ev
 		}
@@ -599,18 +598,20 @@ func gitRemoteUser(projectRoot string) string {
 				break
 			}
 		}
+
+		if remoteUrl == "" {
+			return ""
+		}
+		remoteUrl = strings.TrimSpace(strings.Split(remoteUrl, "=")[1])
+
+		if !strings.Contains(remoteUrl, ":") {
+			return ""
+		}
+		remoteUrl = strings.Split(remoteUrl, ":")[1]
+
 	}
 
-	if remoteUrl == "" {
-		return ""
-	}
-	remoteUrl = strings.TrimSpace(strings.Split(remoteUrl, "=")[1])
-
-	if !strings.Contains(remoteUrl, ":") {
-		return ""
-	}
-	remoteUser := strings.Split(remoteUrl, ":")[1]
-	remoteUser = strings.Split(remoteUser, "/")[0]
-
+	remoteUser := strings.Split(remoteUrl, "/")[0]
+	
 	return remoteUser
 }

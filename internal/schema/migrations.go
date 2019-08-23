@@ -43,21 +43,21 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  CONSTRAINT email UNIQUE  (email)
 					) ;`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TABLE IF EXISTS users`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 				return nil
 			},
 		},
 		// Create new table accounts.
 		{
-			ID: "20190522-01c",
+			ID: "20190522-01h",
 			Migrate: func(tx *sql.Tx) error {
 				if err := createTypeIfNotExists(tx, "account_status_t", "enum('active','pending','disabled')"); err != nil {
 					return err
@@ -83,19 +83,19 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  CONSTRAINT name UNIQUE  (name)
 					)`
 				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TYPE IF EXISTS account_status_t`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				q2 := `DROP TABLE IF EXISTS accounts`
 				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 				return nil
 			},
@@ -125,7 +125,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  CONSTRAINT user_account UNIQUE (user_id,account_id) 
 					)`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				return nil
@@ -133,17 +133,17 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TYPE IF EXISTS user_account_role_t`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				q2 := `DROP TYPE IF EXISTS user_account_status_t`
 				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 
 				q3 := `DROP TABLE IF EXISTS users_accounts`
 				if _, err := tx.Exec(q3); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q3)
+					return errors.Wrapf(err, "Query failed %s", q3)
 				}
 
 				return nil
@@ -168,19 +168,19 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  PRIMARY KEY (id)
 					)`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 				return nil
 			},
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TYPE IF EXISTS project_status_t`
-				if _, err := tx.Exec(q1); err != nil  && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+				if _, err := tx.Exec(q1); err != nil && !errorIsAlreadyExists(err) {
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				q2 := `DROP TABLE IF EXISTS projects`
 				if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 				return nil
 			},
@@ -192,13 +192,13 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				q1 := `ALTER TABLE users 
 					  RENAME COLUMN name to first_name;`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				q2 := `ALTER TABLE users 
 					  ADD last_name varchar(200) NOT NULL DEFAULT '';`
 				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 
 				return nil
@@ -206,7 +206,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			Rollback: func(tx *sql.Tx) error {
 				q1 := `DROP TABLE IF EXISTS users`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 				return nil
 			},
@@ -234,9 +234,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 
 				for _, q := range schemas {
-					_, err := db.Exec(q)
+					_, err := tx.Exec(q)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+						return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 					}
 				}
 
@@ -273,9 +273,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 						"VALUES %s", strings.Join(valueStrings, ","))
 					insertStmt = db.Rebind(insertStmt)
 
-					_, err := db.Exec(insertStmt, valueArgs...)
+					_, err := tx.Exec(insertStmt, valueArgs...)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to execute sql query '%s'", insertStmt)
+						return errors.Wrapf(err, "Failed to execute sql query '%s'", insertStmt)
 					}
 
 					return nil
@@ -331,9 +331,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 
 				for _, q := range queries {
-					_, err := db.Exec(q)
+					_, err := tx.Exec(q)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+						return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 					}
 				}
 
@@ -364,9 +364,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 
 				for _, q := range schemas {
-					_, err := db.Exec(q)
+					_, err := tx.Exec(q)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+						return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 					}
 				}
 
@@ -399,16 +399,16 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					}
 
 					for _, q := range prep {
-						_, err := db.Exec(q)
+						_, err := tx.Exec(q)
 						if err != nil {
-							return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+							return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 						}
 					}
 
 					u := "http://download.geonames.org/export/dump/countryInfo.txt"
 					resp, err := pester.Get(u)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to read country info from '%s'", u)
+						return errors.Wrapf(err, "Failed to read country info from '%s'", u)
 					}
 					defer resp.Body.Close()
 
@@ -491,9 +491,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 
 							q := "insert into countryinfo (" + strings.Join(columns, ",") + ") values(" + strings.Join(placeholders, ",") + ")"
 							q = db.Rebind(q)
-							stmt, err = db.Prepare(q)
+							stmt, err = tx.Prepare(q)
 							if err != nil {
-								return errors.WithMessagef(err, "Failed to prepare sql query '%s'", q)
+								return errors.Wrapf(err, "Failed to prepare sql query '%s'", q)
 							}
 						}
 
@@ -531,9 +531,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					}
 
 					for _, q := range queries {
-						_, err := db.Exec(q)
+						_, err := tx.Exec(q)
 						if err != nil {
-							return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+							return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 						}
 					}
 				}
@@ -558,9 +558,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 
 				for _, q := range queries {
-					_, err := db.Exec(q)
+					_, err := tx.Exec(q)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to execute sql query '%s'", q)
+						return errors.Wrapf(err, "Failed to execute sql query '%s'", q)
 					}
 				}
 
@@ -570,15 +570,15 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					u := "http://download.geonames.org/export/dump/timeZones.txt"
 					resp, err := pester.Get(u)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to read timezones info from '%s'", u)
+						return errors.Wrapf(err, "Failed to read timezones info from '%s'", u)
 					}
 					defer resp.Body.Close()
 
 					q := "insert into country_timezones (country_code,timezone_id) values(?, ?)"
 					q = db.Rebind(q)
-					stmt, err := db.Prepare(q)
+					stmt, err := tx.Prepare(q)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to prepare sql query '%s'", q)
+						return errors.Wrapf(err, "Failed to prepare sql query '%s'", q)
 					}
 
 					scanner := bufio.NewScanner(resp.Body)
@@ -633,7 +633,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					  CONSTRAINT account_preferences_pkey UNIQUE (account_id,name) 
 					)`
 				if _, err := tx.Exec(q); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q)
+					return errors.Wrapf(err, "Query failed %s", q)
 				}
 
 				return nil
@@ -648,12 +648,12 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 			Migrate: func(tx *sql.Tx) error {
 				q1 := `ALTER TABLE users ALTER COLUMN timezone DROP DEFAULT`
 				if _, err := tx.Exec(q1); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q1)
+					return errors.Wrapf(err, "Query failed %s", q1)
 				}
 
 				q2 := `ALTER TABLE users ALTER COLUMN timezone DROP NOT NULL`
 				if _, err := tx.Exec(q2); err != nil {
-					return errors.WithMessagef(err, "Query failed %s", q2)
+					return errors.Wrapf(err, "Query failed %s", q2)
 				}
 
 				return nil
@@ -669,7 +669,7 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 func dropTypeIfExists(tx *sql.Tx, name string) error {
 	q := "DROP TYPE IF EXISTS " + name
 	if _, err := tx.Exec(q); err != nil && !errorIsAlreadyExists(err) {
-		return errors.WithMessagef(err, "Query failed %s", q)
+		return errors.Wrapf(err, "Query failed %s", q)
 	}
 	return nil
 }
@@ -677,10 +677,10 @@ func dropTypeIfExists(tx *sql.Tx, name string) error {
 // createTypeIfNotExists checks to ensure a type doesn't exist before creating.
 func createTypeIfNotExists(tx *sql.Tx, name, val string) error {
 
-	q1 := "select exists (select 1 from pg_type where typname = '"+name+"')"
+	q1 := "select exists (select 1 from pg_type where typname = '" + name + "')"
 	rows, err := tx.Query(q1)
 	if err != nil {
-		return errors.WithMessagef(err, "Query failed %s", q1)
+		return errors.Wrapf(err, "Query failed %s", q1)
 	}
 	defer rows.Close()
 
@@ -700,10 +700,9 @@ func createTypeIfNotExists(tx *sql.Tx, name, val string) error {
 		return nil
 	}
 
-
-	q2 := `CREATE TYPE "+name+" AS `+val
+	q2 := "CREATE TYPE " + name + " AS " + val
 	if _, err := tx.Exec(q2); err != nil && !errorIsAlreadyExists(err) {
-		return errors.WithMessagef(err, "Query failed %s", q2)
+		return errors.Wrapf(err, "Query failed %s", q2)
 	}
 
 	return nil

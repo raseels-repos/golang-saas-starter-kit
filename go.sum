@@ -1,6 +1,7 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
+github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/purell v1.1.1 h1:WEQqlqaGbrPkxLJWfBwQmfEAE1Z7ONdDLqrN38tNFfI=
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
@@ -38,6 +39,14 @@ github.com/geeks-accelerator/files v0.0.0-20190704085106-630677cd5c14 h1:Rrxsq3g
 github.com/geeks-accelerator/files v0.0.0-20190704085106-630677cd5c14/go.mod h1:HMLrFyDC+sI+871eKlqqIBcaDim/NI8//Mbe+UwhY78=
 github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190527223850-4a863a2d30db h1:mjErP7mTFHQ3cw/ibAkW3CvQ8gM4k19EkfzRzRINDAE=
 github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190527223850-4a863a2d30db/go.mod h1:dzpCjo4q7chhMVuHDzs/odROkieZ5Wjp70rNDuX83jU=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823020016-2f4a58a35bb3 h1:183xSX0si++wcRtX6fbGpVXNmC15m4bn4Q9TXEuHtHI=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823020016-2f4a58a35bb3/go.mod h1:dzpCjo4q7chhMVuHDzs/odROkieZ5Wjp70rNDuX83jU=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823020330-42b8aadfc2b9 h1:4O/zyFNOCInZgxMkQTaffOJA6PJYZLY+UFVHzLsLYMc=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823020330-42b8aadfc2b9/go.mod h1:dzpCjo4q7chhMVuHDzs/odROkieZ5Wjp70rNDuX83jU=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823021239-b65769ae7cf1 h1:cH4nj3YQWCvPeRfy6KWzHPKZxn2cJnpQzjbydTdl5Cw=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823021239-b65769ae7cf1/go.mod h1:dzpCjo4q7chhMVuHDzs/odROkieZ5Wjp70rNDuX83jU=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823021348-d047c980bb66 h1:h9pb46oQroOhXmq5cCUU++Eagy240H1/aRwWNIYivrs=
+github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823021348-d047c980bb66/go.mod h1:dzpCjo4q7chhMVuHDzs/odROkieZ5Wjp70rNDuX83jU=
 github.com/geeks-accelerator/swag v1.6.3 h1:WottuX4MHoy5ZJFXfL+p1IrChpUb/e4g5vpM6tcwOIE=
 github.com/geeks-accelerator/swag v1.6.3/go.mod h1:YWy7dtuct7Uk3vmKr7s+v/F0SNkGYEeV7Y1CykFhmWU=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
@@ -203,6 +212,8 @@ gitlab.com/geeks-accelerator/oss/devops v1.0.2 h1:LqME1zTc9bgB+J/tw7tv1WDjvgmrgl
 gitlab.com/geeks-accelerator/oss/devops v1.0.2/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
 gitlab.com/geeks-accelerator/oss/devops v1.0.3 h1:SE2ZD4Csvmm3t/50RoJkVLjDcwXKHayQYawSkpOSqIw=
 gitlab.com/geeks-accelerator/oss/devops v1.0.3/go.mod h1:rvI71qNJyNiO99ZgGnv/PmJCVrjJjupsXBmfYFXdjGM=
+gitlab.com/geeks-accelerator/oss/devops v1.0.7 h1:ZlQufuVnRN3DwJ0I5c5KA5edhQs7OstXc0uUZ9V0ixI=
+gitlab.com/geeks-accelerator/oss/devops v1.0.7/go.mod h1:JEl0T87/zftowrIzY1D+rhDMhG0AxnghuZB+VzEWuqM=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=

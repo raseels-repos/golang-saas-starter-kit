@@ -7,7 +7,7 @@ require (
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/dustin/go-humanize v1.0.0
 	github.com/geeks-accelerator/files v0.0.0-20190704085106-630677cd5c14
-	github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190527223850-4a863a2d30db
+	github.com/geeks-accelerator/sqlxmigrate v0.0.0-20190823021348-d047c980bb66
 	github.com/geeks-accelerator/swag v1.6.3
 	github.com/go-openapi/spec v0.19.2 // indirect
 	github.com/go-openapi/swag v0.19.4 // indirect
@@ -39,7 +39,7 @@ require (
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/urfave/cli v1.21.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	gitlab.com/geeks-accelerator/oss/devops v1.0.3
+	gitlab.com/geeks-accelerator/oss/devops v1.0.7
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 // indirect

@@ -237,7 +237,7 @@ https://docs.docker.com/install/
 There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a 
 `dockerfile`.
 
-Before using `docker-compose`, you need to copy `sample.env_docker_compose` to `.env_docker_compose` that docker will use. When you run `docker-compose up` it will run all the services including the main.go file for each Go service. The 
+Before using `docker-compose`, you need to copy `configs/sample.env_docker_compose` to `.env_docker_compose` that docker will use. When you run `docker-compose up` it will run all the services including the main.go file for each Go service. The 
 following services will run:
 - web-api
 - web-app 
@@ -250,7 +250,7 @@ Use the `docker-compose.yaml` to run all of the services, including the third-pa
 command, Docker will download the required images for the 3rd party services.
 
 ```bash
-$ cp sample.env_docker_compose .env_docker_compose
+$ cp configs/sample.env_docker_compose configs/.env_docker_compose
 $ docker-compose up
 ```
 
@@ -303,7 +303,7 @@ changes.
 
     Fresh is a command line tool that builds and (re)starts your web application everytime you save a Go or template file. 
      
-The (Fresh configuration file](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/fresh-auto-reload.conf) 
+The [Fresh configuration file](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/configs/fresh-auto-reload.conf) 
 is located in the project root. By default the following folders are watched by Fresh:
 - handlers
 - static
@@ -418,7 +418,7 @@ Create a new user with programmatic access and directly attach it the policy `Sa
 
 4. Create a new docker-compose config file
 ```bash
- cp sample.env_docker_compose .env_docker_compose 
+ cp configs/sample.env_docker_compose configs/.env_docker_compose 
 ```
 
 5. Update .env_docker_compose with the Access key ID and Secret access key  
@@ -440,11 +440,11 @@ configs.
 To set AWS configs and credentials for other third-party dependencies, you need to create a copy of the sample 
 environment docker-compose file without "sample" prepending the file name. 
 
-Navigate to the root of the project. Copy `sample.env_docker_compose` to `.env_docker_compose`. 
+Navigate to the root of the project. Copy `configs/sample.env_docker_compose` to `.env_docker_compose`. 
 
 ```bash
 $ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit
-$ cp sample.env_docker_compose .env_docker_compose
+$ cp configs/sample.env_docker_compose configs/.env_docker_compose
 ```
 
 The example the docker-compose file specifies these environmental variables. The $ means that the variable is commented 

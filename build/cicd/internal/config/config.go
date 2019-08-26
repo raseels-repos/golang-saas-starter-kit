@@ -3,12 +3,13 @@ package config
 import (
 	"context"
 	"fmt"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -28,6 +29,10 @@ const (
 
 	// GitLabProjectBaseUrl is the base url used to create links to a specific CI/CD job or pipeline by ID.
 	GitLabProjectBaseUrl = "https://gitlab.com/geeks-accelerator/oss/saas-starter-kit"
+
+	// EnableRdsServerless will use the Aurora database engine that scales the capacity based on database load. This is
+	// a good option for intermittent or unpredictable workloads.
+	EnableRdsServerless = true
 )
 
 // Env defines the target deployment environment.
@@ -92,7 +97,7 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	// Get the current working directory. This should be somewhere contained within the project.
 	workDir, err := os.Getwd()
 	if err != nil {
-		return cfg, errors.WithMessage(err, "Failed to get current working directory.")
+		return cfg, errors.Wrap(err, "Failed to get current working directory.")
 	}
 
 	// Set the project root directory and project name. This is current set by finding the go.mod file for the project
@@ -107,6 +112,21 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 
 	// ProjectName will be used for prefixing AWS resources. This could be changed as needed or manually defined.
 	cfg.ProjectName = ProjectNamePrefix + modDetails.ProjectName
+
+	// In a verbatim fork of the repo, a CI/CD would fail due to a conflict creating AWS resources (such as S3) since
+	// their name is calculated with the go.mod path. Since the name-scope of AWS resources is region/global scope,
+	// it will fail to create appropriate resources for the account of the forked user.
+	if cfg.ProjectName == "saas-starter-kit" {
+		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
+
+		// Its a true fork from the origin repo.
+		if remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
+			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
+			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
+
+			log.Println("switching project name to ", cfg.ProjectName)
+		}
+	}
 
 	// Set default AWS ECR Repository Name.
 	cfg.AwsEcrRepository = &devdeploy.AwsEcrRepository{
@@ -337,32 +357,86 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 		},
 	}
 
-	// Define the RDS Database instance for transactional data. A random one will be generated for any created instance.
-	cfg.AwsRdsDBInstance = &devdeploy.AwsRdsDBInstance{
-		DBInstanceIdentifier:    cfg.ProjectName + "-" + cfg.Env,
-		DBName:                  "shared",
-		Engine:                  "postgres",
-		MasterUsername:          "god",
-		Port:                    5432,
-		DBInstanceClass:         "db.t2.small",
-		AllocatedStorage:        20,
-		PubliclyAccessible:      false,
-		BackupRetentionPeriod:   aws.Int64(7),
-		AutoMinorVersionUpgrade: true,
-		CopyTagsToSnapshot:      aws.Bool(true),
-		Tags: []devdeploy.Tag{
-			{Key: devdeploy.AwsTagNameProject, Value: cfg.ProjectName},
-			{Key: devdeploy.AwsTagNameEnv, Value: cfg.Env},
-		},
-		AfterCreate: func(res *rds.DBInstance, dbInfo *devdeploy.DBConnInfo) error {
-			masterDb, err := sqlx.Open(dbInfo.Driver, dbInfo.URL())
-			if err != nil {
-				return errors.WithMessage(err, "Failed to connect to db for schema migration.")
-			}
-			defer masterDb.Close()
+	// If serverless RDS is enabled, defined the RDS database cluster and link it to the database instance.
+	if EnableRdsServerless {
+		cfg.AwsRdsDBCluster = &devdeploy.AwsRdsDBCluster{
+			DBClusterIdentifier:   cfg.ProjectName + "-" + cfg.Env,
+			Engine:                "aurora-postgresql",
+			EngineMode:            "serverless",
+			DatabaseName:          "shared",
+			MasterUsername:        "god",
+			Port:                  5432,
+			BackupRetentionPeriod: aws.Int64(7),
+			CopyTagsToSnapshot:    aws.Bool(true),
+			Tags: []devdeploy.Tag{
+				{Key: devdeploy.AwsTagNameProject, Value: cfg.ProjectName},
+				{Key: devdeploy.AwsTagNameEnv, Value: cfg.Env},
+			},
+			PreCreate: func(input *rds.CreateDBClusterInput) error {
+				input.ScalingConfiguration = &rds.ScalingConfiguration{
+					// A value that indicates whether to allow or disallow automatic pause for an
+					// Aurora DB cluster in serverless DB engine mode. A DB cluster can be paused
+					// only when it's idle (it has no connections).
+					//
+					// If a DB cluster is paused for more than seven days, the DB cluster might
+					// be backed up with a snapshot. In this case, the DB cluster is restored when
+					// there is a request to connect to it.
+					AutoPause: aws.Bool(true),
 
-			return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
-		},
+					// The maximum capacity for an Aurora DB cluster in serverless DB engine mode.
+					// Valid capacity values are 1, 2, 4, 8, 16, 32, 64, 128, and 256.
+					// The maximum capacity must be greater than or equal to the minimum capacity.
+					MaxCapacity: aws.Int64(2),
+
+					// The minimum capacity for an Aurora DB cluster in serverless DB engine mode.
+					// Valid capacity values are 1, 2, 4, 8, 16, 32, 64, 128, and 256.
+					// The minimum capacity must be less than or equal to the maximum capacity.
+					MinCapacity: aws.Int64(2),
+
+					// The time, in seconds, before an Aurora DB cluster in serverless mode is paused.
+					SecondsUntilAutoPause: aws.Int64(3600),
+
+					// The action to take when the timeout is reached, either ForceApplyCapacityChange
+					// or RollbackCapacityChange.
+					// ForceApplyCapacityChange sets the capacity to the specified value as soon
+					// as possible.
+					// RollbackCapacityChange, the default, ignores the capacity change if a scaling
+					// point is not found in the timeout period.
+					// If you specify ForceApplyCapacityChange, connections that prevent Aurora
+					// Serverless from finding a scaling point might be dropped.
+					// For more information, see Autoscaling for Aurora Serverless (https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless.how-it-works.html#aurora-serverless.how-it-works.auto-scaling)
+					// in the Amazon Aurora User Guide.
+					TimeoutAction: aws.String("ForceApplyCapacityChange"),
+				}
+
+				return nil
+			},
+			AfterCreate: func(res *rds.DBCluster, dbInfo *devdeploy.DBConnInfo, masterDb *sqlx.DB) error {
+				return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
+			},
+		}
+	} else {
+		// Define the RDS database instance for transactional data. A random password will be generated for any created instance.
+		cfg.AwsRdsDBInstance = &devdeploy.AwsRdsDBInstance{
+			DBInstanceIdentifier:    cfg.ProjectName + "-" + cfg.Env,
+			DBName:                  "shared",
+			Engine:                  "postgres",
+			MasterUsername:          "god",
+			Port:                    5432,
+			DBInstanceClass:         "db.t2.small",
+			AllocatedStorage:        20,
+			PubliclyAccessible:      false,
+			BackupRetentionPeriod:   aws.Int64(7),
+			AutoMinorVersionUpgrade: true,
+			CopyTagsToSnapshot:      aws.Bool(true),
+			Tags: []devdeploy.Tag{
+				{Key: devdeploy.AwsTagNameProject, Value: cfg.ProjectName},
+				{Key: devdeploy.AwsTagNameEnv, Value: cfg.Env},
+			},
+			AfterCreate: func(res *rds.DBInstance, dbInfo *devdeploy.DBConnInfo, masterDb *sqlx.DB) error {
+				return schema.Migrate(context.Background(), cfg.Env, masterDb, log, false)
+			},
+		}
 	}
 
 	// AwsIamPolicy defines the name and policy that will be attached to the task role. The policy document grants
@@ -497,4 +571,46 @@ func getCommitRef() string {
 	}
 
 	return commitRef
+}
+
+// gitRemoteUser returns the git username/organization for the git repo
+func gitRemoteUser(projectRoot string) string {
+
+	var remoteUrl string
+	if ev := os.Getenv("CI_PROJECT_PATH"); ev != "" {
+		if strings.Contains(ev, "/") {
+			remoteUrl = strings.Split(ev, "/")[1]
+		} else {
+			remoteUrl = ev
+		}
+	} else {
+		dat, err := ioutil.ReadFile(filepath.Join(projectRoot, ".git/config"))
+		if err != nil {
+			return ""
+		}
+
+		lines := strings.Split(string(dat), "\n")
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if strings.HasPrefix(l, "url =") {
+				remoteUrl = l
+				break
+			}
+		}
+
+		if remoteUrl == "" {
+			return ""
+		}
+		remoteUrl = strings.TrimSpace(strings.Split(remoteUrl, "=")[1])
+
+		if !strings.Contains(remoteUrl, ":") {
+			return ""
+		}
+		remoteUrl = strings.Split(remoteUrl, ":")[1]
+
+	}
+
+	remoteUser := strings.Split(remoteUrl, "/")[0]
+
+	return remoteUser
 }

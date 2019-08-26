@@ -169,7 +169,7 @@ func New() *Test {
 		ctx := context.WithValue(context.Background(), webcontext.KeyValues, &v)
 
 		// Execute the migrations
-		if err = schema.Migrate(ctx, masterDB, log, true); err != nil {
+		if err = schema.Migrate(ctx, v.Env, masterDB, log, true); err != nil {
 			log.Fatalf("main : Migrate : %v", err)
 		}
 		log.Printf("main : Migrate : Completed")

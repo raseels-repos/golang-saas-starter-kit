@@ -90,7 +90,6 @@ func main() {
 			Host         string        `default:"" envconfig:"HOST"`
 			ReadTimeout  time.Duration `default:"5s" envconfig:"READ_TIMEOUT"`
 			WriteTimeout time.Duration `default:"5s" envconfig:"WRITE_TIMEOUT"`
-			DisableHTTP2 bool          `default:"false" envconfig:"DISABLE_HTTP2"`
 		}
 		Service struct {
 			Name        string   `default:"web-app" envconfig:"SERVICE_NAME"`
@@ -1071,9 +1070,6 @@ func main() {
 		}
 		api.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
 		api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, acme.ALPNProto)
-		if !cfg.HTTPS.DisableHTTP2 {
-			api.TLSConfig.NextProtos = append(api.TLSConfig.NextProtos, "h2")
-		}
 
 		httpServers = append(httpServers, api)
 

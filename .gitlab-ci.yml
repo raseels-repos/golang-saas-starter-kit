@@ -6,16 +6,16 @@ services:
 variables:
   DOCKER_TLS_CERTDIR: ""
 
-before_script:
-  - 'go install ./build/cicd'
-
 stages:
+  - setup:dev
   - build:dev
   - migrate:dev
   - deploy:dev
+  - setup:stage
   - build:stage
   - migrate:stage
   - deploy:stage
+  - setup:prod
   - build:prod
   - migrate:prod
   - deploy:prod
@@ -29,20 +29,43 @@ cache:
   only:
     - master
 
-.build_tmpl: &build_tmpl
+.setup_tmpl: &setup_tmpl
   <<: *job_tmpl
   script:
-    - 'cicd --env=${TARGET_ENV} build ${TARGET_TYPE} --name=${TARGET_REF}'
-
-.deploy_tmpl: &deploy_tmpl
-  <<: *job_tmpl
-  script:
-    - 'cicd --env=${TARGET_ENV} deploy ${TARGET_TYPE} --name=${TARGET_REF}'
+    - 'go build -o cicd ./build/cicd'
+    - './cicd --env=${TARGET_ENV} deploy infrastructure'
+  artifacts:
+    paths:
+      - cicd
+    expire_in: 1 day
 
 .migrate_tmpl: &migrate_tmpl
   <<: *job_tmpl
   script:
-    - 'cicd --env=${TARGET_ENV} schema migrate'
+    - './cicd --env=${TARGET_ENV} schema migrate'
+
+.build_tmpl: &build_tmpl
+  <<: *job_tmpl
+  script:
+    - './cicd --env=${TARGET_ENV} build ${TARGET_TYPE} --name=${TARGET_REF}'
+
+.deploy_tmpl: &deploy_tmpl
+  <<: *job_tmpl
+  script:
+    - './cicd --env=${TARGET_ENV} deploy ${TARGET_TYPE} --name=${TARGET_REF}'
+
+infra:setup:prod:
+  <<: *setup_tmpl
+  stage: setup:prod
+  tags:
+    - prod
+  only:
+    - master
+    - prod
+    - /^prod-.*$/
+  variables:
+    TARGET_ENV: 'prod'
+    AWS_USE_ROLE: 'true'
 
 db:migrate:prod:
   <<: *migrate_tmpl
@@ -56,6 +79,7 @@ db:migrate:prod:
   variables:
     TARGET_ENV: 'prod'
     AWS_USE_ROLE: 'true'
+  #when: manual
 
 webapp:build:prod:
   <<: *build_tmpl
@@ -81,6 +105,7 @@ webapp:deploy:prod:
     - prod
     - prod-web-app
   dependencies:
+    - 'infra:setup:prod'
     - 'webapp:build:prod'
     - 'db:migrate:prod'
   variables:
@@ -114,6 +139,7 @@ webapi:deploy:prod:
     - prod
     - prod-web-api
   dependencies:
+    - 'infra:setup:prod'
     - 'webapi:build:prod'
     - 'db:migrate:prod'
   variables:
@@ -147,6 +173,7 @@ ddlogscollector:deploy:prod:
     - prod
     - prod-ddlogs
   dependencies:
+    - 'infra:setup:prod'
     - 'ddlogscollector:build:prod'
     - 'db:migrate:prod'
   variables:

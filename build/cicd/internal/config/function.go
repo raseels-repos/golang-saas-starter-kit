@@ -15,57 +15,35 @@ type Function = string
 
 var (
 	Function_Ddlogscollector = "ddlogscollector"
-	Function_YourNewFunction = "your-new-function"
 )
 
 // List of function names used by main.go for help.
 var FunctionNames = []Function{
 	// Python Datadog Logs Collector
 	Function_Ddlogscollector,
-	Function_YourNewFunction,
 }
 
-// FunctionContext defines the flags for deploying a function.
-type FunctionContext struct {
-	// Required flags.
-	Name              string                       `validate:"required" example:"aws-lambda-go-func"`
-	AwsLambdaFunction *devdeploy.AwsLambdaFunction `validate:"required"`
-	AwsIamRole        *devdeploy.AwsIamRole        `validate:"required"`
-	AwsIamPolicy      *devdeploy.AwsIamPolicy      `validate:"required"`
+// NewFunction returns the *devdeploy.ProjectFunction.
+func NewFunction(funcName string, cfg *devdeploy.Config) (*devdeploy.ProjectFunction, error) {
 
-	// Optional flags.
-	FunctionDir        string `validate:"omitempty"`
-	BuildDir           string `validate:"omitempty"`
-	DockerBuildContext string `validate:"omitempty" example:"."`
-	Dockerfile         string `validate:"required" example:"./cmd/web-api/Dockerfile"`
-	ReleaseTag         string `validate:"required"`
-	EnableVPC          bool   `validate:"omitempty" example:"false"`
-}
-
-// NewFunctionContext returns the FunctionContext.
-func NewFunctionContext(funcName string, cfg *devdeploy.Config) (*FunctionContext, error) {
-
-	ctx := &FunctionContext{
-		Name: funcName,
-
-		FunctionDir: filepath.Join(cfg.ProjectRoot, "examples", funcName),
-
+	ctx := &devdeploy.ProjectFunction{
+		Name:               funcName,
+		CodeDir:            filepath.Join(cfg.ProjectRoot, "cmd", funcName),
+		DockerBuildDir:     cfg.ProjectRoot,
 		DockerBuildContext: ".",
 
-		// Set the release tag for the image to use include env + service name + commit hash/tag.
+		// Set the release tag for the image to use include env + function name + commit hash/tag.
 		ReleaseTag: devdeploy.GitLabCiReleaseTag(cfg.Env, funcName),
 	}
 
 	switch funcName {
-	case Function_YourNewFunction:
-		// No additional settings for function.
 	case Function_Ddlogscollector:
 
 		// Python Datadog Logs Collector is
-		ctx.FunctionDir = filepath.Join(cfg.ProjectRoot, "deployments/ddlogscollector")
+		ctx.CodeDir = filepath.Join(cfg.ProjectRoot, "deployments", funcName)
 
 		// Change the build directory to the function directory instead of project root.
-		ctx.BuildDir = ctx.FunctionDir
+		ctx.DockerBuildDir = ctx.CodeDir
 
 		// AwsLambdaFunction defines the details needed to create an lambda function.
 		ctx.AwsLambdaFunction = &devdeploy.AwsLambdaFunction{
@@ -215,105 +193,54 @@ func NewFunctionContext(funcName string, cfg *devdeploy.Config) (*FunctionContex
 		return nil
 	}
 
+	ctx.CodeS3Bucket = cfg.AwsS3BucketPrivate.BucketName
+	ctx.CodeS3Key = filepath.Join("src", "aws", "lambda", cfg.Env, ctx.Name, ctx.ReleaseTag+".zip")
+
 	// Set the docker file if no custom one has been defined for the service.
 	if ctx.Dockerfile == "" {
-		ctx.Dockerfile = filepath.Join(ctx.BuildDir, "Dockerfile")
+		ctx.Dockerfile = filepath.Join(ctx.CodeDir, "Dockerfile")
 	}
 
 	return ctx, nil
 }
 
-// Build handles defining all the information needed to deploy a service to AWS ECS.
-func (ctx *FunctionContext) Build(log *log.Logger, noCache, noPush bool) (*devdeploy.BuildLambda, error) {
-
-	log.Printf("Define build for function '%s'.", ctx.Name)
-	log.Printf("\tUsing release tag %s.", ctx.ReleaseTag)
-
-	srv := &devdeploy.BuildLambda{
-		FuncName:           ctx.Name,
-		ReleaseTag:         ctx.ReleaseTag,
-		BuildDir:           ctx.BuildDir,
-		Dockerfile:         ctx.Dockerfile,
-		DockerBuildContext: ctx.DockerBuildContext,
-		NoCache:            noCache,
-		NoPush:             noPush,
-	}
-
-	return srv, nil
-}
-
-// Deploy handles defining all the information needed to deploy a service to AWS ECS.
-func (ctx *FunctionContext) Deploy(log *log.Logger) (*devdeploy.DeployLambda, error) {
-
-	log.Printf("Define build for function '%s'.", ctx.Name)
-	log.Printf("\tUsing release tag %s.", ctx.ReleaseTag)
-
-	srv := &devdeploy.DeployLambda{
-		FuncName:          ctx.Name,
-		EnableVPC:         ctx.EnableVPC,
-		AwsLambdaFunction: ctx.AwsLambdaFunction,
-		AwsIamPolicy:      ctx.AwsIamPolicy,
-		AwsIamRole:        ctx.AwsIamRole,
-	}
-
-	return srv, nil
-}
-
-// S3Location returns the s3 bucket and key used to upload the code to.
-func (ctx *FunctionContext) S3Location(cfg *devdeploy.Config) (string, string) {
-	s3Bucket := cfg.AwsS3BucketPrivate.BucketName
-	s3Key := filepath.Join("src", "aws", "lambda", cfg.Env, ctx.Name, ctx.ReleaseTag+".zip")
-
-	return s3Bucket, s3Key
-}
 
 // BuildFunctionForTargetEnv executes the build commands for a target function.
 func BuildFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, functionName, releaseTag string, dryRun, noCache, noPush bool) error {
 
-	cfgCtx, err := NewConfigContext(targetEnv, awsCredentials)
+	cfg, err := NewConfig(log, targetEnv, awsCredentials)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := cfgCtx.Config(log)
-	if err != nil {
-		return err
-	}
-
-	funcCtx, err := NewFunctionContext(functionName, cfg)
+	targetFunc, err := NewFunction(functionName, cfg)
 	if err != nil {
 		return err
 	}
 
 	// Override the release tag if set.
 	if releaseTag != "" {
-		funcCtx.ReleaseTag = releaseTag
+		targetFunc.ReleaseTag = releaseTag
 	}
 
-	details, err := funcCtx.Build(log, noCache, noPush)
-	if err != nil {
-		return err
+	// Append build args to be used for all functions.
+	if targetFunc.DockerBuildArgs == nil {
+		targetFunc.DockerBuildArgs = make(map[string]string)
 	}
-
-	// Set the s3 bucket and s3 for uploading the zip file.
-	details.CodeS3Bucket, details.CodeS3Key = funcCtx.S3Location(cfg)
 
 	// funcPath is used to copy the service specific code in the Dockerfile.
-	funcPath, err := filepath.Rel(cfg.ProjectRoot, funcCtx.FunctionDir)
+	codePath, err := filepath.Rel(cfg.ProjectRoot, targetFunc.CodeDir)
 	if err != nil {
 		return err
 	}
+	targetFunc.DockerBuildArgs["code_path"] = codePath
 
 	// commitRef is used by main.go:build constant.
 	commitRef := getCommitRef()
 	if commitRef == "" {
-		commitRef = funcCtx.ReleaseTag
+		commitRef = targetFunc.ReleaseTag
 	}
-
-	details.BuildArgs = map[string]string{
-		"func_path":  funcPath,
-		"commit_ref": commitRef,
-	}
+	targetFunc.DockerBuildArgs["commit_ref"] = commitRef
 
 	if dryRun {
 		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
@@ -322,7 +249,7 @@ func BuildFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCred
 		}
 		log.Printf("BuildFunctionForTargetEnv : config : %v\n", string(cfgJSON))
 
-		detailsJSON, err := json.MarshalIndent(details, "", "    ")
+		detailsJSON, err := json.MarshalIndent(targetFunc, "", "    ")
 		if err != nil {
 			log.Fatalf("BuildFunctionForTargetEnv : Marshalling details to JSON : %+v", err)
 		}
@@ -331,39 +258,26 @@ func BuildFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCred
 		return nil
 	}
 
-	return devdeploy.BuildLambdaForTargetEnv(log, cfg, details)
+	return devdeploy.BuildLambdaForTargetEnv(log, cfg, targetFunc, noCache, noPush)
 }
 
 // DeployFunctionForTargetEnv executes the deploy commands for a target function.
 func DeployFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, functionName, releaseTag string, dryRun bool) error {
 
-	cfgCtx, err := NewConfigContext(targetEnv, awsCredentials)
+	cfg, err := NewConfig(log, targetEnv, awsCredentials)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := cfgCtx.Config(log)
-	if err != nil {
-		return err
-	}
-
-	funcCtx, err := NewFunctionContext(functionName, cfg)
+	targetFunc, err := NewFunction(functionName, cfg)
 	if err != nil {
 		return err
 	}
 
 	// Override the release tag if set.
 	if releaseTag != "" {
-		funcCtx.ReleaseTag = releaseTag
+		targetFunc.ReleaseTag = releaseTag
 	}
-
-	details, err := funcCtx.Deploy(log)
-	if err != nil {
-		return err
-	}
-
-	// Set the s3 bucket and s3 for uploading the zip file.
-	details.CodeS3Bucket, details.CodeS3Key = funcCtx.S3Location(cfg)
 
 	if dryRun {
 		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
@@ -372,7 +286,7 @@ func DeployFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCre
 		}
 		log.Printf("DeployFunctionForTargetEnv : config : %v\n", string(cfgJSON))
 
-		detailsJSON, err := json.MarshalIndent(details, "", "    ")
+		detailsJSON, err := json.MarshalIndent(targetFunc, "", "    ")
 		if err != nil {
 			log.Fatalf("DeployFunctionForTargetEnv : Marshalling details to JSON : %+v", err)
 		}
@@ -381,5 +295,5 @@ func DeployFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCre
 		return nil
 	}
 
-	return devdeploy.DeployLambdaToTargetEnv(log, cfg, details)
+	return devdeploy.DeployLambdaToTargetEnv(log, cfg, targetFunc)
 }

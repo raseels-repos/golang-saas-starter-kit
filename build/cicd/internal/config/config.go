@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -51,47 +52,26 @@ var EnvNames = []Env{
 	EnvProd,
 }
 
-// ConfigContext defines the flags for build env.
-type ConfigContext struct {
-	// Env is the target environment used for the deployment.
-	Env string `validate:"oneof=dev stage prod"`
-
-	// AwsCredentials defines the credentials used for deployment.
-	AwsCredentials devdeploy.AwsCredentials `validate:"required,dive,required"`
-}
-
-// NewConfigContext returns the ConfigContext.
-func NewConfigContext(targetEnv Env, awsCredentials devdeploy.AwsCredentials) (*ConfigContext, error) {
-	ctx := &ConfigContext{
+// NewConfig defines the details to setup the target environment for the project to build services and functions.
+func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCredentials) (*devdeploy.Config, error) {
+	cfg := &devdeploy.Config{
 		Env:            targetEnv,
 		AwsCredentials: awsCredentials,
 	}
 
 	// If AWS Credentials are not set and use role is not enabled, try to load the credentials from env vars.
-	if ctx.AwsCredentials.UseRole == false && ctx.AwsCredentials.AccessKeyID == "" {
+	if cfg.AwsCredentials.UseRole == false && cfg.AwsCredentials.AccessKeyID == "" {
 		var err error
-		ctx.AwsCredentials, err = devdeploy.GetAwsCredentialsFromEnv(ctx.Env)
+		cfg.AwsCredentials, err = devdeploy.GetAwsCredentialsFromEnv(cfg.Env)
 		if err != nil {
 			return nil, err
 		}
-	} else if ctx.AwsCredentials.Region == "" {
-		awsCreds, err := devdeploy.GetAwsCredentialsFromEnv(ctx.Env)
+	} else if cfg.AwsCredentials.Region == "" {
+		awsCreds, err := devdeploy.GetAwsCredentialsFromEnv(cfg.Env)
 		if err != nil {
 			return nil, err
 		}
-		ctx.AwsCredentials.Region = awsCreds.Region
-	}
-
-	return ctx, nil
-}
-
-// Config defines the details to setup the target environment for the project to build services and functions.
-func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) {
-
-	// Init a new build target environment for the project.
-	cfg := &devdeploy.Config{
-		Env:            cfgCtx.Env,
-		AwsCredentials: cfgCtx.AwsCredentials,
+		cfg.AwsCredentials.Region = awsCreds.Region
 	}
 
 	// Get the current working directory. This should be somewhere contained within the project.
@@ -517,6 +497,24 @@ func (cfgCtx *ConfigContext) Config(log *log.Logger) (*devdeploy.Config, error) 
 	}
 	log.Printf("\t\tSet Task Policy Name to '%s'.", cfg.AwsIamPolicy.PolicyName)
 
+	// Append all the defined services to the config.
+	for _, n := range ServiceNames {
+		srv, err := NewService(n, cfg)
+		if err != nil {
+			return nil, err
+		}
+		cfg.ProjectServices = append(cfg.ProjectServices, srv)
+	}
+
+	// Append all the defined functions to the config.
+	for _, n := range FunctionNames {
+		fn, err := NewFunction(n, cfg)
+		if err != nil {
+			return nil, err
+		}
+		cfg.ProjectFunctions = append(cfg.ProjectFunctions, fn)
+	}
+
 	return cfg, nil
 }
 
@@ -613,4 +611,31 @@ func gitRemoteUser(projectRoot string) string {
 	remoteUser := strings.Split(remoteUrl, "/")[0]
 
 	return remoteUser
+}
+
+
+// DeployInfrastructureForTargetEnv executes the deploy commands for a target function.
+func DeployInfrastructureForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, dryRun bool) error {
+
+	cfg, err := NewConfig(log, targetEnv, awsCredentials)
+	if err != nil {
+		return err
+	}
+
+	if dryRun {
+		cfgJSON, err := json.MarshalIndent(cfg, "", "    ")
+		if err != nil {
+			log.Fatalf("DeployFunctionForTargetEnv : Marshalling config to JSON : %+v", err)
+		}
+		log.Printf("DeployFunctionForTargetEnv : config : %v\n", string(cfgJSON))
+
+		return nil
+	}
+
+	_, err = devdeploy.SetupInfrastructure(log, cfg, devdeploy.SetupOptionSkipCache)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

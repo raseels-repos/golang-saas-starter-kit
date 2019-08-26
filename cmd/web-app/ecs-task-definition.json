@@ -12,7 +12,7 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "{AWS_LOGS_GROUP}",
-          "awslogs-region": "{AWS_REGION}",
+          "awslogs-region": "{AWS_DEFAULT_REGION}",
           "awslogs-stream-prefix": "ecs"
         }
       },
@@ -27,7 +27,7 @@
       "memoryReservation": 128,
       "volumesFrom": [],
       "environment": [
-        {"name": "AWS_REGION", "value": "{AWS_REGION}"},
+        {"name": "AWS_DEFAULT_REGION", "value": "{AWS_DEFAULT_REGION}"},
         {"name": "AWS_USE_ROLE", "value": "true"},
         {"name": "AWSLOGS_GROUP", "value": "{AWS_LOGS_GROUP}"},
         {"name": "ECS_CLUSTER", "value": "{ECS_CLUSTER}"},

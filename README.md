@@ -452,13 +452,13 @@ out.
 ```
 $ AWS_ACCESS_KEY_ID=
 $ AWS_SECRET_ACCESS_KEY=
-AWS_REGION=us-east-1
+AWS_DEFAULT_REGION=us-east-1
 $ AWS_USE_ROLE=false
 $ DD_API_KEY=
 ```
 
 In your new copy of the example docker-compose file ".env_docker_compose", set the AWS configs by updating the following 
-environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION. Remember to remove the $ before the 
+environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_DEFAULT_REGION. Remember to remove the $ before the 
 variable name. 
 
 As noted in the Local Installation section, the project is integrated with Datadog for observability. You can specify 

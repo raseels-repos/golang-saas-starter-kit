@@ -54,7 +54,7 @@ func New() *Test {
 		Aws struct {
 			AccessKeyID     string `envconfig:"AWS_ACCESS_KEY_ID"`              // WEB_API_AWS_AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY_ID
 			SecretAccessKey string `envconfig:"AWS_SECRET_ACCESS_KEY" json:"-"` // don't print
-			Region          string `default:"us-west-2" envconfig:"AWS_REGION"`
+			Region          string `default:"us-west-2" envconfig:"AWS_DEFAULT_REGION"`
 			UseRole         bool   `envconfig:"AWS_USE_ROLE"`
 		}
 	}

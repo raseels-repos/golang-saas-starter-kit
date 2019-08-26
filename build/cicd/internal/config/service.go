@@ -174,7 +174,7 @@ func NewServiceContext(serviceName Service, cfg *devdeploy.Config) (*ServiceCont
 		return []*ecs.KeyValuePair{
 			ecsKeyValuePair(devdeploy.ENV_KEY_ECS_CLUSTER, srv.AwsEcsCluster.ClusterName),
 			ecsKeyValuePair(devdeploy.ENV_KEY_ECS_SERVICE, srv.AwsEcsService.ServiceName),
-			ecsKeyValuePair("AWS_REGION", cfg.AwsCredentials.Region),
+			ecsKeyValuePair("AWS_DEFAULT_REGION", cfg.AwsCredentials.Region),
 			ecsKeyValuePair("AWS_USE_ROLE", "true"),
 			ecsKeyValuePair("AWSLOGS_GROUP", srv.AwsCloudWatchLogGroup.LogGroupName),
 			ecsKeyValuePair("ECS_ENABLE_CONTAINER_METADATA", "true"),

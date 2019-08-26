@@ -55,7 +55,7 @@ func main() {
 		cli.StringFlag{
 			Name:        "aws-region",
 			Usage:       "AWS Region",
-			EnvVar:      "AWS_REGION",
+			EnvVar:      "AWS_DEFAULT_REGION",
 			Destination: &awsCredentials.Region,
 		},
 		cli.BoolFlag{
@@ -158,6 +158,23 @@ func main() {
 			Aliases: []string{"d"},
 			Usage:   "deploy a service or function",
 			Subcommands: []cli.Command{
+				{
+					Name:    "infrastructure",
+					Aliases: []string{"infra"},
+					Usage:   "deploy infrastructure for target environment",
+					Flags: []cli.Flag{
+						cli.BoolFlag{
+							Name:  "dry-run",
+							Usage: "print out the deploy details",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						targetEnv := c.GlobalString("env")
+						dryRun := c.Bool("dry-run")
+
+						return config.DeployInfrastructureForTargetEnv(log, awsCredentials, targetEnv, dryRun)
+					},
+				},
 				{
 					Name:  "service",
 					Usage: "deploy a service",

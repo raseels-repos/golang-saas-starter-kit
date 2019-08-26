@@ -285,7 +285,7 @@ These can also be passed into _cicd_ as command line options.
 ```bash
 export AWS_ACCESS_KEY_ID=XXXXXXXXX
 export AWS_SECRET_ACCESS_KEY=XXXXXXXXX
-export AWS_REGION="us-west-2"
+export AWS_DEFAULT_REGION="us-west-2"
 export AWS_USE_ROLE=false
 ```
 
@@ -311,7 +311,7 @@ $ cicd [global options] command [command options] [arguments...]
 
     `--aws-secret-key value`   
 
-* AWS Region - optional, can be set via env variable `AWS_REGION`
+* AWS Region - optional, can be set via env variable `AWS_DEFAULT_REGION`
 
     `--aws-region value`
 

@@ -99,6 +99,8 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 	if cfg.ProjectName == "saas-starter-kit" {
 		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
 
+		log.Println("remoteUser", remoteUser)
+
 		// Its a true fork from the origin repo.
 		if remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.

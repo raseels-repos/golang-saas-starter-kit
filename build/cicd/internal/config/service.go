@@ -45,7 +45,7 @@ type ServiceContext struct {
 	EnableHTTPS         bool     `validate:"omitempty" example:"false"`
 	EnableElb           bool     `validate:"omitempty" example:"false"`
 	StaticFilesS3Enable bool     `validate:"omitempty" example:"false"`
-	DockerBuildDir            string   `validate:"omitempty"`
+	DockerBuildDir      string   `validate:"omitempty"`
 	DockerBuildContext  string   `validate:"omitempty" example:"."`
 }
 
@@ -135,7 +135,7 @@ func (c ServiceContext) BaseUrl() string {
 // NewService returns the ProjectService for a service that is configured for the target deployment env.
 func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectService, error) {
 
-	ctx, err  :=  NewServiceContext(serviceName, cfg)
+	ctx, err := NewServiceContext(serviceName, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +147,13 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 		CodeDir:            filepath.Join(cfg.ProjectRoot, "cmd", serviceName),
 		DockerBuildDir:     ctx.DockerBuildDir,
 		DockerBuildContext: ".",
-		EnableHTTPS: ctx.EnableHTTPS,
+		EnableHTTPS:        ctx.EnableHTTPS,
 
 		ServiceHostPrimary: ctx.ServiceHostPrimary,
-		ServiceHostNames: ctx.ServiceHostNames,
-		ReleaseTag: ctx.ReleaseTag,
+		ServiceHostNames:   ctx.ServiceHostNames,
+		ReleaseTag:         ctx.ReleaseTag,
+
+		DockerBuildArgs: make(map[string]string),
 	}
 
 	if srv.DockerBuildDir == "" {
@@ -362,7 +364,7 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			},
 			Cpu:               aws.Int64(128),
 			MemoryReservation: aws.Int64(128),
-			Environment:       baseEnvVals(cfg, srv),
+			Environment:       baseEnvVals(),
 			HealthCheck: &ecs.HealthCheck{
 				Retries: aws.Int64(3),
 				Command: aws.StringSlice([]string{
@@ -488,7 +490,7 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			},
 			Cpu:               aws.Int64(128),
 			MemoryReservation: aws.Int64(128),
-			Environment:       baseEnvVals(cfg, srv),
+			Environment:       baseEnvVals(),
 			HealthCheck: &ecs.HealthCheck{
 				Retries: aws.Int64(3),
 				Command: aws.StringSlice([]string{
@@ -588,6 +590,9 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 				return nil
 			},
 		}
+
+
+		srv.DockerBuildArgs["swagInit"] = "1"
 
 	default:
 		return nil, errors.Wrapf(devdeploy.ErrInvalidService,

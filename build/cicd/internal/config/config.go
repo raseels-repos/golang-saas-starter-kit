@@ -100,7 +100,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
 
 		// Its a true fork from the origin repo.
-		if remoteUser != "saas-starter-kit" && remoteUser != "geeks-accelerator" {
+		if remoteUser != "oss" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
 			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
 
@@ -612,7 +612,6 @@ func gitRemoteUser(projectRoot string) string {
 
 	return remoteUser
 }
-
 
 // DeployInfrastructureForTargetEnv executes the deploy commands for a target function.
 func DeployInfrastructureForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, dryRun bool) error {

@@ -204,7 +204,6 @@ func NewFunction(funcName string, cfg *devdeploy.Config) (*devdeploy.ProjectFunc
 	return ctx, nil
 }
 
-
 // BuildFunctionForTargetEnv executes the build commands for a target function.
 func BuildFunctionForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, functionName, releaseTag string, dryRun, noCache, noPush bool) error {
 

@@ -357,7 +357,18 @@ Access/Secret Keys are required
     --no-cache                        skip caching for the docker build
     --no-push                         disable pushing release image to remote repository
     ```
-   
+
+* `deploy infrastructure` - Executes a deploy to setup the infrastructure for the deployment environment.
+       
+     ```bash
+     $ cicd -env [dev|stage|prod] deploy infrastructure [command options]
+     ``` 
+     
+     Options: 
+     ```bash
+     --dry-run                         print out the deploy details
+     ```    
+      
 * `deploy service` - Executes a deploy for a single service
       
     ```bash
@@ -402,6 +413,11 @@ Access/Secret Keys are required
     ```
 
 ### Examples
+
+Setup the infrastructure for _prod_
+```bash
+$ cicid --env=prod deploy infrastructure --dry-run=false
+```
 
 Build the example service _web-app_ 
 ```bash

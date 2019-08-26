@@ -152,6 +152,8 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 		ServiceHostPrimary: ctx.ServiceHostPrimary,
 		ServiceHostNames:   ctx.ServiceHostNames,
 		ReleaseTag:         ctx.ReleaseTag,
+
+		DockerBuildArgs: make(map[string]string),
 	}
 
 	if srv.DockerBuildDir == "" {
@@ -588,6 +590,9 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 				return nil
 			},
 		}
+
+
+		srv.DockerBuildArgs["swagInit"] = "1"
 
 	default:
 		return nil, errors.Wrapf(devdeploy.ErrInvalidService,

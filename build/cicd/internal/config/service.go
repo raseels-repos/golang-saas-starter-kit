@@ -591,7 +591,6 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			},
 		}
 
-
 		srv.DockerBuildArgs["swagInit"] = "1"
 
 	default:

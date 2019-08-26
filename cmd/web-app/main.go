@@ -807,7 +807,7 @@ func main() {
 				return key
 			}
 
-			res, err :=  trns.T(key, params...)
+			res, err := trns.T(key, params...)
 			if err != nil {
 				log.Printf("main : Translate.T : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
 				return key
@@ -821,7 +821,7 @@ func main() {
 				return key
 			}
 
-			res, err :=  trns.C(key, num, digits, param)
+			res, err := trns.C(key, num, digits, param)
 			if err != nil {
 				log.Printf("main : Translate.C : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
 				return key
@@ -829,13 +829,13 @@ func main() {
 			return res
 		},
 		// O creates the ordinal translation for the locale given the 'key', 'num' and 'digit' arguments and param passed in
-		"O": func(ctx context.Context, key string,  num float64, digits uint64, param string) string {
+		"O": func(ctx context.Context, key string, num float64, digits uint64, param string) string {
 			trns := webcontext.ContextTranslator(ctx)
 			if trns == nil {
 				return key
 			}
 
-			res, err :=  trns.O(key,  num, digits, param)
+			res, err := trns.O(key, num, digits, param)
 			if err != nil {
 				log.Printf("main : Translate.O : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
 				return key
@@ -850,7 +850,7 @@ func main() {
 				return key
 			}
 
-			res, err :=  trns.R(key, num1, digits1, num2, digits2, param1, param2)
+			res, err := trns.R(key, num1, digits1, num2, digits2, param1, param2)
 			if err != nil {
 				log.Printf("main : Translate.R : Failed to translate %s with '%s' - %+v", trns.Locale(), key, err.Error())
 				return key

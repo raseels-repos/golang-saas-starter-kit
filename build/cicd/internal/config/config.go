@@ -613,7 +613,6 @@ func gitRemoteUser(projectRoot string) string {
 	return remoteUser
 }
 
-
 // DeployInfrastructureForTargetEnv executes the deploy commands for a target function.
 func DeployInfrastructureForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredentials, targetEnv Env, dryRun bool) error {
 

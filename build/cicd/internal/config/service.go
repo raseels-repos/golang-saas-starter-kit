@@ -400,7 +400,7 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			ecsKeyValuePair("PROJECT_NAME", cfg.ProjectName),
 
 			// Use placeholders for these environment variables that will be replaced with devdeploy.DeployServiceToTargetEnv
-			ecsKeyValuePair("WEB_APP_HOST_HOST", "{HTTP_HOST}"),
+			ecsKeyValuePair("WEB_APP_HTTP_HOST", "{HTTP_HOST}"),
 			ecsKeyValuePair("WEB_APP_HTTPS_HOST", "{HTTPS_HOST}"),
 			ecsKeyValuePair("WEB_APP_SERVICE_ENABLE_HTTPS", "{HTTPS_ENABLED}"),
 			ecsKeyValuePair("WEB_APP_SERVICE_BASE_URL", "{APP_BASE_URL}"),
@@ -590,7 +590,6 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 				return nil
 			},
 		}
-
 
 		srv.DockerBuildArgs["swagInit"] = "1"
 

@@ -8,6 +8,9 @@ RUN apk --update --no-cache add \
 # Change dir to project base.
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
 
+# Build and (re)start go apps after saving/creating/deleting source files.
+RUN GO111MODULE=off go get github.com/pilu/fresh
+
 # Enable go modules.
 ARG GOPROXY=https://goproxy.io
 ENV GOPROXY=$GOPROXY
@@ -15,7 +18,6 @@ ENV GO111MODULE="on"
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
-RUN go get github.com/pilu/fresh
 
 FROM build_base_golang AS dev
 

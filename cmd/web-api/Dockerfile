@@ -25,6 +25,8 @@ RUN GO111MODULE=on go get -u github.com/geeks-accelerator/swag/cmd/swag
 WORKDIR $GOPATH/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
 
 # Enable go modules.
+ARG GOPROXY=https://goproxy.io
+ENV GOPROXY=$GOPROXY
 ENV GO111MODULE="on"
 COPY go.mod .
 COPY go.sum .

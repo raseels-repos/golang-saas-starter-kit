@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 
@@ -27,7 +28,7 @@ var FunctionNames = []Function{
 func NewFunction(funcName string, cfg *devdeploy.Config) (*devdeploy.ProjectFunction, error) {
 
 	ctx := &devdeploy.ProjectFunction{
-		Name:               funcName,
+		Name:               fmt.Sprintf("%s-%s-%s", cfg.Env, cfg.ProjectName, funcName),
 		CodeDir:            filepath.Join(cfg.ProjectRoot, "cmd", funcName),
 		DockerBuildDir:     cfg.ProjectRoot,
 		DockerBuildContext: ".",

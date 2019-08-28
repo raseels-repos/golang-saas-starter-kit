@@ -66,7 +66,7 @@ services:
       target: dev
       dockerfile: cmd/web-app/Dockerfile
       args:
-        service: 'web-app'
+        name: 'web-app'
     volumes:
       - ./:/go/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
     ports:
@@ -76,6 +76,10 @@ services:
       main:
         aliases:
           - web-app
+    depends_on:
+      - postgres
+      - redis
+      - datadog
     env_file:
       - configs/.env_docker_compose
     environment:
@@ -101,7 +105,7 @@ services:
       target: dev
       dockerfile: cmd/web-api/Dockerfile
       args:
-        service: 'web-api'
+        name: 'web-api'
     volumes:
       - ./:/go/src/gitlab.com/geeks-accelerator/oss/saas-starter-kit
     ports:
@@ -111,6 +115,10 @@ services:
       main:
         aliases:
           - web-api
+    depends_on:
+      - postgres
+      - redis
+      - datadog
     env_file:
       - configs/.env_docker_compose
     environment:

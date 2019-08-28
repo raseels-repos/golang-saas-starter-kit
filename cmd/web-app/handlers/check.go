@@ -58,6 +58,7 @@ func (c *Check) Health(ctx context.Context, w http.ResponseWriter, r *http.Reque
 }
 
 // Ping validates the service is ready to accept requests.
+// This endpoint is used for the health check when an AWS ELastic Load Balancer is enabled.
 func (c *Check) Ping(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	status := "pong"

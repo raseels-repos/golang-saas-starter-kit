@@ -5,7 +5,7 @@ services:
 
 variables:
   DOCKER_TLS_CERTDIR: ""
-
+  GIT_DEPTH: "1"
 stages:
   - setup:dev
   - build:dev

@@ -13,11 +13,9 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/schema"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/iancoleman/strcase"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -98,9 +96,9 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 	// it will fail to create appropriate resources for the account of the forked user.
 	if cfg.ProjectName == "saas-starter-kit" {
 		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
-
+		
 		// Its a true fork from the origin repo.
-		if remoteUser != "oss" {
+		if remoteUser != "oss" && remoteUser != "geeks-accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
 			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
 
@@ -528,9 +526,9 @@ func getDatadogApiKey(cfg *devdeploy.Config) (string, error) {
 	if apiKey == "" {
 		prefixedSecretId := cfg.SecretID("datadog")
 		var err error
-		apiKey, err = devdeploy.GetAwsSecretValue(cfg.AwsCredentials, prefixedSecretId)
+		apiKey, err = devdeploy.SecretManagerGetString(cfg.AwsCredentials.Session(), prefixedSecretId)
 		if err != nil {
-			if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
+			if errors.Cause(err) != devdeploy.ErrSecreteNotFound {
 				return "", err
 			}
 		}
@@ -540,9 +538,9 @@ func getDatadogApiKey(cfg *devdeploy.Config) (string, error) {
 	if apiKey == "" {
 		secretId := "datadog"
 		var err error
-		apiKey, err = devdeploy.GetAwsSecretValue(cfg.AwsCredentials, secretId)
+		apiKey, err = devdeploy.SecretManagerGetString(cfg.AwsCredentials.Session(), secretId)
 		if err != nil {
-			if aerr, ok := errors.Cause(err).(awserr.Error); !ok || aerr.Code() != secretsmanager.ErrCodeResourceNotFoundException {
+			if errors.Cause(err) != devdeploy.ErrSecreteNotFound {
 				return "", err
 			}
 		}

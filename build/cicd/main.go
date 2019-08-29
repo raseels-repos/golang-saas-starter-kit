@@ -149,6 +149,44 @@ func main() {
 						return config.BuildFunctionForTargetEnv(log, awsCredentials, targetEnv, funcName, releaseTag, dryRun, noCache, noPush)
 					},
 				},
+				{
+					Name:  "image",
+					Usage: "build an image",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name: "name, n",
+							Usage: fmt.Sprintf("target image, one of [%s]",
+								strings.Join(config.ImageNames, ", ")),
+							Required: true,
+						},
+						cli.StringFlag{
+							Name:  "release-tag, tag",
+							Usage: "optional tag to override default CI_COMMIT_SHORT_SHA",
+						},
+						cli.BoolFlag{
+							Name:  "dry-run",
+							Usage: "print out the build details",
+						},
+						cli.BoolFlag{
+							Name:  "no-cache",
+							Usage: "skip caching for the docker build",
+						},
+						cli.BoolFlag{
+							Name:  "no-push",
+							Usage: "disable pushing release image to remote repository",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						targetEnv := c.GlobalString("env")
+						funcName := c.String("name")
+						releaseTag := c.String("release-tag")
+						dryRun := c.Bool("dry-run")
+						noCache := c.Bool("no-cache")
+						noPush := c.Bool("no-push")
+
+						return config.BuildImageForTargetEnv(log, awsCredentials, targetEnv, funcName, releaseTag, dryRun, noCache, noPush)
+					},
+				},
 			},
 		},
 

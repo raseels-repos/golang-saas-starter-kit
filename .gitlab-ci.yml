@@ -5,7 +5,8 @@ services:
 
 variables:
   DOCKER_TLS_CERTDIR: ""
-  GIT_DEPTH: "1"
+  GIT_DEPTH: "10"
+
 stages:
   - setup:dev
   - build:dev
@@ -90,6 +91,8 @@ webapp:build:prod:
     - master
     - prod
     - prod-web-app
+  dependencies:
+    - 'infra:setup:prod'
   variables:
     TARGET_ENV: 'prod'
     TARGET_TYPE: 'service'
@@ -124,6 +127,8 @@ webapi:build:prod:
     - master
     - prod
     - prod-web-api
+  dependencies:
+    - 'infra:setup:prod'
   variables:
     TARGET_ENV: 'prod'
     TARGET_TYPE: 'service'
@@ -158,6 +163,8 @@ ddlogscollector:build:prod:
     - master
     - prod
     - prod-ddlogs
+  dependencies:
+    - 'infra:setup:prod'
   variables:
     TARGET_ENV: 'prod'
     TARGET_TYPE: 'function'

@@ -215,8 +215,8 @@ github.com/urfave/cli v1.21.0/go.mod h1:lxDj6qX9Q6lWQxIrbrT0nwecwUtRnhVZAJjJZrVU
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 h1:zzrxE1FKn5ryBNl9eKOeqQ58Y/Qpo3Q9QNxKHX5uzzQ=
 github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2/go.mod h1:hzfGeIUDq/j97IG+FhNqkowIyEcD88LrW6fyU3K3WqY=
-gitlab.com/geeks-accelerator/oss/devops v1.0.18 h1:Vkk7WrTIvGd+Nnb6ru3o4r1yw4h7lJBdcnGLG71d390=
-gitlab.com/geeks-accelerator/oss/devops v1.0.18/go.mod h1:xr+rhNSDXrEh0A6bkBPnfMiRIou3OiPZK0oD5h9GAAM=
+gitlab.com/geeks-accelerator/oss/devops v1.0.19 h1:x/PknYjZFZNfrm9TW4wWXlI73Jd56HYrQt3a1IUbpK8=
+gitlab.com/geeks-accelerator/oss/devops v1.0.19/go.mod h1:xr+rhNSDXrEh0A6bkBPnfMiRIou3OiPZK0oD5h9GAAM=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=

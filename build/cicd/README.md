@@ -358,6 +358,21 @@ Access/Secret Keys are required
     --no-push                         disable pushing release image to remote repository
     ```
 
+* `build image` - Executes a build for a single image   
+   
+    ```bash
+    $ cicd -env [dev|stage|prod] build image -name NNNNN [command options]
+    ``` 
+    
+    Options: 
+    ```bash
+    --name value, -n value            target image, required
+    --release-tag value, --tag value  optional tag to override default CI_COMMIT_SHORT_SHA
+    --dry-run                         print out the build details
+    --no-cache                        skip caching for the docker build
+    --no-push                         disable pushing release image to remote repository
+    ```   
+
 * `deploy infrastructure` - Executes a deploy to setup the infrastructure for the deployment environment.
        
      ```bash

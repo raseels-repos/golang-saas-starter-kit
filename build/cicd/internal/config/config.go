@@ -538,7 +538,7 @@ func getDatadogApiKey(cfg *devdeploy.Config) (string, error) {
 
 	// 3. Check AWS Secrets Manager for Datadog entry.
 	if apiKey == "" {
-		secretId := "DATADOG"
+		secretId := "datadog"
 		var err error
 		apiKey, err = devdeploy.GetAwsSecretValue(cfg.AwsCredentials, secretId)
 		if err != nil {

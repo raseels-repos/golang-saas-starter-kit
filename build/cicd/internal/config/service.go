@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -41,8 +42,8 @@ const (
 type Service = string
 
 var (
-	ServiceWebApi = "web-api"
-	ServiceWebApp = "web-app"
+	ServiceWebApi Service = "web-api"
+	ServiceWebApp Service = "web-app"
 )
 
 // List of service names used by main.go for help.
@@ -185,7 +186,6 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 		srv.StaticFilesS3Prefix = filepath.Join(cfg.AwsS3BucketPublicKeyPrefix, ctx.ReleaseTag, "static")
 	}
 
-
 	// =========================================================================
 	// Service settings based on target env.
 	var enableElb bool
@@ -293,7 +293,7 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			srv.AwsElbLoadBalancer.TargetGroups[0].Name)
 
 		// Set ECS configs based on specified env.
-		if cfg.Env == "prod" {
+		if cfg.Env == EnvProd {
 			srv.AwsElbLoadBalancer.EcsTaskDeregistrationDelay = 300
 		} else {
 			// Force staging to deploy immediately without waiting for connections to drain
@@ -311,12 +311,12 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 	}
 
 	// Set ECS configs based on specified env.
-	if cfg.Env == "prod" {
+	if cfg.Env == EnvProd {
 		srv.AwsEcsService.DeploymentMinimumHealthyPercent = 100
 		srv.AwsEcsService.DeploymentMaximumPercent = 200
 	} else {
-		srv.AwsEcsService.DeploymentMinimumHealthyPercent = 100
-		srv.AwsEcsService.DeploymentMaximumPercent = 200
+		srv.AwsEcsService.DeploymentMinimumHealthyPercent = 0
+		srv.AwsEcsService.DeploymentMaximumPercent = 100
 	}
 
 	if EnableServiceAutoscaling {
@@ -415,6 +415,55 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 		return nil, err
 	}
 
+	// Try to find the Datadog API key, this value is optional.
+	// If Datadog API key is not specified, then integration with Datadog for observability will not be active.
+	datadogApiKey, err := getDatadogApiKey(cfg)
+	if err != nil {
+		return srv, err
+	}
+
+	// Add the Datadog container to the task definition if an API Key is set.
+	var ddContainer *ecs.ContainerDefinition
+	if datadogApiKey != "" {
+		ddTags := []string{
+			"source:docker",
+			"service:" + srv.AwsEcsService.ServiceName,
+			"service_name:" + ctx.Name,
+			"cluster:" + srv.AwsEcsCluster.ClusterName,
+			"env:" + cfg.Env,
+		}
+
+		// Defined a container definition for the specific service.
+		ddContainer = &ecs.ContainerDefinition{
+			Name:      aws.String("datadog-agent"),
+			Image:     aws.String(srv.ReleaseImage),
+			Essential: aws.Bool(true),
+			PortMappings: []*ecs.PortMapping{
+				&ecs.PortMapping{
+					ContainerPort: aws.Int64(8125),
+				},
+				&ecs.PortMapping{
+					ContainerPort: aws.Int64(8126),
+				},
+			},
+			Cpu:               aws.Int64(128),
+			MemoryReservation: aws.Int64(256),
+			Environment: []*ecs.KeyValuePair{
+				ecsKeyValuePair("DD_API_KEY", datadogApiKey),
+				ecsKeyValuePair("DD_LOGS_ENABLED", "true"),
+				ecsKeyValuePair("DD_APM_ENABLED", "true"),
+				ecsKeyValuePair("DD_RECEIVER_PORT", "8126"),
+				ecsKeyValuePair("DD_APM_NON_LOCAL_TRAFFIC", "true"),
+				ecsKeyValuePair("DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL", "true"),
+				ecsKeyValuePair("DD_TAGS", strings.Join(ddTags, " ")),
+				ecsKeyValuePair("DD_DOGSTATSD_ORIGIN_DETECTION", "true"),
+				ecsKeyValuePair("DD_DOGSTATSD_NON_LOCAL_TRAFFIC", "true"),
+				ecsKeyValuePair("ECS_FARGATE", "true"),
+			},
+		}
+
+	}
+
 	// Define a base set of environment variables that can be assigned to individual container definitions.
 	baseEnvVals := func() []*ecs.KeyValuePair {
 
@@ -428,7 +477,7 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			ciPipelineURL = strings.TrimRight(GitLabProjectBaseUrl, "/") + "/pipelines/" + os.Getenv("CI_PIPELINE_ID")
 		}
 
-		return []*ecs.KeyValuePair{
+		envVars := []*ecs.KeyValuePair{
 			ecsKeyValuePair(devdeploy.ENV_KEY_ECS_CLUSTER, srv.AwsEcsCluster.ClusterName),
 			ecsKeyValuePair(devdeploy.ENV_KEY_ECS_SERVICE, srv.AwsEcsService.ServiceName),
 			ecsKeyValuePair("AWS_DEFAULT_REGION", cfg.AwsCredentials.Region),
@@ -447,6 +496,16 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			ecsKeyValuePair("WEB_API_BASE_URL", webApiCtx.BaseUrl()),
 			ecsKeyValuePair("EMAIL_SENDER", "lee+saas-starter-kit@geeksinthewoods.com"),
 		}
+
+		if datadogApiKey != "" {
+			envVars = append(envVars, ecsKeyValuePair("DATADOG_ADDR", "127.0.0.1:8125"),
+				ecsKeyValuePair("DD_API_KEY", datadogApiKey),
+				ecsKeyValuePair("DD_TRACE_AGENT_PORT", "8126"),
+				ecsKeyValuePair("DD_SERVICE_NAME", srv.AwsEcsService.ServiceName),
+				ecsKeyValuePair("DD_ENV", cfg.Env))
+		}
+
+		return envVars
 	}
 
 	// =========================================================================
@@ -508,33 +567,6 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			})
 		}
 
-		// Append env vars for the service task.
-		container1.Environment = append(container1.Environment,
-			ecsKeyValuePair("SERVICE_NAME", ctx.Name),
-			ecsKeyValuePair("PROJECT_NAME", cfg.ProjectName),
-
-			// Use placeholders for these environment variables that will be replaced with devdeploy.DeployServiceToTargetEnv
-			ecsKeyValuePair("WEB_APP_HTTP_HOST", "{HTTP_HOST}"),
-			ecsKeyValuePair("WEB_APP_HTTPS_HOST", "{HTTPS_HOST}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_ENABLE_HTTPS", "{HTTPS_ENABLED}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_BASE_URL", "{APP_BASE_URL}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_HOST_NAMES", "{HOST_NAMES}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_S3_ENABLED", "{STATIC_FILES_S3_ENABLED}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_S3_PREFIX", "{STATIC_FILES_S3_PREFIX}"),
-			ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", "{STATIC_FILES_CLOUDFRONT_ENABLED}"),
-			ecsKeyValuePair("WEB_APP_REDIS_HOST", "{CACHE_HOST}"),
-			ecsKeyValuePair("WEB_APP_DB_HOST", "{DB_HOST}"),
-			ecsKeyValuePair("WEB_APP_DB_USERNAME", "{DB_USER}"),
-			ecsKeyValuePair("WEB_APP_DB_PASSWORD", "{DB_PASS}"),
-			ecsKeyValuePair("WEB_APP_DB_DATABASE", "{DB_DATABASE}"),
-			ecsKeyValuePair("WEB_APP_DB_DRIVER", "{DB_DRIVER}"),
-			ecsKeyValuePair("WEB_APP_DB_DISABLE_TLS", "{DB_DISABLE_TLS}"),
-			ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PRIVATE", "{AWS_S3_BUCKET_PRIVATE}"),
-			ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PUBLIC", "{AWS_S3_BUCKET_PUBLIC}"),
-			ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_UPDATE_TASK_IPS, "{ROUTE53_UPDATE_TASK_IPS}"),
-			ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_ZONES, "{ROUTE53_ZONES}"),
-		)
-
 		// Define the full task definition for the service.
 		taskDef := &ecs.RegisterTaskDefinitionInput{
 			Family:      aws.String(fmt.Sprintf("%s-%s-%s", cfg.Env, srv.AwsEcsCluster.ClusterName, ctx.Name)),
@@ -547,32 +579,44 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			RequiresCompatibilities: aws.StringSlice([]string{"FARGATE"}),
 		}
 
+		// Append the datadog container if defined.
+		if ddContainer != nil {
+			taskDef.ContainerDefinitions = append(taskDef.ContainerDefinitions, ddContainer)
+		}
+
 		srv.AwsEcsTaskDefinition = &devdeploy.AwsEcsTaskDefinition{
 			RegisterInput: taskDef,
-			UpdatePlaceholders: func(placeholders map[string]string) error {
+			PreRegister: func(input *ecs.RegisterTaskDefinitionInput, vars devdeploy.AwsEcsServiceDeployVariables) error {
+				// Append env vars for the service task.
+				input.ContainerDefinitions[0].Environment = append(input.ContainerDefinitions[0].Environment,
+					ecsKeyValuePair("SERVICE_NAME", ctx.Name),
+					ecsKeyValuePair("PROJECT_NAME", cfg.ProjectName),
 
-				// Try to find the Datadog API key, this value is optional.
-				// If Datadog API key is not specified, then integration with Datadog for observability will not be active.
-				{
-					datadogApiKey, err := getDatadogApiKey(cfg)
-					if err != nil {
-						return err
-					}
+					// Use placeholders for these environment variables that will be replaced with devdeploy.DeployServiceToTargetEnv
+					ecsKeyValuePair("WEB_APP_HTTP_HOST", vars.HTTPHost),
+					ecsKeyValuePair("WEB_APP_HTTPS_HOST", vars.HTTPSHost),
+					ecsKeyValuePair("WEB_APP_SERVICE_ENABLE_HTTPS", strconv.FormatBool(vars.HTTPSEnabled)),
+					ecsKeyValuePair("WEB_APP_SERVICE_BASE_URL", vars.ServiceBaseUrl),
+					ecsKeyValuePair("WEB_APP_SERVICE_HOST_NAMES", strings.Join(vars.AlternativeHostnames, ",")),
+					ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_S3_ENABLED", strconv.FormatBool(vars.StaticFilesS3Enabled)),
+					ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_S3_PREFIX", vars.StaticFilesS3Prefix),
+					ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", strconv.FormatBool(vars.StaticFilesCloudfrontEnabled)),
+					ecsKeyValuePair("WEB_APP_REDIS_HOST", vars.CacheHost),
+					ecsKeyValuePair("WEB_APP_DB_HOST", vars.DbHost),
+					ecsKeyValuePair("WEB_APP_DB_USERNAME", vars.DbUser),
+					ecsKeyValuePair("WEB_APP_DB_PASSWORD", vars.DbPass),
+					ecsKeyValuePair("WEB_APP_DB_DATABASE", vars.DbName),
+					ecsKeyValuePair("WEB_APP_DB_DRIVER", vars.DbDriver),
+					ecsKeyValuePair("WEB_APP_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),
+					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PRIVATE", vars.AwsS3BucketNamePrivate),
+					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PUBLIC", vars.AwsS3BucketNamePublic),
+				)
 
-					if datadogApiKey != "" {
-						log.Println("DATADOG API Key set.")
-					} else {
-						log.Printf("DATADOG API Key NOT set.")
-					}
-
-					placeholders["{DATADOG_APIKEY}"] = datadogApiKey
-
-					// When the datadog API key is empty, don't force the container to be essential have have the whole task fail.
-					if datadogApiKey != "" {
-						placeholders["{DATADOG_ESSENTIAL}"] = "true"
-					} else {
-						placeholders["{DATADOG_ESSENTIAL}"] = "false"
-					}
+				// When no Elastic Load Balance is used, tasks need to be able to directly update the Route 53 records.
+				if vars.AwsElbLoadBalancer == nil {
+					input.ContainerDefinitions[0].Environment = append(input.ContainerDefinitions[0].Environment,
+						ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_ZONES, vars.EncodeRoute53Zones()),
+						ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_UPDATE_TASK_IPS, "true"))
 				}
 
 				return nil
@@ -634,33 +678,6 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			})
 		}
 
-		// Append env vars for the service task.
-		container1.Environment = append(container1.Environment,
-			ecsKeyValuePair("SERVICE_NAME", ctx.Name),
-			ecsKeyValuePair("PROJECT_NAME", cfg.ProjectName),
-
-			// Use placeholders for these environment variables that will be replaced with devdeploy.DeployServiceToTargetEnv
-			ecsKeyValuePair("WEB_API_HTTP_HOST", "{HTTP_HOST}"),
-			ecsKeyValuePair("WEB_API_HTTPS_HOST", "{HTTPS_HOST}"),
-			ecsKeyValuePair("WEB_API_SERVICE_ENABLE_HTTPS", "{HTTPS_ENABLED}"),
-			ecsKeyValuePair("WEB_API_SERVICE_BASE_URL", "{APP_BASE_URL}"),
-			ecsKeyValuePair("WEB_API_SERVICE_HOST_NAMES", "{HOST_NAMES}"),
-			ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_S3_ENABLED", "{STATIC_FILES_S3_ENABLED}"),
-			ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_S3_PREFIX", "{STATIC_FILES_S3_PREFIX}"),
-			ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", "{STATIC_FILES_CLOUDFRONT_ENABLED}"),
-			ecsKeyValuePair("WEB_API_REDIS_HOST", "{CACHE_HOST}"),
-			ecsKeyValuePair("WEB_API_DB_HOST", "{DB_HOST}"),
-			ecsKeyValuePair("WEB_API_DB_USERNAME", "{DB_USER}"),
-			ecsKeyValuePair("WEB_API_DB_PASSWORD", "{DB_PASS}"),
-			ecsKeyValuePair("WEB_API_DB_DATABASE", "{DB_DATABASE}"),
-			ecsKeyValuePair("WEB_API_DB_DRIVER", "{DB_DRIVER}"),
-			ecsKeyValuePair("WEB_API_DB_DISABLE_TLS", "{DB_DISABLE_TLS}"),
-			ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PRIVATE", "{AWS_S3_BUCKET_PRIVATE}"),
-			ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PUBLIC", "{AWS_S3_BUCKET_PUBLIC}"),
-			ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_UPDATE_TASK_IPS, "{ROUTE53_UPDATE_TASK_IPS}"),
-			ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_ZONES, "{ROUTE53_ZONES}"),
-		)
-
 		// Define the full task definition for the service.
 		taskDef := &ecs.RegisterTaskDefinitionInput{
 			Family:      aws.String(fmt.Sprintf("%s-%s-%s", cfg.Env, srv.AwsEcsCluster.ClusterName, ctx.Name)),
@@ -673,32 +690,44 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 			RequiresCompatibilities: aws.StringSlice([]string{"FARGATE"}),
 		}
 
+		// Append the datadog container if defined.
+		if ddContainer != nil {
+			taskDef.ContainerDefinitions = append(taskDef.ContainerDefinitions, ddContainer)
+		}
+
 		srv.AwsEcsTaskDefinition = &devdeploy.AwsEcsTaskDefinition{
 			RegisterInput: taskDef,
-			UpdatePlaceholders: func(placeholders map[string]string) error {
+			PreRegister: func(input *ecs.RegisterTaskDefinitionInput, vars devdeploy.AwsEcsServiceDeployVariables) error {
+				// Append env vars for the service task.
+				input.ContainerDefinitions[0].Environment = append(input.ContainerDefinitions[0].Environment,
+					ecsKeyValuePair("SERVICE_NAME", ctx.Name),
+					ecsKeyValuePair("PROJECT_NAME", cfg.ProjectName),
 
-				// Try to find the Datadog API key, this value is optional.
-				// If Datadog API key is not specified, then integration with Datadog for observability will not be active.
-				{
-					datadogApiKey, err := getDatadogApiKey(cfg)
-					if err != nil {
-						return err
-					}
+					// Use placeholders for these environment variables that will be replaced with devdeploy.DeployServiceToTargetEnv
+					ecsKeyValuePair("WEB_API_HTTP_HOST", vars.HTTPHost),
+					ecsKeyValuePair("WEB_API_HTTPS_HOST", vars.HTTPSHost),
+					ecsKeyValuePair("WEB_API_SERVICE_ENABLE_HTTPS", strconv.FormatBool(vars.HTTPSEnabled)),
+					ecsKeyValuePair("WEB_API_SERVICE_BASE_URL", vars.ServiceBaseUrl),
+					ecsKeyValuePair("WEB_API_SERVICE_HOST_NAMES", strings.Join(vars.AlternativeHostnames, ",")),
+					ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_S3_ENABLED", strconv.FormatBool(vars.StaticFilesS3Enabled)),
+					ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_S3_PREFIX", vars.StaticFilesS3Prefix),
+					ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", strconv.FormatBool(vars.StaticFilesCloudfrontEnabled)),
+					ecsKeyValuePair("WEB_API_REDIS_HOST", vars.CacheHost),
+					ecsKeyValuePair("WEB_API_DB_HOST", vars.DbHost),
+					ecsKeyValuePair("WEB_API_DB_USERNAME", vars.DbUser),
+					ecsKeyValuePair("WEB_API_DB_PASSWORD", vars.DbPass),
+					ecsKeyValuePair("WEB_API_DB_DATABASE", vars.DbName),
+					ecsKeyValuePair("WEB_API_DB_DRIVER", vars.DbDriver),
+					ecsKeyValuePair("WEB_API_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),
+					ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PRIVATE", vars.AwsS3BucketNamePrivate),
+					ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PUBLIC", vars.AwsS3BucketNamePublic),
+				)
 
-					if datadogApiKey != "" {
-						log.Println("DATADOG API Key set.")
-					} else {
-						log.Printf("DATADOG API Key NOT set.")
-					}
-
-					placeholders["{DATADOG_APIKEY}"] = datadogApiKey
-
-					// When the datadog API key is empty, don't force the container to be essential have have the whole task fail.
-					if datadogApiKey != "" {
-						placeholders["{DATADOG_ESSENTIAL}"] = "true"
-					} else {
-						placeholders["{DATADOG_ESSENTIAL}"] = "false"
-					}
+				// When no Elastic Load Balance is used, tasks need to be able to directly update the Route 53 records.
+				if vars.AwsElbLoadBalancer == nil {
+					input.ContainerDefinitions[0].Environment = append(input.ContainerDefinitions[0].Environment,
+						ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_ZONES, vars.EncodeRoute53Zones()),
+						ecsKeyValuePair(devdeploy.ENV_KEY_ROUTE53_UPDATE_TASK_IPS, "true"))
 				}
 
 				return nil

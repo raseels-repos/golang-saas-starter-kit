@@ -27,7 +27,13 @@ func Errors(log *log.Logger, renderer web.Renderer) web.Middleware {
 			if er := before(ctx, w, r, params); er != nil {
 
 				// Log the error.
-				log.Printf("%d : ERROR : %+v", span.Context().TraceID(), er)
+				if span != nil && span.Context() != nil {
+					log.Printf("%d : ERROR : %+v", span.Context().TraceID(), er)
+				} else {
+					log.Printf("ERROR : %+v", er)
+				}
+
+
 
 				// Respond to the error.
 				if web.RequestIsJson(r) {

@@ -238,6 +238,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 		Redis:    appCtx.Redis,
 	}
 	app.Handle("GET", "/v1/health", check.Health)
+	app.Handle("GET", "/ping", check.Ping)
 
 	// Handle static files/pages. Render a custom 404 page when file not found.
 	static := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {

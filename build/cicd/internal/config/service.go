@@ -603,14 +603,20 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 					ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", strconv.FormatBool(vars.StaticFilesCloudfrontEnabled)),
 					ecsKeyValuePair("WEB_APP_REDIS_HOST", vars.CacheHost),
 					ecsKeyValuePair("WEB_APP_DB_HOST", vars.DbHost),
-					ecsKeyValuePair("WEB_APP_DB_USERNAME", vars.DbUser),
-					ecsKeyValuePair("WEB_APP_DB_PASSWORD", vars.DbPass),
+					ecsKeyValuePair("WEB_APP_DB_USER", vars.DbUser),
+					ecsKeyValuePair("WEB_APP_DB_PASS", vars.DbPass),
 					ecsKeyValuePair("WEB_APP_DB_DATABASE", vars.DbName),
 					ecsKeyValuePair("WEB_APP_DB_DRIVER", vars.DbDriver),
 					ecsKeyValuePair("WEB_APP_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),
 					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PRIVATE", vars.AwsS3BucketNamePrivate),
 					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PUBLIC", vars.AwsS3BucketNamePublic),
 				)
+
+				// Enable image resize s3 is enabled.
+				if vars.StaticFilesS3Enabled {
+					input.ContainerDefinitions[0].Environment = append(input.ContainerDefinitions[0].Environment,
+						ecsKeyValuePair("WEB_APP_SERVICE_STATICFILES_IMG_RESIZE_ENABLED", "true"))
+				}
 
 				// When no Elastic Load Balance is used, tasks need to be able to directly update the Route 53 records.
 				if vars.AwsElbLoadBalancer == nil {
@@ -714,8 +720,8 @@ func NewService(serviceName string, cfg *devdeploy.Config) (*devdeploy.ProjectSe
 					ecsKeyValuePair("WEB_API_SERVICE_STATICFILES_CLOUDFRONT_ENABLED", strconv.FormatBool(vars.StaticFilesCloudfrontEnabled)),
 					ecsKeyValuePair("WEB_API_REDIS_HOST", vars.CacheHost),
 					ecsKeyValuePair("WEB_API_DB_HOST", vars.DbHost),
-					ecsKeyValuePair("WEB_API_DB_USERNAME", vars.DbUser),
-					ecsKeyValuePair("WEB_API_DB_PASSWORD", vars.DbPass),
+					ecsKeyValuePair("WEB_API_DB_USER", vars.DbUser),
+					ecsKeyValuePair("WEB_API_DB_PASS", vars.DbPass),
 					ecsKeyValuePair("WEB_API_DB_DATABASE", vars.DbName),
 					ecsKeyValuePair("WEB_API_DB_DRIVER", vars.DbDriver),
 					ecsKeyValuePair("WEB_API_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),

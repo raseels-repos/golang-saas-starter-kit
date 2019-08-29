@@ -33,8 +33,6 @@ func Errors(log *log.Logger, renderer web.Renderer) web.Middleware {
 					log.Printf("ERROR : %+v", er)
 				}
 
-
-
 				// Respond to the error.
 				if web.RequestIsJson(r) {
 					if err := web.RespondJsonError(ctx, w, er); err != nil {

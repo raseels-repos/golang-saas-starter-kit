@@ -452,9 +452,9 @@ func main() {
 	prjRepo := project.NewRepository(masterDb)
 
 	appCtx := &handlers.AppContext{
-		Log: log,
-		Env: cfg.Env,
-		//MasterDB:        masterDb,
+		Log:             log,
+		Env:             cfg.Env,
+		MasterDB:        masterDb,
 		Redis:           redisClient,
 		TemplateDir:     cfg.Service.TemplateDir,
 		StaticDir:       cfg.Service.StaticFiles.Dir,

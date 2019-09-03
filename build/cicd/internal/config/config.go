@@ -497,7 +497,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 
 	// Append all the defined services to the config.
 	for _, n := range ServiceNames {
-		srv, err := NewService(n, cfg)
+		srv, err := NewService(log, n, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -506,7 +506,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 
 	// Append all the defined functions to the config.
 	for _, n := range FunctionNames {
-		fn, err := NewFunction(n, cfg)
+		fn, err := NewFunction(log, n, cfg)
 		if err != nil {
 			return nil, err
 		}

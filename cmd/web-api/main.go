@@ -24,7 +24,6 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
-	"geeks-accelerator/oss/saas-starter-kit/internal/platform/devops"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
@@ -45,6 +44,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	"gitlab.com/geeks-accelerator/oss/devops/pkg/devdeploy"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	awstrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws"
@@ -303,8 +303,8 @@ func main() {
 
 		// If AWS is enabled, check the Secrets Manager for the session key.
 		if awsSession != nil {
-			cfg.Project.SharedSecretKey, err = devops.SecretManagerGetString(awsSession, secretID)
-			if err != nil && errors.Cause(err) != devops.ErrSecreteNotFound {
+			cfg.Project.SharedSecretKey, err = devdeploy.SecretManagerGetString(awsSession, secretID)
+			if err != nil && errors.Cause(err) != devdeploy.ErrSecreteNotFound {
 				log.Fatalf("main : Session : %+v", err)
 			}
 		}
@@ -314,7 +314,7 @@ func main() {
 			cfg.Project.SharedSecretKey = string(securecookie.GenerateRandomKey(32))
 
 			if awsSession != nil {
-				err = devops.SecretManagerPutString(awsSession, secretID, cfg.Project.SharedSecretKey)
+				err = devdeploy.SecretManagerPutString(awsSession, secretID, cfg.Project.SharedSecretKey)
 				if err != nil {
 					log.Fatalf("main : Session : %+v", err)
 				}
@@ -510,7 +510,7 @@ func main() {
 
 	// =========================================================================
 	// ECS Task registration for services that don't use an AWS Elastic Load Balancer.
-	err = devops.EcsServiceTaskInit(log, awsSession)
+	err = devdeploy.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
 		log.Fatalf("main : Ecs Service Task init : %+v", err)
 	}
@@ -588,7 +588,7 @@ func main() {
 		// Local file cache to reduce requests hitting Secret Manager.
 		localCache := autocert.DirCache(os.TempDir())
 
-		cache, err := devops.NewSecretManagerAutocertCache(log, awsSession, secretPrefix, localCache)
+		cache, err := devdeploy.NewSecretManagerAutocertCache(log, awsSession, secretPrefix, localCache)
 		if err != nil {
 			log.Fatalf("main : HTTPS : %+v", err)
 		}
@@ -621,7 +621,7 @@ func main() {
 		log.Printf("main : %v : Start shutdown..", sig)
 
 		// Ensure the public IP address for the task is removed from Route53.
-		err = devops.EcsServiceTaskTaskShutdown(log, awsSession)
+		err = devdeploy.EcsServiceTaskTaskShutdown(log, awsSession)
 		if err != nil {
 			log.Fatalf("main : Ecs Service Task shutdown : %+v", err)
 		}

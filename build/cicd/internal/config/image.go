@@ -23,7 +23,7 @@ var ImageNames = []Image{
 }
 
 // NewImage returns the *devdeploy.ProjectImage.
-func NewImage(imageName string, cfg *devdeploy.Config) (*devdeploy.ProjectImage, error) {
+func NewImage(log *log.Logger, imageName string, cfg *devdeploy.Config) (*devdeploy.ProjectImage, error) {
 
 	ctx := &devdeploy.ProjectImage{
 		Name:               fmt.Sprintf("%s-%s-%s", cfg.Env, cfg.ProjectName, imageName),
@@ -61,7 +61,7 @@ func BuildImageForTargetEnv(log *log.Logger, awsCredentials devdeploy.AwsCredent
 		return err
 	}
 
-	targetImage, err := NewImage(imageName, cfg)
+	targetImage, err := NewImage(log, imageName, cfg)
 	if err != nil {
 		return err
 	}

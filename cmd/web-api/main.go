@@ -104,6 +104,7 @@ func main() {
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
+			ScaleToZero time.Duration `envconfig:"SCALE_TO_ZERO"`
 		}
 		Project struct {
 			Name              string `default:"" envconfig:"PROJECT_NAME"`
@@ -513,6 +514,23 @@ func main() {
 	err = devdeploy.EcsServiceTaskInit(log, awsSession)
 	if err != nil {
 		log.Fatalf("main : Ecs Service Task init : %+v", err)
+	}
+
+	// Optional to scale down the service after X seconds. This is useful for a stage env when after 1 hours, review
+	// should have been completed. The service will automatically scale back to zero for avoid extra costs. The
+	// deploy stage can always be executed again to bring the service back online.
+	if cfg.Service.ScaleToZero.Seconds() > 0 {
+		log.Printf("Scaling service to 0 tasks after %v seconds\n", cfg.Service.ScaleToZero.Seconds())
+
+		exitTimer := time.NewTimer(cfg.Service.ScaleToZero)
+		go func() {
+			<-exitTimer.C
+			log.Printf("exitTimer expired, scaling awsSession task to 0")
+			err = devdeploy.EcsServiceSetDesiredCount(log, awsSession, 0)
+			if err != nil {
+				log.Fatalf("main : Ecs Service scale down : %+v", err)
+			}
+		}()
 	}
 
 	// =========================================================================

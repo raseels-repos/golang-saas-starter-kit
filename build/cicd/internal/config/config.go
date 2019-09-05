@@ -434,6 +434,8 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 						"s3:ListObjects",
 						"s3:PutObject",
 						"s3:PutObjectAcl",
+						"s3:GetObject",
+						"s3:HeadObject",
 						"cloudfront:ListDistributions",
 						"ec2:DescribeNetworkInterfaces",
 						"ec2:DeleteNetworkInterface",

@@ -26,9 +26,9 @@ services:
   redis:
     image: redis:latest
     expose:
-      - "6378"
+      - "6379"
     ports:
-      - "6378:6379"
+      - "6379:6379"
     networks:
       main:
         aliases:
@@ -80,6 +80,7 @@ services:
       - postgres
       - redis
       - datadog
+      - web-api
     env_file:
       - configs/.env_docker_compose
     environment:

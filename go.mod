@@ -41,7 +41,7 @@ require (
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/urfave/cli v1.21.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	gitlab.com/geeks-accelerator/oss/devops v1.0.25
+	gitlab.com/geeks-accelerator/oss/devops v1.0.32
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 	golang.org/x/tools v0.0.0-20190807223507-b346f7fd45de // indirect
@@ -53,3 +53,5 @@ require (
 )
 
 // replace gitlab.com/geeks-accelerator/oss/devops => ../devops
+
+go 1.13

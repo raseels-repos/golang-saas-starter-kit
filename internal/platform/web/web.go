@@ -79,6 +79,7 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 
 			// If we have specifically handled the error, then no need
 			// to initiate a shutdown.
+			// This shouldn't happen because the error middleware should handle this....
 			if webErr, ok := err.(*weberror.Error); ok {
 				// Render an error response.
 				if rerr := RespondErrorStatus(ctx, w, webErr.Err, webErr.Status); rerr == nil {
@@ -91,6 +92,7 @@ func (a *App) Handle(verb, path string, handler Handler, mw ...Middleware) {
 			if ok := a.SignalShutdown(); !ok {
 				// When shutdown chan is nil, in the case of unit testing
 				// we need to force display of the error.
+				// TODO:  the http package captures the panic and wont't force a shutdown, replace this
 				panic(err)
 			}
 			return

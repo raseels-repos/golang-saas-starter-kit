@@ -56,7 +56,7 @@ func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		tmpName = "site-api.gohtml"
 
 		// http://127.0.0.1:3001/docs/doc.json
-		swaggerJsonUrl := h.ProjectRoute.ApiDocsJson()
+		swaggerJsonUrl := h.ProjectRoute.ApiDocsJson(true)
 
 		// Load the json file from the API service.
 		res, err := pester.Get(swaggerJsonUrl)

@@ -1,8 +1,12 @@
 package project_route
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
+	"net"
 	"net/url"
+	"os"
+	"strings"
 )
 
 type ProjectRoute struct {
@@ -58,8 +62,18 @@ func (r ProjectRoute) ApiDocs() string {
 	return u.String()
 }
 
-func (r ProjectRoute) ApiDocsJson() string {
+func (r ProjectRoute) ApiDocsJson(internal bool) string {
 	u := r.webApiUrl
+
+	if ev := os.Getenv("USE_NETWORK_ALIAS"); ev != "" {
+		if internal && strings.Contains(u.Host, ":") {
+			h, p, _ := net.SplitHostPort(u.Host)
+			if h == "127.0.0.1" || h == "localhost" {
+				u.Host = fmt.Sprintf("web-api:%s", p)
+			}
+		}
+	}
+
 	u.Path = "/docs/doc.json"
 	return u.String()
 }

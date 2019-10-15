@@ -42,6 +42,19 @@ ARG code_path=./cmd/${name}
 ARG commit_ref=-
 ARG swagInit
 
+ARG name
+ARG code_path=./cmd/${name}
+ARG commit_ref=-
+
+ARG name
+ENV SERVICE_NAME $name
+
+ARG env="dev"
+ENV ENV $env
+
+ARG gogc="20"
+ENV GOGC $gogc
+
 # Copy shared packages.
 COPY internal ./internal
 

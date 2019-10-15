@@ -212,16 +212,22 @@ the next section.
 
 This project is using Go Module support for vendoring dependencies. 
 
-We are using the `tidy` command to maintain the dependencies and make sure the project can create reproducible builds. 
-
+If already on running Go 1.13 and above, Go Modules are enabled by default. You can check the current version of Go by 
+using the `go version` command. 
 ```bash
-$ GO111MODULE=on go mod tidy
-```
+$ go version 
+``` 
 
-It is recommended to use at least Go 1.12 and enable go modules.
+It is required to enable Go Modules for Go 1.12 and below. 
 
 ```bash
 $ echo "export  GO111MODULE=on" >> ~/.bash_profile
+```
+
+The `tidy` command will fetch all the project dependencies. 
+
+```bash
+$ GO111MODULE=on go mod tidy
 ```
 
 

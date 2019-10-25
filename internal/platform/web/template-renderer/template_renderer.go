@@ -403,13 +403,21 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 
 		// Save the session before writing to the response for the session cookie to be sent to the client.
 		if err := sess.Save(req, w); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	// Render template with data.
 	if err := t.Execute(w, renderData); err != nil {
-		return errors.WithStack(err)
+		type stackTracer interface {
+			StackTrace() errors.StackTrace
+		}
+
+		if st, ok := err.(stackTracer); !ok ||st == nil || st.StackTrace() == nil  {
+			err = errors.WithStack(err)
+		}
+
+		return err
 	}
 
 	return nil

@@ -107,7 +107,7 @@ func main() {
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
-			ScaleToZero time.Duration `envconfig:"SCALE_TO_ZERO"`
+			ScaleToZero     time.Duration `envconfig:"SCALE_TO_ZERO"`
 		}
 		Project struct {
 			Name              string `default:"" envconfig:"PROJECT_NAME"`
@@ -456,6 +456,7 @@ func main() {
 		Log:             log,
 		Env:             cfg.Env,
 		MasterDB:        masterDb,
+		MasterDbHost:    cfg.DB.Host,
 		Redis:           redisClient,
 		TemplateDir:     cfg.Service.TemplateDir,
 		StaticDir:       cfg.Service.StaticFiles.Dir,
@@ -470,6 +471,7 @@ func main() {
 		InviteRepo:      inviteRepo,
 		ProjectRepo:     prjRepo,
 		Authenticator:   authenticator,
+		AwsSession:      awsSession,
 	}
 
 	// =========================================================================

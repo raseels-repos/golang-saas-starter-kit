@@ -25,6 +25,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
@@ -40,6 +41,7 @@ type AppContext struct {
 	Log               *log.Logger
 	Env               webcontext.Env
 	MasterDB          *sqlx.DB
+	MasterDbHost      string
 	Redis             *redis.Client
 	UserRepo          *user.Repository
 	UserAccountRepo   *user_account.Repository
@@ -57,6 +59,7 @@ type AppContext struct {
 	ProjectRoute      project_route.ProjectRoute
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
+	AwsSession        *session.Session
 }
 
 // API returns a handler for a set of routes.
@@ -80,6 +83,24 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
 	// Construct the web.App which holds all routes as well as common Middleware.
 	app := web.NewApp(shutdown, appCtx.Log, appCtx.Env, middlewares...)
+
+	// Register serverless endpoint. This route is not authenticated.
+	serverless := Serverless{
+		MasterDB:     appCtx.MasterDB,
+		MasterDbHost: appCtx.MasterDbHost,
+		AwsSession:   appCtx.AwsSession,
+		Renderer:     appCtx.Renderer,
+	}
+	app.Handle("GET", "/serverless/pending", serverless.Pending)
+
+	// waitDbMid ensures the database is active before allowing the user to access the requested URI.
+	waitDbMid := mid.WaitForDbResumed(mid.WaitForDbResumedConfig{
+		// Database handle to be used to ensure its online.
+		DB: appCtx.MasterDB,
+
+		// WaitHandler defines the handler to render for the user to when the database is being resumed.
+		WaitHandler: serverless.Pending,
+	})
 
 	// Build a sitemap.
 	sm := stm.NewSitemap(1)
@@ -146,7 +167,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 		Renderer:        appCtx.Renderer,
 	}
 	app.Handle("POST", "/user/login", u.Login)
-	app.Handle("GET", "/user/login", u.Login)
+	app.Handle("GET", "/user/login", u.Login, waitDbMid)
 	app.Handle("GET", "/user/logout", u.Logout)
 	app.Handle("POST", "/user/reset-password/:hash", u.ResetConfirm)
 	app.Handle("GET", "/user/reset-password/:hash", u.ResetConfirm)
@@ -188,7 +209,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	}
 	// This route is not authenticated
 	app.Handle("POST", "/signup", s.Step1)
-	app.Handle("GET", "/signup", s.Step1)
+	app.Handle("GET", "/signup", s.Step1, waitDbMid)
 
 	// Register example endpoints.
 	ex := Examples{
@@ -224,6 +245,15 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	app.Handle("GET", "/robots.txt", r.RobotTxt)
 	app.Handle("GET", "/sitemap.xml", r.SitemapXml)
 
+	// Register health check endpoint. This route is not authenticated.
+	check := Check{
+		MasterDB: appCtx.MasterDB,
+		Redis:    appCtx.Redis,
+	}
+
+	app.Handle("GET", "/v1/health", check.Health)
+	app.Handle("GET", "/ping", check.Ping)
+
 	// Add sitemap entries for Root.
 	smLocAddModified(stm.URL{{"loc", "/"}, {"changefreq", "weekly"}, {"mobile", true}, {"priority", 0.9}}, "site-index.gohtml")
 	smLocAddModified(stm.URL{{"loc", "/pricing"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.8}}, "site-pricing.gohtml")
@@ -231,14 +261,6 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	smLocAddModified(stm.URL{{"loc", "/api"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.7}}, "site-api.gohtml")
 	smLocAddModified(stm.URL{{"loc", "/legal/privacy"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.5}}, "legal-privacy.gohtml")
 	smLocAddModified(stm.URL{{"loc", "/legal/terms"}, {"changefreq", "monthly"}, {"mobile", true}, {"priority", 0.5}}, "legal-terms.gohtml")
-
-	// Register health check endpoint. This route is not authenticated.
-	check := Check{
-		MasterDB: appCtx.MasterDB,
-		Redis:    appCtx.Redis,
-	}
-	app.Handle("GET", "/v1/health", check.Health)
-	app.Handle("GET", "/ping", check.Ping)
 
 	// Handle static files/pages. Render a custom 404 page when file not found.
 	static := func(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {

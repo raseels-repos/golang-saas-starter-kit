@@ -1,0 +1,51 @@
+{{define "title"}}Service Scaling{{end}}
+{{define "description"}}Service is scaling.{{end}}
+{{define "style"}}
+
+{{end}}
+{{ define "partials/app-wrapper" }}
+    <div class="container" id="page-content">
+        <div class="row justify-content-center">
+            <div class="col-xl-10 col-lg-12 col-md-9">
+                <div class="card o-hidden border-0 shadow-lg my-5">
+                    <div class="card-body p-0">
+                        <!-- Nested Row within Card Body -->
+                        <div class="row">
+                            <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
+                            <div class="col-lg-6">
+                                <div class="p-5">
+                                    {{ template "app-flashes" . }}
+
+                                    <div class="text-center" style="margin-bottom: 250px; ">
+                                        <h1 class="h4 text-gray-900 mb-4">The service is scaling up!</h1>
+                                        <p>Please wait a moment, you will be redirected to your request page when operation complete.</p>
+                                        <div class="spinner-border" role="status">
+                                            <span class="sr-only">Scaling...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{{end}}
+{{define "js"}}
+    <script>
+        $(document).ready(function() {
+            $(document).find('body').addClass('bg-gradient-primary');
+
+            $.ajax({
+                contentType: "application/json",
+                url: '{{ $.statusUrl }}',
+                dataType: "json"
+            }).done(function(data) {
+                if (data.statusCode == 200) {
+                    window.location = data.redirectUri;
+                }
+            });
+        });
+    </script>
+{{end}}

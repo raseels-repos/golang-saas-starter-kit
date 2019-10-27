@@ -413,7 +413,7 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 			StackTrace() errors.StackTrace
 		}
 
-		if st, ok := err.(stackTracer); !ok ||st == nil || st.StackTrace() == nil  {
+		if st, ok := err.(stackTracer); !ok || st == nil || st.StackTrace() == nil {
 			err = errors.WithStack(err)
 		}
 

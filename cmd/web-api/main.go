@@ -104,7 +104,7 @@ func main() {
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
-			ScaleToZero time.Duration `envconfig:"SCALE_TO_ZERO"`
+			ScaleToZero     time.Duration `envconfig:"SCALE_TO_ZERO"`
 		}
 		Project struct {
 			Name              string `default:"" envconfig:"PROJECT_NAME"`

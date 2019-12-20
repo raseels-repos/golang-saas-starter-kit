@@ -23,15 +23,21 @@ import (
 )
 
 const (
-	// ProjectNamePrefix will be appending to the name of the project.
-	ProjectNamePrefix = ""
-
 	// GitLabProjectBaseUrl is the base url used to create links to a specific CI/CD job or pipeline by ID.
 	GitLabProjectBaseUrl = "https://gitlab.com/geeks-accelerator/oss/saas-starter-kit"
 
 	// EnableRdsServerless will use the Aurora database engine that scales the capacity based on database load. This is
 	// a good option for intermittent or unpredictable workloads.
 	EnableRdsServerless = true
+
+	// EnableCloudFront will create a CloudFront distribution (CDN) that is associated with your public bucket.
+	// Static asset files will be served by CloudFront instead of from S3 which will improve performance.
+	EnableCloudFront = true
+)
+
+var (
+	// ProjectNamePrefix will be appending to the name of the project.
+	ProjectNamePrefix = ""
 )
 
 // Env defines the target deployment environment.
@@ -48,6 +54,11 @@ var EnvNames = []Env{
 	EnvDev,
 	EnvStage,
 	EnvProd,
+}
+
+// init ensures global variables are set correctly.
+func init() {
+	ProjectNamePrefix = strings.Replace(ProjectNamePrefix, ".", "-", -1)
 }
 
 // NewConfig defines the details to setup the target environment for the project to build services and functions.
@@ -100,7 +111,13 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 		// Its a true fork from the origin repo.
 		if remoteUser != "oss" && remoteUser != "geeks-accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
-			cfg.ProjectName = filepath.Base(filepath.Dir(cfg.ProjectRoot)) + "-starter-kit"
+			projectPrefix := filepath.Base(filepath.Dir(cfg.ProjectRoot))
+			projectPrefix = strings.Replace(projectPrefix, ".", "", -1)
+			if len(projectPrefix) > 10 {
+				projectPrefix = projectPrefix[0:10]
+			}
+
+			cfg.ProjectName = projectPrefix + "-starter-kit"
 
 			log.Println("switching project name to ", cfg.ProjectName)
 		}
@@ -203,7 +220,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 	cfg.AwsS3BucketPublicKeyPrefix = "/public"
 
 	// For production, enable Cloudfront CDN for all static files to avoid serving them from the slower S3 option.
-	if cfg.Env == EnvProd {
+	if EnableCloudFront && cfg.Env == EnvProd {
 		cfg.AwsS3BucketPublic.CloudFront = &devdeploy.AwsS3BucketCloudFront{
 			// S3 key prefix to request your content from a directory in your Amazon S3 bucket.
 			OriginPath: cfg.AwsS3BucketPublicKeyPrefix,
@@ -430,12 +447,6 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 					Sid:    "DefaultServiceAccess",
 					Effect: "Allow",
 					Action: []string{
-						"s3:HeadBucket",
-						"s3:ListObjects",
-						"s3:PutObject",
-						"s3:PutObjectAcl",
-						"s3:GetObject",
-						"s3:HeadObject",
 						"cloudfront:ListDistributions",
 						"ec2:DescribeNetworkInterfaces",
 						"ec2:DeleteNetworkInterface",
@@ -458,6 +469,29 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 						"secretsmanager:DeleteSecret",
 					},
 					Resource: "*",
+				},
+
+				{
+					Effect: "Allow",
+					Action: []string{
+						"s3:ListBucket",
+					},
+					Resource: []string{
+						"arn:aws:s3:::"+cfg.AwsS3BucketPublic.BucketName,
+						"arn:aws:s3:::"+cfg.AwsS3BucketPrivate.BucketName,
+					},
+				},
+				{
+					Effect: "Allow",
+					Action: []string{
+						"s3:PutObject",
+						"s3:PutObjectAcl",
+						"s3:GetObject",
+					},
+					Resource: []string{
+						"arn:aws:::"+cfg.AwsS3BucketPublic.BucketName+"/*",
+						"arn:aws:::"+cfg.AwsS3BucketPrivate.BucketName+"/*",
+					},
 				},
 				{
 					Sid:    "ServiceInvokeLambda",

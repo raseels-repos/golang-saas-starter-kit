@@ -26,7 +26,6 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 [![Google Slides of Screen Captures for SaaS Startup Kit web app](resources/images/saas-webapp-screencapture-01.jpg)](https://saasstartupkit.com/)
 
 
-
 <!-- toc -->
 
 - [Motivation](#motivation)
@@ -37,6 +36,8 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
     * [Go Modules](#go-modules) 
     * [Installing Docker](#installing-docker)
 - [Getting started](#getting-started)
+    * [Video tutorials](#video-tutorials)
+    * [Setup local environment](#setup-local-environment)
     * [Running the project](#running-the-project) 
     * [How we run the project](#how-we-run-the-project) 
     * [Stopping the project](#stopping-the-project) 
@@ -120,7 +121,7 @@ It contains the following features:
 * Integration with Datadog for enterprise-level observability. 
 * Testing patterns.
 * Build, deploy and run application using Docker, Docker Compose, and Makefiles.
-* Vendoring dependencies with Modules, requires Go 1.12 or higher.
+* Vendoring dependencies with Modules, requires Go 1.13 or higher.
 * Continuous deployment pipeline. 
 * Serverless deployments with AWS ECS Fargate.
 * CLI with boilerplate templates to reduce repetitive copy/pasting.
@@ -176,6 +177,8 @@ have created this diagram below. Since it is very detailed, you can click on the
 
 
 
+
+
 ## Local Installation
 
 Docker is required to run this project on your local machine. This project uses multiple open-source services that will 
@@ -218,7 +221,7 @@ using the `go version` command.
 $ go version 
 ``` 
 
-It is required to enable Go Modules for Go 1.12 and below. 
+It is required to enable Go Modules for Go 1.13 and below. 
 
 ```bash
 $ echo "export  GO111MODULE=on" >> ~/.bash_profile
@@ -239,6 +242,19 @@ https://docs.docker.com/install/
 
     
 ## Getting started
+
+### Video tutorials 
+
+Three screen casts have be created by @huyng to provide additional help getting started. 
+
+1. [Create Repo from SaaS Startup Kit Golang](https://youtu.be/sA5oeuTrsZM)
+
+2. [Change References for SaaS Startup Kit Golang](https://youtu.be/sA5oeuTrsZM)
+
+3. [Configure GitLab Runner for SaaS Startup Kit Golang](https://youtu.be/yIGSpZVDnlM)
+
+
+### Setup local environment
 
 There is a `docker-compose` file that knows how to build and run all the services. Each service has its own a 
 `dockerfile`.

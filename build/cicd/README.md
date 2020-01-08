@@ -127,9 +127,9 @@ API and documentation.
 
 The `Dockerfile` for both services is defined as [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) 
 that includes building a base layer, running unittests and compiling the go application as static binary. The final 
-layer in the multi-stage uses [alpine:3.9](https://hub.docker.com/_/alpine?tab=description) as its base image and copies 
+layer in the multi-stage uses [alpine:3.11](https://hub.docker.com/_/alpine?tab=description) as its base image and copies 
 in the compiled binary resulting in a docker container that is around 50mbs excluding any additional static assets. It's 
-possible to swap out `alpine:3.9` with [busybox](https://willschenk.com/articles/2019/building_a_slimmer_go_docker_container/) 
+possible to swap out `alpine:3.11` with [busybox](https://willschenk.com/articles/2019/building_a_slimmer_go_docker_container/) 
 for an even small resulting docker image. 
 
 A service is built using the defined service Dockerfile. The resulting image is pushed to 

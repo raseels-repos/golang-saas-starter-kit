@@ -28,7 +28,10 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 
 <!-- toc -->
 
+- [Join Us on Gopher Slack](#join-us-on-gopher-slack)
+- [Join our Email List](#join-our-email-list)
 - [Motivation](#motivation)
+- [Contributions](#contributions)
 - [Description](#description)
     * [Example project](#example-project)
 - [Local Installation](#local-installation)
@@ -52,11 +55,24 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 - [Deployment](#deployment)
 - [Development Notes](#development-notes)
 - [What's Next](#whats-next)
-- [Join us on Gopher Slack](#join-us-on-gopher-slack)
 - [License](#license)
 
 <!-- tocstop -->
 
+
+
+## Join Us on Gopher Slack
+
+If you are having problems installing, troubles getting the project running or would like to contribute, join the 
+channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/) 
+
+
+## Join our Email List
+
+Hate emails? I do too. But if want to keep updated on important updates and releases, 
+you should subscribe to our email list on the [SaaS Startup Kit website](https://saasstartupkit.com/). 
+We will only email when it is really really important. Other than that, you won't recieve 
+any email from us. 
 
 
 ## Motivation
@@ -94,6 +110,17 @@ Instead a comprehensive CI pipeline is provided to create scaleable serverless i
 5. Observability - Ensure the code is running as expected in a remote environment. This project implements Datadog to 
 facilitate exposing metrics, logs and request tracing to obverse and validate your services are stable and responsive 
  for your clients (hopefully paying clients). 
+
+
+## Contributions
+
+We :heart: contributions.
+
+Have you had a good experience with SaaS Startup Kit? Why not share some love and contribute code?
+
+Thank you to all those that have contributed to this project and are using it in their projects. You can find a 
+CONTRIBUTORS file where we keep a list of contributors to the project. If you contribute a PR please consider adding 
+your name there. 
 
 
 ## Description
@@ -682,25 +709,6 @@ For additional details refer to [bindvars](https://jmoiron.github.io/sqlx/#bindv
 
 We are in the process of writing more documentation about this code. We welcome you to make enhancements to this 
 documentation or just send us your feedback and suggestions :wink:
-
-
-
-## Contributions
-
-We :heart: contributions.
-
-Have you had a good experience with SaaS Startup Kit? Why not share some love and contribute code?
-
-Thank you to all those that have contributed to this project and are using it in their projects. You can find a 
-CONTRIBUTORS file where we keep a list of contributors to the project. If you contribute a PR please consider adding 
-your name there. 
-
-
-
-## Join us on Gopher Slack
-
-If you are having problems installing, troubles getting the project running or would like to contribute, join the 
-channel #saas-starter-kit on [Gopher Slack](http://invite.slack.golangbridge.org/) 
 
 
 

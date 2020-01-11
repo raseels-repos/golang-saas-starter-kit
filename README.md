@@ -27,6 +27,7 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
 
 
 <!-- toc -->
+## Table of Contents
 
 - [Join Us on Gopher Slack](#join-us-on-gopher-slack)
 - [Join our Email List](#join-our-email-list)

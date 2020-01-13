@@ -55,6 +55,7 @@
                                         <div class="form-control-select-wrapper">
                                             <select id="selectAccountCountry" name="Account.Country" placeholder="Country" required
                                                      class="form-control form-control-select-box {{ ValidationFieldClass $.validationErrors "Account.Country" }}">
+                                                <option value="">Country</option>
                                                 {{ range $i := $.countries }}
                                                     {{ $hasGeonames := false }}
                                                     {{ range $c := $.geonameCountries }}

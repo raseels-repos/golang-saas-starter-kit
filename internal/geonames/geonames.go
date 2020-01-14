@@ -201,7 +201,7 @@ func (repo *Repository) GetGeonameCountry(ctx context.Context, country string) (
 	var err error
 	var resp *http.Response
 
-	u := fmt.Sprintf("http://download.geonames.org/export/zip/%s.zip", country)
+	u := fmt.Sprintf("http://www.geonames.org/export/zip/%s.zip", country)
 
 	h := fmt.Sprintf("%x", md5.Sum([]byte(u)))
 	cp := filepath.Join(os.TempDir(), h+".zip")

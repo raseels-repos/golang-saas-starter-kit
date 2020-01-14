@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path"
@@ -200,7 +201,8 @@ func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er
 	data := map[string]interface{}{
 		"StatusCode": resp.StatusCode,
 		"Error":      resp.Error,
-		"Details":    resp.Details,
+		"Details":    template.HTML(resp.Details),
+		"StackTrace": template.HTML(resp.StackTrace),
 		"Fields":     resp.Fields,
 	}
 

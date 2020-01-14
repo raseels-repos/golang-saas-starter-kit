@@ -10,6 +10,9 @@
             {{ if .Details }}
                 <p class="text-gray-500 mb-0">{{ .Details }}</p>
             {{ end }}
+            {{ if .StackTrace }}
+                <p class="text-gray-500 mb-0">{{ .StackTrace }}</p>
+            {{ end }}
         </div>
     </div>
 {{ end }}

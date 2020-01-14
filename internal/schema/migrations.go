@@ -245,6 +245,9 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					countries = []string{"US"}
 				}
 
+				fmt.Println("isUnittest", isUnittest)
+				fmt.Println("countries", countries)
+
 				ncol := 12
 				fn := func(geoNames []geonames.Geoname) error {
 					valueStrings := make([]string, 0, len(geoNames))
@@ -282,10 +285,10 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				}
 				start := time.Now()
 				for _, country := range countries {
-					//fmt.Println("LoadGeonames: start country: ", country)
+					log.Println("LoadGeonames: start country: ", country)
 					v, err := geoRepo.GetGeonameCountry(context.Background(), country)
 					if err != nil {
-						return errors.WithStack(err)
+						return errors.WithMessagef(err, "Failed to load country %s", country)
 					}
 					//fmt.Println("Geoname records: ", len(v))
 					// Max argument values of Postgres is about 54460. So the batch size for bulk insert is selected 4500*12 (ncol)
@@ -297,25 +300,25 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					if n == 0 {
 						err := fn(v)
 						if err != nil {
-							return errors.WithStack(err)
+							return err
 						}
 					} else {
 						for i := 0; i < n; i++ {
 							vn := v[i*batch : (i+1)*batch]
 							err := fn(vn)
 							if err != nil {
-								return errors.WithStack(err)
+								return err
 							}
 							if n > 0 && n%25 == 0 {
 								time.Sleep(200)
 							}
 						}
 						if len(v)%batch > 0 {
-							fmt.Println("Remain part: ", len(v)-n*batch)
+							log.Printf("Remain part: %d\n", len(v)-n*batch)
 							vn := v[n*batch:]
 							err := fn(vn)
 							if err != nil {
-								return errors.WithStack(err)
+								return err
 							}
 						}
 					}

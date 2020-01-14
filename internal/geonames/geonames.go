@@ -17,9 +17,7 @@ import (
 	"time"
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-
 	"github.com/huandu/go-sqlbuilder"
-	//	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sethgrid/pester"
 	"github.com/shopspring/decimal"
@@ -37,15 +35,15 @@ func ValidGeonameCountries(ctx context.Context) []string {
 		return []string{"US"}
 	}
 	return []string{
-		"AD", "AR", "AS", "AT", "AU", "AX", "BD", "BE", "BG", "BM",
-		"BR", "BY", "CA", "CH", "CO", "CR", "CZ", "DE", "DK", "DO",
+		"AD", "AR", "AS", "AT", "AU", "AX", "BD", "BE", "BG",
+		"BR", "CA", "CH", "CZ", "DE", "DK", "DO",
 		"DZ", "ES", "FI", "FO", "FR", "GB", "GF", "GG", "GL", "GP",
-		"GT", "GU", "HR", "HU", "IE", "IM", "IN", "IS", "IT", "JE",
-		"JP", "LI", "LK", "LT", "LU", "LV", "MC", "MD", "MH", "MK",
-		"MP", "MQ", "MT", "MX", "MY", "NC", "NL", "NO", "NZ", "PH",
+		"GT", "GU", "HR", "HU", "IM", "IN", "IS", "IT", "JE",
+		"JP", "LI", "LK", "LT", "LU", "MC", "MD", "MH", "MK",
+		"MP", "MQ", "MX", "MY", "NL", "NO", "NZ", "PH",
 		"PK", "PL", "PM", "PR", "PT", "RE", "RO", "RU", "SE", "SI",
-		"SJ", "SK", "SM", "TH", "TR", "UA", "US", "UY", "VA", "VI",
-		"WF", "YT", "ZA"}
+		"SJ", "SK", "SM", "TH", "TR", "US", "VA", "VI",
+		"YT", "ZA"}
 }
 
 // FindGeonames ....

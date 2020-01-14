@@ -47,6 +47,8 @@ ADD resources/templates/shared /templates/shared
 ADD configs/fresh-auto-reload.conf /runner.conf
 
 ENV TEMPLATE_DIR=/templates
+ENV SHARED_TEMPLATE_DIR=/templates/shared
+ENV STATIC_DIR=/static
 
 WORKDIR ${code_path}
 

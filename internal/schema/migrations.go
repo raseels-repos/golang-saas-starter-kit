@@ -245,9 +245,6 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 					countries = []string{"US"}
 				}
 
-				fmt.Println("isUnittest", isUnittest)
-				fmt.Println("countries", countries)
-
 				ncol := 12
 				fn := func(geoNames []geonames.Geoname) error {
 					valueStrings := make([]string, 0, len(geoNames))

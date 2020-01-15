@@ -41,7 +41,7 @@ require (
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/urfave/cli v1.22.2
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	gitlab.com/geeks-accelerator/oss/devops v1.0.54
+	gitlab.com/geeks-accelerator/oss/devops v1.0.57
 	golang.org/x/crypto v0.0.0-20200109152110-61a87790db17
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1 // indirect

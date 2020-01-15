@@ -96,6 +96,9 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 		return cfg, err
 	}
 
+	// Set the Aws Secret Prefix to the Go module name to prevent possible namespace conflict.
+	cfg.AwsSecretPrefix = modDetails.GoModName
+
 	// ProjectRoot should be the root directory for the project.
 	cfg.ProjectRoot = modDetails.ProjectRoot
 
@@ -489,8 +492,8 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 						"s3:GetObject",
 					},
 					Resource: []string{
-						"arn:aws:::" + cfg.AwsS3BucketPublic.BucketName + "/*",
-						"arn:aws:::" + cfg.AwsS3BucketPrivate.BucketName + "/*",
+						"arn:aws:s3:::" + cfg.AwsS3BucketPublic.BucketName + "/*",
+						"arn:aws:s3:::" + cfg.AwsS3BucketPrivate.BucketName + "/*",
 					},
 				},
 				{

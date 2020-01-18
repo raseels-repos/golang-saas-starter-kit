@@ -217,6 +217,9 @@ func NewTemplateRenderer(templateDir string, enableHotReload bool, globalViewDat
 	// Recursively loop through all folders/files in the template directory and group them by their
 	// template type. They are filename / filepath for lookup on render.
 	err := filepath.Walk(templateDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return errors.WithMessagef(err, "Failed to list directory %s", path)
+		}
 		dir := filepath.Base(filepath.Dir(path))
 
 		// Skip directories.

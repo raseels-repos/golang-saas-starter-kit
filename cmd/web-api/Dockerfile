@@ -1,3 +1,8 @@
+# To manully execute build locally use:
+#   docker build -f cmd/web-api/Dockerfile  --build-arg name=web-api .
+# This uses a multi-stage docker file. You can use target to build a specific stage.
+#   docker build -f cmd/web-api/Dockerfile  --build-arg name=web-api --target dev .
+
 FROM golang:1.13.5-alpine3.11 AS build_base_golang
 
 LABEL maintainer="lee@geeksinthewoods.com"
@@ -60,20 +65,21 @@ COPY internal ./internal
 
 # Copy cmd specific packages.
 COPY ${code_path} ${code_path}
-COPY ${code_path}/templates /templates
-#COPY ${code_path}/static /static
+COPY ${code_path}/templates /build/templates
+#COPY ${code_path}/static /build/static
 
 # Copy the global templates.
-ADD resources/templates/shared /templates/shared
-ADD configs/fresh-auto-reload.conf /runner.conf
+ADD resources/templates/shared /build/templates/shared
+ADD configs/fresh-auto-reload.conf /build/runner.conf
 
-ENV TEMPLATE_DIR=/templates
-ENV SHARED_TEMPLATE_DIR=/templates/shared
-#ENV STATIC_DIR=/static
+# These need to be relative paths for Hot reloads to work with docker-compose.
+ENV TEMPLATE_DIR=./templates
+ENV SHARED_TEMPLATE_DIR=../../resources/templates/shared
+#ENV STATIC_DIR=./static
 
 WORKDIR ${code_path}
 
-ENTRYPOINT ["fresh", "-c", "/runner.conf"]
+ENTRYPOINT ["fresh", "-c", "/build/runner.conf"]
 
 FROM dev AS builder
 
@@ -88,9 +94,7 @@ FROM alpine:3.11
 RUN apk --update --no-cache add \
             tzdata ca-certificates curl openssl
 
-COPY --from=builder /gosrv /
-#COPY --from=builder /static /static
-COPY --from=builder /templates /templates
+COPY --from=builder /build /
 
 ENV TEMPLATE_DIR=/templates
 ENV SHARED_TEMPLATE_DIR=/templates/shared

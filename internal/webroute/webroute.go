@@ -1,12 +1,13 @@
-package project_route
+package webroute
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"net"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type ProjectRoute struct {

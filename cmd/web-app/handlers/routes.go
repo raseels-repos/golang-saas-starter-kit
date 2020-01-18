@@ -18,7 +18,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -56,7 +56,7 @@ type AppContext struct {
 	StaticDir         string
 	TemplateDir       string
 	Renderer          web.Renderer
-	ProjectRoute      project_route.ProjectRoute
+	ProjectRoute      webroute.ProjectRoute
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
 	AwsSession        *session.Session

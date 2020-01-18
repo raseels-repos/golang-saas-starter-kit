@@ -8,7 +8,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/pkg/errors"
@@ -21,7 +21,7 @@ import (
 type Root struct {
 	Renderer     web.Renderer
 	Sitemap      *stm.Sitemap
-	ProjectRoute project_route.ProjectRoute
+	ProjectRoute webroute.ProjectRoute
 }
 
 // Index determines if the user has authentication and loads the associated page.

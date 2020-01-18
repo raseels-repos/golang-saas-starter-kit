@@ -28,7 +28,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -437,7 +437,7 @@ func main() {
 	// =========================================================================
 	// Init repositories and AppContext
 
-	projectRoute, err := project_route.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
+	projectRoute, err := webroute.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
 	if err != nil {
 		log.Fatalf("main : project routes : %s: %+v", cfg.Service.BaseUrl, err)
 	}

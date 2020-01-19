@@ -1,4 +1,4 @@
-{{define "title"}}Create Project{{end}}
+{{define "title"}}Create Checklist{{end}}
 {{define "style"}}
 
 {{end}}
@@ -6,13 +6,13 @@
 
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/projects">Projects</a></li>
+            <li class="breadcrumb-item"><a href="/checklists">Checklists</a></li>
             <li class="breadcrumb-item active" aria-current="page">Create</li>
         </ol>
     </nav>
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Create Project</h1>
+        <h1 class="h3 mb-0 text-gray-800">Create Checklist</h1>
     </div>
 
     <form class="user" method="post" novalidate>
@@ -23,10 +23,10 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label for="inputName">Project Name</label>
+                            <label for="inputName">Checklist Name</label>
                             <input type="text" id="inputName"
                                    class="form-control {{ ValidationFieldClass $.validationErrors "Name" }}"
-                                   placeholder="Enter name for your project" name="Name"value="{{ .form.Name }}" required>
+                                   placeholder="Enter name for your checklist" name="Name"value="{{ .form.Name }}" required>
                             {{template "invalid-feedback" dict "fieldName" "Name" "validationDefaults" $.validationDefaults "validationErrors" $.validationErrors }}
                         </div>
                     </div>
@@ -37,7 +37,7 @@
         <div class="row mt-4">
             <div class="col">
                 <input id="btnSubmit" type="submit" name="action" value="Save" class="btn btn-primary"/>
-                <a href="/projects" class="ml-2 btn btn-secondary" >Cancel</a>
+                <a href="/checklists" class="ml-2 btn btn-secondary" >Cancel</a>
             </div>
         </div>
 

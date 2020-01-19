@@ -662,6 +662,21 @@ func migrationList(ctx context.Context, db *sqlx.DB, log *log.Logger, isUnittest
 				return nil
 			},
 		},
+		// Remove default value for users.timezone.
+		{
+			ID: "20200118-01",
+			Migrate: func(tx *sql.Tx) error {
+				q1 := `ALTER TABLE projects RENAME TO checklists`
+				if _, err := tx.Exec(q1); err != nil {
+					return errors.Wrapf(err, "Query failed %s", q1)
+				}
+
+				return nil
+			},
+			Rollback: func(tx *sql.Tx) error {
+				return nil
+			},
+		},
 	}
 }
 

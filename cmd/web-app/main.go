@@ -23,6 +23,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-app/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
@@ -33,13 +34,12 @@ import (
 	template_renderer "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/tmplrender"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -440,20 +440,20 @@ func main() {
 	// =========================================================================
 	// Init repositories and AppContext
 
-	projectRoute, err := webroute.New(cfg.Project.WebApiBaseUrl, cfg.Service.BaseUrl)
+	webRoute, err := webroute.New(cfg.Project.WebApiBaseUrl, cfg.Service.BaseUrl)
 	if err != nil {
-		log.Fatalf("main : project routes : %+v", cfg.Service.BaseUrl, err)
+		log.Fatalf("main : checklist routes : %+v", cfg.Service.BaseUrl, err)
 	}
 
-	usrRepo := user.NewRepository(masterDb, projectRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
+	usrRepo := user.NewRepository(masterDb, webRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
 	usrAccRepo := user_account.NewRepository(masterDb)
 	accRepo := account.NewRepository(masterDb)
 	geoRepo := geonames.NewRepository(masterDb)
 	accPrefRepo := account_preference.NewRepository(masterDb)
 	authRepo := user_auth.NewRepository(masterDb, authenticator, usrRepo, usrAccRepo, accPrefRepo)
 	signupRepo := signup.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo)
-	inviteRepo := invite.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo, projectRoute.UserInviteAccept, notifyEmail, cfg.Project.SharedSecretKey)
-	prjRepo := project.NewRepository(masterDb)
+	inviteRepo := invite.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo, webRoute.UserInviteAccept, notifyEmail, cfg.Project.SharedSecretKey)
+	chklstRepo := checklist.NewRepository(masterDb)
 
 	appCtx := &handlers.AppContext{
 		Log:             log,
@@ -463,7 +463,7 @@ func main() {
 		Redis:           redisClient,
 		TemplateDir:     cfg.Service.TemplateDir,
 		StaticDir:       cfg.Service.StaticFiles.Dir,
-		ProjectRoute:    projectRoute,
+		WebRoute:        webRoute,
 		UserRepo:        usrRepo,
 		UserAccountRepo: usrAccRepo,
 		AccountRepo:     accRepo,
@@ -472,7 +472,7 @@ func main() {
 		GeoRepo:         geoRepo,
 		SignupRepo:      signupRepo,
 		InviteRepo:      inviteRepo,
-		ProjectRepo:     prjRepo,
+		ChecklistRepo:   chklstRepo,
 		Authenticator:   authenticator,
 		AwsSession:      awsSession,
 	}
@@ -525,13 +525,14 @@ func main() {
 		staticS3UrlFormatter = func(p string) string {
 			// When the path starts with a forward slash its referencing a local file,
 			// make sure the static file prefix is included
-			if strings.HasPrefix(p, "/") || !strings.HasPrefix(p, "://") {
+			if (strings.HasPrefix(p, "/") || !strings.HasPrefix(p, "://")) && !strings.HasPrefix(p, cfg.Service.StaticFiles.S3Prefix) {
 				p = filepath.Join(cfg.Service.StaticFiles.S3Prefix, p)
 			}
+
 			return s3UrlFormatter(p)
 		}
 	} else {
-		staticS3UrlFormatter = projectRoute.WebAppUrl
+		staticS3UrlFormatter = webRoute.WebAppUrl
 	}
 
 	// staticUrlFormatter is a help function used by template functions defined below.
@@ -920,11 +921,12 @@ func main() {
 	tmplFuncs["S3ImgUrl"] = func(ctx context.Context, p string, size int) string {
 		imgUrl := imgUrlFormatter(p)
 		if cfg.Service.StaticFiles.ImgResizeEnabled {
+
 			var rerr error
 			imgUrl, rerr = img_resize.S3ImgUrl(ctx, redisClient, staticS3UrlFormatter, awsSession, cfg.Aws.S3BucketPublic, imgResizeS3KeyPrefix, imgUrl, size)
 			if rerr != nil {
 				imgUrl = "error"
-				log.Printf("main : S3ImgUrl : %s - %s\n", p, rerr)
+				log.Printf("main : S3ImgUrl : %s - %+v\n", p, rerr)
 			}
 		}
 		return imgUrl

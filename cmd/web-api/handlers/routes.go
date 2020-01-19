@@ -7,13 +7,13 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	saasSwagger "geeks-accelerator/oss/saas-starter-kit/internal/mid/saas-swagger"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	_ "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
@@ -36,7 +36,7 @@ type AppContext struct {
 	AuthRepo          *user_auth.Repository
 	SignupRepo        *signup.Repository
 	InviteRepo        *invite.Repository
-	ProjectRepo       *project.Repository
+	ChecklistRepo     *checklist.Repository
 	Authenticator     *auth.Authenticator
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
@@ -74,7 +74,7 @@ func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
 	// Register example endpoints.
 	ex := Example{
-		Project: appCtx.ProjectRepo,
+		Checklist: appCtx.ChecklistRepo,
 	}
 	app.Handle("GET", "/v1/examples/error-response", ex.ErrorResponse)
 
@@ -119,16 +119,16 @@ func API(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	}
 	app.Handle("POST", "/v1/signup", s.Signup)
 
-	// Register project.
-	p := Projects{
-		Repository: appCtx.ProjectRepo,
+	// Register checklist.
+	p := Checklists{
+		Repository: appCtx.ChecklistRepo,
 	}
-	app.Handle("GET", "/v1/projects", p.Find, mid.AuthenticateHeader(appCtx.Authenticator))
-	app.Handle("POST", "/v1/projects", p.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/v1/projects/:id", p.Read, mid.AuthenticateHeader(appCtx.Authenticator))
-	app.Handle("PATCH", "/v1/projects", p.Update, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("PATCH", "/v1/projects/archive", p.Archive, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("DELETE", "/v1/projects/:id", p.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/checklists", p.Find, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("POST", "/v1/checklists", p.Create, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/v1/checklists/:id", p.Read, mid.AuthenticateHeader(appCtx.Authenticator))
+	app.Handle("PATCH", "/v1/checklists", p.Update, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("PATCH", "/v1/checklists/archive", p.Archive, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("DELETE", "/v1/checklists/:id", p.Delete, mid.AuthenticateHeader(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
 
 	// Register swagger documentation.
 	// TODO: Add authentication. Current authenticator requires an Authorization header

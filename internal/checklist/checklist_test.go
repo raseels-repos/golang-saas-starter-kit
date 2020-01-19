@@ -1,4 +1,4 @@
-package project
+package checklist
 
 import (
 	"os"
@@ -37,7 +37,7 @@ func TestFindRequestQuery(t *testing.T) {
 		offset uint = 34
 	)
 
-	req := ProjectFindRequest{
+	req := ChecklistFindRequest{
 		Where: "field1 = ? or field2 = ?",
 		Args: []interface{}{
 			"lee brown",
@@ -53,7 +53,7 @@ func TestFindRequestQuery(t *testing.T) {
 		Offset: &offset,
 	}
 
-	expected := "SELECT " + projectMapColumns + " FROM " + projectTableName + " WHERE (field1 = ? or field2 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
+	expected := "SELECT " + checklistMapColumns + " FROM " + checklistTableName + " WHERE (field1 = ? or field2 = ?) ORDER BY id asc, created_at desc LIMIT 12 OFFSET 34"
 	res, args := findRequestQuery(req)
 	if diff := cmp.Diff(res.String(), expected); diff != "" {
 		t.Fatalf("\t%s\tExpected result query to match. Diff:\n%s", tests.Failed, diff)
@@ -101,9 +101,6 @@ func TestApplyClaimsSelect(t *testing.T) {
 
 				t.Logf("\t%s\tapplyClaimsSelect ok.", tests.Success)
 			}
-
 		}
-
 	}
-
 }

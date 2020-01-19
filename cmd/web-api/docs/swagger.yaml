@@ -673,7 +673,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/project.ProjectResponse'
+              $ref: '#/definitions/checklist.ProjectResponse'
             type: array
         "400":
           description: Bad Request
@@ -691,18 +691,18 @@ paths:
       - OAuth2Password: []
       summary: List projects
       tags:
-      - project
+      - checklist
     patch:
       consumes:
       - application/json
-      description: Update updates the specified project in the system.
+      description: Update updates the specified checklist in the system.
       parameters:
       - description: Update fields
         in: body
         name: data
         required: true
         schema:
-          $ref: '#/definitions/project.ProjectUpdateRequest'
+          $ref: '#/definitions/checklist.ProjectUpdateRequest'
           type: object
       produces:
       - application/json
@@ -722,20 +722,20 @@ paths:
             $ref: '#/definitions/weberror.ErrorResponse'
       security:
       - OAuth2Password: []
-      summary: Update project by ID
+      summary: Update checklist by ID
       tags:
-      - project
+      - checklist
     post:
       consumes:
       - application/json
-      description: Create inserts a new project into the system.
+      description: Create inserts a new checklist into the system.
       parameters:
       - description: Project details
         in: body
         name: data
         required: true
         schema:
-          $ref: '#/definitions/project.ProjectCreateRequest'
+          $ref: '#/definitions/checklist.ProjectCreateRequest'
           type: object
       produces:
       - application/json
@@ -743,7 +743,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/project.ProjectResponse'
+            $ref: '#/definitions/checklist.ProjectResponse'
         "400":
           description: Bad Request
           schema:
@@ -762,14 +762,14 @@ paths:
             $ref: '#/definitions/weberror.ErrorResponse'
       security:
       - OAuth2Password: []
-      summary: Create new project.
+      summary: Create new checklist.
       tags:
-      - project
+      - checklist
   /projects/{id}:
     delete:
       consumes:
       - application/json
-      description: Delete removes the specified project from the system.
+      description: Delete removes the specified checklist from the system.
       parameters:
       - description: Project ID
         in: path
@@ -794,13 +794,13 @@ paths:
             $ref: '#/definitions/weberror.ErrorResponse'
       security:
       - OAuth2Password: []
-      summary: Delete project by ID
+      summary: Delete checklist by ID
       tags:
-      - project
+      - checklist
     get:
       consumes:
       - application/json
-      description: Read returns the specified project from the system.
+      description: Read returns the specified checklist from the system.
       parameters:
       - description: Project ID
         in: path
@@ -813,7 +813,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/project.ProjectResponse'
+            $ref: '#/definitions/checklist.ProjectResponse'
         "400":
           description: Bad Request
           schema:
@@ -828,21 +828,21 @@ paths:
             $ref: '#/definitions/weberror.ErrorResponse'
       security:
       - OAuth2Password: []
-      summary: Get project by ID.
+      summary: Get checklist by ID.
       tags:
-      - project
+      - checklist
   /projects/archive:
     patch:
       consumes:
       - application/json
-      description: Archive soft-deletes the specified project from the system.
+      description: Archive soft-deletes the specified checklist from the system.
       parameters:
       - description: Update fields
         in: body
         name: data
         required: true
         schema:
-          $ref: '#/definitions/project.ProjectArchiveRequest'
+          $ref: '#/definitions/checklist.ProjectArchiveRequest'
           type: object
       produces:
       - application/json
@@ -862,9 +862,9 @@ paths:
             $ref: '#/definitions/weberror.ErrorResponse'
       security:
       - OAuth2Password: []
-      summary: Archive project by ID
+      summary: Archive checklist by ID
       tags:
-      - project
+      - checklist
   /signup:
     post:
       consumes:

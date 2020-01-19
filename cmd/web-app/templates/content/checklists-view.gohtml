@@ -1,4 +1,4 @@
-{{define "title"}}Project - {{ .project.Name }}{{end}}
+{{define "title"}}Checklist - {{ .checklist.Name }}{{end}}
 {{define "style"}}
 
 {{end}}
@@ -6,29 +6,29 @@
 
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/projects">Projects</a></li>
-            <li class="breadcrumb-item"><a href="{{ .urlProjectsView }}">{{ .project.Name }}</a></li>
+            <li class="breadcrumb-item"><a href="/checklists">Checklists</a></li>
+            <li class="breadcrumb-item"><a href="{{ .urlChecklistsView }}">{{ .checklist.Name }}</a></li>
             <li class="breadcrumb-item active" aria-current="page">View</li>
         </ol>
     </nav>
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">{{ .project.Name }}</h1>
-        <!-- a href="{{ .urlProjectsUpdate }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a -->
+        <h1 class="h3 mb-0 text-gray-800">{{ .checklist.Name }}</h1>
+        <!-- a href="{{ .urlChecklistsUpdate }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="far fa-edit fa-sm text-white-50 mr-1"></i>Edit Details</a -->
     </div>
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-dark">Project Details</h6>
+            <h6 class="m-0 font-weight-bold text-dark">Checklist Details</h6>
             <div class="dropdown no-arrow show">
                 <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
                     <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
                 </a>
                 <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink" x-placement="bottom-end" style="position: absolute; transform: translate3d(-156px, 19px, 0px); top: 0px; left: 0px; will-change: transform;">
                     <div class="dropdown-header">Actions</div>
-                    <a class="dropdown-item" href="{{ .urlProjectsUpdate }}">Update Details</a>
+                    <a class="dropdown-item" href="{{ .urlChecklistsUpdate }}">Update Details</a>
                     {{ if HasRole $._Ctx "admin" }}
-                        <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive Project" class="dropdown-item"></form>
+                        <form method="post"><input type="hidden" name="action" value="archive" /><input type="submit" value="Archive Checklist" class="dropdown-item"></form>
                     {{ end }}
                 </div>
             </div>
@@ -38,16 +38,16 @@
                 <div class="col-md-6">
                     <p>
                         <small>Name</small><br/>
-                        <b>{{ .project.Name }}</b>
+                        <b>{{ .checklist.Name }}</b>
                     </p>
                     <p>
                         <small>Status</small><br/>
-                        {{ if .project }}
+                        {{ if .checklist }}
                             <b>
-                                {{ if eq .project.Status.Value "active" }}
-                                    <span class="text-green"><i class="fas fa-circle mr-1"></i>{{ .project.Status.Title }}</span>
+                                {{ if eq .checklist.Status.Value "active" }}
+                                    <span class="text-green"><i class="fas fa-circle mr-1"></i>{{ .checklist.Status.Title }}</span>
                                 {{else}}
-                                    <span class="text-orange"><i class="fas fa-circle-notch mr-1"></i>{{.project.Status.Title }}</span>
+                                    <span class="text-orange"><i class="fas fa-circle-notch mr-1"></i>{{.checklist.Status.Title }}</span>
                                 {{end}}
                             </b>
                         {{ end }}
@@ -56,7 +56,7 @@
                 <div class="col-md-6">
                     <p>
                         <small>ID</small><br/>
-                        <b>{{ .project.ID }}</b>
+                        <b>{{ .checklist.ID }}</b>
                     </p>
                 </div>
             </div>

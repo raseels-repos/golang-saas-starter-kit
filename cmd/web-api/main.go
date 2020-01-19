@@ -22,18 +22,18 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -437,19 +437,19 @@ func main() {
 	// =========================================================================
 	// Init repositories and AppContext
 
-	projectRoute, err := webroute.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
+	webRoute, err := webroute.New(cfg.Service.BaseUrl, cfg.Project.WebAppBaseUrl)
 	if err != nil {
-		log.Fatalf("main : project routes : %s: %+v", cfg.Service.BaseUrl, err)
+		log.Fatalf("main : checklist routes : %s: %+v", cfg.Service.BaseUrl, err)
 	}
 
-	usrRepo := user.NewRepository(masterDb, projectRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
+	usrRepo := user.NewRepository(masterDb, webRoute.UserResetPassword, notifyEmail, cfg.Project.SharedSecretKey)
 	usrAccRepo := user_account.NewRepository(masterDb)
 	accRepo := account.NewRepository(masterDb)
 	accPrefRepo := account_preference.NewRepository(masterDb)
 	authRepo := user_auth.NewRepository(masterDb, authenticator, usrRepo, usrAccRepo, accPrefRepo)
 	signupRepo := signup.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo)
-	inviteRepo := invite.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo, projectRoute.UserInviteAccept, notifyEmail, cfg.Project.SharedSecretKey)
-	prjRepo := project.NewRepository(masterDb)
+	inviteRepo := invite.NewRepository(masterDb, usrRepo, usrAccRepo, accRepo, webRoute.UserInviteAccept, notifyEmail, cfg.Project.SharedSecretKey)
+	chklstRepo := checklist.NewRepository(masterDb)
 
 	appCtx := &handlers.AppContext{
 		Log:             log,
@@ -463,7 +463,7 @@ func main() {
 		AuthRepo:        authRepo,
 		SignupRepo:      signupRepo,
 		InviteRepo:      inviteRepo,
-		ProjectRepo:     prjRepo,
+		ChecklistRepo:   chklstRepo,
 		Authenticator:   authenticator,
 	}
 

@@ -177,7 +177,7 @@ func S3ImgSrc(ctx context.Context, redisClient *redistrace.Client, s3UrlFormatte
 			Prefix: aws.String(s3Path),
 		})
 		if err != nil {
-			return defaultSrc, errors.WithStack(err)
+			return defaultSrc, errors.WithMessagef(err, "Failed to list objects for s3://%s/%s", s3Bucket, s3Path)
 		}
 
 		// Loop through all the S3 objects and store by in map by

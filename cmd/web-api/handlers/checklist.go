@@ -6,28 +6,28 @@ import (
 	"strconv"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
 )
 
-// Project represents the Project API method handler set.
-type Projects struct {
-	Repository *project.Repository
+// Checklist represents the Checklist API method handler set.
+type Checklists struct {
+	Repository *checklist.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER IF NEEDED.
 }
 
 // Find godoc
-// TODO: Need to implement unittests on projects/find endpoint. There are none.
-// @Summary List projects
-// @Description Find returns the existing projects in the system.
-// @Tags project
+// TODO: Need to implement unittests on checklists/find endpoint. There are none.
+// @Summary List checklists
+// @Description Find returns the existing checklists in the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
@@ -36,18 +36,18 @@ type Projects struct {
 // @Param limit				query integer  	false 	"Limit, example: 10"
 // @Param offset			query integer  	false 	"Offset, example: 20"
 // @Param include-archived query boolean 	false 	"Included Archived, example: false"
-// @Success 200 {array} project.ProjectResponse
+// @Success 200 {array} checklist.ChecklistResponse
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects [get]
-func (h *Projects) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists [get]
+func (h *Checklists) Find(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
 	}
 
-	var req project.ProjectFindRequest
+	var req checklist.ChecklistFindRequest
 
 	// Handle where query value if set.
 	if v := r.URL.Query().Get("where"); v != "" {
@@ -113,7 +113,7 @@ func (h *Projects) Find(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return err
 	}
 
-	var resp []*project.ProjectResponse
+	var resp []*checklist.ChecklistResponse
 	for _, m := range res {
 		resp = append(resp, m.Response(ctx))
 	}
@@ -122,19 +122,19 @@ func (h *Projects) Find(ctx context.Context, w http.ResponseWriter, r *http.Requ
 }
 
 // Read godoc
-// @Summary Get project by ID.
-// @Description Read returns the specified project from the system.
-// @Tags project
+// @Summary Get checklist by ID.
+// @Description Read returns the specified checklist from the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
-// @Param id path string true "Project ID"
-// @Success 200 {object} project.ProjectResponse
+// @Param id path string true "Checklist ID"
+// @Success 200 {object} checklist.ChecklistResponse
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects/{id} [get]
-func (h *Projects) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists/{id} [get]
+func (h *Checklists) Read(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, ok := ctx.Value(auth.Key).(auth.Claims)
 	if !ok {
 		return errors.New("claims missing from context")
@@ -151,14 +151,14 @@ func (h *Projects) Read(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		includeArchived = b
 	}
 
-	res, err := h.Repository.Read(ctx, claims, project.ProjectReadRequest{
+	res, err := h.Repository.Read(ctx, claims, checklist.ChecklistReadRequest{
 		ID:              params["id"],
 		IncludeArchived: includeArchived,
 	})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrNotFound:
+		case checklist.ErrNotFound:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusNotFound))
 		default:
 			return errors.Wrapf(err, "ID: %s", params["id"])
@@ -169,20 +169,20 @@ func (h *Projects) Read(ctx context.Context, w http.ResponseWriter, r *http.Requ
 }
 
 // Create godoc
-// @Summary Create new project.
-// @Description Create inserts a new project into the system.
-// @Tags project
+// @Summary Create new checklist.
+// @Description Create inserts a new checklist into the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
-// @Param data body project.ProjectCreateRequest true "Project details"
-// @Success 201 {object} project.ProjectResponse
+// @Param data body checklist.ChecklistCreateRequest true "Checklist details"
+// @Success 201 {object} checklist.ChecklistResponse
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 404 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects [post]
-func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists [post]
+func (h *Checklists) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return err
 	}
 
-	var req project.ProjectCreateRequest
+	var req checklist.ChecklistCreateRequest
 	if err := web.Decode(ctx, r, &req); err != nil {
 		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
 			err = weberror.NewError(ctx, err, http.StatusBadRequest)
@@ -205,14 +205,14 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrForbidden:
+		case checklist.ErrForbidden:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
 			if ok {
 				return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusBadRequest))
 			}
-			return errors.Wrapf(err, "Project: %+v", &req)
+			return errors.Wrapf(err, "Checklist: %+v", &req)
 		}
 	}
 
@@ -220,19 +220,19 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 }
 
 // Read godoc
-// @Summary Update project by ID
-// @Description Update updates the specified project in the system.
-// @Tags project
+// @Summary Update checklist by ID
+// @Description Update updates the specified checklist in the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
-// @Param data body project.ProjectUpdateRequest true "Update fields"
+// @Param data body checklist.ChecklistUpdateRequest true "Update fields"
 // @Success 204
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects [patch]
-func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists [patch]
+func (h *Checklists) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -243,7 +243,7 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return err
 	}
 
-	var req project.ProjectUpdateRequest
+	var req checklist.ChecklistUpdateRequest
 	if err := web.Decode(ctx, r, &req); err != nil {
 		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
 			err = weberror.NewError(ctx, err, http.StatusBadRequest)
@@ -255,7 +255,7 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrForbidden:
+		case checklist.ErrForbidden:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
@@ -271,19 +271,19 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 }
 
 // Read godoc
-// @Summary Archive project by ID
-// @Description Archive soft-deletes the specified project from the system.
-// @Tags project
+// @Summary Archive checklist by ID
+// @Description Archive soft-deletes the specified checklist from the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
-// @Param data body project.ProjectArchiveRequest true "Update fields"
+// @Param data body checklist.ChecklistArchiveRequest true "Update fields"
 // @Success 204
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects/archive [patch]
-func (h *Projects) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists/archive [patch]
+func (h *Checklists) Archive(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	v, err := webcontext.ContextValues(ctx)
 	if err != nil {
 		return err
@@ -294,7 +294,7 @@ func (h *Projects) Archive(ctx context.Context, w http.ResponseWriter, r *http.R
 		return err
 	}
 
-	var req project.ProjectArchiveRequest
+	var req checklist.ChecklistArchiveRequest
 	if err := web.Decode(ctx, r, &req); err != nil {
 		if _, ok := errors.Cause(err).(*weberror.Error); !ok {
 			err = weberror.NewError(ctx, err, http.StatusBadRequest)
@@ -306,7 +306,7 @@ func (h *Projects) Archive(ctx context.Context, w http.ResponseWriter, r *http.R
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrForbidden:
+		case checklist.ErrForbidden:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)
@@ -322,30 +322,30 @@ func (h *Projects) Archive(ctx context.Context, w http.ResponseWriter, r *http.R
 }
 
 // Delete godoc
-// @Summary Delete project by ID
-// @Description Delete removes the specified project from the system.
-// @Tags project
+// @Summary Delete checklist by ID
+// @Description Delete removes the specified checklist from the system.
+// @Tags checklist
 // @Accept  json
 // @Produce  json
 // @Security OAuth2Password
-// @Param id path string true "Project ID"
+// @Param id path string true "Checklist ID"
 // @Success 204
 // @Failure 400 {object} weberror.ErrorResponse
 // @Failure 403 {object} weberror.ErrorResponse
 // @Failure 500 {object} weberror.ErrorResponse
-// @Router /projects/{id} [delete]
-func (h *Projects) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// @Router /checklists/{id} [delete]
+func (h *Checklists) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
 	err = h.Repository.Delete(ctx, claims,
-		project.ProjectDeleteRequest{ID: params["id"]})
+		checklist.ChecklistDeleteRequest{ID: params["id"]})
 	if err != nil {
 		cause := errors.Cause(err)
 		switch cause {
-		case project.ErrForbidden:
+		case checklist.ErrForbidden:
 			return web.RespondJsonError(ctx, w, weberror.NewError(ctx, err, http.StatusForbidden))
 		default:
 			_, ok := cause.(validator.ValidationErrors)

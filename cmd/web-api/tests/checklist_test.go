@@ -8,26 +8,26 @@ import (
 	"testing"
 	"time"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 	"github.com/pborman/uuid"
 )
 
-func mockProjectCreateRequest(accountID string) project.ProjectCreateRequest {
-	return project.ProjectCreateRequest{
+func mockChecklistCreateRequest(accountID string) checklist.ChecklistCreateRequest {
+	return checklist.ChecklistCreateRequest{
 		Name:      fmt.Sprintf("Moon Launch %s", uuid.NewRandom().String()),
 		AccountID: accountID,
 	}
 }
 
-// mockProject creates a new project for testing and associates it with the supplied account ID.
-func newMockProject(accountID string) *project.Project {
-	req := mockProjectCreateRequest(accountID)
-	p, err := appCtx.ProjectRepo.Create(tests.Context(), auth.Claims{}, req, time.Now().UTC().AddDate(-1, -1, -1))
+// mockChecklist creates a new checklist for testing and associates it with the supplied account ID.
+func newMockChecklist(accountID string) *checklist.Checklist {
+	req := mockChecklistCreateRequest(accountID)
+	p, err := appCtx.ChecklistRepo.Create(tests.Context(), auth.Claims{}, req, time.Now().UTC().AddDate(-1, -1, -1))
 	if err != nil {
 		panic(err)
 	}
@@ -35,25 +35,25 @@ func newMockProject(accountID string) *project.Project {
 	return p
 }
 
-// TestProjectCRUDAdmin tests all the project CRUD endpoints using an user with role admin.
-func TestProjectCRUDAdmin(t *testing.T) {
+// TestChecklistCRUDAdmin tests all the checklist CRUD endpoints using an user with role admin.
+func TestChecklistCRUDAdmin(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create.
-	var created project.ProjectResponse
+	var created checklist.ChecklistResponse
 	{
 		expectedStatus := http.StatusCreated
 
-		req := mockProjectCreateRequest(tr.Account.ID)
+		req := mockChecklistCreateRequest(tr.Account.ID)
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
+			"/v1/checklists",
 			req,
 			tr.Token,
 			tr.Claims,
@@ -68,7 +68,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual project.ProjectResponse
+		var actual checklist.ChecklistResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -79,12 +79,12 @@ func TestProjectCRUDAdmin(t *testing.T) {
 			"updated_at": web.NewTimeResponse(ctx, actual.UpdatedAt.Value),
 			"id":         actual.ID,
 			"account_id": req.AccountID,
-			"status":     web.NewEnumResponse(ctx, "active", project.ProjectStatus_ValuesInterface()...),
+			"status":     web.NewEnumResponse(ctx, "active", checklist.ChecklistStatus_ValuesInterface()...),
 			"created_at": web.NewTimeResponse(ctx, actual.CreatedAt.Value),
 			"name":       req.Name,
 		}
 
-		var expected project.ProjectResponse
+		var expected checklist.ChecklistResponse
 		if err := decodeMapToStruct(expectedMap, &expected); err != nil {
 			t.Logf("\t\tGot error : %+v\nActual results to format expected : \n", err)
 			printResultMap(ctx, w.Body.Bytes()) // used to help format expectedMap
@@ -107,7 +107,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/checklists/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -122,7 +122,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual project.ProjectResponse
+		var actual checklist.ChecklistResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -142,7 +142,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", randID),
+			fmt.Sprintf("/v1/checklists/%s", randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -166,7 +166,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    fmt.Sprintf("project %s not found: Entity not found", randID),
+			Details:    fmt.Sprintf("checklist %s not found: Entity not found", randID),
 			StackTrace: actual.StackTrace,
 		}
 
@@ -177,14 +177,14 @@ func TestProjectCRUDAdmin(t *testing.T) {
 	}
 
 	// Test Read with forbidden ID.
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenChecklist := newMockChecklist(newMockSignup().account.ID)
 	{
 		expectedStatus := http.StatusNotFound
 
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
+			fmt.Sprintf("/v1/checklists/%s", forbiddenChecklist.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -208,7 +208,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			Details:    fmt.Sprintf("checklist %s not found: Entity not found", forbiddenChecklist.ID),
 			StackTrace: actual.StackTrace,
 		}
 
@@ -226,8 +226,8 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
+			"/v1/checklists",
+			checklist.ChecklistUpdateRequest{
 				ID:   created.ID,
 				Name: &newName,
 			},
@@ -259,8 +259,8 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
+			"/v1/checklists/archive",
+			checklist.ChecklistArchiveRequest{
 				ID: created.ID,
 			},
 			tr.Token,
@@ -291,7 +291,7 @@ func TestProjectCRUDAdmin(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/checklists/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -315,24 +315,24 @@ func TestProjectCRUDAdmin(t *testing.T) {
 	}
 }
 
-// TestProjectCRUDUser tests all the project CRUD endpoints using an user with role project.
-func TestProjectCRUDUser(t *testing.T) {
+// TestChecklistCRUDUser tests all the checklist CRUD endpoints using an user with role checklist.
+func TestChecklistCRUDUser(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleUser]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create.
 	{
 		expectedStatus := http.StatusForbidden
 
-		req := mockProjectCreateRequest(tr.Account.ID)
+		req := mockChecklistCreateRequest(tr.Account.ID)
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
+			"/v1/checklists",
 			req,
 			tr.Token,
 			tr.Claims,
@@ -363,7 +363,7 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 
 	// Since role doesn't support create, bypass auth to test other endpoints.
-	created := newMockProject(tr.Account.ID).Response(ctx)
+	created := newMockChecklist(tr.Account.ID).Response(ctx)
 
 	// Test read.
 	{
@@ -372,7 +372,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/checklists/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -387,7 +387,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		}
 		t.Logf("\t%s\tReceived valid status code of %d.", tests.Success, w.Code)
 
-		var actual *project.ProjectResponse
+		var actual *checklist.ChecklistResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &actual); err != nil {
 			t.Logf("\t\tGot error : %+v", err)
 			t.Fatalf("\t%s\tDecode response body failed.", tests.Failed)
@@ -407,7 +407,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using random ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", randID),
+			fmt.Sprintf("/v1/checklists/%s", randID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -431,7 +431,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    fmt.Sprintf("project %s not found: Entity not found", randID),
+			Details:    fmt.Sprintf("checklist %s not found: Entity not found", randID),
 			StackTrace: actual.StackTrace,
 		}
 
@@ -442,14 +442,14 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 
 	// Test Read with forbidden ID.
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenChecklist := newMockChecklist(newMockSignup().account.ID)
 	{
 		expectedStatus := http.StatusNotFound
 
 		rt := requestTest{
 			fmt.Sprintf("Read %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodGet,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
+			fmt.Sprintf("/v1/checklists/%s", forbiddenChecklist.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -473,7 +473,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    fmt.Sprintf("project %s not found: Entity not found", forbiddenProject.ID),
+			Details:    fmt.Sprintf("checklist %s not found: Entity not found", forbiddenChecklist.ID),
 			StackTrace: actual.StackTrace,
 		}
 
@@ -491,8 +491,8 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Update %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
+			"/v1/checklists",
+			checklist.ChecklistUpdateRequest{
 				ID:   created.ID,
 				Name: &newName,
 			},
@@ -531,8 +531,8 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
+			"/v1/checklists/archive",
+			checklist.ChecklistArchiveRequest{
 				ID: created.ID,
 			},
 			tr.Token,
@@ -570,7 +570,7 @@ func TestProjectCRUDUser(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", created.ID),
+			fmt.Sprintf("/v1/checklists/%s", created.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -601,26 +601,26 @@ func TestProjectCRUDUser(t *testing.T) {
 	}
 }
 
-// TestProjectCreate validates create project endpoint.
-func TestProjectCreate(t *testing.T) {
+// TestChecklistCreate validates create checklist endpoint.
+func TestChecklistCreate(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test create with invalid data.
 	{
 		expectedStatus := http.StatusBadRequest
 
-		req := mockProjectCreateRequest(tr.Account.ID)
-		invalidStatus := project.ProjectStatus("invalid status")
+		req := mockChecklistCreateRequest(tr.Account.ID)
+		invalidStatus := checklist.ChecklistStatus("invalid status")
 		req.Status = &invalidStatus
 		rt := requestTest{
 			fmt.Sprintf("Create %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPost,
-			"/v1/projects",
+			"/v1/checklists",
 			req,
 			tr.Token,
 			tr.Claims,
@@ -646,7 +646,7 @@ func TestProjectCreate(t *testing.T) {
 			Details:    actual.Details,
 			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
-				//{Field: "status", Error: "Key: 'ProjectCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+				//{Field: "status", Error: "Key: 'ChecklistCreateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
 					Field:   "status",
 					Value:   invalidStatus.String(),
@@ -665,25 +665,25 @@ func TestProjectCreate(t *testing.T) {
 	}
 }
 
-// TestProjectUpdate validates update project endpoint.
-func TestProjectUpdate(t *testing.T) {
+// TestChecklistUpdate validates update checklist endpoint.
+func TestChecklistUpdate(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
 	// Test update with invalid data.
 	{
 		expectedStatus := http.StatusBadRequest
 
-		invalidStatus := project.ProjectStatus("invalid status")
+		invalidStatus := checklist.ChecklistStatus("invalid status")
 		rt := requestTest{
 			fmt.Sprintf("Update %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects",
-			project.ProjectUpdateRequest{
+			"/v1/checklists",
+			checklist.ChecklistUpdateRequest{
 				ID:     uuid.NewRandom().String(),
 				Status: &invalidStatus,
 			},
@@ -711,7 +711,7 @@ func TestProjectUpdate(t *testing.T) {
 			Details:    actual.Details,
 			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
-				//{Field: "status", Error: "Key: 'ProjectUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
+				//{Field: "status", Error: "Key: 'ChecklistUpdateRequest.status' Error:Field validation for 'status' failed on the 'oneof' tag"},
 				{
 					Field:   "status",
 					Value:   invalidStatus.String(),
@@ -730,16 +730,16 @@ func TestProjectUpdate(t *testing.T) {
 	}
 }
 
-// TestProjectArchive validates archive project endpoint.
-func TestProjectArchive(t *testing.T) {
+// TestChecklistArchive validates archive checklist endpoint.
+func TestChecklistArchive(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenChecklist := newMockChecklist(newMockSignup().account.ID)
 
 	// Test archive with invalid data.
 	{
@@ -750,8 +750,8 @@ func TestProjectArchive(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
+			"/v1/checklists/archive",
+			checklist.ChecklistArchiveRequest{
 				ID: invalidId,
 			},
 			tr.Token,
@@ -778,7 +778,7 @@ func TestProjectArchive(t *testing.T) {
 			Details:    actual.Details,
 			Error:      "Field validation error",
 			Fields: []weberror.FieldError{
-				//{Field: "id", Error: "Key: 'ProjectArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
+				//{Field: "id", Error: "Key: 'ChecklistArchiveRequest.id' Error:Field validation for 'id' failed on the 'uuid' tag"},
 				{
 					Field:   "id",
 					Value:   invalidId,
@@ -803,9 +803,9 @@ func TestProjectArchive(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Archive %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodPatch,
-			"/v1/projects/archive",
-			project.ProjectArchiveRequest{
-				ID: forbiddenProject.ID,
+			"/v1/checklists/archive",
+			checklist.ChecklistArchiveRequest{
+				ID: forbiddenChecklist.ID,
 			},
 			tr.Token,
 			tr.Claims,
@@ -829,7 +829,7 @@ func TestProjectArchive(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    project.ErrForbidden.Error(),
+			Details:    checklist.ErrForbidden.Error(),
 			StackTrace: actual.StackTrace,
 		}
 
@@ -840,16 +840,16 @@ func TestProjectArchive(t *testing.T) {
 	}
 }
 
-// TestProjectDelete validates delete project endpoint.
-func TestProjectDelete(t *testing.T) {
+// TestChecklistDelete validates delete checklist endpoint.
+func TestChecklistDelete(t *testing.T) {
 	defer tests.Recover(t)
 
 	tr := roleTests[auth.RoleAdmin]
 
-	// Add claims to the context for the project.
+	// Add claims to the context for the checklist.
 	ctx := context.WithValue(tests.Context(), auth.Key, tr.Claims)
 
-	forbiddenProject := newMockProject(newMockSignup().account.ID)
+	forbiddenChecklist := newMockChecklist(newMockSignup().account.ID)
 
 	// Test delete with invalid data.
 	{
@@ -860,7 +860,7 @@ func TestProjectDelete(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s using invalid data", expectedStatus, tr.Role),
 			http.MethodDelete,
-			"/v1/projects/" + invalidId,
+			"/v1/checklists/" + invalidId,
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -911,7 +911,7 @@ func TestProjectDelete(t *testing.T) {
 		rt := requestTest{
 			fmt.Sprintf("Delete %d w/role %s using forbidden ID", expectedStatus, tr.Role),
 			http.MethodDelete,
-			fmt.Sprintf("/v1/projects/%s", forbiddenProject.ID),
+			fmt.Sprintf("/v1/checklists/%s", forbiddenChecklist.ID),
 			nil,
 			tr.Token,
 			tr.Claims,
@@ -935,7 +935,7 @@ func TestProjectDelete(t *testing.T) {
 		expected := weberror.ErrorResponse{
 			StatusCode: expectedStatus,
 			Error:      http.StatusText(expectedStatus),
-			Details:    project.ErrForbidden.Error(),
+			Details:    checklist.ErrForbidden.Error(),
 			StackTrace: actual.StackTrace,
 		}
 

@@ -41,6 +41,7 @@ https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pk
     * [Installing Docker](#installing-docker)
 - [Getting started](#getting-started)
     * [Video tutorials](#video-tutorials)
+    * [Execute initial database migrations](#execute-initial-database-migrations)
     * [Setup local environment](#setup-local-environment)
     * [Running the project](#running-the-project) 
     * [How we run the project](#how-we-run-the-project) 
@@ -293,6 +294,14 @@ following services will run:
 - web-app 
 - postgres
 
+### Execute initial database migrations
+
+Before you can run the project, you will need to load the initial database schema. This can be run using [tools/schema](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/schema). 
+Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/schema/README.md) for additional usage details.
+
+```bash
+go run tools/schema/main.go migrate
+``` 
 
 ### Running the project
 

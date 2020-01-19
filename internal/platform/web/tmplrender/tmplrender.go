@@ -1,4 +1,4 @@
-package template_renderer
+package tmplrender
 
 import (
 	"context"

@@ -220,7 +220,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
                 "summary": "List projects",
                 "parameters": [
@@ -261,7 +261,7 @@ var doc = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/project.ProjectResponse"
+                                "$ref": "#/definitions/checklist.ProjectResponse"
                             }
                         }
                     },
@@ -291,7 +291,7 @@ var doc = `{
                         "OAuth2Password": []
                     }
                 ],
-                "description": "Create inserts a new project into the system.",
+                "description": "Create inserts a new checklist into the system.",
                 "consumes": [
                     "application/json"
                 ],
@@ -299,9 +299,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
-                "summary": "Create new project.",
+                "summary": "Create new checklist.",
                 "parameters": [
                     {
                         "description": "Project details",
@@ -310,7 +310,7 @@ var doc = `{
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/project.ProjectCreateRequest"
+                            "$ref": "#/definitions/checklist.ProjectCreateRequest"
                         }
                     }
                 ],
@@ -318,7 +318,7 @@ var doc = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/project.ProjectResponse"
+                            "$ref": "#/definitions/checklist.ProjectResponse"
                         }
                     },
                     "400": {
@@ -353,7 +353,7 @@ var doc = `{
                         "OAuth2Password": []
                     }
                 ],
-                "description": "Update updates the specified project in the system.",
+                "description": "Update updates the specified checklist in the system.",
                 "consumes": [
                     "application/json"
                 ],
@@ -361,9 +361,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
-                "summary": "Update project by ID",
+                "summary": "Update checklist by ID",
                 "parameters": [
                     {
                         "description": "Update fields",
@@ -372,7 +372,7 @@ var doc = `{
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/project.ProjectUpdateRequest"
+                            "$ref": "#/definitions/checklist.ProjectUpdateRequest"
                         }
                     }
                 ],
@@ -406,7 +406,7 @@ var doc = `{
                         "OAuth2Password": []
                     }
                 ],
-                "description": "Archive soft-deletes the specified project from the system.",
+                "description": "Archive soft-deletes the specified checklist from the system.",
                 "consumes": [
                     "application/json"
                 ],
@@ -414,9 +414,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
-                "summary": "Archive project by ID",
+                "summary": "Archive checklist by ID",
                 "parameters": [
                     {
                         "description": "Update fields",
@@ -425,7 +425,7 @@ var doc = `{
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/project.ProjectArchiveRequest"
+                            "$ref": "#/definitions/checklist.ProjectArchiveRequest"
                         }
                     }
                 ],
@@ -459,7 +459,7 @@ var doc = `{
                         "OAuth2Password": []
                     }
                 ],
-                "description": "Read returns the specified project from the system.",
+                "description": "Read returns the specified checklist from the system.",
                 "consumes": [
                     "application/json"
                 ],
@@ -467,9 +467,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
-                "summary": "Get project by ID.",
+                "summary": "Get checklist by ID.",
                 "parameters": [
                     {
                         "type": "string",
@@ -483,7 +483,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/project.ProjectResponse"
+                            "$ref": "#/definitions/checklist.ProjectResponse"
                         }
                     },
                     "400": {
@@ -512,7 +512,7 @@ var doc = `{
                         "OAuth2Password": []
                     }
                 ],
-                "description": "Delete removes the specified project from the system.",
+                "description": "Delete removes the specified checklist from the system.",
                 "consumes": [
                     "application/json"
                 ],
@@ -520,9 +520,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project"
+                    "checklist"
                 ],
-                "summary": "Delete project by ID",
+                "summary": "Delete checklist by ID",
                 "parameters": [
                     {
                         "type": "string",
@@ -1512,7 +1512,7 @@ var doc = `{
                 }
             }
         },
-        "project.ProjectArchiveRequest": {
+        "checklist.ProjectArchiveRequest": {
             "type": "object",
             "required": [
                 "id"
@@ -1524,7 +1524,7 @@ var doc = `{
                 }
             }
         },
-        "project.ProjectCreateRequest": {
+        "checklist.ProjectCreateRequest": {
             "type": "object",
             "required": [
                 "account_id",
@@ -1541,7 +1541,7 @@ var doc = `{
                 }
             }
         },
-        "project.ProjectResponse": {
+        "checklist.ProjectResponse": {
             "type": "object",
             "required": [
                 "account_id",
@@ -1579,7 +1579,7 @@ var doc = `{
                 }
             }
         },
-        "project.ProjectUpdateRequest": {
+        "checklist.ProjectUpdateRequest": {
             "type": "object",
             "required": [
                 "id"

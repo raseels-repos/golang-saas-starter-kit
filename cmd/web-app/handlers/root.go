@@ -8,7 +8,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
 	"github.com/pkg/errors"
@@ -19,9 +19,9 @@ import (
 
 // Root represents the Root API method handler set.
 type Root struct {
-	Renderer     web.Renderer
-	Sitemap      *stm.Sitemap
-	ProjectRoute project_route.ProjectRoute
+	Renderer web.Renderer
+	Sitemap  *stm.Sitemap
+	WebRoute webroute.WebRoute
 }
 
 // Index determines if the user has authentication and loads the associated page.
@@ -56,7 +56,7 @@ func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		tmpName = "site-api.gohtml"
 
 		// http://127.0.0.1:3001/docs/doc.json
-		swaggerJsonUrl := h.ProjectRoute.ApiDocsJson(true)
+		swaggerJsonUrl := h.WebRoute.ApiDocsJson(true)
 
 		// Load the json file from the API service.
 		res, err := pester.Get(swaggerJsonUrl)
@@ -92,8 +92,8 @@ func (h *Root) SitePage(ctx context.Context, w http.ResponseWriter, r *http.Requ
 			return errors.WithStack(err)
 		}
 
-		data["urlApiBaseUri"] = h.ProjectRoute.WebApiUrl(doc.BasePath)
-		data["urlApiDocs"] = h.ProjectRoute.ApiDocs()
+		data["urlApiBaseUri"] = h.WebRoute.WebApiUrl(doc.BasePath)
+		data["urlApiDocs"] = h.WebRoute.ApiDocs()
 
 	case "/pricing":
 		tmpName = "site-pricing.gohtml"
@@ -122,7 +122,7 @@ func (h *Root) RobotTxt(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return web.RespondText(ctx, w, txt, http.StatusOK)
 	}
 
-	sitemapUrl := h.ProjectRoute.WebAppUrl("/sitemap.xml")
+	sitemapUrl := h.WebRoute.WebAppUrl("/sitemap.xml")
 
 	txt := fmt.Sprintf("User-agent: *\nDisallow: /ping\nDisallow: /status\nDisallow: /debug/\nSitemap: %s", sitemapUrl)
 	return web.RespondText(ctx, w, txt, http.StatusOK)

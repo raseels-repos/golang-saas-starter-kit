@@ -4,18 +4,18 @@ import (
 	"context"
 	"net/http"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 
 	"github.com/pkg/errors"
 )
 
 // Example represents the Example API method handler set.
 type Example struct {
-	Project *project.Repository
+	Checklist *checklist.Repository
 
 	// ADD OTHER STATE LIKE THE LOGGER AND CONFIG HERE.
 }
@@ -28,7 +28,7 @@ func (h *Example) ErrorResponse(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	if qv := r.URL.Query().Get("test-validation-error"); qv != "" {
-		_, err := h.Project.Create(ctx, auth.Claims{}, project.ProjectCreateRequest{}, v.Now)
+		_, err := h.Checklist.Create(ctx, auth.Claims{}, checklist.ChecklistCreateRequest{}, v.Now)
 		return web.RespondJsonError(ctx, w, err)
 	}
 

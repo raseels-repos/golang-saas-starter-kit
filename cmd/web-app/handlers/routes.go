@@ -11,19 +11,19 @@ import (
 
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/geonames"
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ikeikeikeike/go-sitemap-generator/v2/stm"
@@ -50,13 +50,13 @@ type AppContext struct {
 	AuthRepo          *user_auth.Repository
 	SignupRepo        *signup.Repository
 	InviteRepo        *invite.Repository
-	ProjectRepo       *project.Repository
+	ChecklistRepo     *checklist.Repository
 	GeoRepo           *geonames.Repository
 	Authenticator     *auth.Authenticator
 	StaticDir         string
 	TemplateDir       string
 	Renderer          web.Renderer
-	ProjectRoute      project_route.ProjectRoute
+	WebRoute          webroute.WebRoute
 	PreAppMiddleware  []web.Middleware
 	PostAppMiddleware []web.Middleware
 	AwsSession        *session.Session
@@ -105,7 +105,7 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 	// Build a sitemap.
 	sm := stm.NewSitemap(1)
 	sm.SetVerbose(false)
-	sm.SetDefaultHost(appCtx.ProjectRoute.WebAppUrl(""))
+	sm.SetDefaultHost(appCtx.WebRoute.WebAppUrl(""))
 	sm.Create()
 
 	smLocAddModified := func(loc stm.URL, filename string) {
@@ -121,19 +121,19 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 		sm.Add(loc)
 	}
 
-	// Register project management pages.
-	p := Projects{
-		ProjectRepo: appCtx.ProjectRepo,
-		Redis:       appCtx.Redis,
-		Renderer:    appCtx.Renderer,
+	// Register checklist management pages.
+	p := Checklists{
+		ChecklistRepo: appCtx.ChecklistRepo,
+		Redis:         appCtx.Redis,
+		Renderer:      appCtx.Renderer,
 	}
-	app.Handle("POST", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/:project_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("POST", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/:project_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
-	app.Handle("POST", "/projects/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
-	app.Handle("GET", "/projects", p.Index, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("POST", "/checklists/:checklist_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/checklists/:checklist_id/update", p.Update, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("POST", "/checklists/:checklist_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/checklists/:checklist_id", p.View, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
+	app.Handle("POST", "/checklists/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/checklists/create", p.Create, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasRole(auth.RoleAdmin))
+	app.Handle("GET", "/checklists", p.Index, mid.AuthenticateSessionRequired(appCtx.Authenticator), mid.HasAuth())
 
 	// Register user management pages.
 	us := Users{
@@ -231,9 +231,9 @@ func APP(shutdown chan os.Signal, appCtx *AppContext) http.Handler {
 
 	// Register root
 	r := Root{
-		Renderer:     appCtx.Renderer,
-		ProjectRoute: appCtx.ProjectRoute,
-		Sitemap:      sm,
+		Renderer: appCtx.Renderer,
+		WebRoute: appCtx.WebRoute,
+		Sitemap:  sm,
 	}
 	app.Handle("GET", "/api", r.SitePage)
 	app.Handle("GET", "/pricing", r.SitePage)

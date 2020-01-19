@@ -6,50 +6,50 @@ import (
 	"net/http"
 	"strings"
 
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/datatable"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
 
 	"github.com/gorilla/schema"
 	"github.com/pkg/errors"
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/go-redis/redis"
 )
 
-// Projects represents the Projects API method handler set.
-type Projects struct {
-	ProjectRepo *project.Repository
-	Redis       *redis.Client
-	Renderer    web.Renderer
+// Checklists represents the Checklists API method handler set.
+type Checklists struct {
+	ChecklistRepo *checklist.Repository
+	Redis         *redis.Client
+	Renderer      web.Renderer
 }
 
-func urlProjectsIndex() string {
-	return fmt.Sprintf("/projects")
+func urlChecklistsIndex() string {
+	return fmt.Sprintf("/checklists")
 }
 
-func urlProjectsCreate() string {
-	return fmt.Sprintf("/projects/create")
+func urlChecklistsCreate() string {
+	return fmt.Sprintf("/checklists/create")
 }
 
-func urlProjectsView(projectID string) string {
-	return fmt.Sprintf("/projects/%s", projectID)
+func urlChecklistsView(checklistID string) string {
+	return fmt.Sprintf("/checklists/%s", checklistID)
 }
 
-func urlProjectsUpdate(projectID string) string {
-	return fmt.Sprintf("/projects/%s/update", projectID)
+func urlChecklistsUpdate(checklistID string) string {
+	return fmt.Sprintf("/checklists/%s/update", checklistID)
 }
 
-// Index handles listing all the projects for the current account.
-func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Index handles listing all the checklists for the current account.
+func (h *Checklists) Index(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	claims, err := auth.ClaimsFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	statusOpts := web.NewEnumResponse(ctx, nil, project.ProjectStatus_ValuesInterface()...)
+	statusOpts := web.NewEnumResponse(ctx, nil, checklist.ChecklistStatus_ValuesInterface()...)
 
 	statusFilterItems := []datatable.FilterOptionItem{}
 	for _, opt := range statusOpts.Options {
@@ -61,13 +61,13 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	fields := []datatable.DisplayField{
 		datatable.DisplayField{Field: "id", Title: "ID", Visible: false, Searchable: true, Orderable: true, Filterable: false},
-		datatable.DisplayField{Field: "name", Title: "Project", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "filter Name"},
+		datatable.DisplayField{Field: "name", Title: "Checklist", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "filter Name"},
 		datatable.DisplayField{Field: "status", Title: "Status", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "All Statuses", FilterItems: statusFilterItems},
 		datatable.DisplayField{Field: "updated_at", Title: "Last Updated", Visible: true, Searchable: true, Orderable: true, Filterable: false},
 		datatable.DisplayField{Field: "created_at", Title: "Created", Visible: true, Searchable: true, Orderable: true, Filterable: false},
 	}
 
-	mapFunc := func(q *project.Project, cols []datatable.DisplayField) (resp []datatable.ColumnValue, err error) {
+	mapFunc := func(q *checklist.Checklist, cols []datatable.DisplayField) (resp []datatable.ColumnValue, err error) {
 		for i := 0; i < len(cols); i++ {
 			col := cols[i]
 			var v datatable.ColumnValue
@@ -76,17 +76,17 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 				v.Value = fmt.Sprintf("%s", q.ID)
 			case "name":
 				v.Value = q.Name
-				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlProjectsView(q.ID), v.Value)
+				v.Formatted = fmt.Sprintf("<a href='%s'>%s</a>", urlChecklistsView(q.ID), v.Value)
 			case "status":
 				v.Value = q.Status.String()
 
 				var subStatusClass string
 				var subStatusIcon string
 				switch q.Status {
-				case project.ProjectStatus_Active:
+				case checklist.ChecklistStatus_Active:
 					subStatusClass = "text-green"
 					subStatusIcon = "far fa-dot-circle"
-				case project.ProjectStatus_Disabled:
+				case checklist.ChecklistStatus_Disabled:
 					subStatusClass = "text-orange"
 					subStatusIcon = "far fa-circle"
 				}
@@ -110,7 +110,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	loadFunc := func(ctx context.Context, sorting string, fields []datatable.DisplayField) (resp [][]datatable.ColumnValue, err error) {
-		res, err := h.ProjectRepo.Find(ctx, claims, project.ProjectFindRequest{
+		res, err := h.ChecklistRepo.Find(ctx, claims, checklist.ChecklistFindRequest{
 			Where: "account_id = ?",
 			Args:  []interface{}{claims.Audience},
 			Order: strings.Split(sorting, ","),
@@ -122,7 +122,7 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 		for _, a := range res {
 			l, err := mapFunc(a, fields)
 			if err != nil {
-				return resp, errors.Wrapf(err, "Failed to map project for display.")
+				return resp, errors.Wrapf(err, "Failed to map checklist for display.")
 			}
 
 			resp = append(resp, l)
@@ -148,15 +148,15 @@ func (h *Projects) Index(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	data := map[string]interface{}{
-		"datatable":         dt.Response(),
-		"urlProjectsCreate": urlProjectsCreate(),
+		"datatable":           dt.Response(),
+		"urlChecklistsCreate": urlChecklistsCreate(),
 	}
 
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "checklists-index.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
-// Create handles creating a new project for the account.
-func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Create handles creating a new checklist for the account.
+func (h *Checklists) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -169,7 +169,7 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 
 	//
-	req := new(project.ProjectCreateRequest)
+	req := new(checklist.ChecklistCreateRequest)
 	data := make(map[string]interface{})
 	f := func() (bool, error) {
 		if r.Method == http.MethodPost {
@@ -186,7 +186,7 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 			}
 			req.AccountID = claims.Audience
 
-			usr, err := h.ProjectRepo.Create(ctx, claims, *req, ctxValues.Now)
+			usr, err := h.ChecklistRepo.Create(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -199,12 +199,12 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 				}
 			}
 
-			// Display a success message to the project.
+			// Display a success message to the checklist.
 			webcontext.SessionFlashSuccess(ctx,
-				"Project Created",
-				"Project successfully created.")
+				"Checklist Created",
+				"Checklist successfully created.")
 
-			return true, web.Redirect(ctx, w, r, urlProjectsView(usr.ID), http.StatusFound)
+			return true, web.Redirect(ctx, w, r, urlChecklistsView(usr.ID), http.StatusFound)
 		}
 
 		return false, nil
@@ -219,17 +219,17 @@ func (h *Projects) Create(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	data["form"] = req
 
-	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(project.ProjectCreateRequest{})); ok {
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(checklist.ChecklistCreateRequest{})); ok {
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-create.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "checklists-create.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
-// View handles displaying a project.
-func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// View handles displaying a checklist.
+func (h *Checklists) View(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
-	projectID := params["project_id"]
+	checklistID := params["checklist_id"]
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -251,18 +251,18 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 			switch r.PostForm.Get("action") {
 			case "archive":
-				err = h.ProjectRepo.Archive(ctx, claims, project.ProjectArchiveRequest{
-					ID: projectID,
+				err = h.ChecklistRepo.Archive(ctx, claims, checklist.ChecklistArchiveRequest{
+					ID: checklistID,
 				}, ctxValues.Now)
 				if err != nil {
 					return false, err
 				}
 
 				webcontext.SessionFlashSuccess(ctx,
-					"Project Archive",
-					"Project successfully archive.")
+					"Checklist Archive",
+					"Checklist successfully archive.")
 
-				return true, web.Redirect(ctx, w, r, urlProjectsIndex(), http.StatusFound)
+				return true, web.Redirect(ctx, w, r, urlChecklistsIndex(), http.StatusFound)
 			}
 		}
 
@@ -276,21 +276,21 @@ func (h *Projects) View(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return nil
 	}
 
-	prj, err := h.ProjectRepo.ReadByID(ctx, claims, projectID)
+	prj, err := h.ChecklistRepo.ReadByID(ctx, claims, checklistID)
 	if err != nil {
 		return err
 	}
-	data["project"] = prj.Response(ctx)
-	data["urlProjectsView"] = urlProjectsView(projectID)
-	data["urlProjectsUpdate"] = urlProjectsUpdate(projectID)
+	data["checklist"] = prj.Response(ctx)
+	data["urlChecklistsView"] = urlChecklistsView(checklistID)
+	data["urlChecklistsUpdate"] = urlChecklistsUpdate(checklistID)
 
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-view.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "checklists-view.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }
 
-// Update handles updating a project for the account.
-func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
+// Update handles updating a checklist for the account.
+func (h *Checklists) Update(ctx context.Context, w http.ResponseWriter, r *http.Request, params map[string]string) error {
 
-	projectID := params["project_id"]
+	checklistID := params["checklist_id"]
 
 	ctxValues, err := webcontext.ContextValues(ctx)
 	if err != nil {
@@ -303,7 +303,7 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 
 	//
-	req := new(project.ProjectUpdateRequest)
+	req := new(checklist.ChecklistUpdateRequest)
 	data := make(map[string]interface{})
 	f := func() (bool, error) {
 		if r.Method == http.MethodPost {
@@ -318,9 +318,9 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 			if err := decoder.Decode(req, r.PostForm); err != nil {
 				return false, err
 			}
-			req.ID = projectID
+			req.ID = checklistID
 
-			err = h.ProjectRepo.Update(ctx, claims, *req, ctxValues.Now)
+			err = h.ChecklistRepo.Update(ctx, claims, *req, ctxValues.Now)
 			if err != nil {
 				switch errors.Cause(err) {
 				default:
@@ -333,12 +333,12 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 				}
 			}
 
-			// Display a success message to the project.
+			// Display a success message to the checklist.
 			webcontext.SessionFlashSuccess(ctx,
-				"Project Updated",
-				"Project successfully updated.")
+				"Checklist Updated",
+				"Checklist successfully updated.")
 
-			return true, web.Redirect(ctx, w, r, urlProjectsView(req.ID), http.StatusFound)
+			return true, web.Redirect(ctx, w, r, urlChecklistsView(req.ID), http.StatusFound)
 		}
 
 		return false, nil
@@ -351,13 +351,13 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return nil
 	}
 
-	prj, err := h.ProjectRepo.ReadByID(ctx, claims, projectID)
+	prj, err := h.ChecklistRepo.ReadByID(ctx, claims, checklistID)
 	if err != nil {
 		return err
 	}
-	data["project"] = prj.Response(ctx)
+	data["checklist"] = prj.Response(ctx)
 
-	data["urlProjectsView"] = urlProjectsView(projectID)
+	data["urlChecklistsView"] = urlChecklistsView(checklistID)
 
 	if req.ID == "" {
 		req.Name = &prj.Name
@@ -365,9 +365,9 @@ func (h *Projects) Update(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 	data["form"] = req
 
-	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(project.ProjectUpdateRequest{})); ok {
+	if verr, ok := weberror.NewValidationError(ctx, webcontext.Validator().Struct(checklist.ChecklistUpdateRequest{})); ok {
 		data["validationDefaults"] = verr.(*weberror.Error)
 	}
 
-	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "projects-update.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
+	return h.Renderer.Render(ctx, w, r, TmplLayoutBase, "checklists-update.gohtml", web.MIMETextHTMLCharsetUTF8, http.StatusOK, data)
 }

@@ -1,4 +1,4 @@
-{{define "title"}}Update Project - {{ .project.Name }}{{end}}
+{{define "title"}}Update Checklist - {{ .checklist.Name }}{{end}}
 {{define "style"}}
 
 {{end}}
@@ -6,14 +6,14 @@
 
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/projects">Projects</a></li>
-            <li class="breadcrumb-item"><a href="{{ .urlProjectsView }}">{{ .form.Name }}</a></li>
+            <li class="breadcrumb-item"><a href="/checklists">Checklists</a></li>
+            <li class="breadcrumb-item"><a href="{{ .urlChecklistsView }}">{{ .form.Name }}</a></li>
             <li class="breadcrumb-item active" aria-current="page">Update</li>
         </ol>
     </nav>
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Update Project</h1>
+        <h1 class="h3 mb-0 text-gray-800">Update Checklist</h1>
     </div>
 
     <form class="user" method="post" novalidate>
@@ -22,7 +22,7 @@
                 <div class="row mb-2">
                     <div class="col-12">
 
-                        <h4 class="card-title">Project Details</h4>
+                        <h4 class="card-title">Checklist Details</h4>
                     </div>
                 </div>
 
@@ -39,7 +39,7 @@
                             <label for="selectStatus">Status</label>
                             <select class="form-control {{ ValidationFieldClass $.validationErrors "Status" }}"
                                     id="selectStatus" name="Status">
-                                {{ range $t := .project.Status.Options }}
+                                {{ range $t := .checklist.Status.Options }}
                                     <option value="{{ $t.Value }}" {{ if $t.Selected }}selected="selected"{{ end }}>{{ $t.Title }}</option>
                                 {{ end }}
                             </select>

@@ -17,19 +17,19 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/cmd/web-api/handlers"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/account/account_preference"
+	"geeks-accelerator/oss/saas-starter-kit/internal/checklist"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/tests"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/webcontext"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web/weberror"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project"
-	"geeks-accelerator/oss/saas-starter-kit/internal/project_route"
 	"geeks-accelerator/oss/saas-starter-kit/internal/signup"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_account/invite"
 	"geeks-accelerator/oss/saas-starter-kit/internal/user_auth"
+	"geeks-accelerator/oss/saas-starter-kit/internal/webroute"
 	"github.com/google/go-cmp/cmp"
 	"github.com/iancoleman/strcase"
 	"github.com/pborman/uuid"
@@ -93,7 +93,7 @@ func testMain(m *testing.M) int {
 	log := test.Log
 	log.SetOutput(ioutil.Discard)
 
-	projectRoute, err := project_route.New("http://web-api.com", "http://web-app.com")
+	projectRoute, err := webroute.New("http://web-api.com", "http://web-app.com")
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +107,7 @@ func testMain(m *testing.M) int {
 	authRepo := user_auth.NewRepository(test.MasterDB, authenticator, usrRepo, usrAccRepo, accPrefRepo)
 	signupRepo := signup.NewRepository(test.MasterDB, usrRepo, usrAccRepo, accRepo)
 	inviteRepo := invite.NewRepository(test.MasterDB, usrRepo, usrAccRepo, accRepo, projectRoute.UserInviteAccept, notifyEmail, "6368616e676520746869732070613434")
-	prjRepo := project.NewRepository(test.MasterDB)
+	prjRepo := checklist.NewRepository(test.MasterDB)
 
 	appCtx = &handlers.AppContext{
 		Log:             log,

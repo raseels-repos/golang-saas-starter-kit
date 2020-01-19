@@ -1,4 +1,4 @@
-package project
+package checklist
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	// The database table for Project
-	projectTableName = "projects"
+	// The database table for Checklist
+	checklistTableName = "checklists"
 )
 
 var (
@@ -27,14 +27,14 @@ var (
 	ErrForbidden = errors.New("Attempted action is not allowed")
 )
 
-// CanReadProject determines if claims has the authority to access the specified project by id.
-func (repo *Repository) CanReadProject(ctx context.Context, claims auth.Claims, id string) error {
+// CanReadChecklist determines if claims has the authority to access the specified checklist by id.
+func (repo *Repository) CanReadChecklist(ctx context.Context, claims auth.Claims, id string) error {
 
-	// If the request has claims from a specific project, ensure that the claims
-	// has the correct access to the project.
+	// If the request has claims from a specific checklist, ensure that the claims
+	// has the correct access to the checklist.
 	if claims.Audience != "" {
-		// select id from projects where account_id = [accountID]
-		query := sqlbuilder.NewSelectBuilder().Select("id").From(projectTableName)
+		// select id from checklists where account_id = [accountID]
+		query := sqlbuilder.NewSelectBuilder().Select("id").From(checklistTableName)
 		query.Where(query.And(
 			query.Equal("account_id", claims.Audience),
 			query.Equal("ID", id),
@@ -50,7 +50,7 @@ func (repo *Repository) CanReadProject(ctx context.Context, claims auth.Claims, 
 		}
 
 		// When there is no id returned, then the current claim user does not have access
-		// to the specified project.
+		// to the specified checklist.
 		if id == "" {
 			return errors.WithStack(ErrForbidden)
 		}
@@ -60,14 +60,14 @@ func (repo *Repository) CanReadProject(ctx context.Context, claims auth.Claims, 
 	return nil
 }
 
-// CanModifyProject determines if claims has the authority to modify the specified project by id.
-func (repo *Repository) CanModifyProject(ctx context.Context, claims auth.Claims, id string) error {
-	err := repo.CanReadProject(ctx, claims, id)
+// CanModifyChecklist determines if claims has the authority to modify the specified checklist by id.
+func (repo *Repository) CanModifyChecklist(ctx context.Context, claims auth.Claims, id string) error {
+	err := repo.CanReadChecklist(ctx, claims, id)
 	if err != nil {
 		return err
 	}
 
-	// Admin users can update projects they have access to.
+	// Admin users can update checklists they have access to.
 	if !claims.HasRole(auth.RoleAdmin) {
 		return errors.WithStack(ErrForbidden)
 	}
@@ -88,21 +88,21 @@ func applyClaimsSelect(ctx context.Context, claims auth.Claims, query *sqlbuilde
 	return nil
 }
 
-// projectMapColumns is the list of columns needed for find.
-var projectMapColumns = "id,account_id,name,status,created_at,updated_at,archived_at"
+// checklistMapColumns is the list of columns needed for find.
+var checklistMapColumns = "id,account_id,name,status,created_at,updated_at,archived_at"
 
-// selectQuery constructs a base select query for Project.
+// selectQuery constructs a base select query for Checklist.
 func selectQuery() *sqlbuilder.SelectBuilder {
 	query := sqlbuilder.NewSelectBuilder()
-	query.Select(projectMapColumns)
-	query.From(projectTableName)
+	query.Select(checklistMapColumns)
+	query.From(checklistTableName)
 	return query
 }
 
 // findRequestQuery generates the select query for the given find request.
 // TODO: Need to figure out why can't parse the args when appending the where
 // 			to the query.
-func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
+func findRequestQuery(req ChecklistFindRequest) (*sqlbuilder.SelectBuilder, []interface{}) {
 	query := selectQuery()
 
 	if req.Where != "" {
@@ -124,19 +124,19 @@ func findRequestQuery(req ProjectFindRequest) (*sqlbuilder.SelectBuilder, []inte
 	return query, req.Args
 }
 
-// Find gets all the projects from the database based on the request params.
-func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req ProjectFindRequest) (Projects, error) {
+// Find gets all the checklists from the database based on the request params.
+func (repo *Repository) Find(ctx context.Context, claims auth.Claims, req ChecklistFindRequest) (Checklists, error) {
 	query, args := findRequestQuery(req)
 	return find(ctx, claims, repo.DbConn, query, args, req.IncludeArchived)
 }
 
-// find internal method for getting all the projects from the database using a select query.
-func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Projects, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Find")
+// find internal method for getting all the checklists from the database using a select query.
+func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbuilder.SelectBuilder, args []interface{}, includedArchived bool) (Checklists, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Find")
 	defer span.Finish()
 
-	query.Select(projectMapColumns)
-	query.From(projectTableName)
+	query.Select(checklistMapColumns)
+	query.From(checklistTableName)
 	if !includedArchived {
 		query.Where(query.IsNull("archived_at"))
 	}
@@ -154,15 +154,15 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	rows, err := dbConn.QueryContext(ctx, queryStr, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessage(err, "find projects failed")
+		err = errors.WithMessage(err, "find checklists failed")
 		return nil, err
 	}
 
 	// Iterate over each row.
-	resp := []*Project{}
+	resp := []*Checklist{}
 	for rows.Next() {
 		var (
-			m   Project
+			m   Checklist
 			err error
 		)
 		err = rows.Scan(&m.ID, &m.AccountID, &m.Name, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.ArchivedAt)
@@ -177,17 +177,17 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 	return resp, nil
 }
 
-// ReadByID gets the specified project by ID from the database.
-func (repo *Repository) ReadByID(ctx context.Context, claims auth.Claims, id string) (*Project, error) {
-	return repo.Read(ctx, claims, ProjectReadRequest{
+// ReadByID gets the specified checklist by ID from the database.
+func (repo *Repository) ReadByID(ctx context.Context, claims auth.Claims, id string) (*Checklist, error) {
+	return repo.Read(ctx, claims, ChecklistReadRequest{
 		ID:              id,
 		IncludeArchived: false,
 	})
 }
 
-// Read gets the specified project from the database.
-func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req ProjectReadRequest) (*Project, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Read")
+// Read gets the specified checklist from the database.
+func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req ChecklistReadRequest) (*Checklist, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Read")
 	defer span.Finish()
 
 	// Validate the request.
@@ -205,7 +205,7 @@ func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req Projec
 	if err != nil {
 		return nil, err
 	} else if res == nil || len(res) == 0 {
-		err = errors.WithMessagef(ErrNotFound, "project %s not found", req.ID)
+		err = errors.WithMessagef(ErrNotFound, "checklist %s not found", req.ID)
 		return nil, err
 	}
 
@@ -213,12 +213,12 @@ func (repo *Repository) Read(ctx context.Context, claims auth.Claims, req Projec
 	return u, nil
 }
 
-// Create inserts a new project into the database.
-func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req ProjectCreateRequest, now time.Time) (*Project, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Create")
+// Create inserts a new checklist into the database.
+func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req ChecklistCreateRequest, now time.Time) (*Checklist, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Create")
 	defer span.Finish()
 	if claims.Audience != "" {
-		// Admin users can update projects they have access to.
+		// Admin users can update checklists they have access to.
 		if !claims.HasRole(auth.RoleAdmin) {
 			return nil, errors.WithStack(ErrForbidden)
 		}
@@ -253,11 +253,11 @@ func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req Proj
 	// Postgres truncates times to milliseconds when storing. We and do the same
 	// here so the value we return is consistent with what we store.
 	now = now.Truncate(time.Millisecond)
-	m := Project{
+	m := Checklist{
 		ID:        uuid.NewRandom().String(),
 		AccountID: req.AccountID,
 		Name:      req.Name,
-		Status:    ProjectStatus_Active,
+		Status:    ChecklistStatus_Active,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -268,7 +268,7 @@ func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req Proj
 
 	// Build the insert SQL statement.
 	query := sqlbuilder.NewInsertBuilder()
-	query.InsertInto(projectTableName)
+	query.InsertInto(checklistTableName)
 	query.Cols(
 		"id",
 		"account_id",
@@ -295,16 +295,16 @@ func (repo *Repository) Create(ctx context.Context, claims auth.Claims, req Proj
 	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessage(err, "create project failed")
+		err = errors.WithMessage(err, "create checklist failed")
 		return nil, err
 	}
 
 	return &m, nil
 }
 
-// Update replaces an project in the database.
-func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req ProjectUpdateRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Update")
+// Update replaces an checklist in the database.
+func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req ChecklistUpdateRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Update")
 	defer span.Finish()
 
 	// Validate the request.
@@ -314,8 +314,8 @@ func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req Proj
 		return err
 	}
 
-	// Ensure the claims can modify the project specified in the request.
-	err = repo.CanModifyProject(ctx, claims, req.ID)
+	// Ensure the claims can modify the checklist specified in the request.
+	err = repo.CanModifyChecklist(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req Proj
 	now = now.Truncate(time.Millisecond)
 	// Build the update SQL statement.
 	query := sqlbuilder.NewUpdateBuilder()
-	query.Update(projectTableName)
+	query.Update(checklistTableName)
 	var fields []string
 	if req.Name != nil {
 		fields = append(fields, query.Assign("name", req.Name))
@@ -357,16 +357,16 @@ func (repo *Repository) Update(ctx context.Context, claims auth.Claims, req Proj
 	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "update project %s failed", req.ID)
+		err = errors.WithMessagef(err, "update checklist %s failed", req.ID)
 		return err
 	}
 
 	return nil
 }
 
-// Archive soft deleted the project from the database.
-func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req ProjectArchiveRequest, now time.Time) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Archive")
+// Archive soft deleted the checklist from the database.
+func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req ChecklistArchiveRequest, now time.Time) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Archive")
 	defer span.Finish()
 
 	// Validate the request.
@@ -376,8 +376,8 @@ func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req Pro
 		return err
 	}
 
-	// Ensure the claims can modify the project specified in the request.
-	err = repo.CanModifyProject(ctx, claims, req.ID)
+	// Ensure the claims can modify the checklist specified in the request.
+	err = repo.CanModifyChecklist(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req Pro
 	now = now.Truncate(time.Millisecond)
 	// Build the update SQL statement.
 	query := sqlbuilder.NewUpdateBuilder()
-	query.Update(projectTableName)
+	query.Update(checklistTableName)
 	query.Set(
 		query.Assign("archived_at", now),
 	)
@@ -406,16 +406,16 @@ func (repo *Repository) Archive(ctx context.Context, claims auth.Claims, req Pro
 	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "archive project %s failed", req.ID)
+		err = errors.WithMessagef(err, "archive checklist %s failed", req.ID)
 		return err
 	}
 
 	return nil
 }
 
-// Delete removes an project from the database.
-func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req ProjectDeleteRequest) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "internal.project.Delete")
+// Delete removes an checklist from the database.
+func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req ChecklistDeleteRequest) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "internal.checklist.Delete")
 	defer span.Finish()
 
 	// Validate the request.
@@ -425,15 +425,15 @@ func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req Proj
 		return err
 	}
 
-	// Ensure the claims can modify the project specified in the request.
-	err = repo.CanModifyProject(ctx, claims, req.ID)
+	// Ensure the claims can modify the checklist specified in the request.
+	err = repo.CanModifyChecklist(ctx, claims, req.ID)
 	if err != nil {
 		return err
 	}
 
 	// Build the delete SQL statement.
 	query := sqlbuilder.NewDeleteBuilder()
-	query.DeleteFrom(projectTableName)
+	query.DeleteFrom(checklistTableName)
 	query.Where(query.Equal("id", req.ID))
 	// Execute the query with the provided context.
 	sql, args := query.Build()
@@ -441,7 +441,7 @@ func (repo *Repository) Delete(ctx context.Context, claims auth.Claims, req Proj
 	_, err = repo.DbConn.ExecContext(ctx, sql, args...)
 	if err != nil {
 		err = errors.Wrapf(err, "query - %s", query.String())
-		err = errors.WithMessagef(err, "delete project %s failed", req.ID)
+		err = errors.WithMessagef(err, "delete checklist %s failed", req.ID)
 		return err
 	}
 

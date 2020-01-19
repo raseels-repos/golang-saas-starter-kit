@@ -87,7 +87,7 @@ FROM dev AS builder
 # Disabled for the moment as it takes forever to run, rely on manual execution.
 RUN if [ "$swagInit" != "" ]; then swag init ; fi
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /gosrv .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /build/gosrv .
 
 FROM alpine:3.11
 

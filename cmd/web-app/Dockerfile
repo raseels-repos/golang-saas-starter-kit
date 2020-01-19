@@ -62,7 +62,7 @@ ENTRYPOINT ["fresh", "-c", "/build/runner.conf"]
 
 FROM dev AS builder
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /gosrv .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.build=${commit_ref}" -a -installsuffix nocgo -o /build/gosrv .
 
 FROM alpine:3.11
 

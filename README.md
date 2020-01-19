@@ -171,7 +171,7 @@ to the Keeni.Space website, its [SOP software pricing](https://keeni.space/prici
 app is then available at [app.keeni.space](https://app.keeni.space). They are leveraging this most recent experience to 
 build a simplified set example services for both a web API and a web app for SaaS businesses. 
 
-For this example, *projects* will be the single business logic package that will be exposed to users for management 
+For this example, *checklists* will be the single business logic package that will be exposed to users for management 
 based on their role. Additional business logic packages can be added to support your project. It's important at the 
 beginning to minimize the connection between business logic packages on the same horizontal level. 
 
@@ -180,11 +180,11 @@ This project provides the following functionality to users:
 
 New customers can sign up which creates an account and a user with role of admin.
 * Users with the role of admin can manage users for their account. 
-* Authenticated users can manage their projects based on RBAC.
+* Authenticated users can manage their checklists based on RBAC.
 
 The project implements RBAC with two basic roles for users: admin and user. 
-* The role of admin provides the ability to perform all CRUD actions on projects and users. 
-* The role of user limits users to only view projects and users. 
+* The role of admin provides the ability to perform all CRUD actions on checklists and users. 
+* The role of user limits users to only view checklists and users. 
 
 Of course, this example implementation of RBAC can be modified and enhanced to meet your requirements. 
 
@@ -623,7 +623,7 @@ shared=# \dt
 --------+----------------+-------+----------
  public | accounts       | table | postgres
  public | migrations     | table | postgres
- public | projects       | table | postgres
+ public | checklists     | table | postgres
  public | users          | table | postgres
  public | users_accounts | table | postgres
 (5 rows)

@@ -615,7 +615,7 @@ func TestCrud(t *testing.T) {
 					t.Fatalf("\t%s\tVerify update user account failed.", tests.Failed)
 				} else if tt.findErr == nil {
 					var expected UserAccounts = []*UserAccount{
-						&UserAccount{
+						{
 							//ID:        ua.ID,
 							UserID:    ua.UserID,
 							AccountID: ua.AccountID,
@@ -657,7 +657,7 @@ func TestCrud(t *testing.T) {
 					}
 
 					var expected UserAccounts = []*UserAccount{
-						&UserAccount{
+						{
 							//ID:         ua.ID,
 							UserID:     ua.UserID,
 							AccountID:  ua.AccountID,

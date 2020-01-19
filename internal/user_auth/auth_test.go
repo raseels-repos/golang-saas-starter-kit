@@ -317,10 +317,10 @@ func TestSwitchAccount(t *testing.T) {
 	// Test all the combinations there the user has access to all three accounts.
 	if true {
 		for _, roles := range [][]user_account.UserAccountRole{
-			[]user_account.UserAccountRole{user_account.UserAccountRole_Admin, user_account.UserAccountRole_Admin, user_account.UserAccountRole_Admin},
-			[]user_account.UserAccountRole{user_account.UserAccountRole_User, user_account.UserAccountRole_User, user_account.UserAccountRole_User},
-			[]user_account.UserAccountRole{user_account.UserAccountRole_Admin, user_account.UserAccountRole_User, user_account.UserAccountRole_Admin},
-			[]user_account.UserAccountRole{user_account.UserAccountRole_User, user_account.UserAccountRole_Admin, user_account.UserAccountRole_User},
+			{user_account.UserAccountRole_Admin, user_account.UserAccountRole_Admin, user_account.UserAccountRole_Admin},
+			{user_account.UserAccountRole_User, user_account.UserAccountRole_User, user_account.UserAccountRole_User},
+			{user_account.UserAccountRole_Admin, user_account.UserAccountRole_User, user_account.UserAccountRole_Admin},
+			{user_account.UserAccountRole_User, user_account.UserAccountRole_Admin, user_account.UserAccountRole_User},
 		} {
 			// Create a new user for testing.
 			usrAcc, err := user_account.MockUserAccount(ctx, test.MasterDB, now, roles[0])

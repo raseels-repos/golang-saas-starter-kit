@@ -189,7 +189,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 		LocationConstraint: &cfg.AwsCredentials.Region,
 		LifecycleRules:     []*s3.LifecycleRule{bucketLifecycleTempRule},
 		CORSRules: []*s3.CORSRule{
-			&s3.CORSRule{
+			{
 				// Headers that are specified in the Access-Control-Request-Headers header.
 				// These headers are allowed in a preflight OPTIONS request. In response to
 				// any preflight OPTIONS request, Amazon S3 returns any requested headers that
@@ -348,7 +348,7 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 		AutoMinorVersionUpgrade: aws.Bool(true),
 		SnapshotRetentionLimit:  aws.Int64(7),
 		ParameterNameValues: []devdeploy.AwsElasticCacheParameter{
-			devdeploy.AwsElasticCacheParameter{
+			{
 				ParameterName:  "maxmemory-policy",
 				ParameterValue: "allkeys-lru",
 			},

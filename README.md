@@ -502,7 +502,7 @@ environment docker-compose file without "sample" prepending the file name.
 Navigate to the root of the project. Copy `configs/sample.env_docker_compose` to `.env_docker_compose`. 
 
 ```bash
-$ cd $GOPATH/src/geeks-accelerator/oss/saas-starter-kit
+$ cd ./saas-starter-kit
 $ cp configs/sample.env_docker_compose configs/.env_docker_compose
 ```
 

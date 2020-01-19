@@ -273,7 +273,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 
 		// Define the target group for service to receive HTTP traffic from the load balancer.
 		srv.AwsElbLoadBalancer.TargetGroups = []*devdeploy.AwsElbTargetGroup{
-			&devdeploy.AwsElbTargetGroup{
+			{
 				Name:                       fmt.Sprintf("%s-http", ctx.Name),
 				Port:                       80,
 				Protocol:                   "HTTP",
@@ -439,10 +439,10 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 			Image:     aws.String(srv.ReleaseImage),
 			Essential: aws.Bool(true),
 			PortMappings: []*ecs.PortMapping{
-				&ecs.PortMapping{
+				{
 					ContainerPort: aws.Int64(8125),
 				},
-				&ecs.PortMapping{
+				{
 					ContainerPort: aws.Int64(8126),
 				},
 			},
@@ -529,7 +529,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 				},
 			},
 			PortMappings: []*ecs.PortMapping{
-				&ecs.PortMapping{
+				{
 					HostPort:      aws.Int64(80),
 					Protocol:      aws.String("tcp"),
 					ContainerPort: aws.Int64(80),
@@ -549,7 +549,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 				StartPeriod: aws.Int64(60),
 			},
 			Ulimits: []*ecs.Ulimit{
-				&ecs.Ulimit{
+				{
 					Name:      aws.String("nofile"),
 					SoftLimit: aws.Int64(987654),
 					HardLimit: aws.Int64(999999),
@@ -646,7 +646,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 				},
 			},
 			PortMappings: []*ecs.PortMapping{
-				&ecs.PortMapping{
+				{
 					HostPort:      aws.Int64(80),
 					Protocol:      aws.String("tcp"),
 					ContainerPort: aws.Int64(80),
@@ -666,7 +666,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 				StartPeriod: aws.Int64(60),
 			},
 			Ulimits: []*ecs.Ulimit{
-				&ecs.Ulimit{
+				{
 					Name:      aws.String("nofile"),
 					SoftLimit: aws.Int64(987654),
 					HardLimit: aws.Int64(999999),

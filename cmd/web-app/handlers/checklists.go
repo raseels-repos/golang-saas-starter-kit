@@ -60,11 +60,11 @@ func (h *Checklists) Index(ctx context.Context, w http.ResponseWriter, r *http.R
 	}
 
 	fields := []datatable.DisplayField{
-		datatable.DisplayField{Field: "id", Title: "ID", Visible: false, Searchable: true, Orderable: true, Filterable: false},
-		datatable.DisplayField{Field: "name", Title: "Checklist", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "filter Name"},
-		datatable.DisplayField{Field: "status", Title: "Status", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "All Statuses", FilterItems: statusFilterItems},
-		datatable.DisplayField{Field: "updated_at", Title: "Last Updated", Visible: true, Searchable: true, Orderable: true, Filterable: false},
-		datatable.DisplayField{Field: "created_at", Title: "Created", Visible: true, Searchable: true, Orderable: true, Filterable: false},
+		{Field: "id", Title: "ID", Visible: false, Searchable: true, Orderable: true, Filterable: false},
+		{Field: "name", Title: "Checklist", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "filter Name"},
+		{Field: "status", Title: "Status", Visible: true, Searchable: true, Orderable: true, Filterable: true, FilterPlaceholder: "All Statuses", FilterItems: statusFilterItems},
+		{Field: "updated_at", Title: "Last Updated", Visible: true, Searchable: true, Orderable: true, Filterable: false},
+		{Field: "created_at", Title: "Created", Visible: true, Searchable: true, Orderable: true, Filterable: false},
 	}
 
 	mapFunc := func(q *checklist.Checklist, cols []datatable.DisplayField) (resp []datatable.ColumnValue, err error) {

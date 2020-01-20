@@ -104,6 +104,7 @@ func main() {
 				CloudFrontEnabled bool   `envconfig:"CLOUDFRONT_ENABLED"`
 				ImgResizeEnabled  bool   `envconfig:"IMG_RESIZE_ENABLED"`
 			}
+			Minify          bool          `envconfig:"MINIFY"`
 			SessionName     string        `default:"" envconfig:"SESSION_NAME"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
@@ -500,6 +501,11 @@ func main() {
 
 	// Add the translator middleware for localization.
 	appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, mid.Translator(webcontext.UniversalTranslator()))
+
+	// Apply response minification if enabled.
+	if cfg.Service.Minify {
+		appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, mid.Minify())
+	}
 
 	// Generate the new session store and append it to the global list of middlewares.
 

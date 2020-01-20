@@ -102,6 +102,7 @@ func main() {
 			HostNames       []string      `envconfig:"HOST_NAMES" example:"alternative-subdomain.example.saasstartupkit.com"`
 			EnableHTTPS     bool          `default:"false" envconfig:"ENABLE_HTTPS"`
 			TemplateDir     string        `default:"./templates" envconfig:"TEMPLATE_DIR"`
+			Minify          bool          `envconfig:"MINIFY"`
 			DebugHost       string        `default:"0.0.0.0:4000" envconfig:"DEBUG_HOST"`
 			ShutdownTimeout time.Duration `default:"5s" envconfig:"SHUTDOWN_TIMEOUT"`
 			ScaleToZero     time.Duration `envconfig:"SCALE_TO_ZERO"`
@@ -490,6 +491,11 @@ func main() {
 
 	// Add the translator middleware for localization.
 	appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, mid.Translator(webcontext.UniversalTranslator()))
+
+	// Apply response minification if enabled.
+	if cfg.Service.Minify {
+		appCtx.PostAppMiddleware = append(appCtx.PostAppMiddleware, mid.Minify())
+	}
 
 	// =========================================================================
 	// Start Tracing Support

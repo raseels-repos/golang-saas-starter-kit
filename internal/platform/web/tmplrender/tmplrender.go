@@ -288,6 +288,27 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 		return nil
 	}
 
+	// Set the status code for the request logger middleware.
+	// If the context is missing this value, request the service
+	// to be shutdown gracefully.
+	v, err := webcontext.ContextValues(ctx)
+	if err != nil {
+		return err
+	}
+	v.StatusCode = statusCode
+
+	// If there is nothing to marshal then set status code and return.
+	if statusCode == http.StatusNoContent {
+		w.WriteHeader(statusCode)
+		return nil
+	}
+
+	// Set the content type and headers once we know marshaling has succeeded.
+	w.Header().Set("Content-Type", contentType)
+
+	// Write the status code to the response.
+	w.WriteHeader(statusCode)
+
 	// If the template has not been rendered yet or hot reload is enabled,
 	// then parse the template files.
 	t, ok := r.templates[templateContentName]

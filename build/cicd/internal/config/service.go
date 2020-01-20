@@ -610,6 +610,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 					ecsKeyValuePair("WEB_APP_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),
 					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PRIVATE", vars.AwsS3BucketNamePrivate),
 					ecsKeyValuePair("WEB_APP_AWS_S3_BUCKET_PUBLIC", vars.AwsS3BucketNamePublic),
+					ecsKeyValuePair("WEB_APP_SERVICE_MINIFY", "true"),
 				)
 
 				// Enable image resize s3 is enabled.
@@ -727,6 +728,7 @@ func NewService(log *log.Logger, serviceName string, cfg *devdeploy.Config) (*de
 					ecsKeyValuePair("WEB_API_DB_DISABLE_TLS", strconv.FormatBool(vars.DbDisableTLS)),
 					ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PRIVATE", vars.AwsS3BucketNamePrivate),
 					ecsKeyValuePair("WEB_API_AWS_S3_BUCKET_PUBLIC", vars.AwsS3BucketNamePublic),
+					ecsKeyValuePair("WEB_API_SERVICE_MINIFY", "true"),
 				)
 
 				// When no Elastic Load Balance is used, tasks need to be able to directly update the Route 53 records.

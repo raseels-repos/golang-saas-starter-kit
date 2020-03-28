@@ -193,6 +193,7 @@ func RenderError(ctx context.Context, w http.ResponseWriter, r *http.Request, er
 	v.StatusCode = webErr.Status
 
 	if RequestIsImage(r) {
+		w.WriteHeader(v.StatusCode)
 		return nil
 	}
 
@@ -253,7 +254,10 @@ func StaticHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, 
 
 	// Make sure the file exists before attempting to serve it so
 	// have the opportunity to handle the when a file does not exist.
-	if _, err := os.Stat(filePath); err != nil {
+	if i, err := os.Stat(filePath); err != nil || i.IsDir() {
+		if err == nil && i.IsDir() {
+			err = os.ErrNotExist
+		}
 		return err
 	}
 

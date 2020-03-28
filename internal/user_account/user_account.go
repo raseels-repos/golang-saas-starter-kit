@@ -164,6 +164,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		err = errors.WithMessage(err, "find user accounts failed")
 		return nil, err
 	}
+	defer rows.Close()
 
 	// iterate over each row
 	resp := []*UserAccount{}
@@ -174,6 +175,13 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 			return nil, err
 		}
 		resp = append(resp, ua)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "find user accounts failed")
+		return nil, err
 	}
 
 	return resp, nil

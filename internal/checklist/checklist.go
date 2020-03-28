@@ -157,6 +157,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		err = errors.WithMessage(err, "find checklists failed")
 		return nil, err
 	}
+	defer rows.Close()
 
 	// Iterate over each row.
 	resp := []*Checklist{}
@@ -172,6 +173,13 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		}
 
 		resp = append(resp, &m)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "find checklists failed")
+		return nil, err
 	}
 
 	return resp, nil

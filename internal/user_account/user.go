@@ -123,6 +123,7 @@ func (repo *Repository) UserFindByAccount(ctx context.Context, claims auth.Claim
 		err = errors.WithMessage(err, "find users failed")
 		return nil, err
 	}
+	defer rows.Close()
 
 	// iterate over each row
 	resp := []*User{}
@@ -140,6 +141,13 @@ func (repo *Repository) UserFindByAccount(ctx context.Context, claims auth.Claim
 		}
 
 		resp = append(resp, &u)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "find users failed")
+		return nil, err
 	}
 
 	return resp, nil

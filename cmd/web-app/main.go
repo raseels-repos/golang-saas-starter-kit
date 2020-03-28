@@ -28,7 +28,7 @@ import (
 	"geeks-accelerator/oss/saas-starter-kit/internal/mid"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/auth"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/flag"
-	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/img-resize"
+	img_resize "geeks-accelerator/oss/saas-starter-kit/internal/platform/imgresize"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/notify"
 	"geeks-accelerator/oss/saas-starter-kit/internal/platform/web"
 	template_renderer "geeks-accelerator/oss/saas-starter-kit/internal/platform/web/tmplrender"

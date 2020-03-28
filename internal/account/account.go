@@ -207,6 +207,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		err = errors.WithMessage(err, "find accounts failed")
 		return nil, err
 	}
+	defer rows.Close()
 
 	// iterate over each row
 	resp := []*Account{}
@@ -220,6 +221,13 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 			err = errors.Wrapf(err, "query - %s", query.String())
 		}
 		resp = append(resp, &a)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "find accounts failed")
+		return nil, err
 	}
 
 	return resp, nil
@@ -237,7 +245,6 @@ func UniqueName(ctx context.Context, dbConn *sqlx.DB, name, accountId string) (b
 
 	var existingId string
 	err := dbConn.QueryRowContext(ctx, queryStr, args...).Scan(&existingId)
-
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "query - %s", query.String())
 		return false, err

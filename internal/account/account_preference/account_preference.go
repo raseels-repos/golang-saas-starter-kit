@@ -138,6 +138,7 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 		err = errors.WithMessage(err, "find account preferences failed")
 		return nil, err
 	}
+	defer rows.Close()
 
 	// iterate over each row
 	resp := []*AccountPreference{}
@@ -152,6 +153,13 @@ func find(ctx context.Context, claims auth.Claims, dbConn *sqlx.DB, query *sqlbu
 			return nil, err
 		}
 		resp = append(resp, &a)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		err = errors.Wrapf(err, "query - %s", query.String())
+		err = errors.WithMessage(err, "find account preferences failed")
+		return nil, err
 	}
 
 	return resp, nil

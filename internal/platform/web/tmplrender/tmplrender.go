@@ -295,19 +295,12 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 	if err != nil {
 		return err
 	}
-	v.StatusCode = statusCode
 
 	// If there is nothing to marshal then set status code and return.
 	if statusCode == http.StatusNoContent {
 		w.WriteHeader(statusCode)
 		return nil
 	}
-
-	// Set the content type and headers once we know marshaling has succeeded.
-	w.Header().Set("Content-Type", contentType)
-
-	// Write the status code to the response.
-	w.WriteHeader(statusCode)
 
 	// If the template has not been rendered yet or hot reload is enabled,
 	// then parse the template files.
@@ -431,6 +424,13 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 		}
 	}
 
+	// Write the status code to the response.
+	v.StatusCode = statusCode
+	w.WriteHeader(statusCode)
+
+	// Set the content type and headers once we know marshaling has succeeded.
+	w.Header().Set("Content-Type", contentType)
+
 	// Render template with data.
 	if err := t.Execute(w, renderData); err != nil {
 		type stackTracer interface {
@@ -443,6 +443,8 @@ func (r *TemplateRenderer) Render(ctx context.Context, w http.ResponseWriter, re
 
 		return err
 	}
+
+
 
 	return nil
 }

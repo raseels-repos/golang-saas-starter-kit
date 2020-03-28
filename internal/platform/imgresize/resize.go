@@ -1,4 +1,4 @@
-package img_resize
+package imgresize
 
 import (
 	"bytes"
@@ -312,12 +312,13 @@ func S3ImgSrc(ctx context.Context, redisClient *redistrace.Client, s3UrlFormatte
 		}
 
 		imgSrc = fmt.Sprintf(`srcset="%s" sizes="%s" src="%s"`, strings.Join(srcSets, ","), strings.Join(srcSizes, ","), srcUrl)
+
+		err = redisClient.WithContext(ctx).Set(ck, imgSrc, 0).Err()
+		if err != nil {
+			return imgSrc, errors.WithStack(err)
+		}
 	}
 
-	err = redisClient.WithContext(ctx).Set(ck, imgSrc, 0).Err()
-	if err != nil {
-		return imgSrc, errors.WithStack(err)
-	}
 
 	return imgSrc, nil
 }

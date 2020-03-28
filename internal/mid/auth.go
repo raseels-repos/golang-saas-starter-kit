@@ -101,6 +101,8 @@ func authenticateSession(authenticator *auth.Authenticator, required bool) web.M
 						err := errors.New("missing AccessToken from session")
 						return weberror.NewError(ctx, err, http.StatusUnauthorized)
 					} else {
+						// Add claims to the context so they can be retrieved later.
+						ctx = context.WithValue(ctx, auth.Key, auth.Claims{})
 						return nil
 					}
 				}
@@ -109,8 +111,6 @@ func authenticateSession(authenticator *auth.Authenticator, required bool) web.M
 				if err != nil {
 					if required {
 						return weberror.NewError(ctx, err, http.StatusUnauthorized)
-					} else {
-						return nil
 					}
 				}
 

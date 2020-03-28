@@ -1,4 +1,4 @@
-image: geeksaccelerator/docker-library:golang1.12-docker
+image: registry.gitlab.com/geeks-accelerator/oss/saas-starter-kit:golang1.13-docker
 
 services:
   - docker:dind

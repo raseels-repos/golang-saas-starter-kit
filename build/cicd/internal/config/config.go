@@ -108,11 +108,12 @@ func NewConfig(log *log.Logger, targetEnv Env, awsCredentials devdeploy.AwsCrede
 	// In a verbatim fork of the repo, a CI/CD would fail due to a conflict creating AWS resources (such as S3) since
 	// their name is calculated with the go.mod path. Since the name-scope of AWS resources is region/global scope,
 	// it will fail to create appropriate resources for the account of the forked user.
-	if cfg.ProjectName == "saas-starter-kit" {
+	// Need to not include full words to avoid find/replace detection for project setup.
+	if cfg.ProjectName == "saas-"+"starter-kit" {
 		remoteUser := gitRemoteUser(modDetails.ProjectRoot)
 
 		// Its a true fork from the origin repo.
-		if remoteUser != "oss" && remoteUser != "geeks-accelerator" {
+		if remoteUser != "os"+"s" && remoteUser != "geeks"+"accelerator" {
 			// Replace the prefix 'saas' with the parent directory name, hopefully the gitlab group/username.
 			projectPrefix := filepath.Base(filepath.Dir(cfg.ProjectRoot))
 			projectPrefix = strings.Replace(projectPrefix, ".", "", -1)

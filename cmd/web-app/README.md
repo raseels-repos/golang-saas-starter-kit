@@ -195,7 +195,7 @@ In any production ready web application there're many concerns that should be ha
 * observability metrics
 * security
 
-All these responsabilities are orthogonal between each other, and in particular, to the business logic. In `saas-starter-kit` these responsabilities are handeled in a chained set of middlewares which allow a clear separation of concerns and it avoids polluting business-rule code.
+All these responsibilities are orthogonal between each other, and in particular, to the business logic. In `saas-starter-kit` these responsabilities are handeled in a chained set of middlewares which allow a clear separation of concerns and it avoids polluting business-rule code.
 
 We can separate existing middlewares in two dimensions: cross-cutting application middlewares, and middlewares for particular routes. Middlewares such as tracing, error handling, and metrics belong to the former category, whereas authentication/authorization to the latter.
 

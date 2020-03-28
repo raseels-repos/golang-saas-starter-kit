@@ -1,6 +1,6 @@
 # SaaS Startup Kit
-[![Build Status](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/badges/master/pipeline.svg)](https://gitlab.com/geeks-accelerator/oss/devops/pipelines) 
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/geeks-accelerator/oss/saas-starter-kit?style=flat-square)](https://goreportcard.com/report/gitlab.com/geeks-accelerator/oss/devops)
+[![Build Status](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/badges/master/pipeline.svg)](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/pipelines) 
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/geeks-accelerator/oss/saas-starter-kit?style=flat-square)](https://goreportcard.com/report/gitlab.com/geeks-accelerator/oss/saas-starter-kit)
 
 
 The [SaaS Startup Kit](https://saasstartupkit.com/) is a set of libraries in Go and boilerplate Golang code for building 
@@ -20,6 +20,8 @@ least two main components: a REST API and a web application.
 
 To see screen captures of the web app and auto-generated API documentation, check out this Google Slides deck:
 https://docs.google.com/presentation/d/1WGYqMZ-YUOaNxlZBfU4srpN8i86MU0ppWWSBb3pkejM/edit#slide=id.p
+
+There is also a trimmed down version of this project for launching basic websites. [geeks-accelerator/oss/website-starter-kit](https://gitlab.com/geeks-accelerator/oss/website-starter-kit)
 
 *You are welcome to add comments to the Google Slides.*
 
@@ -229,16 +231,37 @@ An AWS account is required for deployment for the following AWS dependencies:
 Clone the repo into your desired location. This project uses Go modules and does not need to be in your GOPATH. You will 
 need to be using Go >= 1.11.
 
-You should now be able to clone the project. 
-
-```bash
-$ git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
-$ cd saas-starter-kit/
-```
-
-If you have Go Modules enabled, you should be able compile the project locally. If you have Go Modules disabled, see 
-the next section.
-
+1. Create a [new group](https://gitlab.com/groups/new) in gitlab to house this project if you don't have one already. 
+    We will be using the group `geeks-accelerator/oss`.
+2. Create a new folder locally for this group. You can use any directory now with the support of Go modules.
+    ```bash
+    $ mkdir -p ~/Desktop/projects/geeks-accelerator/oss
+    $ cd ~/Desktop/projects/geeks-accelerator/oss
+    ```
+3. Create a [new project](https://gitlab.com/projects/new). We will be using the project name `aurora-cam`. 
+4. Clone the project to inside the project directory. 
+    ```bash
+    $ git clone git@gitlab.com:geeks-accelerator/oss/saas-starter-kit.git
+    ``` 
+5. Rename the cloned project to match your project name.
+    ```bash
+    $ mv saas-starter-kit aurora-cam
+    $ cd aurora-cam
+    ```
+6. You should have setup a new gitlab project. 
+    ```bash
+    $ git remote set-url origin git@gitlab.com:geeks-accelerator/oss/aurora-cam.git
+    ``` 
+7. Push the project to gitlab to ensure everything is ok.
+    ```bash
+    $ git push origin master 
+    ```  
+8. Update the path references in the project. Run [setup.sh](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/-/blob/master/setup.sh) 
+script that will update all the references `gitlab.com:geeks-accelerator/oss/website-starter-kit` to 
+the gitlab project you have setup for the project. It reads `.git/config` for the project for configuration.
+     ```bash
+     $ ./setup.sh 
+     ``` 
 
 ### Go Modules
 
@@ -308,8 +331,20 @@ go run tools/schema/main.go migrate
 Use the `docker-compose.yaml` to run all of the services, including the third-party services. The first time to run this 
 command, Docker will download the required images for the 3rd party services.
 
+The `docker-compose.yaml` file references your project directory to enable hot reloads using [github.com/gravityblast/fresh](https://github.com/gravityblast/fresh). 
+The references should be updated to your current project directory. It must be an absolute path.
+```yaml
+    volumes:
+      - ./:/Users/leebrown/Desktop/projects/geeks-accelerator/oss/saas-starter-kit.
+```
+
+Copy the example provided `sample.env_docker_compose` file and review the contents.
 ```bash
 $ cp configs/sample.env_docker_compose configs/.env_docker_compose
+```
+
+Now your ready to get the services running.
+```bash
 $ docker-compose up
 ```
 
@@ -673,13 +708,13 @@ stages:
 Currently `.gitlab-ci.yaml` only defines jobs for the first three stages. The remaining stages can be chained together 
 so each job is dependant on the previous or run jobs for each target environment independently. 
 
-A build tool called [devops](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/tools/devops) has 
+A build tool called [cicd](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/tree/master/build/cicd) has 
 been included apart of this project. _Devops_ handles creating AWS resources and deploying your services with minimal 
 additional configuration. You can customize any of the configuration in the code. While AWS is already a core part of 
 the saas-starter-kit, keeping the deployment in GoLang limits the scope of additional technologies required to get your 
 project successfully up and running. If you understand Golang, then you will be a master at devops with this tool.
 
-Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/tools/devops/README.md) for 
+Refer to the [README](https://gitlab.com/geeks-accelerator/oss/saas-starter-kit/blob/master/build/cicd/README.md) for 
 setup details. 
 
 
